@@ -1,0 +1,102 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Notices and progress furniture, drawn in code (no kit art; the mockups draw them with dashed "stitch" outlines):
+      Banner          dashed outline, a 4 px bar and icon in the severity colour, bold title, body text (info / warning / error)
+      StepIndicator   round marker + label + dashed connector (done / current / pending)
+      ContentControl.toast   the undo notice: leather popup plate over a soft shadow
+      Line.stitch     dashed rule (sheet headers, the sidebar edge); add class "parchment" on parchment
+    Banner and steps are for the leather surface.
+  -->
+  <Styles.Resources>
+    <ControlTheme x:Key="RpBanner" TargetType="c:Banner">
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="Padding" Value="16,12"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Rectangle Fill="#33000000" Stroke="{DynamicResource BronzeDarkBrush}" StrokeThickness="1"
+                       StrokeDashArray="4,3" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
+            <Border Name="Bar" Width="4" HorizontalAlignment="Left" Margin="1,1,0,1" Background="{DynamicResource BronzeLightBrush}"/>
+            <Grid ColumnDefinitions="Auto,*" Margin="{TemplateBinding Padding}">
+              <c:Icon Name="Glyph" Width="22" Height="22" Margin="8,0,16,0" VerticalAlignment="Center" StrokeThickness="1.8"
+                      Foreground="{DynamicResource BoneBrush}" Data="{DynamicResource IconInfo}"/>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                  FontFamily="{DynamicResource FontBody}" FontWeight="Bold" FontSize="15"
+                                  Foreground="{DynamicResource BoneBrush}"/>
+                <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  FontFamily="{DynamicResource FontBody}" FontSize="15"
+                                  Foreground="{DynamicResource BoneSoftBrush}"/>
+              </StackPanel>
+            </Grid>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:warning /template/ Border#Bar"><Setter Property="Background" Value="{DynamicResource AmberLightBrush}"/></Style>
+      <Style Selector="^:warning /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconWarning}"/><Setter Property="Foreground" Value="{DynamicResource AmberLightBrush}"/></Style>
+      <Style Selector="^:error /template/ Border#Bar"><Setter Property="Background" Value="{DynamicResource WaxLightBrush}"/></Style>
+      <Style Selector="^:error /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconError}"/><Setter Property="Foreground" Value="{DynamicResource WaxLightBrush}"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpStepIndicator" TargetType="c:StepIndicator">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid ColumnDefinitions="Auto,Auto,*">
+            <Panel Width="22" Height="22" VerticalAlignment="Center">
+              <Ellipse Name="Marker" Fill="{DynamicResource Leather950Brush}" Stroke="{DynamicResource BronzeDarkBrush}" StrokeThickness="1.5"/>
+              <Ellipse Name="Dot" Width="8" Height="8" Fill="{DynamicResource IvoryBrush}" IsVisible="False"/>
+              <c:Icon Name="Check" Data="{DynamicResource IconCheckMark}" Width="12" Height="12" StrokeThickness="2.6"
+                      Foreground="{DynamicResource Leather950Brush}" IsVisible="False"/>
+            </Panel>
+            <TextBlock Grid.Column="1" Margin="8,0,10,0" VerticalAlignment="Center" Text="{TemplateBinding Label}"
+                       FontFamily="{DynamicResource FontBody}" FontSize="14" Foreground="{DynamicResource BoneBrush}"/>
+            <Line Name="Connector" Grid.Column="2" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" VerticalAlignment="Center" Margin="0,0,10,0"
+                  Stroke="{DynamicResource BronzeDarkBrush}" StrokeThickness="1" StrokeDashArray="3,3"
+                  IsVisible="{TemplateBinding ShowConnector}"/>
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:done /template/ Ellipse#Marker"><Setter Property="Fill" Value="{DynamicResource BronzeBrush}"/><Setter Property="Stroke" Value="{DynamicResource BronzeLightBrush}"/></Style>
+      <Style Selector="^:done /template/ c|Icon#Check"><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^:current /template/ Ellipse#Marker"><Setter Property="Fill" Value="{DynamicResource WaxBrush}"/><Setter Property="Stroke" Value="{DynamicResource IvoryBrush}"/></Style>
+      <Style Selector="^:current /template/ Ellipse#Dot"><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^:pending">
+        <Setter Property="Opacity" Value="0.85"/>
+      </Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpToast" TargetType="ContentControl">
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="Padding" Value="16,10"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <c:NineSlice Source="shadow-soft" Insets="18" ShadowMargin="12" IsHitTestVisible="False"/>
+            <c:NineSlice Source="popup-leather" Insets="16">
+              <ContentPresenter Padding="{TemplateBinding Padding}" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+            </c:NineSlice>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="c|Banner"><Setter Property="Theme" Value="{StaticResource RpBanner}"/></Style>
+  <Style Selector="c|StepIndicator"><Setter Property="Theme" Value="{StaticResource RpStepIndicator}"/></Style>
+  <Style Selector="ContentControl.toast"><Setter Property="Theme" Value="{StaticResource RpToast}"/></Style>
+  <Style Selector="Line.stitch">
+    <Setter Property="Stroke" Value="{DynamicResource BronzeDarkBrush}"/>
+    <Setter Property="StrokeThickness" Value="1"/>
+    <Setter Property="StrokeDashArray" Value="4,3"/>
+  </Style>
+  <Style Selector="Line.stitch.parchment"><Setter Property="Stroke" Value="{DynamicResource BronzeDarkBrush}"/></Style>
+  <!-- Small caps heading of a sheet (CLIENTES GUARDADOS, DATOS DEL SERVIDOR); give it upper-case text. -->
+  <Style Selector="TextBlock.sheet-title">
+    <Setter Property="FontFamily" Value="{DynamicResource FontCaps}"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="LetterSpacing" Value="1.8"/>
+    <Setter Property="Foreground" Value="{DynamicResource InkSoftBrush}"/>
+  </Style>
+</Styles>

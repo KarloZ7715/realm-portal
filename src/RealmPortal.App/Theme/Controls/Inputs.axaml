@@ -19,8 +19,8 @@
       <Setter Property="CaretBrush" Value="{DynamicResource BoneBrush}"/>
       <Setter Property="SelectionBrush" Value="#88A8743F"/>
       <Setter Property="SelectionForegroundBrush" Value="{DynamicResource IvoryBrush}"/>
-      <Setter Property="MinHeight" Value="36"/>
-      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="Padding" Value="12,0"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Hidden"/>
       <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Hidden"/>
