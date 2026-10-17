@@ -90,7 +90,7 @@ jobs:
       - name: Restore (locked mode)
         run: |
           set -euo pipefail
-          dotnet restore "$APP_PROJECT" -r linux-x64 --locked-mode
+          dotnet restore "$APP_PROJECT" -r linux-x64 --locked-mode -p:PublishReadyToRun=true
 
       - name: Publish (linux-x64, self-contained, trimmed, ReadyToRun)
         run: |
