@@ -13,7 +13,6 @@ Checked against the restored packages' `.nuspec` files (Phase 1, 2026-10-17).
 | Avalonia, Avalonia.Desktop, Avalonia.Themes.Fluent | 11.3.22 | MIT (© The AvaloniaUI Project) | cross-platform UI (`RealmPortal.App`) |
 | PeNet | 5.1.0 | Apache-2.0 | reads the version resource of `Wow.exe` (`RealmPortal.Core`) |
 | Avalonia.Headless, Avalonia.Headless.XUnit, Avalonia.Skia | 11.3.22 | MIT (© The AvaloniaUI Project) | headless UI tests and screenshots (development only) |
-| PeNet | 5.1.0 | Apache-2.0 | reads the version resource of `Wow.exe` (`RealmPortal.Core`) |
 | Microsoft.NET.Test.Sdk | 17.12.0 | MIT | tests (development only) |
 | FsCheck.Xunit | 3.4.0 | BSD-3-Clause | property-based tests (development only) |
 | xunit | 2.9.3 | Apache-2.0 | tests (development only) |
@@ -27,8 +26,6 @@ Checked against the restored packages' `.nuspec` files (Phase 1, 2026-10-17).
 | SkiaSharp (+ NativeAssets) | 2.88.9 | MIT (Skia: BSD-3-Clause) |
 | HarfBuzzSharp (+ NativeAssets) | 8.3.1.1 | MIT (HarfBuzz: MIT) |
 | Avalonia.Angle.Windows.Natives | 2.1.25547.20250602 | BSD-3-Clause (© The ANGLE Project Authors), Windows only |
-| PeNet.Asn1 | 2.0.1 | Apache-2.0 |
-| System.Security.Cryptography.Pkcs (PeNet dependency) | 8.0.1 | MIT |
 | FsCheck (FsCheck.Xunit dependency) | 3.4.0 | BSD-3-Clause (tests only) |
 | FSharp.Core (FsCheck dependency) | 5.0.2 | MIT (tests only) |
 | PeNet.Asn1 | 2.0.1 | Apache-2.0 |
