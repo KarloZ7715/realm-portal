@@ -6,6 +6,7 @@ All original artwork in this project is released under the **MIT License**, the 
 
 - the Realm Portal app icon ("Tesera") and all its variants in `assets/branding/icon/` and `packaging/linux/icons/`;
 - the window frames, buttons, dividers and hardware in `assets/frames/`;
+- the UI kit (panels, buttons, fields, controls) in `assets/ui/`;
 - the status seals and the UI icons in `assets/icons/`.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of these image files, to use, copy, modify, merge, publish, distribute, sublicense and/or sell copies of them, subject to the following condition: the copyright notice above and this permission notice shall be included in all copies or substantial portions of the files.
