@@ -25,6 +25,13 @@ public static class DemoData
         new("1.12.1 (5875)", "/home/demo/.wine/drive_c/WoW-Classic", ClientOrigin.Wine, InUse: true),
         new("3.3.5a (12340)", "/home/demo/.steam/steamapps/common/WoW", ClientOrigin.Steam, InUse: false),
     ];
+
+    /// <summary>Folders the simulated "pick a folder by hand" button adds, one per press.</summary>
+    public static IReadOnlyList<ClientSeed> PickableClients { get; } =
+    [
+        new("3.3.5a (12340)", "/home/demo/Games/Client-335-copy", ClientOrigin.Manual, InUse: false),
+        new("1.12.1 (5875)", "/home/demo/Games/Vanilla", ClientOrigin.Manual, InUse: false),
+    ];
 }
 
 public sealed record ServerSeed(string Name, string Host, int Port, string ClientVersion, string? Account, bool IsActive, bool IsCompatible);

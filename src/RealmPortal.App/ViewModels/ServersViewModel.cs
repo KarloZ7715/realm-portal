@@ -159,7 +159,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     public event Action? AddServerRequested;
 
     [RelayCommand]
-    private void AddServer() => AddServerRequested?.Invoke();
+    private void RequestAddServer() => AddServerRequested?.Invoke();
 
     [RelayCommand]
     private void ClearSearch() => SearchText = string.Empty;
@@ -201,6 +201,16 @@ public sealed partial class ServersViewModel : ViewModelBase
         {
             HideToast();
         }
+    }
+
+    /// <summary>Adds a server to the in-memory list (the add-server form).</summary>
+    public ServerItemViewModel AddServer(ServerSeed seed)
+    {
+        var item = new ServerItemViewModel(seed, i => _ = PlayAsync(i), i => _ = SwitchOnlyAsync(i)) { Order = _all.Count == 0 ? 0 : _all.Max(s => s.Order) + 1 };
+        _all.Add(item);
+        SearchText = string.Empty;
+        Refresh();
+        return item;
     }
 
     public Task SwitchOnlyAsync(ServerItemViewModel target) =>

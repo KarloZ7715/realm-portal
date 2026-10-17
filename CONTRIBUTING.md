@@ -65,11 +65,26 @@ RP_SCREENSHOT_DIR=/tmp/rp-shots dotnet test tests/RealmPortal.App.Tests -c Relea
 
 The theme draws the designer's UI kit (`assets/ui`, inventory in the kit's `ASSETS.md`); what is still missing is listed in `assets/ART-GAPS.md`.
 
+## Screens (simulated data)
+
+`dotnet run --project src/RealmPortal.App` opens the compact UI (servers, clients, add server) with **simulated data only**: the lists come from
+`Demo/DemoData.cs`, switching and launching are timed steps in `Demo/DemoBackend.cs`, and nothing reads or writes a game client, `~/.config/wow-servidores`
+or the network. Screens, states and the assumptions behind them are in [docs/ui-screens.md](docs/ui-screens.md).
+UI strings live in `src/RealmPortal.App/Localization/Strings/{es,en}.json` (a test checks both files have the same keys and that every key used in XAML or code exists);
+use `{loc:T some.key}` in XAML and `Loc.Get` / `Loc.Format` in code.
+
+Screenshots of every screen and state at render scales 1.0, 1.5 and 2.0:
+
+```bash
+RP_SCREENSHOT_DIR=/tmp/rp-shots dotnet test tests/RealmPortal.App.Tests -c Release
+```
+
 ## Design notes
 
 - [docs/client-files.md](docs/client-files.md): what is written into the game client.
 - [docs/client-files-backup.md](docs/client-files-backup.md): backup, apply and undo.
 - [docs/launch.md](docs/launch.md): starting the game.
+- [docs/ui-screens.md](docs/ui-screens.md): the F3b screens, their states and what is simulated.
 - [assets/ASSETS.md](assets/ASSETS.md) and [assets/branding/README.md](assets/branding/README.md): assets and the Tésera mark.
 
 ## Secret scanning (gitleaks)

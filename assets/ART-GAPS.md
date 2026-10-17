@@ -26,7 +26,7 @@ Priority: **P1** = visible in the F3b screens, **P2** = nice to have, **P3** = o
 
 | # | Gap | Priority | Stand-in today | Notes |
 |---|---|---|---|---|
-| 1 | **Menu / dropdown / tooltip theming** | P1 | Not themed yet (Simple look). The kit has `popup-leather` and `popup-parchment`, but no menu-item hover or ComboBox art. | Needed for the split-button menu ("only change"), language and client selectors, context menus. Code work is mine once the designer confirms: flat wood hover row inside the popup plate, or a textured one. |
+| 1 | **Menu / dropdown / tooltip art** | P1 | Themed with the closest kit pieces (F3b M1): `popup-leather` / `popup-parchment` plates, flat wood hover rows, no shadow layer. | Real art needed for menu item hover, separators, ComboBox list and tooltip, plus a popup shadow. See "Pieces to validate" below. |
 | 2 | **Design sign-off for kit pieces that are not in Figma** | P1 | Used as delivered. | Card hover, `ghost-leather-{hover,pressed}` (Figma shows a leather ghost with no plate, only a lighter label), scroll bar, progress stripes, checkbox/radio/switch hover and disabled, popup plates. |
 | 3 | **Pressed art for checkbox, radio and switch** | P3 | The hover art is used while pressed. | |
 | 4 | **Parchment progress bar** | P3 | Not provided; the theme has the leather bar only. | Only if a progress bar appears on parchment. |
@@ -48,3 +48,32 @@ Priority: **P1** = visible in the F3b screens, **P2** = nice to have, **P3** = o
   `160 + 6k` / `200 + 6k` grid (`tests/RealmPortal.App.Tests/SeamTests.cs`).
 - Off-grid button widths can shorten one stitch dash near the right cap, as `assets/ui/ASSETS.md` says; the gallery shows 100, 166, 232, 251 and 400 px.
 - The selected sidebar tab now carries the wax-red edge at the window side, as in the mockup (rec-12b).
+
+## Pieces to validate with the designer (F3b)
+
+Everything below is built and visible in the F3b screens, but has **no mockup** (or only a hint of one). The list is what the product owner should look at
+when checking the build; screenshots at 1.0, 1.5 and 2.0 come from the UI tests (`RP_SCREENSHOT_DIR`).
+
+| # | Piece | Where it shows | What was done | Question |
+|---|---|---|---|---|
+| 1 | **Card hover** (`panel-tile-hover`) | server cards | Kit hover art on pointer over. Cards are not clickable as a whole, only their buttons, so hover may mislead. | Keep the hover, or no hover on cards? |
+| 2 | **Ghost button on leather** (`ghost-leather-hover/pressed`) | none in F3b screens now; "Limpiar búsqueda" and "Cancelar" are plain text links | The undo notice uses the secondary button like the mockup. Text links have no hover plate, only a brighter label and a thin bronze keyboard outline. | Should text links get the ghost plate on hover? |
+| 3 | **Scroll bar** | server list and client list when they overflow | Kit scroll bar. The mockups never show one (they crop the list). | Position and width OK next to the cards? |
+| 4 | **Progress bar** with running stripes | switching and opening banners | Kit track and fill; the stripes are on while busy (the mockups show a plain fill). | Keep the stripes? |
+| 5 | **Hover / disabled** of buttons, cards, split button, checkbox | all screens | Kit states. The disabled split button on cards while busy is the dark disabled plate as in mockups 04 and 06. | Disabled "Reintentar" is dimmer than in mockup 06b. |
+| 6 | **Menu** (split button "Solo cambiar") | card menu | `popup-leather` plate, flat wood hover row, no shadow layer. | Needs real menu art: plate, item hover, separator, shadow. |
+| 7 | **ComboBox** (client choice) | add server | Input plate with chevron; list in `popup-parchment`, flat tint for hover and selected item. | Needs real dropdown art. |
+| 8 | **Tooltip** | sidebar items, language toggle, search clear | `popup-leather` plate, bone text. | Needs real tooltip art. |
+| 9 | **Banner, steps, toast** | switching, opening, running, undo | Drawn in code from the mockups (dashed outline, 4 px bar, round markers, countdown line); only the toast uses kit art (`popup-leather` + `shadow-soft`). | Dash pattern and sizes against the mockups. |
+| 10 | **Status bar, sidebar edge, sheet titles** | all screens | Drawn in code (bronze-dark rules, dashed edge). | Colours of the rules. |
+| 11 | **Wide sidebar** (960 px and up) | any screen in a wide window | Labels next to the icons, non-affiliation note at the bottom. | No mockup at this size. |
+| 12 | **Origin and result badges** | clients ("LUTRIS", "WINE", "STEAM", "MANUAL"), add server result | The inactive badge for origins; ready / no-response / inactive for the test result. The badge border now uses the status colour as in the mockups. | Is "Sin respuesta" (error glyph) right for a failed test? |
+
+### States marked "Definido aquí" in UX-DESIGN.md 2b
+
+Filtered list, no results, switching, opening the game and game running are built as designed. They still wait for the product owner's approval; see
+`docs/ui-screens.md` for the assumptions that go with them.
+
+### Seals
+
+The seals in the repository are now the designer's v2 set (ring and dot for active, ring only for inactive). The old portal-arch version of those two is gone.

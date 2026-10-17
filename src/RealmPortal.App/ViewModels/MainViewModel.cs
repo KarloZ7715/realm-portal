@@ -11,12 +11,13 @@ namespace RealmPortal.App.ViewModels;
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly ViewModelBase[] _sections;
+    private AddServerViewModel? _adding;
 
     public MainViewModel(DemoBackend? backend = null, bool autoTick = true)
     {
         Backend = backend ?? new DemoBackend();
         Servers = new ServersViewModel(Backend, autoTick);
-        Clients = new PlaceholderViewModel("nav.clients");
+        Clients = new ClientsViewModel(Backend);
         Settings = new PlaceholderViewModel("nav.settings");
         _sections = [Servers, Clients, Settings];
         foreach (var section in _sections)
@@ -24,6 +25,7 @@ public sealed partial class MainViewModel : ObservableObject
             section.PropertyChanged += OnSectionChanged;
         }
 
+        Servers.AddServerRequested += ShowAddServer;
         Loc.Instance.Changed += OnLanguageChanged;
     }
 
@@ -31,7 +33,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ServersViewModel Servers { get; }
 
-    public ViewModelBase Clients { get; }
+    public ClientsViewModel Clients { get; }
 
     public ViewModelBase Settings { get; }
 
@@ -40,7 +42,12 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Content), nameof(StatusText))]
     private int _sectionIndex;
 
-    public ViewModelBase Content => _sections[Math.Clamp(SectionIndex, 0, _sections.Length - 1)];
+    /// <summary>The form being filled in, or null. It belongs to the servers section: leaving the section drops it.</summary>
+    public AddServerViewModel? Adding => _adding;
+
+    public ViewModelBase Content => SectionIndex == 0 && _adding is not null
+        ? _adding
+        : _sections[Math.Clamp(SectionIndex, 0, _sections.Length - 1)];
 
     public string StatusText => Content.StatusText;
 
@@ -52,6 +59,47 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void ToggleLanguage() => Loc.Instance.Toggle();
+
+    partial void OnSectionIndexChanged(int value)
+    {
+        if (value != 0)
+        {
+            CloseAddServer();
+        }
+    }
+
+    private void ShowAddServer()
+    {
+        SectionIndex = 0;
+        if (_adding is not null)
+        {
+            return;
+        }
+
+        _adding = new AddServerViewModel(Clients, Backend, seed =>
+        {
+            Servers.AddServer(seed);
+            CloseAddServer();
+        }, CloseAddServer);
+        _adding.PropertyChanged += OnSectionChanged;
+        OnPropertyChanged(nameof(Adding));
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void CloseAddServer()
+    {
+        if (_adding is null)
+        {
+            return;
+        }
+
+        _adding.PropertyChanged -= OnSectionChanged;
+        _adding = null;
+        OnPropertyChanged(nameof(Adding));
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
 
     private void OnSectionChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -68,6 +116,7 @@ public sealed partial class MainViewModel : ObservableObject
             section.RefreshText();
         }
 
+        _adding?.RefreshText();
         OnPropertyChanged(nameof(LanguageLabel));
         OnPropertyChanged(nameof(Disclaimer));
         OnPropertyChanged(nameof(StatusText));
