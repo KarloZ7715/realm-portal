@@ -79,6 +79,12 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
         Save(entry with { FilesUndone = true });
     }
 
+    public void MarkFilesNotUndone()
+    {
+        var entry = Load() ?? throw new StoreException("No last-switch journal entry to update.");
+        Save(entry with { FilesUndone = false });
+    }
+
     public void Clear()
     {
         PortalConfigFile.WithConfigLock(() =>

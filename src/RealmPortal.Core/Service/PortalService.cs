@@ -325,7 +325,14 @@ public sealed class PortalService : IPortalService
                     var version = _versionReader.Read(client.Path);
                     var plan = applier.Plan(BuildRequest(journal.ClientId, active, client.Path, version));
                     if (!plan.IsEmpty)
-                        applier.Apply(plan);
+                    {
+                        var applied = applier.Apply(plan);
+                        if (applied.BackupId is { } rollbackBackupId)
+                            applier.MarkBackupUndone(journal.ClientId, rollbackBackupId);
+                    }
+
+                    // Original backup stays pending; the client again holds its sha256_after bytes.
+                    _journal.MarkFilesNotUndone();
                 }
                 catch (Exception rollbackEx)
                 {
