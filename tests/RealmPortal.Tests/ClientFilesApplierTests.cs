@@ -32,7 +32,9 @@ public class ClientFilesApplierTests
         public Func<int, bool> Fail { get; set; } = _ => false;
         public Func<int, bool> Corrupt { get; set; } = _ => false;
 
-        public void WriteAllBytes(string path, byte[] content)
+        public void WriteAllBytes(string path, byte[] content) => WriteAllBytes(path, content, null);
+
+        public void WriteAllBytes(string path, byte[] content, RealmPortal.Core.IO.FileReplacementPermissions? permissions)
         {
             if (Path.GetFullPath(path).StartsWith(Path.GetFullPath(clientRoot), StringComparison.Ordinal))
             {
@@ -43,7 +45,7 @@ public class ClientFilesApplierTests
                     content = [.. content, (byte)'!'];
             }
 
-            _inner.WriteAllBytes(path, content);
+            _inner.WriteAllBytes(path, content, permissions);
         }
     }
 

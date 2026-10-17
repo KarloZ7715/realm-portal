@@ -1,3 +1,5 @@
+using RealmPortal.Core.IO;
+
 namespace RealmPortal.Core.ClientFiles;
 
 /// <summary>Captured permission bits of an existing client file before replace.</summary>
@@ -10,7 +12,7 @@ internal readonly record struct FilePermissionSnapshot(int? UnixMode, bool? Wind
 
         int? unix = null;
         if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
-            unix = (int)File.GetUnixFileMode(path);
+            unix = (int)File.GetUnixFileMode(path) & FileReplacementPermissions.UnixPermissionMask;
 
         bool? windowsReadOnly = OperatingSystem.IsWindows()
             ? File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly)
@@ -30,16 +32,6 @@ internal readonly record struct FilePermissionSnapshot(int? UnixMode, bool? Wind
         return false;
     }
 
-    public void Apply(string path)
-    {
-        if (!File.Exists(path))
-            return;
-        if (UnixMode is int unix && (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS()))
-            File.SetUnixFileMode(path, (UnixFileMode)unix);
-        if (WindowsReadOnly is bool readOnly)
-        {
-            var attrs = File.GetAttributes(path);
-            File.SetAttributes(path, readOnly ? attrs | FileAttributes.ReadOnly : attrs & ~FileAttributes.ReadOnly);
-        }
-    }
+    public FileReplacementPermissions? ToReplacementPermissions() =>
+        FileReplacementPermissions.FromUnixAndWindows(UnixMode, WindowsReadOnly);
 }

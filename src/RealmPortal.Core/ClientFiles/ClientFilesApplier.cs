@@ -109,8 +109,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             foreach (var target in targets)
             {
                 attempted.Add(target);
-                Guard(() => _writer.WriteAllBytes(target.Path, target.Edit.NewBytes), target.Path, "write");
-                target.Permissions?.Apply(target.Path);
+                Guard(() => _writer.WriteAllBytes(target.Path, target.Edit.NewBytes, target.Permissions?.ToReplacementPermissions()), target.Path, "write");
                 var written = Guard(() => File.ReadAllBytes(target.Path), target.Path, "read back");
                 if (ClientFilesIo.Sha256Hex(written) != target.Edit.Sha256After)
                     throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, target.Path, $"'{target.Path}' does not hold the expected bytes after writing.");
@@ -168,11 +167,11 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             else
             {
                 var original = ReadBackupFile(backupDir, file);
-                Guard(() => _writer.WriteAllBytes(path, original), path, "restore");
+                var permissions = FileReplacementPermissions.FromUnixAndWindows(file.UnixMode, file.WindowsReadOnly);
+                Guard(() => _writer.WriteAllBytes(path, original, permissions), path, "restore");
                 var restored = Guard(() => File.ReadAllBytes(path), path, "read back");
                 if (ClientFilesIo.Sha256Hex(restored) != file.Sha256Before)
                     throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
-                new FilePermissionSnapshot(file.UnixMode, file.WindowsReadOnly).Apply(path);
                 status = UndoFileStatus.Restored;
             }
 
@@ -277,8 +276,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 }
                 else if (!ClientFilesIo.Sha256Hex(ReadIfExists(t.Path) ?? []).Equals(t.Edit.Sha256Before, StringComparison.Ordinal))
                 {
-                    _writer.WriteAllBytes(t.Path, t.Original);
-                    t.Permissions?.Apply(t.Path);
+                    _writer.WriteAllBytes(t.Path, t.Original, t.Permissions?.ToReplacementPermissions());
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ClientFilesException)

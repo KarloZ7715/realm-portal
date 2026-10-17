@@ -28,7 +28,10 @@ public static class ClientPaths
     public static string ResolveManagedPath(string canonicalRoot, string relativePath)
     {
         ValidateManagedRelativePath(relativePath);
-        return ResolveInside(canonicalRoot, relativePath);
+        var segments = relativePath.Split('/');
+        var (realSegments, _) = CaseInsensitivePath.Resolve(canonicalRoot, segments);
+        var normalized = string.Join('/', realSegments);
+        return ResolveInside(canonicalRoot, normalized);
     }
 
     public static void ValidateManagedRelativePath(string relative)

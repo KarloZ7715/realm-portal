@@ -1,0 +1,25 @@
+using RealmPortal.Core.ClientFiles;
+using RealmPortal.Tests.Support;
+
+namespace RealmPortal.Tests;
+
+public class ClientPathsCaseTests
+{
+    [Fact]
+    public void ResolveManagedPath_UsesExistingDirectoryCasing_OnLinux()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        using var temp = new TempDirectory();
+        var client = temp.Combine("client");
+        Directory.CreateDirectory(Path.Combine(client, "WTF"));
+        File.WriteAllText(Path.Combine(client, "WTF", "Config.wtf"), "x");
+
+        var root = ClientPaths.CanonicalRoot(client);
+        var resolved = ClientPaths.ResolveManagedPath(root, "wtf/Config.wtf");
+
+        Assert.Equal(Path.Combine(client, "WTF", "Config.wtf"), resolved);
+        Assert.False(File.Exists(Path.Combine(client, "wtf", "Config.wtf")));
+    }
+}

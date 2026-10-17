@@ -24,7 +24,9 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
         _decorateStream = decorateStream;
     }
 
-    public void WriteAllBytes(string path, byte[] content)
+    public void WriteAllBytes(string path, byte[] content) => WriteAllBytes(path, content, null);
+
+    public void WriteAllBytes(string path, byte[] content, FileReplacementPermissions? permissions)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         ArgumentNullException.ThrowIfNull(content);
@@ -44,7 +46,9 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
                 stream.Flush(flushToDisk: true);
             }
 
+            ApplyPermissionsBeforeReplace(tempPath, fullPath, permissions);
             File.Move(tempPath, fullPath, overwrite: true);
+            ApplyPermissionsAfterReplace(fullPath, permissions);
         }
         catch
         {
@@ -60,6 +64,31 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
             }
 
             throw;
+        }
+    }
+
+    private static void ApplyPermissionsBeforeReplace(string tempPath, string destinationPath, FileReplacementPermissions? permissions)
+    {
+        if (permissions is null)
+            return;
+
+        if (permissions.UnixMode is int unix && (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS()))
+            File.SetUnixFileMode(tempPath, (UnixFileMode)unix);
+
+        if (OperatingSystem.IsWindows() && permissions.WindowsReadOnly is true && File.Exists(destinationPath))
+        {
+            var attrs = File.GetAttributes(destinationPath);
+            if (attrs.HasFlag(FileAttributes.ReadOnly))
+                File.SetAttributes(destinationPath, attrs & ~FileAttributes.ReadOnly);
+        }
+    }
+
+    private static void ApplyPermissionsAfterReplace(string destinationPath, FileReplacementPermissions? permissions)
+    {
+        if (permissions?.WindowsReadOnly is true && OperatingSystem.IsWindows())
+        {
+            var attrs = File.GetAttributes(destinationPath);
+            File.SetAttributes(destinationPath, attrs | FileAttributes.ReadOnly);
         }
     }
 }
