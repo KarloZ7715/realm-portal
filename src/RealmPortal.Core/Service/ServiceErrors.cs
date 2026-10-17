@@ -24,12 +24,30 @@ internal static class ServiceErrors
                 ServiceErrorCode.PermissionDenied,
                 Consistency: consistency,
                 Diagnostic: uae.Message),
-            IOException io => new(
-                ServiceErrorCode.ReadOnlyFs,
-                Consistency: consistency,
-                Diagnostic: io.Message),
+            IOException io => FromIOException(io, consistency),
             _ => new(ServiceErrorCode.Unexpected, Consistency: consistency, Diagnostic: ex.Message),
         };
+
+    private static ServiceError FromIOException(IOException io, Consistency consistency)
+    {
+        var code = MapIOException(io);
+        return new(code, Consistency: consistency, Diagnostic: io.Message);
+    }
+
+    private static ServiceErrorCode MapIOException(IOException io)
+    {
+        var code = io.HResult & 0xFFFF;
+        if (code is 112 or 28)
+            return ServiceErrorCode.DiskFull;
+        if (code == 32)
+            return ServiceErrorCode.FileSharingViolation;
+        if (IsReadOnlyFileSystem(io))
+            return ServiceErrorCode.ReadOnlyFs;
+        return ServiceErrorCode.PermissionDenied;
+    }
+
+    private static bool IsReadOnlyFileSystem(IOException ex) =>
+        ex.HResult == 30 || (ex.HResult & 0xFFFF) == 19 && (ex.HResult & 0x7FFF0000) == 0x70000;
 
     public static ServiceError FromClientFiles(ClientFilesException ex, Consistency consistency = Consistency.Unchanged)
     {
@@ -77,7 +95,17 @@ internal static class ServiceErrors
         if (msg.Contains("no server matches", StringComparison.OrdinalIgnoreCase))
             return new(ServiceErrorCode.ServerNotFound, Consistency: consistency, Diagnostic: msg);
 
-        return new(ServiceErrorCode.StoreCorrupt, Consistency: consistency, Diagnostic: msg);
+        var configPath = ExtractQuotedPath(msg);
+        return new(ServiceErrorCode.StoreCorrupt, Path: configPath, Consistency: consistency, Diagnostic: msg);
+    }
+
+    private static string? ExtractQuotedPath(string message)
+    {
+        var start = message.IndexOf('\'');
+        if (start < 0)
+            return null;
+        var end = message.IndexOf('\'', start + 1);
+        return end > start ? message[(start + 1)..end] : null;
     }
 
     private static ServiceError FromArgument(ArgumentException ex, Consistency consistency)

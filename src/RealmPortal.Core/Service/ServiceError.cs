@@ -19,6 +19,12 @@ public enum ServiceErrorCode
     PermissionDenied,
     ReadOnlyFs,
 
+    /// <summary>Not enough space to complete the write.</summary>
+    DiskFull,
+
+    /// <summary>The file is in use by another process.</summary>
+    FileSharingViolation,
+
     /// <summary>The client directory or a path inside it does not exist.</summary>
     PathNotFound,
 
