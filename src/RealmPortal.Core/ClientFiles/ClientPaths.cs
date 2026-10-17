@@ -29,7 +29,7 @@ public static class ClientPaths
     {
         ValidateManagedRelativePath(relativePath);
         var segments = relativePath.Split('/');
-        var (realSegments, _) = CaseInsensitivePath.Resolve(canonicalRoot, segments);
+        var (realSegments, _) = CaseInsensitivePath.Resolve(canonicalRoot, segments, rejectAmbiguousMatches: true);
         var normalized = string.Join('/', realSegments);
         return ResolveInside(canonicalRoot, normalized);
     }
