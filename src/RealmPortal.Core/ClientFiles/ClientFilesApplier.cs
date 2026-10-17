@@ -138,10 +138,15 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             throw new ClientFilesException(ClientFilesErrorCode.GameRunning, trustedRoot, "The game is running; close it before restoring its files.");
 
         var backupDir = Path.GetDirectoryName(manifestPath)!;
+
+        // Resolve every manifest path before restoring anything so a bad entry cannot leave a partial undo.
+        var resolved = manifest.Files
+            .Select(file => (file, path: ClientPaths.ResolveManagedPath(trustedRoot, file.Path)))
+            .ToList();
+
         var results = new List<UndoFileResult>();
-        foreach (var file in manifest.Files)
+        foreach (var (file, path) in resolved)
         {
-            var path = ClientPaths.ResolveManagedPath(trustedRoot, file.Path);
             var current = ReadIfExists(path);
             var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
 
