@@ -103,7 +103,15 @@ public sealed class ActiveServerManager(
             ? state with { ActiveId = stored.Id }
             : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } };
         SaveState(next);
-        writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
+        try
+        {
+            writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SaveState(state);
+            throw;
+        }
     }
 
     /// <summary>
@@ -138,11 +146,21 @@ public sealed class ActiveServerManager(
             }
         }
 
-        SaveState(new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null });
-        if (target is null)
-            DeleteProjection();
-        else
-            writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
+        var stateBeforeUndo = state;
+        var nextState = new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null };
+        SaveState(nextState);
+        try
+        {
+            if (target is null)
+                DeleteProjection();
+            else
+                writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SaveState(stateBeforeUndo);
+            throw;
+        }
 
         return target;
     }

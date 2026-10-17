@@ -97,8 +97,14 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
             throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, folder, "Backup folder must be an absolute path.");
 
         var full = Path.GetFullPath(folder);
-        if (ClientPathSecurity.IsReparsePointOrSymlink(full))
-            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, full, "Backup folder cannot be a symbolic link or reparse point.");
+        try
+        {
+            ClientPathSecurity.EnsureTrustedDirectoryPath(full);
+        }
+        catch (StoreException ex)
+        {
+            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, full, ex.Message, ex);
+        }
         if (!Directory.Exists(full))
             throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, full, $"Backup folder '{full}' does not exist.");
 
