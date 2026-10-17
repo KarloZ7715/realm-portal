@@ -176,11 +176,11 @@ License: own design, original artwork under the repository's MIT license (see `a
 
 | State | SVG | PNG | Color / glyph |
 |---|---|---|---|
-| active | `icons/seals/seal-active.svg` | `seal-active-64.png`, `seal-active-128.png` | wax red · portal arch |
+| active | `icons/seals/seal-active.svg` | `seal-active-64.png`, `seal-active-128.png` | wax red · ring and dot (live realm) |
 | ready | `icons/seals/seal-ready.svg` | `seal-ready-64.png`, `seal-ready-128.png` | forest green · check mark |
 | incompatible | `icons/seals/seal-incompatible.svg` | `seal-incompatible-64.png`, `seal-incompatible-128.png` | amber · warning triangle |
 | no-response | `icons/seals/seal-no-response.svg` | `seal-no-response-64.png`, `seal-no-response-128.png` | muted · cross |
-| inactive | `icons/seals/seal-inactive.svg` | `seal-inactive-64.png`, `seal-inactive-128.png` | muted · portal arch in bone |
+| inactive | `icons/seals/seal-inactive.svg` | `seal-inactive-64.png`, `seal-inactive-128.png` | muted · ring only |
 
 State is never conveyed by color alone: every seal carries its glyph. "Incompatible" corresponds to the seal named "Aviso" (warning) in Figma.
 

@@ -28,12 +28,9 @@ public class Icon : Control
     {
         AffectsRender<Icon>(DataProperty, IsFilledProperty, StrokeThicknessProperty, ForegroundProperty);
         AffectsMeasure<Icon>(WidthProperty, HeightProperty);
-    }
-
-    public Icon()
-    {
-        Width = 16;
-        Height = 16;
+        // Defaults, not local values: a size set inside a control template (the badge glyph, the banner icon) must win over them.
+        WidthProperty.OverrideDefaultValue<Icon>(16);
+        HeightProperty.OverrideDefaultValue<Icon>(16);
     }
 
     public Geometry? Data { get => GetValue(DataProperty); set => SetValue(DataProperty, value); }

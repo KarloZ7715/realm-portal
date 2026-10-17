@@ -20,8 +20,8 @@
                        StrokeDashArray="4,3" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
             <Border Name="Bar" Width="4" HorizontalAlignment="Left" Margin="1,1,0,1" Background="{DynamicResource BronzeLightBrush}"/>
             <Grid ColumnDefinitions="Auto,*" Margin="{TemplateBinding Padding}">
-              <c:Icon Name="Glyph" Width="22" Height="22" Margin="8,0,16,0" VerticalAlignment="Center" StrokeThickness="1.8"
-                      Foreground="{DynamicResource BoneBrush}" Data="{DynamicResource IconInfo}"/>
+              <c:Icon Name="Glyph" Width="26" Height="26" Margin="6,0,14,0" VerticalAlignment="Center" StrokeThickness="1.7"
+                      Foreground="{DynamicResource BronzeLightBrush}" Data="{DynamicResource IconInfo}"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                 <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
                                   FontFamily="{DynamicResource FontBody}" FontWeight="Bold" FontSize="15"

@@ -48,7 +48,7 @@ public sealed class Loc : INotifyPropertyChanged
 
     public static string Get(string key) => Instance[key];
 
-    public static string Format(string key, params object[] arguments) =>
+    public static string Format(string key, params object?[] arguments) =>
         string.Format(CultureInfo.CurrentCulture, Instance[key], arguments);
 
     public static Language FromCulture(string? cultureName) =>
