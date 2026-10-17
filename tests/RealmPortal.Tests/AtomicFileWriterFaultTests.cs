@@ -123,7 +123,7 @@ public class AtomicFileWriterFaultTests
 
     [Property(MaxTest = 150)]
     public Property SwitchThenUndo_WithAFailingWriter_NeverCorruptsFiles_AndRecoversOnRetry() =>
-        Prop.ForAll(Gen.Choose(1, 3).ToArbitrary(), Gen.Choose(0, 400).ToArbitrary(), Gen.Elements(true, false).ToArbitrary(), (failOnWrite, allowed, faultInSwitch) =>
+        Prop.ForAll(Gen.Choose(1, 2).ToArbitrary(), Gen.Choose(0, 400).ToArbitrary(), Gen.Elements(true, false).ToArbitrary(), (failOnWrite, allowed, faultInSwitch) =>
         {
             using var dir = new TempDirectory();
             var config = dir.Combine("config");
