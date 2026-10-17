@@ -560,7 +560,13 @@ public sealed class PortalService : IPortalService
             if (launch)
             {
                 if (!RunStep(progress, ServiceStep.Launch, () => LaunchGame(client.Path, _settings.GetLauncherSettings()), out var launchError))
-                    return ServiceResult<SwitchOutcome>.Fail(launchError! with { Code = ServiceErrorCode.LaunchFailed, Consistency = Consistency.AppliedLaunchFailed });
+                {
+                    // A setting the launcher cannot apply is not a process-start failure. The switch is already applied.
+                    if (launchError!.Code == ServiceErrorCode.InvalidLauncherSettings)
+                        return ServiceResult<SwitchOutcome>.Fail(launchError with { Consistency = Consistency.AppliedLaunchFailed });
+
+                    return ServiceResult<SwitchOutcome>.Fail(launchError with { Code = ServiceErrorCode.LaunchFailed, Consistency = Consistency.AppliedLaunchFailed });
+                }
             }
 
             return ServiceResult<SwitchOutcome>.Ok(new SwitchOutcome(activeEntry, previous, backupId, changedFiles));
@@ -578,6 +584,10 @@ public sealed class PortalService : IPortalService
         try
         {
             _launchService.Launch(settings.ToSpec(executable, clientPath));
+        }
+        catch (ArgumentException ex) when (ex.ParamName == GameLaunchSpec.UnsupportedSettingParameter)
+        {
+            throw;
         }
         catch (Exception ex)
         {

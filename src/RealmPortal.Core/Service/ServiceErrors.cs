@@ -1,5 +1,6 @@
 using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Clients;
+using RealmPortal.Core.Launch;
 using RealmPortal.Core.Servers;
 
 namespace RealmPortal.Core.Service;
@@ -110,6 +111,9 @@ internal static class ServiceErrors
 
     private static ServiceError FromArgument(ArgumentException ex, Consistency consistency)
     {
+        if (ex.ParamName == GameLaunchSpec.UnsupportedSettingParameter)
+            return new(ServiceErrorCode.InvalidLauncherSettings, Consistency: consistency, Diagnostic: UserFacingMessages.Sanitize(ex.Message));
+
         var field = ex.ParamName switch
         {
             nameof(NewServer.Name) or "name" => "name",
