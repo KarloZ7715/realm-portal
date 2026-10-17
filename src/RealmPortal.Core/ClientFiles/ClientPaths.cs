@@ -172,7 +172,11 @@ public static class ClientPaths
             ? string.Equals(a, b, StringComparison.OrdinalIgnoreCase)
             : string.Equals(a, b, StringComparison.Ordinal);
 
-    private static string TrimTrailingSeparators(string path)
+    /// <summary>
+    /// Drops trailing directory separators while keeping the filesystem root (<c>/</c> or <c>C:\</c>).
+    /// <see cref="CanonicalRoot"/> and client-id derivation both use this form.
+    /// </summary>
+    internal static string TrimTrailingSeparators(string path)
     {
         if (string.IsNullOrEmpty(path))
             return path;
