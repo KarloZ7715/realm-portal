@@ -9,7 +9,7 @@ review.
 - **Synchronous.** Everything underneath (applier, stores, PE reader, process probe) is synchronous file/process work, so the service is
   too and the UI wraps calls in `Task.Run`. No `async` ceremony around blocking IO.
 - **Results, not exceptions.** Every operation returns `ServiceResult<T>` (`Value` or `Error`; `Succeeded` is annotated so `Value`/`Error` are non-null without `!`); only null arguments throw. `IProgress.Report` is never called after the method returned. Every call is safe from a thread-pool thread.
-- **Progress.** `SwitchServer` and `Play` take an optional `IProgress<ServiceProgress>`. Callbacks run on the worker thread (the UI marshals).
+- **Progress.** `SwitchServer` and `Play` take an optional `IProgress<ServiceProgress>`. The service invokes `IProgress<ServiceProgress>.Report` on the **worker thread** that is running the operation (typically a thread-pool thread when the UI wrapped the call in `Task.Run`). **Where the progress handler runs** depends on the `IProgress` implementation: `Progress<T>` captures `SynchronizationContext.Current` at construction and posts callbacks to that context, so the App should create progress on the UI thread (or dispatch inside a custom `IProgress` implementation). The service does not marshal to the UI thread.
 - **No user-facing text** in Core. An error is a stable `ServiceErrorCode` plus parameters (`ServerName`, `Path`, `LineNumber`,
   `RealmlistKind`, `Field`, `RequiredBuild`, `ClientBuild`, `Consistency`); `ClientVersion`, `ConflictingFiles`, `Diagnostic` is English text for logs only.
 
@@ -67,12 +67,14 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 | backup folder cannot be used | `PathNotFound`, `PermissionDenied`, `ReadOnlyFs` |
 | `ArgumentException` from `Server.Create` | `InvalidServerInput` with `Field` |
 | `GameLaunchSpec.Resolve` / settings | `InvalidLauncherSettings` |
-| process start failure | `LaunchFailed` |
+| process start failure after a successful switch (`Play` only) | `LaunchFailed` with `Consistency.AppliedLaunchFailed` (switch and active server stay; undo remains available) |
+| process start failure when launch never ran | `LaunchFailed` with `Consistency.Unchanged` or `RolledBack` as for other multi-step failures |
 | incompatible build without `Force` | `IncompatibleClient` with `RequiredBuild`, `ClientBuild` |
 | anything else | `Unexpected` (with `Diagnostic`) |
 
 `Consistency` tells the UI what a failed multi-step call left behind: `Unchanged`, `RolledBack` (steps ran and were put back), `Inconsistent`
-(`InconsistentState`: even the rollback failed; tell the user to review the client) or `Pending` (only `UndoConflict`: stopped on purpose, can be retried or discarded).
+(`InconsistentState`: even the rollback failed; tell the user to review the client), `Pending` (only `UndoConflict`: stopped on purpose, can be retried or discarded), or
+`AppliedLaunchFailed` (only `Play`: plan, apply and activate succeeded; launch failed — the client is configured, the new server is active, and undo is still available).
 
 ## Consistency between the two undo stacks
 
@@ -97,8 +99,8 @@ so undo knows whether the switch changed any client file. One level only, like t
   by the service; the UI keeps its own file.
 - **Client of a server:** `NewServer.ClientId` / `ServerEntry.ClientId` is the preferred client chosen when the server was added (optional). It is only a label for the UI;
   `SwitchRequest` still names the client.
-- **Play** = switch + launch. A failed launch leaves the switch done (the client is configured, the server is active, undo still works) and returns
-  `LaunchFailed`.
+- **Play** = switch + launch. When launch fails after activate succeeded, the switch stays done (the client is configured, the server is active, undo still works) and the call returns
+  `LaunchFailed` with `Consistency.AppliedLaunchFailed` (not `Unchanged`).
 
 ## Launcher settings
 
