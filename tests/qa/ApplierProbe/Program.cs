@@ -5,8 +5,11 @@ using RealmPortal.Core.IO;
 // applier-probe plan|apply|undo --client <dir> --backup <dir> [--install <id>] [--realmlist <text with \r\n escapes>] [--realm <name>]
 // Exit codes: 0 ok, 2 ClientFilesException (the code is printed as "ERROR <Code>"), 3 conflicts on undo, 1 usage.
 // SAFETY: refuses to run when --client or --backup is not under the system temp directory.
-if (args.Length < 1)
+// Only plan, apply and undo are accepted. Anything else (including a missing or misspelled command such as "aply")
+// is rejected here, before any option parsing or planning, so an exit-code-based caller can never mistake it for success.
+if (args.Length < 1 || args[0] is not ("plan" or "apply" or "undo"))
 {
+    Console.Error.WriteLine($"unknown command: {(args.Length < 1 ? "(none)" : args[0])}");
     Console.Error.WriteLine("usage: applier-probe plan|apply|undo --client DIR --backup DIR [--install ID] [--realmlist TEXT] [--realm NAME]");
     return 1;
 }
