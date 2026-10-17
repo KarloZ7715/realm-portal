@@ -45,6 +45,8 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 <backupRoot>/<installationId>/<backupId>/files/<n>.symlink   optional UTF-8 link text when file <n> was a symlink at apply time
 ```
 
+`files/<n>.symlink` is written only together with `symlink_sha256` (SHA-256 of those exact bytes) on the matching manifest entry. Undo uses a sidecar only when the entry declares that field and the bytes still hash to it.
+
 `backupId` is `yyyyMMddTHHmmssfffZ-NNNNNN` (UTC time plus a sequence number). It is always greater than the newest existing id of the installation
 (the same millisecond or a clock that went backwards bump the sequence), so ids sort in apply order.
 
@@ -60,14 +62,16 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
   "undone_at": null,
   "files": [
     { "path": "Data/enUS/realmlist.wtf", "existed": true, "backup_file": "files/0",
-      "sha256_before": "…", "sha256_after": "…", "unix_mode": 292, "windows_read_only": null },
+      "sha256_before": "…", "sha256_after": "…", "unix_mode": 292, "windows_read_only": null,
+      "symlink_sha256": null },
     { "path": "WTF/Config.wtf", "existed": false, "backup_file": null,
-      "sha256_before": null, "sha256_after": "…" }
+      "sha256_before": null, "sha256_after": "…", "symlink_sha256": null }
   ]
 }
 ```
 
 `path` uses `/` and the real casing found on disk. `undone_at` is set when the backup was fully undone.
+`symlink_sha256` is null when the file was not a symlink. `existed: false` requires `backup_file`, `sha256_before` and `symlink_sha256` to be null; `existed: true` requires `backup_file` and `sha256_before`.
 
 ## Undo
 
@@ -76,12 +80,26 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 | Current state | Result |
 |---|---|
 | equals `sha256_before` (or is missing when the file did not exist) | `AlreadyRestored` (an earlier undo was interrupted) |
-| equals `sha256_after`, file existed | the original bytes are written back and verified: `Restored` (when a trusted `files/<n>.symlink` sidecar exists and validates inside the client root, the symlink is recreated from that text; otherwise a regular file is restored) |
+| equals `sha256_after`, file existed | the original bytes are written back and verified: `Restored`. A symlink is recreated only from a bound sidecar whose chain stays inside the client; otherwise the original bytes are written as a regular file |
 | equals `sha256_after`, file did not exist | the file is deleted: `Deleted` (folders are never removed) |
 | anything else | `Conflict`: the file is not touched, the UI decides |
 
-A backup copy whose hash no longer matches `sha256_before` is never restored (`HashMismatch`). The backup is marked undone only when
-no file had a conflict; otherwise it stays pending and the next `Undo` reports the same conflicts instead of undoing something older.
+Before any client file is written or deleted, Undo checks every entry: backup copies of files that existed are read and hashed, and every sidecar is checked. A backup copy whose hash no longer matches `sha256_before` is never restored (`HashMismatch`), and nothing is changed. The same is true of a `files/<n>.symlink` that exists without `symlink_sha256`, or whose bytes do not hash to that field.
+
+A sidecar is refused with `VerifyFailed` (nothing changed) when its path is itself a symlink or not a regular file, when it is larger than 4096 bytes, or when it is not valid UTF-8, is empty, or contains a NUL or other control character.
+
+The link is recreated only when following its text one hop at a time stays inside the client. Each hop reads one link with `ResolveLinkTarget(false)` and resolves that text relative to the link's parent; symlinks in parent directories count too. The walk stops at 40 hops. The final target must exist and be a regular file inside the client. An absolute or relative target outside the client, a dangling link, or too many hops is not an error: Undo writes the original bytes back as a regular file. If creating the link fails, or the bytes read through it do not match `sha256_before`, Undo deletes only that link (never its target) and writes the original bytes as a regular file (`Restored`).
+
+The manifest itself is refused with `VerifyFailed`, and nothing is changed, when:
+
+- `files` is empty (Apply does not write a backup for an empty plan);
+- an `existed: false` entry names a `backup_file`, `sha256_before` or `symlink_sha256`, or an `existed: true` entry lacks `backup_file` or `sha256_before`;
+- two entries share a path (compared case-insensitively) or the same `backup_file`;
+- a `files/<n>` or `files/<n>.symlink` in the backup folder is not referenced by an entry. That leftover payload means an entry was removed or flipped to `existed: false`.
+
+Residual: an entry for a file the switch **created** (`existed: false`, no backup file) can be removed from the manifest without detection, because there is no payload left behind to notice. Undo then restores the other files and leaves that created file in place. It does not write or delete anything for the removed entry.
+
+The backup is marked undone only when no file had a conflict; otherwise it stays pending and the next `Undo` reports the same conflicts instead of undoing something older.
 Successive applies are undone one by one, newest first, as long as their backups are kept. No backup pending: `NothingToUndo`. Undo also refuses while the game runs.
 
 ## Game process probe

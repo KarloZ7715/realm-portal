@@ -145,14 +145,31 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
         var backupDir = Path.GetDirectoryName(manifestPath)!;
 
-        // Resolve every manifest path before restoring anything so a bad entry cannot leave a partial undo.
+        // Resolve, hash-check and read every entry before restoring anything so a bad entry cannot leave a partial undo.
         var resolved = manifest.Files
             .Select(file => (file, path: ClientPaths.ResolveManagedPath(trustedRoot, file.Path)))
             .ToList();
+        BackupManifest.EnsureBackupFilesReferenced(backupDir, manifest.Files);
 
-        var results = new List<UndoFileResult>();
+        var prepared = new List<PreparedUndo>(resolved.Count);
         foreach (var (file, path) in resolved)
         {
+            byte[]? original = null;
+            string? linkText = null;
+            if (file.Existed)
+            {
+                original = ReadBackupFile(backupDir, file);
+                linkText = ReadBoundSidecar(backupDir, file);
+            }
+
+            prepared.Add(new PreparedUndo(file, path, original, linkText));
+        }
+
+        var results = new List<UndoFileResult>();
+        foreach (var item in prepared)
+        {
+            var file = item.File;
+            var path = item.Path;
             var current = ReadIfExists(path);
             var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
 
@@ -172,9 +189,8 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             }
             else
             {
-                var original = ReadBackupFile(backupDir, file);
                 var permissions = FileReplacementPermissions.FromUnixAndWindows(file.UnixMode, file.WindowsReadOnly);
-                status = RestoreOriginalBytes(trustedRoot, backupDir, file, path, original, permissions);
+                status = RestoreOriginalBytes(trustedRoot, file, path, item.Original!, item.LinkText, permissions);
             }
 
             results.Add(new UndoFileResult(file.Path, status));
@@ -200,6 +216,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         {
             var t = targets[i];
             string? backupFile = null;
+            string? symlinkSha256 = null;
             if (t.Original is not null)
             {
                 backupFile = $"files/{i}";
@@ -210,6 +227,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                     var sidecar = dest + ".symlink";
                     var bytes = Encoding.UTF8.GetBytes(t.Symlink.Value.Target);
                     Guard(() => _writer.WriteAllBytes(sidecar, bytes), sidecar, "write symlink sidecar");
+                    symlinkSha256 = ClientFilesIo.Sha256Hex(bytes);
                 }
             }
 
@@ -220,7 +238,8 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 t.Edit.Sha256Before,
                 t.Edit.Sha256After,
                 t.Permissions?.UnixMode,
-                t.Permissions?.WindowsReadOnly));
+                t.Permissions?.WindowsReadOnly,
+                symlinkSha256));
         }
 
         var manifest = new BackupManifest(
@@ -267,25 +286,58 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         return bytes;
     }
 
+    /// <summary>
+    /// A sidecar is used only when the entry declares <c>symlink_sha256</c> and the bytes match.
+    /// A sidecar that is present without that field, or whose hash differs, is <see cref="ClientFilesErrorCode.HashMismatch"/>.
+    /// </summary>
+    private static string? ReadBoundSidecar(string backupDir, ManifestFile file)
+    {
+        if (file.BackupFile is null)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, backupDir, $"The manifest has no backup file for '{file.Path}'.");
+
+        var path = Path.Combine(backupDir, file.BackupFile + ".symlink");
+        if (!SymlinkSnapshot.NodeExists(path))
+        {
+            if (file.SymlinkSha256 is not null)
+                throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, path,
+                    $"The symlink sidecar '{path}' is missing; it cannot be restored safely.");
+            return null;
+        }
+
+        var (bytes, text) = SymlinkSnapshot.ReadSidecar(path);
+        if (file.SymlinkSha256 is null)
+            throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, path,
+                $"The symlink sidecar '{path}' is not bound by symlink_sha256; it cannot be restored safely.");
+        if (!string.Equals(ClientFilesIo.Sha256Hex(bytes), file.SymlinkSha256, StringComparison.Ordinal))
+            throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, path,
+                $"The symlink sidecar '{path}' was modified; it cannot be restored safely.");
+        return text;
+    }
+
     private UndoFileStatus RestoreOriginalBytes(
         string clientRoot,
-        string backupDir,
         ManifestFile file,
         string path,
         byte[] original,
+        string? linkText,
         FileReplacementPermissions? permissions)
     {
-        var sidecar = SymlinkSidecarPath(backupDir, file);
-        if (sidecar is not null)
+        if (linkText is not null && SymlinkSnapshot.ChainStaysInsideClient(clientRoot, path, linkText))
         {
-            var linkText = SymlinkSnapshot.ReadValidatedSidecar(
-                clientRoot, path, Guard(() => File.ReadAllBytes(sidecar), sidecar, "read symlink sidecar"));
-            Guard(() => new SymlinkSnapshot(true, linkText).Restore(path), path, "restore symlink");
-            var symlinkBytes = Guard(() => File.ReadAllBytes(path), path, "read back");
-            if (ClientFilesIo.Sha256Hex(symlinkBytes) == file.Sha256Before)
-                return UndoFileStatus.Restored;
+            try
+            {
+                Guard(() => new SymlinkSnapshot(true, linkText).Restore(path), path, "restore symlink");
+                var through = Guard(() => File.ReadAllBytes(path), path, "read back");
+                if (string.Equals(ClientFilesIo.Sha256Hex(through), file.Sha256Before, StringComparison.Ordinal))
+                    return UndoFileStatus.Restored;
+            }
+            catch (ClientFilesException)
+            {
+                // Creating the link or reading through it failed. The original bytes are written below.
+            }
 
-            TryRemovePath(path);
+            // Only the link is removed. Its target, which may live elsewhere in the client, is left as it is.
+            SymlinkSnapshot.DeleteLinkOnly(path);
         }
 
         Guard(() => _writer.WriteAllBytes(path, original, permissions), path, "restore");
@@ -293,29 +345,6 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         if (ClientFilesIo.Sha256Hex(bytes) != file.Sha256Before)
             throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
         return UndoFileStatus.Restored;
-    }
-
-    private static string? SymlinkSidecarPath(string backupDir, ManifestFile file)
-    {
-        if (file.BackupFile is null)
-            return null;
-        var path = Path.Combine(backupDir, file.BackupFile + ".symlink");
-        return File.Exists(path) ? path : null;
-    }
-
-    private static void TryRemovePath(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
     }
 
     // ---- helpers ----
@@ -475,4 +504,6 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         byte[]? Original,
         FilePermissionSnapshot? Permissions,
         SymlinkSnapshot? Symlink);
+
+    private sealed record PreparedUndo(ManifestFile File, string Path, byte[]? Original, string? LinkText);
 }
