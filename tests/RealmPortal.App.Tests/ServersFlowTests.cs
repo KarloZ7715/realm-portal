@@ -34,6 +34,26 @@ public class ServersFlowTests
     }
 
     [AvaloniaFact]
+    public async Task WideWindowShowsSidebarLabelsAndTheNote()
+    {
+        var shell = new Shell(1000, 600);
+        await Pump();
+        var labels = shell.Window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("navlabel")).ToList();
+        Assert.Equal(3, labels.Count);
+        Assert.All(labels, l => Assert.True(l.IsVisible));
+        Assert.Equal(["Servidores", "Clientes", "Ajustes"], labels.Select(l => l.Text));
+        var note = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "DisclaimerText");
+        Assert.True(note.IsVisible);
+        Assert.Equal("No afiliado ni respaldado por Blizzard Entertainment.", note.Text);
+        shell.Snap("servers-wide", 1.0);
+
+        shell.Window.Width = 720;
+        await Pump();
+        Assert.All(labels, l => Assert.False(l.IsVisible));
+        Assert.False(note.IsVisible);
+    }
+
+    [AvaloniaFact]
     public async Task SearchFiltersByNameAddressAndClient()
     {
         var shell = new Shell();
