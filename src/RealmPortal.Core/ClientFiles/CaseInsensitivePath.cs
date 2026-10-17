@@ -41,10 +41,6 @@ internal static class CaseInsensitivePath
 
     private static string? Find(string directory, string wanted, bool wantFile)
     {
-        var exact = Path.Combine(directory, wanted);
-        if (wantFile ? File.Exists(exact) : Directory.Exists(exact))
-            return wanted;
-
         var names = wantFile
             ? Directory.EnumerateFiles(directory)
             : Directory.EnumerateDirectories(directory);
@@ -52,7 +48,9 @@ internal static class CaseInsensitivePath
             .Select(Path.GetFileName)
             .Where(n => n is not null && string.Equals(n, wanted, StringComparison.OrdinalIgnoreCase))
             .Order(StringComparer.Ordinal)
-            .FirstOrDefault();
+            .ToList() is { Count: > 0 } matches
+            ? (matches.Contains(wanted, StringComparer.Ordinal) ? wanted : matches[0])
+            : null;
     }
 
     /// <summary>Real sub-directory names of <paramref name="directory"/> (sorted ordinally); empty when it cannot be listed.</summary>
