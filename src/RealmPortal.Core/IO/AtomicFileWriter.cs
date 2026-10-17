@@ -7,6 +7,23 @@ namespace RealmPortal.Core.IO;
 /// </summary>
 public sealed class AtomicFileWriter : IAtomicFileWriter
 {
+    private readonly Func<string, Stream, Stream>? _decorateStream;
+
+    public AtomicFileWriter()
+    {
+    }
+
+    /// <summary>
+    /// Test seam: <paramref name="decorateStream"/> receives the path of the temporary file and its stream and returns the stream the
+    /// content is written to, so tests can inject faults in the middle of a write (for example a stream that throws after N bytes).
+    /// The original stream is still the one that is flushed to disk and disposed.
+    /// </summary>
+    public AtomicFileWriter(Func<string, Stream, Stream> decorateStream)
+    {
+        ArgumentNullException.ThrowIfNull(decorateStream);
+        _decorateStream = decorateStream;
+    }
+
     public void WriteAllBytes(string path, byte[] content)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
@@ -21,7 +38,9 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
         {
             using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                stream.Write(content, 0, content.Length);
+                var target = _decorateStream?.Invoke(tempPath, stream) ?? stream;
+                target.Write(content, 0, content.Length);
+                target.Flush();
                 stream.Flush(flushToDisk: true);
             }
 
