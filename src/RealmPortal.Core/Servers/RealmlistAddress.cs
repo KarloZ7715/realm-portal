@@ -34,6 +34,8 @@ public static partial class RealmlistAddress
         }
         catch (InvalidRealmlistException)
         {
+            host = string.Empty;
+            port = defaultPort;
             return false;
         }
 
