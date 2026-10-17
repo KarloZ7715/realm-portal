@@ -11,7 +11,7 @@ assets/
   preview-composition.png    test composition
   textures/                  3 tileable CC0 JPG textures + tiling check image
   frames/                    frames, panels, buttons, dividers (PNG @1x/@2x + SVG) + nineslice.json
-  ui/                        UI kit for the Avalonia theme (114 pieces + nineslice.json v2); see ui/README.md
+  ui/                        UI kit for the Avalonia theme (130 pieces + nineslice.json v2); see ui/README.md
   branding/                  app icon "Tesera" (SVG, PNG 16–512, ICO) — see Branding section
   icons/seals/               5 status seals (SVG, PNG 64/128)
   icons/ui/, icons/ui-ink/   23 interface icons as SVG (bone color / ink color)
@@ -148,11 +148,11 @@ Full listing of `frames/`:
 
 ## UI kit (`assets/ui/`)
 
-A second, larger art set for the Avalonia theme (F3a): 114 pieces in `assets/ui/<group>/` (`panels`, `buttons`, `fields`, `focus`, `popups`, `controls`, `shadows`), each as `name.png` (@1x), `name@2x.png` and, where it exists, a flat `name.svg`. Metadata is in `assets/ui/nineslice.json` (version 2). The full inventory, insets, usage rules, design corrections, verification results and limitations are in `assets/ui/README.md`.
+A second, larger art set for the Avalonia theme (F3a): 130 pieces in `assets/ui/<group>/` (`panels`, `buttons`, `fields`, `focus`, `popups`, `controls`, `shadows`), each as `name.png` (@1x), `name@2x.png` and, where it exists, a flat `name.svg`. Metadata is in `assets/ui/nineslice.json` (version 2). The full inventory, insets, usage rules, design corrections, verification results and limitations are in `assets/ui/README.md`.
 
-It sits **next to** the legacy pieces in `assets/frames/` and does not replace them yet. Overlap: `panel-*` / `tab-parchment` (legacy, baked 12/10 px shadow), `button-{primary,secondary}-*` and `focus-ring-*` (same names exist in both sets, in different folders, with different insets). The kit has no baked shadows; use `shadows/shadow-soft` as a separate layer. Not wired into the app yet and not tested inside Avalonia.
+It sits **next to** the legacy pieces in `assets/frames/` and does not replace them yet. Overlap: `panel-*` / `tab-parchment` (legacy, baked 12/10 px shadow), `button-{primary,secondary}-*` and `focus-ring-*` (same names exist in both sets, in different folders, with different insets). The kit has no baked shadows; use `shadows/shadow-soft` as a separate layer. The PNGs are bundled into the app as Avalonia resources (flattened to `Assets/Ui`, see `RealmPortal.App.csproj`); piece names must therefore stay unique across groups.
 
-License: own artwork, MIT. Third-party material baked into some PNGs: ambientCG Leather037 (leather buttons and popup) and Metal008 (scrollbar thumbs, progress fill), both CC0 1.0; the parchment grain is procedural. Generator and verification scripts are not in the repository (see `assets/ui/README.md`, section 7).
+License: own artwork, MIT. Third-party material baked into some PNGs: ambientCG Leather037 (leather buttons and popup) and Metal008 (scrollbar thumbs, progress fills), both CC0 1.0; the parchment grain is procedural. Generator and verification scripts are not in the repository (see `assets/ui/README.md`, section 7).
 
 ## Branding (`assets/branding/`)
 

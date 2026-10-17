@@ -22,7 +22,7 @@ public static class ServerGen
     private static readonly Gen<string[]> ExtraLinesGen =
         Gen.OneOf(
             Gen.Constant(Array.Empty<string>()),
-            Gen.Elements("patch.example.org", "http://patch.example.org/files", "auth.gamefreedom.org")
+            Gen.Elements("patch.example.org", "http://patch.example.org/files", "example.org")
                 .Select(v => new[] { "set patchlist " + v }));
 
     private static readonly Gen<int?> BuildGen =
