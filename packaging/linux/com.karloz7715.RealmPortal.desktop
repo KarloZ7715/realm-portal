@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Version=1.5
+Version=1.0
 Name=Realm Portal
 GenericName=Game Server Launcher
 GenericName[es]=Lanzador de servidores de juego
@@ -13,3 +13,4 @@ Categories=Game;Utility;
 Keywords=launcher;server;realm;private server;game;
 Keywords[es]=lanzador;servidor;reino;servidor privado;juego;
 StartupNotify=true
+StartupWMClass=RealmPortal.App

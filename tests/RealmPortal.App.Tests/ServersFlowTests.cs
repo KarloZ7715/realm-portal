@@ -274,8 +274,11 @@ public class ServersMenuTests
 
         Screenshots.Settle();
         shell.Snap("servers-menu");
-        var item = card.Flyout is MenuFlyout menu ? menu.Items.OfType<MenuItem>().Single() : throw new InvalidOperationException();
-        Assert.Equal("Solo cambiar", item.Header);
+        var items = card.Flyout is MenuFlyout menu ? menu.Items.OfType<MenuItem>().ToList() : throw new InvalidOperationException();
+        Assert.Equal(["MenuPlay", "MenuSwitchOnly"], items.Select(i => i.Name));
+        var item = items[1];
+        Assert.Equal("Solo cambiar", HeaderTexts(item)[0]);
+        Assert.Equal("Cambia el realmlist sin abrir el juego.", HeaderTexts(item)[1]);
         Assert.True(item.Command!.CanExecute(null));
         item.Command.Execute(null);
         Screenshots.Settle();
@@ -288,4 +291,30 @@ public class ServersMenuTests
         Assert.Equal(ServersPhase.Idle, shell.Servers.Phase);
         Assert.False(shell.Backend.GameRunning);
     }
+
+    [AvaloniaFact]
+    public async Task ActiveServerCannotBeSwitchedToAgainButCanPlay()
+    {
+        var shell = new Shell();
+        var card = shell.Window.GetVisualDescendants().OfType<SplitButton>().First();
+        Assert.Equal("Mi Servidor", ((ServerItemViewModel)card.DataContext!).Name);
+
+        card.Flyout!.ShowAt(card);
+        for (var i = 0; i < 5; i++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            await Task.Yield();
+        }
+
+        Screenshots.Settle();
+        shell.Snap("servers-menu-disabled");
+        var items = ((MenuFlyout)card.Flyout).Items.OfType<MenuItem>().ToList();
+        Assert.True(items[0].Command!.CanExecute(null));
+        Assert.False(items[1].Command!.CanExecute(null));
+        Assert.Equal("Ya es el servidor activo.", HeaderTexts(items[1])[1]);
+        Assert.Equal("Cambia de servidor y abre el juego.", HeaderTexts(items[0])[1]);
+    }
+
+    private static List<string?> HeaderTexts(MenuItem item) =>
+        ((Avalonia.Controls.Panel)item.Header!).Children.OfType<TextBlock>().Select(t => t.Text).ToList();
 }

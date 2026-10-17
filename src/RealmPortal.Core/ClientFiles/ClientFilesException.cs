@@ -29,6 +29,9 @@ public enum ClientFilesErrorCode
 
     /// <summary>There is no applied change to undo for the installation.</summary>
     NothingToUndo,
+
+    /// <summary>A path would leave the client directory or is not managed by Realm Portal.</summary>
+    PathEscapesClient,
 }
 
 /// <summary>Typed failure of a client-files operation. <see cref="Exception.Message"/> is a diagnostic in English, not UI text.</summary>

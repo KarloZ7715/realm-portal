@@ -21,6 +21,7 @@
     <DataTemplate DataType="vm:ClientsViewModel"><v:ClientsView/></DataTemplate>
     <DataTemplate DataType="vm:AddServerViewModel"><v:AddServerView/></DataTemplate>
     <DataTemplate DataType="vm:PlaceholderViewModel"><v:PlaceholderView/></DataTemplate>
+    <DataTemplate DataType="vm:SettingsViewModel"><v:SettingsView/></DataTemplate>
   </Window.DataTemplates>
   <Grid RowDefinitions="*,Auto">
     <Panel Grid.RowSpan="2" Name="MainChrome" IsEnabled="{Binding Dialog, Converter={x:Static ObjectConverters.IsNull}}">
