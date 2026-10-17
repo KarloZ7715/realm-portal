@@ -19,26 +19,26 @@
           <StackPanel Spacing="6" Grid.Column="0" Grid.Row="0">
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.name}"/>
             <TextBox Name="NameBox" Classes="parchment" Classes.error="{Binding HasNameError}" Text="{Binding Name, Mode=TwoWay}" MaxLength="64"/>
-            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !HasNameError}">
-              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
-              <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.name.help}"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasNameError}">
-              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
-              <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding NameError}"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding !HasNameError}">
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.name.help}"/>
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding HasNameError}">
+              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+              <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding NameError}"/>
+            </Grid>
           </StackPanel>
           <StackPanel Spacing="6" Grid.Column="1" Grid.Row="0">
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.address}"/>
             <TextBox Name="AddressBox" Classes="parchment" Classes.error="{Binding HasAddressError}" Text="{Binding Address, Mode=TwoWay}" Watermark="logon.ejemplo.com:3724"/>
-            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !HasAddressError}">
-              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
-              <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.address.help}"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasAddressError}">
-              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
-              <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding AddressError}"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding !HasAddressError}">
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.address.help}"/>
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding HasAddressError}">
+              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+              <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding AddressError}"/>
+            </Grid>
           </StackPanel>
           <StackPanel Spacing="6" Grid.Column="0" Grid.Row="1">
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.client}"/>
@@ -47,20 +47,20 @@
                 <DataTemplate x:DataType="vm:ClientItemViewModel"><TextBlock Text="{Binding Label}"/></DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
-            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !HasClientError}">
-              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
-              <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.client.help}"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasClientError}">
-              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
-              <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding ClientError}"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding !HasClientError}">
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.client.help}"/>
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding HasClientError}">
+              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+              <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding ClientError}"/>
+            </Grid>
           </StackPanel>
           <StackPanel Spacing="6" Grid.Column="1" Grid.Row="1">
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.account}"/>
             <TextBox Name="AccountBox" Classes="parchment" Text="{Binding Account, Mode=TwoWay}" MaxLength="32"/>
             <StackPanel Orientation="Horizontal" Spacing="6" >
-              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
               <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.account.help}"/>
             </StackPanel>
           </StackPanel>
