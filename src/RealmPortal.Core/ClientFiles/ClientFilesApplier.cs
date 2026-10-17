@@ -64,8 +64,9 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         if (plan.IsEmpty)
             return new ApplyResult(null, []);
 
-        if (_probe.IsGameRunning(plan.ClientRoot))
-            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, plan.ClientRoot, "The game is running; close it before changing its files.");
+        var clientRoot = ClientPaths.CanonicalRoot(plan.ClientRoot);
+        if (_probe.IsGameRunning(clientRoot))
+            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, clientRoot, "The game is running; close it before changing its files.");
 
         using var installationLock = AcquireLock(plan.InstallationId);
 
@@ -74,7 +75,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         var warnings = new List<string>();
         foreach (var edit in plan.Edits)
         {
-            var path = ResolveInside(plan.ClientRoot, edit.RelativePath);
+            var path = ClientPaths.ResolveManagedPath(clientRoot, edit.RelativePath);
             var original = ReadIfExists(path);
             var currentHash = original is null ? null : ClientFilesIo.Sha256Hex(original);
             if (!string.Equals(currentHash, edit.Sha256Before, StringComparison.Ordinal))
@@ -94,7 +95,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         var backupDir = Path.Combine(_backupRoot, plan.InstallationId, backupId);
         try
         {
-            WriteBackup(plan, backupId, backupDir, targets);
+            WriteBackup(plan, clientRoot, backupId, backupDir, targets);
         }
         catch
         {
@@ -127,22 +128,26 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         return new ApplyResult(backupId, plan.Edits, warnings);
     }
 
-    public UndoResult Undo(string installationId)
+    public UndoResult Undo(string installationId, string clientRoot)
     {
         RequireValidIds(installationId, "-");
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientRoot);
+        var trustedRoot = ClientPaths.CanonicalRoot(clientRoot);
         using var installationLock = AcquireLock(installationId);
         var (manifestPath, manifest) = FindPending(installationId)
             ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
                 $"There is no applied change to undo for '{installationId}'.");
 
-        if (_probe.IsGameRunning(manifest.ClientRoot))
-            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, manifest.ClientRoot, "The game is running; close it before restoring its files.");
+        ClientPaths.RequireMatchingRoots(trustedRoot, manifest.ClientRoot, manifestPath);
+
+        if (_probe.IsGameRunning(trustedRoot))
+            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, trustedRoot, "The game is running; close it before restoring its files.");
 
         var backupDir = Path.GetDirectoryName(manifestPath)!;
         var results = new List<UndoFileResult>();
         foreach (var file in manifest.Files)
         {
-            var path = ResolveInside(manifest.ClientRoot, file.Path);
+            var path = ClientPaths.ResolveManagedPath(trustedRoot, file.Path);
             var current = ReadIfExists(path);
             var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
 
@@ -187,7 +192,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     // ---- backup ----
 
-    private void WriteBackup(ClientFilesPlan plan, string backupId, string backupDir, List<Target> targets)
+    private void WriteBackup(ClientFilesPlan plan, string clientRoot, string backupId, string backupDir, List<Target> targets)
     {
         var files = new List<ManifestFile>();
         for (var i = 0; i < targets.Count; i++)
@@ -216,7 +221,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             backupId,
             plan.InstallationId,
             plan.ProfileId,
-            plan.ClientRoot,
+            clientRoot,
             plan.Version.ToString(),
             _clock(),
             null,
@@ -376,15 +381,6 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             throw new ArgumentException("InstallationId must be 1-64 characters of letters, digits, '.', '_' or '-'.", nameof(installationId));
         if (profileId != "-" && !ClientFilesRequest.IsValidId(profileId))
             throw new ArgumentException("ProfileId must be 1-64 characters of letters, digits, '.', '_' or '-'.", nameof(profileId));
-    }
-
-    /// <summary>Joins a '/'-separated relative path below the client root, refusing anything that could leave it.</summary>
-    private static string ResolveInside(string root, string relative)
-    {
-        var segments = relative.Split('/');
-        if (segments.Any(s => s.Length == 0 || s is "." or ".." || s.Contains('\\') || s.Contains(':')))
-            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, relative, $"'{relative}' is not a relative path inside the client folder.");
-        return Path.Combine([root, .. segments]);
     }
 
     private static byte[]? ReadIfExists(string path)

@@ -58,6 +58,7 @@ public interface IClientFilesApplier
     /// Undoes the most recent applied change of the installation that has not been undone yet. Files whose current
     /// content is not what the apply wrote are reported as conflicts and never overwritten.
     /// </summary>
+    /// <param name="clientRoot">The installation's trusted client directory (must match the backup manifest).</param>
     /// <exception cref="ClientFilesException"><see cref="ClientFilesErrorCode.NothingToUndo"/> when no change is pending.</exception>
-    UndoResult Undo(string installationId);
+    UndoResult Undo(string installationId, string clientRoot);
 }
