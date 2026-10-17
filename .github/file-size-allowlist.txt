@@ -1,0 +1,10 @@
+# Files allowed to exceed the per-file size limit enforced by the `file-size` CI job
+# (see .github/workflows/file-size.yml and CONTRIBUTING.md).
+#
+# Format: one repository-relative path per line, exact match (no globs).
+# Blank lines and lines starting with '#' are ignored.
+# Add a short comment above each entry explaining why the file must be large
+# (e.g. a texture or font that cannot be reduced) and prefer Git LFS or an
+# external download for anything bigger than a few MiB.
+#
+# Currently empty: the largest tracked file is under 1.5 MiB.
