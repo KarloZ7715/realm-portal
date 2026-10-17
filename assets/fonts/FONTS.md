@@ -1,24 +1,24 @@
-# Tipografías de Realm Portal (dirección B)
+# Realm Portal typefaces (direction B)
 
-Descargadas el 2026-10-17 del repositorio oficial **google/fonts** (carpeta `ofl/`). Todas bajo **SIL Open Font License 1.1** (https://openfontlicense.org); el `OFL.txt` de cada familia (copiado del repo) está junto a sus TTF. Se pueden usar, incrustar y redistribuir con la app; no se pueden vender por separado, y las versiones modificadas no pueden usar el «Reserved Font Name» cuando existe.
+Downloaded on 2026-10-17 from the official **google/fonts** repository (`ofl/` folder). All are licensed under the **SIL Open Font License 1.1** (https://openfontlicense.org); each family's `OFL.txt` (copied from the repository) sits next to its TTFs. They may be used, embedded and redistributed with the app; they may not be sold on their own, and modified versions may not use the "Reserved Font Name" when one exists.
 
-| Familia | Archivos TTF incluidos | Copyright (línea 1 del OFL.txt) | Reserved Font Name | URL de origen |
+| Family | Included TTF files | Copyright (line 1 of OFL.txt) | Reserved Font Name | Source URL |
 |---|---|---|---|---|
-| Almendra | `Almendra-Bold.ttf` (35.8 KB) | © 2011-2012 Ana Sanfelippo | «Almendra» | https://github.com/google/fonts/tree/main/ofl/almendra |
-| Marcellus SC | `MarcellusSC-Regular.ttf` (46.8 KB) | © 2012 Brian J. Bonislawsky DBA Astigmatic (AOETI) | «Marcellus» | https://github.com/google/fonts/tree/main/ofl/marcellussc |
-| Alegreya | `Alegreya-Bold.ttf` (262.1 KB), `Alegreya-Medium.ttf` (262.3 KB), `Alegreya-Regular.ttf` (261.7 KB), `Alegreya[wght].ttf` (415.3 KB) | © 2011 The Alegreya Project Authors | ninguno | https://github.com/google/fonts/tree/main/ofl/alegreya |
-| Alegreya Sans | `AlegreyaSans-Bold.ttf` (260.6 KB), `AlegreyaSans-Medium.ttf` (258.4 KB), `AlegreyaSans-Regular.ttf` (257.6 KB) | © 2013 The Alegreya Sans Project Authors | ninguno | https://github.com/google/fonts/tree/main/ofl/alegreyasans |
-| JetBrains Mono | `JetBrainsMono-Regular.ttf` (112.5 KB), `JetBrainsMono[wght].ttf` (182.8 KB) | © 2020 The JetBrains Mono Project Authors | ninguno | https://github.com/google/fonts/tree/main/ofl/jetbrainsmono |
+| Almendra | `Almendra-Bold.ttf` (35.8 KB) | © 2011-2012 Ana Sanfelippo | "Almendra" | https://github.com/google/fonts/tree/main/ofl/almendra |
+| Marcellus SC | `MarcellusSC-Regular.ttf` (46.8 KB) | © 2012 Brian J. Bonislawsky DBA Astigmatic (AOETI) | "Marcellus" | https://github.com/google/fonts/tree/main/ofl/marcellussc |
+| Alegreya | `Alegreya-Bold.ttf` (262.1 KB), `Alegreya-Medium.ttf` (262.3 KB), `Alegreya-Regular.ttf` (261.7 KB), `Alegreya[wght].ttf` (415.3 KB) | © 2011 The Alegreya Project Authors | none | https://github.com/google/fonts/tree/main/ofl/alegreya |
+| Alegreya Sans | `AlegreyaSans-Bold.ttf` (260.6 KB), `AlegreyaSans-Medium.ttf` (258.4 KB), `AlegreyaSans-Regular.ttf` (257.6 KB) | © 2013 The Alegreya Sans Project Authors | none | https://github.com/google/fonts/tree/main/ofl/alegreyasans |
+| JetBrains Mono | `JetBrainsMono-Regular.ttf` (112.5 KB), `JetBrainsMono[wght].ttf` (182.8 KB) | © 2020 The JetBrains Mono Project Authors | none | https://github.com/google/fonts/tree/main/ofl/jetbrainsmono |
 
-Archivos fuente directos: `https://github.com/google/fonts/raw/main/ofl/<carpeta>/<archivo>`.
+Direct source files: `https://github.com/google/fonts/raw/main/ofl/<folder>/<file>`.
 
-## Notas de origen y modificación
-- **Almendra Bold** y **Marcellus SC Regular**: sin modificar, tal cual en el repo (tienen Reserved Font Name; no renombrar ni editar).
-- **Alegreya** y **JetBrains Mono**: en `google/fonts` solo existen como fuentes variables (`Alegreya[wght].ttf`, `JetBrainsMono[wght].ttf`). Se conservan los originales y, para facilitar el uso en Avalonia (que trabaja mejor con pesos estáticos), se generaron instancias estáticas con fontTools `varLib.instancer` (Alegreya 400/500/700 → `Alegreya-Regular/Medium/Bold.ttf`; JetBrains Mono 400 → `JetBrainsMono-Regular.ttf`). Son obras derivadas permitidas por la OFL porque estas familias no declaran Reserved Font Name; su OFL.txt acompaña los archivos. Aviso: el nombre interno de familia de `Alegreya-Medium.ttf` es «Alegreya Medium» (estilo Regular); si Avalonia no resuelve el peso 500, referenciarla por ese nombre.
-- **Alegreya Sans** (Regular/Medium/Bold): estáticas originales del repo, sin modificar.
+## Source and modification notes
+- **Almendra Bold** and **Marcellus SC Regular**: unmodified, exactly as in the repository (they have a Reserved Font Name; do not rename or edit).
+- **Alegreya** and **JetBrains Mono**: in `google/fonts` they exist only as variable fonts (`Alegreya[wght].ttf`, `JetBrainsMono[wght].ttf`). The originals are kept and, to make them easier to use in Avalonia (which works better with static weights), static instances were generated with fontTools `varLib.instancer` (Alegreya 400/500/700 → `Alegreya-Regular/Medium/Bold.ttf`; JetBrains Mono 400 → `JetBrainsMono-Regular.ttf`). They are derivative works permitted by the OFL because these families declare no Reserved Font Name; their OFL.txt accompanies the files. Warning: the internal family name of `Alegreya-Medium.ttf` is "Alegreya Medium" (Regular style); if Avalonia does not resolve weight 500, reference it by that name.
+- **Alegreya Sans** (Regular/Medium/Bold): original static files from the repository, unmodified.
 
-## Uso en la maqueta (según `DESIGN-TOKENS-B.md`)
-Almendra Bold = títulos; Marcellus SC = etiquetas/botones; Alegreya = texto de lectura; Alegreya Sans = texto de interfaz pequeño y estados; JetBrains Mono = código y rutas.
+## Intended use in the design
+Almendra Bold = titles; Marcellus SC = labels/buttons; Alegreya = reading text; Alegreya Sans = small interface text and states; JetBrains Mono = addresses, paths and code.
 
-## Comprobación de glifos
-Verificado con fontTools (cmap) en **cada TTF** de esta carpeta: presentes `á é í ó ú ñ ¿ ¡ ü` y también `Á É Í Ó Ú Ñ Ü « » — ·`. Prueba visual: `preview-composicion.png` renderiza «ñandú, árbol, cigüeña, ¿listo? ¡sí!» con Alegreya. Excepción: JetBrains Mono no tiene `✓` (U+2713).
+## Glyph check
+Verified with fontTools (cmap) in **every TTF** in this folder: `á é í ó ú ñ ¿ ¡ ü` are present, as well as `Á É Í Ó Ú Ñ Ü « » — ·` (needed for the Spanish UI). Exception: JetBrains Mono has no `✓` (U+2713).
