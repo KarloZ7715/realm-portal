@@ -17,7 +17,11 @@ public enum ButtonSurfaceKind
 public static class ButtonSurface
 {
     public static readonly AttachedProperty<ButtonSurfaceKind> SurfaceProperty =
-        AvaloniaProperty.RegisterAttached<Control, ButtonSurfaceKind>("Surface", typeof(ButtonSurface), ButtonSurfaceKind.Leather);
+        AvaloniaProperty.RegisterAttached<Control, ButtonSurfaceKind>(
+            "Surface",
+            typeof(ButtonSurface),
+            ButtonSurfaceKind.Leather,
+            inherits: true);
 
     static ButtonSurface()
     {
@@ -31,6 +35,6 @@ public static class ButtonSurface
 
     private static void OnSurfaceChanged(Control control, AvaloniaPropertyChangedEventArgs args)
     {
-        control.Classes.Set("surface-parchment", (ButtonSurfaceKind)args.NewValue! == ButtonSurfaceKind.Parchment);
+        control.Classes.Set("surface-parchment", GetSurface(control) == ButtonSurfaceKind.Parchment);
     }
 }

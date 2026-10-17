@@ -239,6 +239,19 @@ public class ControlTests
     }
 
     [AvaloniaFact]
+    public void ParchmentSurfaceInheritsFromParentToDescendantButtons()
+    {
+        var button = new Button { Content = "Test", Classes = { "secondary" } };
+        var card = new ContentControl { Classes = { "card" }, Content = button, Width = 300, Height = 80 };
+        ButtonSurface.SetSurface(card, ButtonSurfaceKind.Parchment);
+        Host(card);
+        Screenshots.Settle();
+        Assert.Equal(ButtonSurfaceKind.Parchment, ButtonSurface.GetSurface(button));
+        Assert.Contains("surface-parchment", button.Classes);
+        Assert.Equal("button-secondary-parchment-normal", Source(button, "Plate"));
+    }
+
+    [AvaloniaFact]
     public void ToggleArtFollowsTheControlState()
     {
         var box = Host(new CheckBox { Content = "x", IsChecked = true });
