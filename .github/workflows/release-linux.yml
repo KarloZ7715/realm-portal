@@ -1,0 +1,121 @@
+name: Release (Linux packages)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version (defaults to the project Version in Directory.Build.props)
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+# Read repo; write only workflow artifacts (no GitHub Release, no package registry).
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: release-linux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  APP_PROJECT: src/RealmPortal.App/RealmPortal.App.csproj
+  # AppImageKit release 13 ships appimagetool under the obsolete-* asset names.
+  APPIMAGETOOL_VERSION: "13"
+  APPIMAGETOOL_SHA256: "df3baf5ca5facbecfc2f3fa6713c29ab9cefa8fd8c1eac5d283b79cab33e4acb"
+
+jobs:
+  linux-packages:
+    name: linux-x64 packages
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve package version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
+            ver="${GITHUB_REF_NAME#v}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            ver="${{ inputs.version }}"
+          else
+            ver="$(grep -E '<Version>' Directory.Build.props | head -1 | sed -E 's/.*<Version>([^<]+)<\/Version>.*/\1/')"
+          fi
+          if [ -z "$ver" ]; then
+            echo "::error::Could not determine package version"
+            exit 1
+          fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "Package version: $ver"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', '**/*.csproj', '**/Directory.Packages.props', '**/Directory.Build.props', '**/packages.lock.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Publish (linux-x64, self-contained, trimmed, ReadyToRun)
+        run: |
+          set -euo pipefail
+          publish_dir="$RUNNER_TEMP/publish"
+          dotnet publish "$APP_PROJECT" \
+            -c Release \
+            -r linux-x64 \
+            --self-contained true \
+            -p:PublishTrimmed=true \
+            -p:TrimMode=partial \
+            -p:PublishReadyToRun=true \
+            -o "$publish_dir" \
+            2>&1 | tee "$RUNNER_TEMP/publish.log"
+          if grep -E 'error (IL|NETSDK)' "$RUNNER_TEMP/publish.log"; then
+            echo "::error::Publish reported trim errors"
+            exit 1
+          fi
+          echo "PUBLISH_DIR=$publish_dir" >> "$GITHUB_ENV"
+
+      - name: Install packaging tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends dpkg-dev zsync libfuse2
+          archive="obsolete-appimagetool-x86_64.AppImage"
+          url="https://github.com/AppImage/AppImageKit/releases/download/${APPIMAGETOOL_VERSION}/${archive}"
+          curl -sSfL --retry 3 -o "$RUNNER_TEMP/$archive" "$url"
+          echo "${APPIMAGETOOL_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          chmod +x "$RUNNER_TEMP/$archive"
+          echo "APPIMAGETOOL=$RUNNER_TEMP/$archive" >> "$GITHUB_ENV"
+
+      - name: Build .deb and AppImage
+        run: |
+          set -euo pipefail
+          out_dir="$RUNNER_TEMP/packages"
+          mkdir -p "$out_dir"
+          packaging/linux/build-packages.sh "$PUBLISH_DIR" "${{ steps.version.outputs.version }}" "$out_dir"
+          echo "PACKAGE_DIR=$out_dir" >> "$GITHUB_ENV"
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: realm-portal-linux-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.PACKAGE_DIR }}/*.deb
+            ${{ env.PACKAGE_DIR }}/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
