@@ -37,6 +37,11 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 - The wide sidebar (960 px and up) and the clickable language toggle are not in the 720x480 mockups.
 - The status bar text: idle shows `realmlist · <active host>`; right after a switch `Activo: <name>`.
 
+## Errors and dialogs (F4)
+
+- `ErrorText` turns the stable error codes of the core (`ClientFilesErrorCode`, plus `ProcessCheckFailed`, announced for 0.1) into a localized title and body; the core never supplies UI text. A code without strings shows a generic message; a test fails when a code lacks ES or EN text.
+- `ConfirmDialogViewModel` / `MainViewModel.ConfirmAsync` show a modal question over the window. "Discard backup" (conflicting backup: nothing is restored or deleted, the backup is only marked as discarded and can no longer be undone from the app) uses it with Cancel as the default button and the first focus. The dialog layout is provisional until the designer delivers it; it is not wired to any action yet (the service does not expose Discard).
+
 ## Art used without a Figma reference
 
 See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.

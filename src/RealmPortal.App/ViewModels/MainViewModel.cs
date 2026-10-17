@@ -57,6 +57,38 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The non-affiliation note shown at the foot of the wide sidebar.</summary>
     public string Disclaimer => Loc.Instance.Current == Language.Es ? AppInfo.DisclaimerEs : AppInfo.DisclaimerEn;
 
+    /// <summary>The modal question being shown, or null.</summary>
+    [ObservableProperty]
+    private ConfirmDialogViewModel? _dialog;
+
+    /// <summary>Raised before <see cref="Dialog"/> is set so the window can capture keyboard focus.</summary>
+    public event Action? DialogOpening;
+
+    /// <summary>Raised after <see cref="Dialog"/> is cleared so the window can restore keyboard focus.</summary>
+    public event Action? DialogClosed;
+
+    /// <summary>Shows <paramref name="dialog"/> over the window and returns the user's answer; a second dialog while one is open answers false.</summary>
+    public async Task<bool> ConfirmAsync(ConfirmDialogViewModel dialog)
+    {
+        if (Dialog is not null)
+        {
+            dialog.Reject();
+            return false;
+        }
+
+        DialogOpening?.Invoke();
+        Dialog = dialog;
+        try
+        {
+            return await dialog.Result;
+        }
+        finally
+        {
+            Dialog = null;
+            DialogClosed?.Invoke();
+        }
+    }
+
     [RelayCommand]
     private void ToggleLanguage() => Loc.Instance.Toggle();
 
