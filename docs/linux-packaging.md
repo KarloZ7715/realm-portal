@@ -18,7 +18,7 @@ It does **not** create a GitHub Release. Outputs are uploaded as a single workfl
 
 ### Build steps (summary)
 
-1. `dotnet publish` `src/RealmPortal.App/RealmPortal.App.csproj` for `linux-x64`, self-contained, `PublishTrimmed=true`, `TrimMode=partial`, `PublishReadyToRun=true`.
+1. `dotnet restore` `src/RealmPortal.App/RealmPortal.App.csproj` with `--locked-mode` (NuGet lock files from the repo), then `dotnet publish --no-restore` for `linux-x64`, self-contained, `PublishTrimmed=true`, `TrimMode=partial`, `PublishReadyToRun=true`.
 2. `packaging/linux/build-packages.sh` lays out the `.deb` and AppImage from that publish directory (see below).
 3. `appimagetool` (AppImageKit release 13, pinned SHA in the workflow) produces the AppImage.
 
