@@ -117,6 +117,24 @@ public sealed class CliApp(
         return 2;
     }
 
+    /// <summary>
+    /// Same failure as <see cref="Fail"/>. When launch failed after the switch was applied
+    /// (<see cref="ServiceErrorCode.LaunchFailed"/> and <see cref="Consistency.AppliedLaunchFailed"/>),
+    /// also say the server is still applied and that <c>undo</c> can restore the previous one.
+    /// </summary>
+    private int FailLaunch(ServiceError serviceError, string serverName)
+    {
+        var code = Fail(serviceError);
+        if (serviceError.Code == ServiceErrorCode.LaunchFailed
+            && serviceError.Consistency == Consistency.AppliedLaunchFailed)
+        {
+            error.WriteLine(
+                $"The game did not start, but '{serverName}' is still applied to this client. Run 'undo' to restore the previous server.");
+        }
+
+        return code;
+    }
+
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private static Parsed Parse(string[] args)
@@ -353,7 +371,7 @@ public sealed class CliApp(
 
             var play = service.Play(new SwitchRequest(clientId, server.Id, force));
             if (!play.Succeeded)
-                return Fail(play.Error!);
+                return FailLaunch(play.Error!, server.Name);
             output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
             return 0;
         }
@@ -378,7 +396,7 @@ public sealed class CliApp(
 
         var launch = service.Play(new SwitchRequest(clientId, server.Id, force));
         if (!launch.Succeeded)
-            return Fail(launch.Error!);
+            return FailLaunch(launch.Error!, server.Name);
         output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
         return 0;
     }
