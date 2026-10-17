@@ -2,11 +2,17 @@ using System.Text;
 
 namespace RealmPortal.Core.Servers;
 
-/// <summary>Builds and validates the canonical realmlist text.</summary>
+/// <summary>Builds and validates the realmlist text of a server.</summary>
 /// <remarks>
-/// Contract (the consuming launcher relies on it): the text is pure ASCII (printable characters plus the
-/// <c>\r\n</c> line terminators), starts with exactly <c>set realmlist </c> in lowercase followed by the host,
-/// and every line, the last one included, ends with <c>\r\n</c>.
+/// The realmlist text is the source of truth and is written as-is. Contract (the consuming launcher relies on it):
+/// <list type="bullet">
+/// <item>pure ASCII; every line, the last one included, ends with <c>\r\n</c> (no bare CR or LF);</item>
+/// <item>every line has the form <c>set &lt;key&gt; &lt;value&gt;</c> (lowercase <c>set</c>, single spaces) with key
+/// <c>realmlist</c> or <c>patchlist</c>, each at most once. Other keys are rejected; <c>portal</c> is only meaningful
+/// for WoD/Legion clients, which the project does not model yet, so it is rejected for now;</item>
+/// <item>the first line is <c>set realmlist &lt;host&gt;</c> in lowercase;</item>
+/// <item>values contain no quotes (<c>"</c> or <c>'</c>), spaces or control characters.</item>
+/// </list>
 /// </remarks>
 public static class RealmlistText
 {
@@ -16,74 +22,98 @@ public static class RealmlistText
     /// <summary>The exact (lowercase) prefix of the first line.</summary>
     public const string Prefix = "set realmlist ";
 
-    /// <summary>True for printable ASCII (0x20-0x7E).</summary>
-    public static bool IsPrintableAscii(char c) => c is >= ' ' and <= '~';
+    private static readonly string[] AllowedKeys = ["realmlist", "patchlist"];
 
     /// <summary>
     /// Returns <c>set realmlist {host}</c> followed by the extra lines, each line terminated by <c>\r\n</c>
-    /// (the last one too). Extra lines are trimmed; blank ones are dropped.
+    /// (the last one too). Extra lines are trimmed; blank ones are dropped. The result is validated.
     /// </summary>
-    /// <exception cref="ArgumentException">
-    /// The host is empty, or the host or an extra line contains a line break or a non-printable or non-ASCII character
-    /// (internationalised host names must be given in their ASCII/punycode form).
-    /// </exception>
+    /// <exception cref="InvalidRealmlistException">The resulting text breaks the contract; nothing is returned.</exception>
     public static string Build(string host, IEnumerable<string>? extraLines = null)
     {
         ArgumentNullException.ThrowIfNull(host);
-        if (host.Length == 0 || host.Any(c => !IsPrintableAscii(c)))
-            throw new ArgumentException("The host must be non-empty printable ASCII without line breaks.", nameof(host));
+        if (host.Contains('\r') || host.Contains('\n'))
+            throw new InvalidRealmlistException(InvalidRealmlistKind.InvalidValue, "the host must not contain line breaks", 1);
 
         var text = new StringBuilder();
         text.Append(Prefix).Append(host).Append(LineEnding);
-
         foreach (var raw in extraLines ?? [])
         {
             var line = raw?.Trim() ?? "";
-            if (line.Length == 0)
-                continue;
-            if (line.Any(c => !IsPrintableAscii(c)))
-                throw new ArgumentException(
-                    "A realmlist line must be printable ASCII without line breaks.", nameof(extraLines));
-            text.Append(line).Append(LineEnding);
+            if (line.Length > 0)
+                text.Append(line).Append(LineEnding);
         }
 
-        return text.ToString();
+        var result = text.ToString();
+        Validate(result);
+        return result;
     }
 
-    /// <summary>
-    /// Checks the contract above for a realmlist text (for example one read from a hand-edited file).
-    /// Returns <c>null</c> when valid, otherwise a short human-readable reason.
-    /// </summary>
-    public static string? Validate(string? text)
+    /// <summary>Checks the realmlist contract; returns normally when the text is valid.</summary>
+    /// <exception cref="InvalidRealmlistException">The text is not valid (see <see cref="InvalidRealmlistKind"/>).</exception>
+    public static void Validate(string? text)
     {
         if (string.IsNullOrEmpty(text))
-            return "the realmlist is empty";
-        if (!text.StartsWith(Prefix, StringComparison.Ordinal))
-            return $"it must start with \"{Prefix}\" in lowercase";
-        if (text.Length == Prefix.Length || text[Prefix.Length] is '\r' or '\n')
-            return "the host after \"set realmlist\" is missing";
-        if (!text.EndsWith(LineEnding, StringComparison.Ordinal))
-            return "every line, including the last, must end with CR LF";
+            throw new InvalidRealmlistException(InvalidRealmlistKind.Empty, "the realmlist is empty");
 
+        var bad = text.FirstOrDefault(c => c > '\u007F');
+        if (bad != '\0')
+            throw new InvalidRealmlistException(
+                InvalidRealmlistKind.NotAscii,
+                $"it contains the non-ASCII character U+{(int)bad:X4}; use ASCII only (punycode for international host names)",
+                LineOf(text, text.IndexOf(bad)));
+
+        if (!text.EndsWith(LineEnding, StringComparison.Ordinal))
+            throw new InvalidRealmlistException(InvalidRealmlistKind.BadLineEnding, "every line, including the last, must end with CR LF");
         for (var i = 0; i < text.Length; i++)
         {
-            var c = text[i];
-            if (c == '\r')
-            {
-                if (i + 1 >= text.Length || text[i + 1] != '\n')
-                    return "it contains a bare CR (line endings must be CR LF)";
-                i++;
-            }
-            else if (c == '\n')
-            {
-                return "it contains a bare LF (line endings must be CR LF)";
-            }
-            else if (!IsPrintableAscii(c))
-            {
-                return $"it contains the non-ASCII or control character U+{(int)c:X4} (only printable ASCII is allowed)";
-            }
+            var bareCr = text[i] == '\r' && (i + 1 >= text.Length || text[i + 1] != '\n');
+            var bareLf = text[i] == '\n' && (i == 0 || text[i - 1] != '\r');
+            if (bareCr || bareLf)
+                throw new InvalidRealmlistException(
+                    InvalidRealmlistKind.BadLineEnding, "line endings must be CR LF (found a bare CR or LF)", LineOf(text, i));
         }
 
-        return null;
+        var lines = text[..^LineEnding.Length].Split(LineEnding);
+        var seen = new HashSet<string>();
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var number = index + 1;
+            var line = lines[index];
+
+            if (index == 0 && !line.StartsWith(Prefix, StringComparison.Ordinal))
+                throw new InvalidRealmlistException(
+                    InvalidRealmlistKind.WrongFirstLine, $"the first line must be \"set realmlist <host>\" in lowercase", number);
+
+            var parts = line.Split(' ');
+            if (parts[0] != "set" || parts.Length < 3 || parts[1].Length == 0)
+                throw new InvalidRealmlistException(
+                    InvalidRealmlistKind.MalformedLine, "a line must have the form \"set <key> <value>\"", number);
+
+            var key = parts[1];
+            if (!AllowedKeys.Contains(key, StringComparer.Ordinal))
+                throw new InvalidRealmlistException(
+                    InvalidRealmlistKind.ForbiddenKey,
+                    key == "portal"
+                        ? "the key \"portal\" is only valid for WoD/Legion clients and is not supported yet"
+                        : $"the key \"{key}\" is not allowed (only realmlist and patchlist)",
+                    number);
+            if (index == 0 && key != "realmlist")
+                throw new InvalidRealmlistException(
+                    InvalidRealmlistKind.WrongFirstLine, "the first line must be \"set realmlist <host>\" in lowercase", number);
+            if (!seen.Add(key))
+                throw new InvalidRealmlistException(InvalidRealmlistKind.DuplicateKey, $"the key \"{key}\" appears more than once", number);
+
+            if (parts.Length != 3 || parts[2].Length == 0)
+                throw new InvalidRealmlistException(
+                    InvalidRealmlistKind.InvalidValue,
+                    parts.Length > 3 ? "the value must not contain spaces" : "the value is missing",
+                    number);
+            if (parts[2].Any(c => c is '"' or '\'' || char.IsControl(c)))
+                throw new InvalidRealmlistException(
+                    InvalidRealmlistKind.InvalidValue, "the value must not contain quotes or control characters", number);
+        }
     }
+
+    private static int LineOf(string text, int index) => text.AsSpan(0, Math.Max(index, 0)).Count('\n') + 1;
 }
