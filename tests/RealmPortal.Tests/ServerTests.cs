@@ -43,6 +43,8 @@ public class ServerTests
     [InlineData("n", "")]
     [InlineData("n", "ho st")]
     [InlineData("n", "ho\tst")]
+    [InlineData("n", "ünï.example.org")]
+    [InlineData("n", "host.例え.jp")]
     [InlineData("bad\nname", "h")]
     public void Create_RejectsInvalidInput(string name, string host) =>
         Assert.Throws<ArgumentException>(() => Server.Create(name, host));
@@ -58,6 +60,23 @@ public class ServerTests
     [Fact]
     public void Build_RejectsHostWithLineBreak() =>
         Assert.Throws<ArgumentException>(() => RealmlistText.Build("h\r\nset patchlist evil"));
+
+    [Theory]
+    [InlineData("set patchlist pätch.example.org")]
+    [InlineData("-- 龍")]
+    [InlineData("tab\there")]
+    public void Create_RejectsNonAsciiOrControlExtraLines(string line) =>
+        Assert.Throws<ArgumentException>(() => Server.Create("n", "h", extraRealmlistLines: [line]));
+
+    [Fact]
+    public void Create_AllowsNonAsciiNameAndRealm_ButRealmlistStaysAscii()
+    {
+        var server = Server.Create("Ñandú 龍", "h.example.org", "Reino ñ");
+
+        Assert.Equal("Ñandú 龍", server.Name);
+        Assert.Null(RealmlistText.Validate(server.Realmlist));
+        Assert.StartsWith("set realmlist ", server.Realmlist, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void Create_RejectsExtraLineWithLineBreak() =>
