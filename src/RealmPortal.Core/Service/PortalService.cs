@@ -554,7 +554,7 @@ public sealed class PortalService : IPortalService
             if (launch)
             {
                 if (!RunStep(progress, ServiceStep.Launch, () => LaunchGame(client.Path, _settings.GetLauncherSettings()), out var launchError))
-                    return ServiceResult<SwitchOutcome>.Fail(launchError! with { Code = ServiceErrorCode.LaunchFailed });
+                    return ServiceResult<SwitchOutcome>.Fail(launchError! with { Code = ServiceErrorCode.LaunchFailed, Consistency = Consistency.AppliedLaunchFailed });
             }
 
             return ServiceResult<SwitchOutcome>.Ok(new SwitchOutcome(activeEntry, previous, backupId, changedFiles));
