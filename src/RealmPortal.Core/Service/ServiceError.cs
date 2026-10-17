@@ -1,0 +1,140 @@
+using RealmPortal.Core.Servers;
+
+namespace RealmPortal.Core.Service;
+
+/// <summary>
+/// Stable, machine-readable reason why a service call failed. The UI maps each code (plus the parameters in
+/// <see cref="ServiceError"/>) to localized text; Core never produces user-facing text.
+/// </summary>
+public enum ServiceErrorCode
+{
+    // ---- client files (names match ClientFilesErrorCode one to one) ----
+    /// <summary>The game is running; client files must not be changed.</summary>
+    GameRunning,
+
+    /// <summary>The running game processes could not be listed, so "not running" cannot be confirmed.</summary>
+    ProcessCheckFailed,
+
+    PermissionDenied,
+    ReadOnlyFs,
+
+    /// <summary>The client directory or a path inside it does not exist.</summary>
+    PathNotFound,
+
+    /// <summary>A client file changed since it was planned or backed up (user or game).</summary>
+    HashMismatch,
+
+    VerifyFailed,
+
+    /// <summary>The client version has no known file layout.</summary>
+    UnsupportedClient,
+
+    /// <summary>The server's realmlist breaks the contract; see <see cref="ServiceError.RealmlistKind"/>, <see cref="ServiceError.LineNumber"/>, <see cref="ServiceError.ServerName"/>.</summary>
+    InvalidRealmlist,
+
+    /// <summary>Nothing was applied that could be undone.</summary>
+    NothingToUndo,
+
+    // ---- reading a client's version ----
+    /// <summary>The folder has no <c>Wow.exe</c>.</summary>
+    ClientExecutableNotFound,
+    ClientNotAPortableExecutable,
+    ClientNoVersionResource,
+
+    /// <summary>The client executable exists but cannot be read.</summary>
+    ClientUnreadable,
+
+    // ---- servers, clients and settings ----
+    /// <summary>No server with that id.</summary>
+    ServerNotFound,
+
+    /// <summary>No registered client with that id.</summary>
+    ClientNotFound,
+
+    /// <summary>Another server already has that name (case-insensitive); <see cref="ServiceError.ServerName"/> is set.</summary>
+    ServerNameTaken,
+
+    /// <summary>A field of a new server is invalid; <see cref="ServiceError.Field"/> names it (<c>name</c>, <c>host</c>, <c>realm</c>, <c>account</c>, <c>build</c>).</summary>
+    InvalidServerInput,
+
+    /// <summary>The server needs another client build; <see cref="ServiceError.RequiredBuild"/> and <see cref="ServiceError.ClientBuild"/> are set.</summary>
+    IncompatibleClient,
+
+    /// <summary>servers.json, state.json or the client list is unreadable or has an unsupported format (never overwritten).</summary>
+    StoreCorrupt,
+
+    /// <summary>Undo cannot restore the previous server because it was removed.</summary>
+    UndoTargetMissing,
+
+    /// <summary>The launcher settings cannot be resolved into a command (for example the template has no <c>{exe}</c>).</summary>
+    InvalidLauncherSettings,
+
+    /// <summary>The game process could not be started.</summary>
+    LaunchFailed,
+
+    // ---- cross-cutting ----
+    /// <summary>A multi-step operation failed and the compensating step failed too: the app state and the client files may disagree. See <see cref="ServiceError.Consistency"/>.</summary>
+    InconsistentState,
+
+    /// <summary>Anything not listed above; <see cref="ServiceError.Diagnostic"/> carries the exception text for logs.</summary>
+    Unexpected,
+}
+
+/// <summary>What state the operation left behind when it failed.</summary>
+public enum Consistency
+{
+    /// <summary>Nothing was changed.</summary>
+    Unchanged,
+
+    /// <summary>Some steps ran, then everything was put back (the app and the client are as before the call).</summary>
+    RolledBack,
+
+    /// <summary>The operation could not be rolled back; the user should be told to review the client.</summary>
+    Inconsistent,
+}
+
+/// <summary>A failure as data: a stable code plus the parameters the UI needs for its message. Everything except <see cref="Code"/> is optional.</summary>
+/// <param name="Code">What went wrong.</param>
+/// <param name="ServerName">Server involved (name clash, invalid realmlist, ...).</param>
+/// <param name="Path">File or folder involved.</param>
+/// <param name="LineNumber">1-based realmlist line for <see cref="ServiceErrorCode.InvalidRealmlist"/>.</param>
+/// <param name="RealmlistKind">Why the realmlist is invalid (<see cref="ServiceErrorCode.InvalidRealmlist"/>).</param>
+/// <param name="Field">Offending field of <see cref="NewServer"/> (<see cref="ServiceErrorCode.InvalidServerInput"/>).</param>
+/// <param name="RequiredBuild">Build the server needs (<see cref="ServiceErrorCode.IncompatibleClient"/>).</param>
+/// <param name="ClientBuild">Build of the selected client (<see cref="ServiceErrorCode.IncompatibleClient"/>).</param>
+/// <param name="Consistency">What the failed operation left behind.</param>
+/// <param name="Diagnostic">English exception text for logs. Not UI text and not stable.</param>
+public sealed record ServiceError(
+    ServiceErrorCode Code,
+    string? ServerName = null,
+    string? Path = null,
+    int? LineNumber = null,
+    InvalidRealmlistKind? RealmlistKind = null,
+    string? Field = null,
+    int? RequiredBuild = null,
+    int? ClientBuild = null,
+    Consistency Consistency = Consistency.Unchanged,
+    string Diagnostic = "");
+
+/// <summary>Nothing to return.</summary>
+public readonly record struct Unit;
+
+/// <summary>Outcome of a service call: a value or an error, never an exception.</summary>
+public sealed record ServiceResult<T>
+{
+    private ServiceResult(T? value, ServiceError? error)
+    {
+        Value = value;
+        Error = error;
+    }
+
+    public T? Value { get; }
+
+    public ServiceError? Error { get; }
+
+    public bool Succeeded => Error is null;
+
+    public static ServiceResult<T> Ok(T value) => new(value, null);
+
+    public static ServiceResult<T> Fail(ServiceError error) => new(default, error ?? throw new ArgumentNullException(nameof(error)));
+}
