@@ -29,13 +29,15 @@ public class ClientFilesSymlinkTests
         var plan = applier.Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, ""));
         applier.Apply(plan);
 
-        Assert.Null(File.ResolveLinkTarget(linkPath));
+        Assert.Null(File.ResolveLinkTarget(linkPath, returnFinalTarget: true));
         Assert.Equal("set realmlist logon-a.example.org\r\n", File.ReadAllText(linkPath));
         Assert.Equal("set realmlist shared.example.org\r\n", File.ReadAllText(shared));
 
         applier.Undo("install-1");
 
-        Assert.Equal(shared, File.ResolveLinkTarget(linkPath, returnFinalTarget: true));
+        var restoredTarget = File.ResolveLinkTarget(linkPath, returnFinalTarget: true);
+        Assert.NotNull(restoredTarget);
+        Assert.Equal(Path.GetFullPath(shared), restoredTarget.FullName);
         Assert.Equal("set realmlist shared.example.org\r\n", File.ReadAllText(linkPath));
     }
 
