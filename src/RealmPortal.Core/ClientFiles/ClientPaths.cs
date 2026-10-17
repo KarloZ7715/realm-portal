@@ -28,7 +28,91 @@ public static class ClientPaths
     public static string ResolveManagedPath(string canonicalRoot, string relativePath)
     {
         ValidateManagedRelativePath(relativePath);
-        return ResolveInside(canonicalRoot, relativePath);
+        var combined = ResolveInside(canonicalRoot, relativePath);
+        RequireParentInsideThroughLinks(canonicalRoot, relativePath, combined);
+        return combined;
+    }
+
+    private const int MaxLinkHops = 40;
+
+    /// <summary>
+    /// <see cref="Path.GetFullPath(string)"/> does not follow symbolic links, so a managed folder (<c>Data</c>, <c>Data/enUS</c>,
+    /// <c>WTF</c>) that is a link or junction to a folder outside the client would let a write or delete land outside it.
+    /// Resolves the parent folder of the managed file one link hop at a time and refuses it unless it stays under the
+    /// (resolved) client root. The leaf file itself is not followed: writes replace it atomically.
+    /// </summary>
+    private static void RequireParentInsideThroughLinks(string canonicalRoot, string relative, string combined)
+    {
+        var parent = Path.GetDirectoryName(combined);
+        if (parent is null)
+            return;
+
+        var hops = 0;
+        string realRoot, realParent;
+        try
+        {
+            realRoot = ResolveLinks(canonicalRoot, ref hops);
+            hops = 0;
+            realParent = ResolveLinks(parent, ref hops);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, relative,
+                $"'{relative}' could not be resolved inside the client directory: {ex.Message}", ex);
+        }
+
+        if (!IsUnderRoot(realRoot, realParent))
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, relative,
+                $"'{relative}' resolves outside the client directory through a symbolic link.");
+    }
+
+    /// <summary>Returns <paramref name="path"/> with every existing link component replaced by its target, one hop at a time.</summary>
+    private static string ResolveLinks(string path, ref int hops)
+    {
+        var full = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(full) ?? string.Empty;
+        var pending = new Stack<string>(full[root.Length..]
+            .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries)
+            .Reverse());
+        var current = root;
+        var exists = true;
+        while (pending.Count > 0)
+        {
+            var segment = pending.Pop();
+            if (segment == ".")
+                continue;
+            if (segment == "..")
+            {
+                current = Path.GetDirectoryName(current) ?? current;
+                continue;
+            }
+
+            var next = Path.Combine(current, segment);
+            if (exists)
+            {
+                if (new DirectoryInfo(next).LinkTarget is { } target)
+                {
+                    if (++hops > MaxLinkHops)
+                        throw new IOException($"Too many symbolic links while resolving '{path}'.");
+
+                    // Push the raw target segments so '..' inside the target is applied to the already resolved folder.
+                    if (Path.IsPathRooted(target))
+                        current = Path.GetPathRoot(target) ?? current;
+                    var targetRoot = Path.IsPathRooted(target) ? Path.GetPathRoot(target)?.Length ?? 0 : 0;
+                    foreach (var part in target[targetRoot..]
+                                 .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries)
+                                 .Reverse())
+                        pending.Push(part);
+                    continue;
+                }
+
+                exists = Directory.Exists(next) || File.Exists(next);
+            }
+
+            current = next;
+        }
+
+        return TrimTrailingSeparators(current);
     }
 
     public static void ValidateManagedRelativePath(string relative)
