@@ -94,6 +94,24 @@ public class ClientPathsTests
     }
 
     [Fact]
+    public void Undo_RejectsManifestWowExeOutsideAllowList_DoesNotOverwriteExecutable()
+    {
+        using var env = new ApplierEnv();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        var wowPath = Path.Combine(env.Client, "Wow.exe");
+        File.WriteAllBytes(wowPath, SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+        var wowBefore = File.ReadAllBytes(wowPath);
+        var result = env.Applier.Apply(env.Plan());
+        var manifestPath = Path.Combine(env.Backups, "install-1", result.BackupId!, "manifest.json");
+        var text = File.ReadAllText(manifestPath).Replace("Data/enUS/realmlist.wtf", "Wow.exe");
+        File.WriteAllText(manifestPath, text);
+
+        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+        Assert.Equal(wowBefore, File.ReadAllBytes(wowPath));
+    }
+
+    [Fact]
     public void Undo_RejectsManifestAddonPathOutsideAllowList_DoesNotOverwriteFile()
     {
         using var env = new ApplierEnv();

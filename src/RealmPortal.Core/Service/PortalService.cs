@@ -340,7 +340,7 @@ public sealed class PortalService : IPortalService
 
             _journal.Clear();
             var entry = restored is null ? null : ToServerEntry(restored, restored.Id, journal.ClientId, null);
-            var notice = BuildUndoClientFilesNotice(restored, journal, fileResults, _clients.List().Count);
+            var notice = BuildUndoClientFilesNotice(restored, journal, fileResults, client);
             return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults, notice));
         }
         catch (Exception ex)
@@ -650,19 +650,27 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    private static string? BuildUndoClientFilesNotice(
-        Server? restored,
+    private string? BuildUndoClientFilesNotice(
+        Server? restoredActive,
         LastSwitchEntry journal,
         IReadOnlyList<UndoFileResult> fileResults,
-        int registeredClientCount)
+        StoredClient? switchedClient)
     {
-        if (fileResults.Count > 0)
-            return "Client files: updated";
+        if (restoredActive is null)
+            return null;
 
-        if (restored is not null && registeredClientCount > 0 && journal.BackupId is null)
-            return $"Client files: not changed ({registeredClientCount} client{(registeredClientCount == 1 ? "" : "s")} registered; run 'switch {restored.Name} --client-dir <folder>')";
+        var drift = ListClientsNotMatchingActive(restoredActive);
+        var lines = new List<string>();
 
-        return null;
+        if (fileResults.Count > 0 && switchedClient is not null)
+            lines.Add($"Client files: restored '{switchedClient.Path}' to its state before the switch.");
+        else if (journal.BackupId is null && drift.Count > 0)
+            lines.Add("Client files: not changed.");
+
+        foreach (var entry in drift)
+            lines.Add(ClientSyncMessages.DriftLine(restoredActive, entry.Path));
+
+        return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
     }
 
     private bool ClientFilesMatchFileUndoSnapshot(LastSwitchEntry journal)
@@ -684,7 +692,7 @@ public sealed class PortalService : IPortalService
             foreach (var file in manifest.Files)
             {
                 var relative = file.Path.Replace('\\', '/');
-                var path = Path.Combine(client.Path, relative.Replace('/', Path.DirectorySeparatorChar));
+                var path = ClientPaths.ResolveManagedPath(ClientPaths.CanonicalRoot(client.Path), relative);
                 if (!file.Existed)
                 {
                     if (File.Exists(path))
