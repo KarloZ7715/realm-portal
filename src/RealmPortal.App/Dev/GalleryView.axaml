@@ -138,6 +138,34 @@
       <StackPanel Spacing="6" Width="400"><TextBlock Classes="path" Foreground="{DynamicResource InkSoftBrush}" Text="horizontal"/><ScrollBar Orientation="Horizontal" Width="400" Maximum="100" ViewportSize="40" Value="10" Visibility="Visible" AllowAutoHide="False"/></StackPanel>
     </StackPanel></Border>
 
+    <TextBlock Classes="heading" Text="NOTICES, STEPS AND TOAST"/>
+    <Border Classes="surface"><StackPanel Spacing="14">
+      <c:Banner Severity="Info" Header="Info banner" Content="The body explains what is going on."/>
+      <c:Banner Severity="Warning" Header="Warning banner" Content="Something needs attention before continuing."/>
+      <c:Banner Severity="Error" Header="Error banner" Content="Something failed and nothing was changed."/>
+      <StackPanel Orientation="Horizontal" Spacing="0" Width="720">
+        <c:StepIndicator Label="Done step" State="Done" Width="200"/>
+        <c:StepIndicator Label="Current step" State="Current" Width="200"/>
+        <c:StepIndicator Label="Pending step" State="Pending" ShowConnector="False"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="24">
+        <ContentControl Classes="toast" Width="440"><Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12"><StackPanel VerticalAlignment="Center"><TextBlock Classes="body-bold" Text="Toast title"/><c:CountdownLine Fraction="0.6" Brush="{DynamicResource BronzeBrush}" Height="2" Margin="0,6,0,0"/></StackPanel><Button Classes="ghost" Grid.Column="1"><TextBlock Text="Undo"/></Button><Button Classes="ghost" Grid.Column="2"><TextBlock Text="Close"/></Button></Grid></ContentControl>
+        <StackPanel Spacing="8" Width="200"><TextBlock Classes="path" Foreground="{DynamicResource BoneSoftBrush}" Text="stitch rule"/><Line Classes="stitch" StartPoint="0,0" EndPoint="200,0"/><TextBlock Classes="sheet-title" Foreground="{DynamicResource BoneSoftBrush}" Text="SHEET TITLE"/></StackPanel>
+      </StackPanel>
+    </StackPanel></Border>
+
+    <TextBlock Classes="heading" Text="COMBO BOX, MENU AND TOOLTIP (closest kit pieces; no dedicated art)"/>
+    <Border Classes="surface"><StackPanel Orientation="Horizontal" Spacing="24">
+      <StackPanel Spacing="6" Width="226"><TextBlock Classes="path" Foreground="{DynamicResource BoneSoftBrush}" Text="Normal"/><ComboBox SelectedIndex="0"><ComboBoxItem Content="Option one"/><ComboBoxItem Content="Option two"/></ComboBox></StackPanel>
+      <StackPanel Spacing="6" Width="226"><TextBlock Classes="path" Foreground="{DynamicResource BoneSoftBrush}" Text="Hover"/><ComboBox SelectedIndex="1" dev:ForceState.States=":pointerover"><ComboBoxItem Content="Option one"/><ComboBoxItem Content="Option two"/></ComboBox></StackPanel>
+      <StackPanel Spacing="6" Width="226"><TextBlock Classes="path" Foreground="{DynamicResource BoneSoftBrush}" Text="Error"/><ComboBox Classes="error" SelectedIndex="0"><ComboBoxItem Content="Option one"/></ComboBox></StackPanel>
+      <StackPanel Spacing="6" Width="226"><TextBlock Classes="path" Foreground="{DynamicResource BoneSoftBrush}" Text="Disabled"/><ComboBox IsEnabled="False" SelectedIndex="0"><ComboBoxItem Content="Option one"/></ComboBox></StackPanel>
+    </StackPanel></Border>
+    <Border Background="{DynamicResource ParchmentPaperBrush}" Padding="24" Margin="0,8,0,0"><StackPanel Orientation="Horizontal" Spacing="24">
+      <StackPanel Spacing="6" Width="226"><TextBlock Classes="path" Foreground="{DynamicResource InkSoftBrush}" Text="Parchment"/><ComboBox Classes="parchment" SelectedIndex="0"><ComboBoxItem Content="Option one"/><ComboBoxItem Content="Option two"/></ComboBox></StackPanel>
+      <StackPanel Spacing="6" Width="226"><TextBlock Classes="path" Foreground="{DynamicResource InkSoftBrush}" Text="Parchment, disabled"/><ComboBox Classes="parchment" IsEnabled="False" SelectedIndex="0"><ComboBoxItem Content="Option one"/></ComboBox></StackPanel>
+    </StackPanel></Border>
+
     <TextBlock Classes="heading" Text="TYPOGRAPHY"/>
     <Border Classes="surface"><StackPanel Spacing="8">
       <TextBlock Classes="display" Text="Display 34 - Almendra Bold"/>
