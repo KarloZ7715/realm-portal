@@ -7,8 +7,8 @@ namespace RealmPortal.Tests;
 
 public class RealmlistTextTests
 {
-    private const string GameFreedom =
-        "set realmlist auth.gamefreedom.org\r\nset patchlist auth.gamefreedom.org\r\n";
+    private const string ExampleWithPatchlist =
+        "set realmlist example.org\r\nset patchlist example.org\r\n";
 
     [Fact]
     public void Build_WithoutExtraLines_IsSingleTerminatedLine() =>
@@ -16,11 +16,11 @@ public class RealmlistTextTests
 
     [Fact]
     public void Build_RealExampleWithPatchlist_IsExact() =>
-        Assert.Equal(GameFreedom, RealmlistText.Build("auth.gamefreedom.org", ["set patchlist auth.gamefreedom.org", "  "]));
+        Assert.Equal(ExampleWithPatchlist, RealmlistText.Build("example.org", ["set patchlist example.org", "  "]));
 
     [Theory]
     [InlineData("set realmlist h\r\n")]
-    [InlineData(GameFreedom)]
+        [InlineData(ExampleWithPatchlist)]
     [InlineData("set realmlist 10.0.0.5:3724\r\nset patchlist http://patch.example.org/files\r\n")]
     [InlineData("set realmlist [::1]:3724\r\n")]
     public void Validate_AcceptsValidText(string text) => RealmlistText.Validate(text);
@@ -114,7 +114,7 @@ public class RealmlistTextTests
         Assert.Throws<InvalidRealmlistException>(() => RealmlistText.Build("h", [line]));
 
     private static readonly string[] HostPool =
-        ["h", "auth.gamefreedom.org", "ñ", "龍.org", "a b", "a\tb", "a\"b", "a\r\nb", "ok:3724", "😀", "", "SET", "\u0000", "~"];
+        ["h", "example.org", "ñ", "龍.org", "a b", "a\tb", "a\"b", "a\r\nb", "ok:3724", "😀", "", "SET", "\u0000", "~"];
 
     private static readonly string[] LinePool =
         ["set patchlist x", "set patchlist y.example.org", "set portal x", "set realmname z", "ñ", "龍", "a\nb", "", "  ",
