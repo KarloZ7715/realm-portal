@@ -53,18 +53,55 @@ rp launch --client-dir "$WORK/clients/empty" --dry-run;      expect_rc QA-05d "l
 rp launch --dry-run;                                         expect_rc QA-05e "launch without --client-dir -> usage error exit 1" 1
 rp launch Tbc --client-dir "$C12340" --dry-run;              expect_rc QA-05f "launch of unknown server -> exit 2" 2
 
-echo "--- QA-07a: undo of activo.json is byte-identical"
-rp switch Wotlk >/dev/null
+echo "--- QA-07a: undo of activo.json is byte-identical (fresh state per sub-case)"
+# fresh_state: empty config, projection, backup and HOME dirs, so no state.json, last-switch.json, clients.json or
+# client-file backups left by earlier groups (e.g. QA-03j 'switch --client-dir') can make an undo pass or fail by accident.
+fresh_state() {
+  local d; for d in "$CONFIG_DIR" "$PROJ_DIR" "$WORK/backups" "$FAKE_HOME"; do
+    case "$d" in "$WORK"/*) ;; *) echo "refusing: $d is not under $WORK"; exit 99;; esac
+    chmod -R u+rwX "$d" 2>/dev/null; rm -rf "$d"
+  done
+  mkdir -p "$CONFIG_DIR" "$PROJ_DIR" "$FAKE_HOME"
+}
+fresh_state
+rp add Wotlk wotlk.example.org --build 12340 >/dev/null
 rp add Second second.example.org --build 12340 --realm "Realm Two" --line "set patchlist patch.example.org" >/dev/null
+rp switch Wotlk >/dev/null
 H1="$(sha "$PROJ_DIR/activo.json")"
 rp switch Second;                                            expect_rc QA-07a1 "switch to second server" 0
 H2="$(sha "$PROJ_DIR/activo.json")"; [ "$H1" != "$H2" ]; check QA-07a2 "activo.json changed after switch" $?
 rp undo;                                                     expect_out QA-07a3 "undo restores Wotlk" "restored 'Wotlk'"
-[ "$(sha "$PROJ_DIR/activo.json")" = "$H1" ]; check QA-07a4 "activo.json byte-identical to before switch (sha256)" $?
+[ "$(sha "$PROJ_DIR/activo.json")" = "$H1" ]; check QA-07a4 "activo.json byte-identical to before switch (sha256)" $? "before=$H1 after=$(sha "$PROJ_DIR/activo.json")"
 rp undo;                                                     expect_rc QA-07a5 "second undo fails cleanly (one level only) -> exit 2" 2
-rm -f "$CONFIG_DIR/state.json" "$PROJ_DIR/activo.json"
+fresh_state
+rp add Wotlk wotlk.example.org --build 12340 >/dev/null
 rp switch Wotlk >/dev/null; rp undo >/dev/null
-[ ! -e "$PROJ_DIR/activo.json" ]; check QA-07a6 "undo of first-ever switch removes activo.json" $?
+[ ! -e "$PROJ_DIR/activo.json" ]; check QA-07a6 "undo of first-ever switch removes activo.json" $? "rc=$RC out=[$OUT] err=[$ERR]"
+
+# QA-07a7: a switch with --client-dir leaves a client-files journal; later switches without --client-dir must not let a
+# plain 'undo' replay that old journal. After undo the active server, the client's realmlist.wtf and activo.json must all be B.
+fresh_state
+C7="$(new_client qa07a7 3.3.5.12340)"; mkdir -p "$C7/Data/enUS"
+printf 'set realmlist orig.example.org\r\n' > "$C7/Data/enUS/realmlist.wtf"
+rp add StaleA stale-a.example.org --build 12340 >/dev/null; rp add StaleB stale-b.example.org --build 12340 >/dev/null
+rp switch StaleA --client-dir "$C7"; SETUP="switch A --client-dir rc=$RC"
+rp switch StaleB; SETUP="$SETUP; switch B rc=$RC"
+rp switch StaleA; SETUP="$SETUP; switch A rc=$RC"
+rp undo;                                                     expect_rc QA-07a7a "stale journal: switch A --client-dir, switch B, switch A, undo -> exit 0" 0
+UNDO_OUT="$OUT"
+RL_B="$(jq -r '.servers[] | select(.name == "StaleB") | .realmlist' "$CONFIG_DIR/servers.json" | tr -d '\r')"
+rp status; echo "$OUT" | grep -q '^Active server: StaleB '
+check QA-07a7b "stale journal: active server after undo is B" $? "$SETUP; undo=[$UNDO_OUT] status=[$OUT]"
+WTF7="$(tr -d '\r' < "$C7/Data/enUS/realmlist.wtf")"
+[ -n "$RL_B" ] && [ "$WTF7" = "$RL_B" ] && ! grep -q 'orig.example.org' "$C7/Data/enUS/realmlist.wtf"
+check QA-07a7c "stale journal: client realmlist.wtf matches B's realmlist (not the original)" $? "expected=[$RL_B] actual=[$WTF7]"
+[ "$(jq -r '.name' "$PROJ_DIR/activo.json" 2>/dev/null)" = StaleB ] && [ "$(jq -r '.realmlist' "$PROJ_DIR/activo.json" | tr -d '\r')" = "$RL_B" ]
+check QA-07a7d "stale journal: activo.json matches B" $? "activo.json=[$(tr -d '\r' < "$PROJ_DIR/activo.json" 2>&1 | tr '\n' ' ')]"
+
+# Baseline for the next groups: Wotlk and Second exist, nothing active, no journal.
+fresh_state
+rp add Wotlk wotlk.example.org --build 12340 >/dev/null
+rp add Second second.example.org --build 12340 --realm "Realm Two" --line "set patchlist patch.example.org" >/dev/null
 
 echo "--- QA-08: add by hand, invalid realmlist"
 rp add Bad "bad host.example.org";                           expect_rc QA-08a "host with a space -> rejected (exit 2)" 2
