@@ -19,6 +19,23 @@ tests/RealmPortal.App.Tests  headless Avalonia tests and screenshots (UI)
 assets/                  textures, frames, icons, fonts (see assets/ASSETS.md)
 ```
 
+## Command line
+
+`realm-portal` manages servers without the UI (all output is in English; exit codes: 0 ok, 1 usage, 2 failure):
+
+```bash
+realm-portal add Wotlk wotlk.example.org --build 12340 --line "set patchlist patch.example.org"
+realm-portal list --client-dir /path/to/client     # only servers this client can play on (--all shows every one)
+realm-portal switch Wotlk --client-dir /path/to/client
+realm-portal undo
+realm-portal status --client-dir /path/to/client
+realm-portal launch --client-dir /path/to/client --dry-run
+```
+
+Where files go: `--config-dir` / `REALM_PORTAL_CONFIG_DIR` (default `<app data>/realm-portal`: `servers.json`, `state.json`),
+`--projection-dir` / `REALM_PORTAL_PROJECTION_DIR` (default `~/.config/wow-servidores`: `activo.json`) and
+`--client-dir` / `REALM_PORTAL_CLIENT_DIR`. Always point them at temporary folders when testing.
+
 ## Build
 
 Requires the .NET 9 SDK (see `global.json`).

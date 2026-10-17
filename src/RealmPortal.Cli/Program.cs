@@ -1,5 +1,6 @@
 using RealmPortal.Core;
 using RealmPortal.Core.Clients;
+using RealmPortal.Core.Launch;
 
 namespace RealmPortal.Cli;
 
@@ -9,7 +10,15 @@ public static class Program
         Run(args, Console.Out, Console.Error, new PeClientVersionReader());
 
     /// <summary>Runs the CLI. Exit codes: 0 success, 1 usage error, 2 operation failed.</summary>
-    public static int Run(string[] args, TextWriter output, TextWriter error, IClientVersionReader versionReader)
+    /// <param name="launcher">Starts the game; defaults to a real process launcher. Tests pass a fake.</param>
+    /// <param name="getVariable">Reads environment variables; defaults to the process environment.</param>
+    public static int Run(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        IClientVersionReader versionReader,
+        IGameLauncher? launcher = null,
+        Func<string, string?>? getVariable = null)
     {
         if (args.Length == 1 && args[0] is "--version" or "-v")
         {
@@ -31,10 +40,12 @@ public static class Program
             }
         }
 
+        var app = new CliApp(output, error, versionReader, launcher ?? new ProcessGameLauncher(), getVariable ?? Environment.GetEnvironmentVariable);
+        if (args.Length >= 1 && app.IsCommand(args[0]))
+            return app.Run(args[0], args[1..]);
+
         output.WriteLine($"{AppInfo.Name} {AppInfo.Version}");
-        output.WriteLine("Usage:");
-        output.WriteLine("  realm-portal --version");
-        output.WriteLine("  realm-portal client-version <client-directory>");
+        output.WriteLine(CliApp.Usage);
         return args.Length == 0 ? 0 : 1;
     }
 }
