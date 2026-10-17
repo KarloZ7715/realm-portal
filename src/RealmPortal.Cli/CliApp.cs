@@ -303,7 +303,7 @@ public sealed class CliApp(
 
         var force = parsed.Flags.Contains("--force");
         var wrapper = parsed.Get("--wrapper");
-        if (wrapper is not null)
+        if (wrapper is not null && !dryRun)
         {
             var settings = service.GetLauncherSettings();
             if (!settings.Succeeded)
