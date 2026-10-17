@@ -156,8 +156,10 @@ public sealed class ActiveServerManager(
             else
                 writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or StoreException)
         {
+            // DeleteProjection wraps I/O failures in StoreException. Roll state back so a failed
+            // delete of activo.json does not commit ActiveId=null and drop the undo record.
             SaveState(stateBeforeUndo);
             throw;
         }

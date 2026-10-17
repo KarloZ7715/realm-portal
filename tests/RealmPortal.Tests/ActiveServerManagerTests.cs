@@ -83,6 +83,39 @@ public class ActiveServerManagerTests
     }
 
     [Fact]
+    public void Undo_ToNoActiveServer_WhenActivoDeleteFails_KeepsStateAndActivo()
+    {
+        // A read-only directory does not stop root from unlinking activo.json.
+        if (!OperatingSystem.IsLinux() || Environment.IsPrivilegedProcess)
+            return;
+
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        env.Manager.Switch(a);
+
+        var statePath = Path.Combine(env.Config, ActiveServerManager.StateFileName);
+        var stateBefore = File.ReadAllBytes(statePath);
+        var activoBefore = File.ReadAllBytes(env.ActivoPath);
+        Assert.True(env.Manager.Status().CanUndo);
+
+        var mode = File.GetUnixFileMode(env.Projection);
+        File.SetUnixFileMode(env.Projection, mode & ~UnixFileMode.UserWrite & ~UnixFileMode.GroupWrite & ~UnixFileMode.OtherWrite);
+        try
+        {
+            Assert.Throws<StoreException>(() => env.Manager.Undo());
+
+            Assert.Equal(stateBefore, File.ReadAllBytes(statePath));
+            Assert.Equal(activoBefore, File.ReadAllBytes(env.ActivoPath));
+            Assert.Equal(a, env.Manager.GetActive());
+            Assert.True(env.Manager.Status().CanUndo);
+        }
+        finally
+        {
+            File.SetUnixFileMode(env.Projection, mode);
+        }
+    }
+
+    [Fact]
     public void Undo_WithoutSwitch_Throws()
     {
         using var env = new Env();
