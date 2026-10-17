@@ -30,6 +30,7 @@ coverage*.xml
 .vs/
 *.user
 *.suo
+*.userprefs
 *.userosscache
 *.sln.docstates
 *.DotSettings.user
