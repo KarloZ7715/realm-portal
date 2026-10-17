@@ -1,12 +1,12 @@
 {
- "esquina-bronce-*": {
+ "corner-bronze-*": {
   "size": [
    18,
    18
   ],
-  "nota": "sin 9-slice; colocar en cada esquina del panel a 0,0 (sin margen)"
+  "note": "no 9-slice; place at each panel corner at 0,0 (no margin)"
  },
- "panel-hoja-ancho": {
+ "panel-sheet-wide": {
   "png": [
    724,
    134
@@ -17,14 +17,14 @@
    36,
    36
   ],
-  "margen_sombra": 12,
-  "cuerpo": [
+  "shadow_margin": 12,
+  "body": [
    700,
    110
   ],
-  "nota": "sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura"
+  "note": "shadow included in the PNG (12 px margin); the SVG is flat, without shadow or texture"
  },
- "panel-activa-ancho": {
+ "panel-active-wide": {
   "png": [
    724,
    134
@@ -35,14 +35,14 @@
    36,
    36
   ],
-  "margen_sombra": 12,
-  "cuerpo": [
+  "shadow_margin": 12,
+  "body": [
    700,
    110
   ],
-  "nota": "sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura"
+  "note": "shadow included in the PNG (12 px margin); the SVG is flat, without shadow or texture"
  },
- "panel-hoja-medio": {
+ "panel-sheet-medium": {
   "png": [
    384,
    284
@@ -53,14 +53,14 @@
    36,
    36
   ],
-  "margen_sombra": 12,
-  "cuerpo": [
+  "shadow_margin": 12,
+  "body": [
    360,
    260
   ],
-  "nota": "sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura"
+  "note": "shadow included in the PNG (12 px margin); the SVG is flat, without shadow or texture"
  },
- "panel-activa-medio": {
+ "panel-active-medium": {
   "png": [
    384,
    284
@@ -71,14 +71,14 @@
    36,
    36
   ],
-  "margen_sombra": 12,
-  "cuerpo": [
+  "shadow_margin": 12,
+  "body": [
    360,
    260
   ],
-  "nota": "sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura"
+  "note": "shadow included in the PNG (12 px margin); the SVG is flat, without shadow or texture"
  },
- "boton-primario-normal": {
+ "button-primary-normal": {
   "png": [
    160,
    40
@@ -89,9 +89,9 @@
    14,
    14
   ],
-  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+  "note": "leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide)"
  },
- "boton-primario-hover": {
+ "button-primary-hover": {
   "png": [
    160,
    40
@@ -102,9 +102,9 @@
    14,
    14
   ],
-  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+  "note": "leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide)"
  },
- "boton-primario-pulsado": {
+ "button-primary-pressed": {
   "png": [
    160,
    40
@@ -115,9 +115,9 @@
    14,
    14
   ],
-  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+  "note": "leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide)"
  },
- "boton-primario-desactivado": {
+ "button-primary-disabled": {
   "png": [
    160,
    40
@@ -128,9 +128,9 @@
    14,
    14
   ],
-  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+  "note": "leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide)"
  },
- "boton-secundario-normal": {
+ "button-secondary-normal": {
   "png": [
    160,
    40
@@ -141,9 +141,9 @@
    14,
    14
   ],
-  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+  "note": "leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide)"
  },
- "boton-secundario-hover": {
+ "button-secondary-hover": {
   "png": [
    160,
    40
@@ -154,9 +154,9 @@
    14,
    14
   ],
-  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+  "note": "leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide)"
  },
- "boton-secundario-pulsado": {
+ "button-secondary-pressed": {
   "png": [
    160,
    40
@@ -167,9 +167,9 @@
    14,
    14
   ],
-  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+  "note": "leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide)"
  },
- "boton-secundario-desactivado": {
+ "button-secondary-disabled": {
   "png": [
    160,
    40
@@ -180,9 +180,9 @@
    14,
    14
   ],
-  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+  "note": "leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide)"
  },
- "herraje-bronce-remaches": {
+ "bronze-hardware-rivets": {
   "png": [
    160,
    64
@@ -193,9 +193,9 @@
    16,
    16
   ],
-  "nota": "centro transparente; usar como borde de tarjeta/botón sobre cualquier fondo; remaches en las 4 esquinas"
+  "note": "transparent center; use as a card/button border over any background; rivets at the 4 corners"
  },
- "anillo-foco-cuero": {
+ "focus-ring-leather": {
   "png": [
    176,
    56
@@ -206,9 +206,9 @@
    14,
    14
   ],
-  "nota": "anillo de foco (doble en cuero: contorno oscuro + foco claro; simple en pergamino); elemento de 160x40 centrado con 8 px de margen"
+  "note": "focus ring (double on leather: dark outline + light focus; single on parchment); 160x40 element centered with an 8 px margin"
  },
- "anillo-foco-pergamino": {
+ "focus-ring-parchment": {
   "png": [
    176,
    56
@@ -219,9 +219,9 @@
    14,
    14
   ],
-  "nota": "anillo de foco (doble en cuero: contorno oscuro + foco claro; simple en pergamino); elemento de 160x40 centrado con 8 px de margen"
+  "note": "focus ring (double on leather: dark outline + light focus; single on parchment); 160x40 element centered with an 8 px margin"
  },
- "ventana-marco": {
+ "window-frame": {
   "png": [
    960,
    600
@@ -232,30 +232,30 @@
    14,
    28
   ],
-  "nota": "cuero opaco con barra de título (40 px) y barra de estado (28 px) horneadas, filete de bronce y 4 remaches; el centro es cuero teselado (no se ven costuras al estirar)"
+  "note": "opaque leather with baked-in title bar (40 px) and status bar (28 px), bronze trim and 4 rivets; the center is tiled leather (no visible seams when stretched)"
  },
- "divisor-hilo-medallon": {
+ "divider-thread-medallion": {
   "png": [
    712,
    14
   ],
-  "nota": "3-slice horizontal: hilo izquierdo (estirable, x 0-326), medallón fijo (44 px centrales), hilo derecho (estirable); en Avalonia, mejor 2 hilos con tile + divisor-medallon.png centrado"
+  "note": "horizontal 3-slice: left thread (stretchable, x 0-326), fixed medallion (central 44 px), right thread (stretchable); in Avalonia, better to use 2 tiled threads + divider-medallion.png centered"
  },
- "costura-h-tile": {
+ "stitch-h-tile": {
   "png": [
    10,
    4
   ],
-  "nota": "tile repetible (periodo 10 px: 6 de hilo + 4 de hueco), color #8A6C4A"
+  "note": "repeatable tile (10 px period: 6 thread + 4 gap), color #8A6C4A"
  },
- "costura-v-tile": {
+ "stitch-v-tile": {
   "png": [
    4,
    10
   ],
-  "nota": "tile repetible (periodo 10 px: 6 de hilo + 4 de hueco), color #8A6C4A"
+  "note": "repeatable tile (10 px period: 6 thread + 4 gap), color #8A6C4A"
  },
- "pestana-pergamino": {
+ "tab-parchment": {
   "png": [
    228,
    64
@@ -266,11 +266,11 @@
    18,
    18
   ],
-  "margen_sombra": 10,
-  "cuerpo": [
+  "shadow_margin": 10,
+  "body": [
    208,
    44
   ],
-  "nota": "pestaña activa de la barra lateral: pega al borde izquierdo (x=10 del PNG = borde de la ventana); marca de lacre de 5 px a la izquierda"
+  "note": "active sidebar tab: flush with the left edge (x=10 of the PNG = window edge); 5 px wax-red mark on the left"
  }
 }

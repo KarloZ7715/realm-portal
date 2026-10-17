@@ -1,216 +1,210 @@
-# Realm Portal — Assets sueltos de la dirección B «Pergamino y bronce»
+# Realm Portal — Loose assets for design direction B "Parchment and bronze"
 
-Generado el 2026-10-17 (America/Bogota) para el spike de estilo en Avalonia. Origen visual: maquetas de Figma (https://www.figma.com/design/6kBPmTavrfpbceMSUvvWl3) y `DESIGN-TOKENS-B.md`. Los colores salen de esos tokens. Todos los PNG de `frames/` e `icons/` son RGBA (transparencia real, alfa recta, sin halos comprobados sobre fondo blanco, negro, magenta y cuero).
+Generated on 2026-10-17 for the Avalonia styling spike. Visual source: the project's Figma mockups (https://www.figma.com/design/6kBPmTavrfpbceMSUvvWl3) and the design tokens derived from them. All PNGs in `frames/` and `icons/` are RGBA (real transparency, straight alpha, no halos verified on white, black, magenta and leather backgrounds).
 
-Vista de conjunto: `preview-composicion.png` (ventana 9-slice sobre magenta, tarjeta activa, botones, divisor, pestaña, sellos y esquinas; abajo, los mismos elementos sobre blanco/negro/magenta para detectar halos).
+Overview: `preview-composition.png` (9-slice window on magenta, active card, buttons, divider, tab, seals and corners; below, the same elements on white/black/magenta to spot halos).
 
-## Estructura
+## Layout
 ```
 assets/
-  ASSETS.md                  este documento
-  preview-composicion.png    composición de prueba
-  textures/                  3 texturas JPG teselables (CC0) + mosaico de comprobación
-  frames/                    marcos, paneles, botones, divisores (PNG @1x/@2x + SVG) + nineslice.json
-  icons/app/                 icono de la app (SVG, PNG 512–16, ICO)
-  icons/sellos/              5 sellos de estado (SVG, PNG 64/128)
-  icons/ui/ , icons/ui-tinta/  23 iconos de interfaz SVG (color hueso / color tinta)
-  fonts/                     TTF + OFL.txt por familia + FONTS.md
+  ASSETS.md                  this document
+  preview-composition.png    test composition
+  textures/                  3 tileable CC0 JPG textures + tiling check image
+  frames/                    frames, panels, buttons, dividers (PNG @1x/@2x + SVG) + nineslice.json
+  icons/app/                 app icon (SVG, PNG 512–16, ICO)
+  icons/seals/               5 status seals (SVG, PNG 64/128)
+  icons/ui/, icons/ui-ink/   23 interface icons as SVG (bone color / ink color)
+  fonts/                     TTF + OFL.txt per family + FONTS.md
 ```
 
-## Convenciones
-- **@1x / @2x**: `nombre.png` y `nombre@2x.png` (exactamente el doble de píxeles; se renderizan de forma nativa a cada escala, no se reescalan, para evitar halos).
-- **Insets de 9-slice** se dan como **izquierda, arriba, derecha, abajo** en píxeles del PNG @1x (en @2x multiplicar por 2). También en `frames/nineslice.json` (legible por máquina).
-- Avalonia no trae 9-slice nativo para imágenes (no probado aquí): hará falta un control propio o `DrawingContext.DrawImage` con rectángulos origen/destino por cada una de las 9 zonas. Los insets están pensados para eso.
-- **SVG de `frames/`**: versión vectorial **plana** (sin textura, sin sombras ni filtros) para quien prefiera vectores; el aspecto completo (textura, sombra, sombra interior) está solo en los PNG.
-- Licencia de los dibujos (SVG/PNG de frames e icons): creados desde cero para este proyecto, sin material de terceros salvo las texturas CC0 horneadas en los PNG (ver licencias). Sin assets de Blizzard.
+## Conventions
+- **@1x / @2x**: `name.png` and `name@2x.png` (exactly double the pixels; each scale is rendered natively, not resampled, to avoid halos).
+- **9-slice insets** are given as **left, top, right, bottom** in pixels of the @1x PNG (multiply by 2 for @2x). They are also in `frames/nineslice.json` (machine-readable).
+- Avalonia has no native 9-slice for images (not tested here): a custom control or `DrawingContext.DrawImage` with source/destination rectangles for each of the 9 zones will be needed. The insets are designed for that.
+- **SVGs in `frames/`** are **flat** vector versions (no texture, shadows or filters) for anyone who prefers vectors; the full look (texture, shadow, inner shadow) exists only in the PNGs.
+- License of the drawings (SVG/PNG in frames and icons): created from scratch for this project and released under the repository's MIT license, with no third-party material except the CC0 textures baked into the PNGs (see `THIRD_PARTY_LICENSES.md`). No Blizzard assets.
 
 ## 1. textures/ (CC0 1.0, ambientCG)
 
-| Archivo | Píxeles | Peso | Teselable | Origen / licencia |
+| File | Pixels | Size | Tileable | Source / license |
 |---|---|---|---|---|
-| `textures/tex-pergamino.jpg` | 1024×1024 | 44.8 KB | sí; relación salto/vecino de gradiente 2.0× pero de solo 0.65 niveles de gris; sin costura visible en mosaico 2×2 | Paper003 (ambientCG) · CC0 1.0 |
-| `textures/tex-cuero.jpg` | 1024×1024 | 229.9 KB | sí; relación 1.2×, sin costura visible en mosaico 2×2 | Leather037 (ambientCG) · CC0 1.0 |
-| `textures/tex-bronce.jpg` | 512×512 | 67.3 KB | sí; relación 1.2–1.3×, sin costura visible en mosaico 2×2 | Metal008 (ambientCG) · CC0 1.0 |
-| `textures/preview-mosaico-2x2.png` | 1840×600 | 889.2 KB | — | comprobación visual (cuero, pergamino y bronce en mosaico 2×2) |
+| `textures/tex-parchment.jpg` | 1024×1024 | 44.8 KB | yes; edge-jump to neighbouring-gradient ratio 2.0× but only 0.65 gray levels; no visible seam in a 2×2 tiling | Paper003 (ambientCG) · CC0 1.0 |
+| `textures/tex-leather.jpg` | 1024×1024 | 229.9 KB | yes; ratio 1.2×, no visible seam in a 2×2 tiling | Leather037 (ambientCG) · CC0 1.0 |
+| `textures/tex-bronze.jpg` | 512×512 | 67.3 KB | yes; ratio 1.2–1.3×, no visible seam in a 2×2 tiling | Metal008 (ambientCG) · CC0 1.0 |
+| `textures/preview-tiling-2x2.png` | 1840×600 | 889.2 KB | — | visual check (leather, parchment and bronze in a 2×2 tiling) |
 
-Notas: las tres texturas ya eran teselables en origen (ambientCG las publica así) y no se han modificado respecto a los originales de ambientCG (solo recodificadas a JPEG q90). Se verificó con mosaico 2×2 (con contraste ×2.2 en el cruce) y con la métrica de salto en el borde frente al gradiente interior. En las maquetas se usan con opacidad parcial sobre el color base del token: pergamino 50 % sobre `#D8C7A0` (tile de 512 px css), cuero 34–40 % (tile 512 px css), bronce 35 % en Figma y 45 % en el aro de los PNG del icono. El pergamino tiene manchas grandes reconocibles: al repetirlo 2×2 se nota el patrón; en paneles de hasta ~700 px no se repite.
+Notes: the three textures were already tileable at the source (ambientCG publishes them that way) and are unmodified relative to the ambientCG originals (only re-encoded as JPEG q90). Verified with a 2×2 tiling (with ×2.2 contrast at the junction) and with the edge-jump metric against the interior gradient. In the mockups they are used with partial opacity over the token base color: parchment 50% over `#D8C7A0` (512 css px tile), leather 34–40% (512 css px tile), bronze 35% in Figma and 45% in the ring of the icon PNGs. The parchment has large recognizable blotches: a 2×2 repetition shows the pattern; in panels up to ~700 px it does not repeat.
 
 ## 2. frames/
 
-Insets en px @1x (izq, arriba, der, abajo). «Canvas» = tamaño del PNG @1x.
+Insets are in @1x px (left, top, right, bottom). "Canvas" = size of the @1x PNG.
 
-| Archivo (PNG @1x + @2x, SVG plano) | Canvas @1x | Insets 9-slice | Qué es / notas |
+| File (PNG @1x + @2x, flat SVG) | Canvas @1x | 9-slice insets | What it is / notes |
 |---|---|---|---|
-| `panel-hoja-ancho` | 724×134 | 36, 36, 36, 36 | sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura |
-| `panel-hoja-medio` | 384×284 | 36, 36, 36, 36 | sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura |
-| `panel-activa-ancho` | 724×134 | 36, 36, 36, 36 | sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura |
-| `panel-activa-medio` | 384×284 | 36, 36, 36, 36 | sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura |
-| `esquina-bronce-*` | 18×18 | — | sin 9-slice; colocar en cada esquina del panel a 0,0 (sin margen) |
-| `boton-primario-normal` | 160×40 | 14, 14, 14, 14 | fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho) |
-| `boton-primario-hover` | 160×40 | 14, 14, 14, 14 | fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho) |
-| `boton-primario-pulsado` | 160×40 | 14, 14, 14, 14 | fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho) |
-| `boton-primario-desactivado` | 160×40 | 14, 14, 14, 14 | fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho) |
-| `boton-secundario-normal` | 160×40 | 14, 14, 14, 14 | fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho) |
-| `boton-secundario-hover` | 160×40 | 14, 14, 14, 14 | fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho) |
-| `boton-secundario-pulsado` | 160×40 | 14, 14, 14, 14 | fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho) |
-| `boton-secundario-desactivado` | 160×40 | 14, 14, 14, 14 | fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho) |
-| `herraje-bronce-remaches` | 160×64 | 16, 16, 16, 16 | centro transparente; usar como borde de tarjeta/botón sobre cualquier fondo; remaches en las 4 esquinas |
-| `anillo-foco-cuero` | 176×56 | 14, 14, 14, 14 | anillo de foco (doble en cuero: contorno oscuro + foco claro; simple en pergamino); elemento de 160x40 centrado con 8 px de margen |
-| `anillo-foco-pergamino` | 176×56 | 14, 14, 14, 14 | anillo de foco (doble en cuero: contorno oscuro + foco claro; simple en pergamino); elemento de 160x40 centrado con 8 px de margen |
-| `ventana-marco` | 960×600 | 14, 40, 14, 28 | cuero opaco con barra de título (40 px) y barra de estado (28 px) horneadas, filete de bronce y 4 remaches; el centro es cuero teselado (no se ven costuras al estirar) |
-| `divisor-hilo-medallon` | 712×14 | — | 3-slice horizontal: hilo izquierdo (estirable, x 0-326), medallón fijo (44 px centrales), hilo derecho (estirable); en Avalonia, mejor 2 hilos con tile + divisor-medallon.png centrado |
-| `costura-h-tile` | 10×4 | — | tile repetible (periodo 10 px: 6 de hilo + 4 de hueco), color #8A6C4A |
-| `costura-v-tile` | 4×10 | — | tile repetible (periodo 10 px: 6 de hilo + 4 de hueco), color #8A6C4A |
-| `pestana-pergamino` | 228×64 | 18, 18, 18, 18 | pestaña activa de la barra lateral: pega al borde izquierdo (x=10 del PNG = borde de la ventana); marca de lacre de 5 px a la izquierda |
-| `divisor-medallon` | 44×14 | — | medallón de bronce suelto (para centrarlo sobre dos hilos con tile) |
+| `panel-sheet-wide` | 724×134 | 36, 36, 36, 36 | shadow included in the PNG (12 px margin); the SVG is flat, without shadow or texture |
+| `panel-sheet-medium` | 384×284 | 36, 36, 36, 36 | shadow included in the PNG (12 px margin); the SVG is flat, without shadow or texture |
+| `panel-active-wide` | 724×134 | 36, 36, 36, 36 | shadow included in the PNG (12 px margin); the SVG is flat, without shadow or texture |
+| `panel-active-medium` | 384×284 | 36, 36, 36, 36 | shadow included in the PNG (12 px margin); the SVG is flat, without shadow or texture |
+| `corner-bronze-*` | 18×18 | — | no 9-slice; place at each panel corner at 0,0 (no margin) |
+| `button-primary-{normal,hover,pressed,disabled}` | 160×40 | 14, 14, 14, 14 | leather background with baked-in texture, 1.5 px bronze border, dotted stitching and 2 rivets; the center stretches (the stitching stretches ~1.3x at 200 px wide) |
+| `button-secondary-{normal,hover,pressed,disabled}` | 160×40 | 14, 14, 14, 14 | same as the primary buttons, wood tint instead of wax-red |
+| `bronze-hardware-rivets` | 160×64 | 16, 16, 16, 16 | transparent center; use as a card/button border over any background; rivets at the 4 corners |
+| `focus-ring-leather` | 176×56 | 14, 14, 14, 14 | focus ring (double on leather: dark outline + light focus); 160×40 element centered with an 8 px margin |
+| `focus-ring-parchment` | 176×56 | 14, 14, 14, 14 | focus ring (single on parchment); same geometry as the leather one |
+| `window-frame` | 960×600 | 14, 40, 14, 28 | opaque leather with baked-in title bar (40 px) and status bar (28 px), bronze trim and 4 rivets; the center is tiled leather (no visible seams when stretched) |
+| `divider-thread-medallion` | 712×14 | — | horizontal 3-slice: left thread (stretchable, x 0–326), fixed medallion (central 44 px), right thread (stretchable); in Avalonia, better to use 2 tiled threads + `divider-medallion.png` centered |
+| `stitch-h-tile` | 10×4 | — | repeatable tile (10 px period: 6 thread + 4 gap), color `#8A6C4A` |
+| `stitch-v-tile` | 4×10 | — | repeatable tile (10 px period: 6 thread + 4 gap), color `#8A6C4A` |
+| `tab-parchment` | 228×64 | 18, 18, 18, 18 | active sidebar tab: flush with the left edge (x=10 of the PNG = window edge); 5 px wax-red mark on the left |
+| `divider-medallion` | 44×14 | — | loose bronze medallion (to center over two tiled threads) |
 
-Detalles por pieza:
+Per-piece details:
 
-- **Paneles de pergamino** (`panel-hoja-*` y `panel-activa-*`): formas *Ancho* (cuerpo 700×110) y *Medio* (cuerpo 360×260) como en la maqueta; incluyen 12 px de margen transparente para la sombra, borde irregular (±1.4 px, generado por `paperP`), sombra interior y filete interior de bronce oscuro a 6 px. `activa` = hoja + 4 esquineros de bronce ya horneados. Insets 36 (= 12 margen + 24 de zona decorada) en los cuatro lados. Al estirar, el borde irregular de las zonas centrales se estira con el panel (ondulación más suave): *Ancho* está pensado para formas apaisadas (≥ 200×60) y *Medio* para más cuadradas; con menos de 72 px de lado se solapan los insets.
-- **Esquineros de bronce**: 4 PNG separados (`-tl,-tr,-bl,-br`, 18×18) y `esquina-bronce.svg` (TL, rotable 90/180/270). Se colocan en la esquina del panel a (0,0) del cuerpo (no del canvas con sombra: sumar 12 px en los paneles).
-- **Botones**: 160×40; fondo de cuero con textura horneada (tinte lacre = primario, madera = secundario), borde de bronce 1.5 px, costura punteada interior (3/3) y 2 remaches. Estados normal/hover/pulsado/desactivado (desactivado sin costura ni remaches, como en la maqueta). El texto y el icono NO están horneados. La costura se estira con el 9-slice (≈1.3× a 200 px); si molesta, usar el SVG plano o dibujar la costura en código. El «foco» es una pieza aparte (`anillo-foco-*`, 8 px de margen alrededor del elemento).
-- **`herraje-bronce-remaches`**: marco con centro transparente (borde de bronce, costura, 4 remaches) para tarjetas o botones sobre cualquier fondo. En la maqueta las tarjetas son pergamino con esquineros; este herraje es una extensión coherente con el look, no una pieza literal de la maqueta.
-- **`ventana-marco`**: 960×600 opaco (cuero teselado), barra de título de 40 px y barra de estado de 28 px horneadas (sin texto ni botones), filete de bronce oscuro de 2 px, 4 remaches y esquinas redondeadas de 8 px (transparentes). Insets 14, 40, 14, 28. Ojo: el filete de 2 px y los remaches quedan dentro de los 14 px de las esquinas; las esquinas redondeadas exigen mantener esos 14 px sin estirar.
-- **Divisor**: `divisor-hilo-medallon` 712×14 es 3-slice horizontal (hilo izq. 0–326, medallón fijo de 44 px en 334–378, hilo der. 386–712). Para anchos arbitrarios usar `costura-h-tile` repetido a cada lado del `divisor-medallon`.
-- **Costura punteada**: tiles repetibles de 10×4 (horizontal) y 4×10 (vertical); periodo 10 px (6 hilo + 4 hueco), color `#8A6C4A`. A @1x el trazo de 1.5 px queda en medio píxel (alfa máx. 192): es lo esperado, a @2x queda nítido.
-- **`pestana-pergamino`**: pestaña activa de la barra lateral, cuerpo 208×44 con 10 px de margen de sombra, esquinas derechas redondeadas 6 px, marca de lacre de 5 px a la izquierda; insets 18. Encaja pegada al borde izquierdo (x=10 del PNG = borde de la ventana).
+- **Parchment panels** (`panel-sheet-*` and `panel-active-*`): *wide* (body 700×110) and *medium* (body 360×260) shapes as in the mockup; they include a 12 px transparent margin for the shadow, an irregular edge (±1.4 px), an inner shadow and an inner dark-bronze rule at 6 px. `active` = sheet + 4 bronze corner pieces already baked in. Insets 36 (= 12 margin + 24 decorated zone) on all four sides. When stretched, the irregular edge of the middle zones stretches with the panel (smoother waviness): *wide* is meant for landscape shapes (≥ 200×60) and *medium* for squarer ones; below 72 px per side the insets overlap.
+- **Bronze corners**: 4 separate PNGs (`-tl,-tr,-bl,-br`, 18×18) and `corner-bronze.svg` (TL, rotatable by 90/180/270). They are placed at the panel corner at (0,0) of the body (not of the canvas with shadow: add 12 px on panels).
+- **Buttons**: 160×40; leather background with baked-in texture (wax-red tint = primary, wood = secondary), 1.5 px bronze border, inner dotted stitching (3/3) and 2 rivets. States normal/hover/pressed/disabled (disabled has no stitching or rivets, as in the mockup). Text and icon are NOT baked in. The stitching stretches with the 9-slice (≈1.3× at 200 px); if that bothers, use the flat SVG or draw the stitching in code. "Focus" is a separate piece (`focus-ring-*`, 8 px margin around the element).
+- **`bronze-hardware-rivets`**: frame with a transparent center (bronze border, stitching, 4 rivets) for cards or buttons over any background. In the mockup the cards are parchment with corner pieces; this hardware is a coherent extension of the look, not a literal piece of the mockup.
+- **`window-frame`**: opaque 960×600 (tiled leather), 40 px title bar and 28 px status bar baked in (no text or buttons), 2 px dark-bronze rule, 4 rivets and 8 px rounded (transparent) corners. Insets 14, 40, 14, 28. Note: the 2 px rule and the rivets sit inside the 14 px corners; the rounded corners require keeping those 14 px unstretched.
+- **Divider**: `divider-thread-medallion` 712×14 is a horizontal 3-slice (left thread 0–326, fixed 44 px medallion at 334–378, right thread 386–712). For arbitrary widths, use `stitch-h-tile` repeated on each side of `divider-medallion`.
+- **Dotted stitching**: repeatable tiles of 10×4 (horizontal) and 4×10 (vertical); 10 px period (6 thread + 4 gap), color `#8A6C4A`. At @1x the 1.5 px stroke lands on half a pixel (max alpha 192): this is expected; at @2x it is crisp.
+- **`tab-parchment`**: active sidebar tab, 208×44 body with a 10 px shadow margin, right corners rounded 6 px, 5 px wax-red mark on the left; insets 18. It sits flush with the left edge (x=10 of the PNG = window edge).
 
-Listado completo de `frames/`:
+Full listing of `frames/`:
 
-| Archivo | Píxeles | Peso |
+| File | Pixels | Size |
 |---|---|---|
-| `frames/anillo-foco-cuero.png` | 176×56 | 0.9 KB |
-| `frames/anillo-foco-cuero.svg` | SVG | 0.3 KB |
-| `frames/anillo-foco-cuero@2x.png` | 352×112 | 2.0 KB |
-| `frames/anillo-foco-pergamino.png` | 176×56 | 0.6 KB |
-| `frames/anillo-foco-pergamino.svg` | SVG | 0.2 KB |
-| `frames/anillo-foco-pergamino@2x.png` | 352×112 | 1.2 KB |
-| `frames/boton-primario-desactivado.png` | 160×40 | 8.4 KB |
-| `frames/boton-primario-desactivado@2x.png` | 320×80 | 26.2 KB |
-| `frames/boton-primario-hover.png` | 160×40 | 9.6 KB |
-| `frames/boton-primario-hover@2x.png` | 320×80 | 27.8 KB |
-| `frames/boton-primario-normal.png` | 160×40 | 9.7 KB |
-| `frames/boton-primario-normal.svg` | SVG | 0.5 KB |
-| `frames/boton-primario-normal@2x.png` | 320×80 | 28.5 KB |
-| `frames/boton-primario-pulsado.png` | 160×40 | 9.5 KB |
-| `frames/boton-primario-pulsado@2x.png` | 320×80 | 27.9 KB |
-| `frames/boton-secundario-desactivado.png` | 160×40 | 8.4 KB |
-| `frames/boton-secundario-desactivado@2x.png` | 320×80 | 26.2 KB |
-| `frames/boton-secundario-hover.png` | 160×40 | 9.7 KB |
-| `frames/boton-secundario-hover@2x.png` | 320×80 | 28.1 KB |
-| `frames/boton-secundario-normal.png` | 160×40 | 9.7 KB |
-| `frames/boton-secundario-normal.svg` | SVG | 0.5 KB |
-| `frames/boton-secundario-normal@2x.png` | 320×80 | 28.3 KB |
-| `frames/boton-secundario-pulsado.png` | 160×40 | 9.3 KB |
-| `frames/boton-secundario-pulsado@2x.png` | 320×80 | 27.9 KB |
-| `frames/costura-h-tile.png` | 10×4 | 0.1 KB |
-| `frames/costura-h-tile.svg` | SVG | 0.1 KB |
-| `frames/costura-h-tile@2x.png` | 20×8 | 0.1 KB |
-| `frames/costura-v-tile.png` | 4×10 | 0.1 KB |
-| `frames/costura-v-tile.svg` | SVG | 0.1 KB |
-| `frames/costura-v-tile@2x.png` | 8×20 | 0.1 KB |
-| `frames/divisor-hilo-medallon.png` | 712×14 | 0.8 KB |
-| `frames/divisor-hilo-medallon.svg` | SVG | 0.5 KB |
-| `frames/divisor-hilo-medallon@2x.png` | 1424×28 | 1.9 KB |
-| `frames/divisor-medallon.png` | 44×14 | 0.6 KB |
-| `frames/divisor-medallon.svg` | SVG | 0.3 KB |
-| `frames/divisor-medallon@2x.png` | 88×28 | 1.3 KB |
-| `frames/esquina-bronce-bl.png` | 18×18 | 0.2 KB |
-| `frames/esquina-bronce-bl.svg` | SVG | 0.3 KB |
-| `frames/esquina-bronce-bl@2x.png` | 36×36 | 0.2 KB |
-| `frames/esquina-bronce-br.png` | 18×18 | 0.2 KB |
-| `frames/esquina-bronce-br.svg` | SVG | 0.3 KB |
-| `frames/esquina-bronce-br@2x.png` | 36×36 | 0.2 KB |
-| `frames/esquina-bronce-tl.png` | 18×18 | 0.2 KB |
-| `frames/esquina-bronce-tl.svg` | SVG | 0.3 KB |
-| `frames/esquina-bronce-tl@2x.png` | 36×36 | 0.2 KB |
-| `frames/esquina-bronce-tr.png` | 18×18 | 0.2 KB |
-| `frames/esquina-bronce-tr.svg` | SVG | 0.3 KB |
-| `frames/esquina-bronce-tr@2x.png` | 36×36 | 0.2 KB |
-| `frames/esquina-bronce.svg` | SVG | 0.3 KB |
-| `frames/herraje-bronce-remaches.png` | 160×64 | 1.1 KB |
-| `frames/herraje-bronce-remaches.svg` | SVG | 0.6 KB |
-| `frames/herraje-bronce-remaches@2x.png` | 320×128 | 2.7 KB |
+| `frames/bronze-hardware-rivets.png` | 160×64 | 1.1 KB |
+| `frames/bronze-hardware-rivets.svg` | SVG | 0.6 KB |
+| `frames/bronze-hardware-rivets@2x.png` | 320×128 | 2.7 KB |
+| `frames/button-primary-disabled.png` | 160×40 | 8.4 KB |
+| `frames/button-primary-disabled@2x.png` | 320×80 | 26.2 KB |
+| `frames/button-primary-hover.png` | 160×40 | 9.6 KB |
+| `frames/button-primary-hover@2x.png` | 320×80 | 27.8 KB |
+| `frames/button-primary-normal.png` | 160×40 | 9.7 KB |
+| `frames/button-primary-normal.svg` | SVG | 0.5 KB |
+| `frames/button-primary-normal@2x.png` | 320×80 | 28.5 KB |
+| `frames/button-primary-pressed.png` | 160×40 | 9.5 KB |
+| `frames/button-primary-pressed@2x.png` | 320×80 | 27.9 KB |
+| `frames/button-secondary-disabled.png` | 160×40 | 8.4 KB |
+| `frames/button-secondary-disabled@2x.png` | 320×80 | 26.2 KB |
+| `frames/button-secondary-hover.png` | 160×40 | 9.7 KB |
+| `frames/button-secondary-hover@2x.png` | 320×80 | 28.1 KB |
+| `frames/button-secondary-normal.png` | 160×40 | 9.7 KB |
+| `frames/button-secondary-normal.svg` | SVG | 0.5 KB |
+| `frames/button-secondary-normal@2x.png` | 320×80 | 28.3 KB |
+| `frames/button-secondary-pressed.png` | 160×40 | 9.3 KB |
+| `frames/button-secondary-pressed@2x.png` | 320×80 | 27.9 KB |
+| `frames/corner-bronze-bl.png` | 18×18 | 0.2 KB |
+| `frames/corner-bronze-bl.svg` | SVG | 0.3 KB |
+| `frames/corner-bronze-bl@2x.png` | 36×36 | 0.2 KB |
+| `frames/corner-bronze-br.png` | 18×18 | 0.2 KB |
+| `frames/corner-bronze-br.svg` | SVG | 0.3 KB |
+| `frames/corner-bronze-br@2x.png` | 36×36 | 0.2 KB |
+| `frames/corner-bronze-tl.png` | 18×18 | 0.2 KB |
+| `frames/corner-bronze-tl.svg` | SVG | 0.3 KB |
+| `frames/corner-bronze-tl@2x.png` | 36×36 | 0.2 KB |
+| `frames/corner-bronze-tr.png` | 18×18 | 0.2 KB |
+| `frames/corner-bronze-tr.svg` | SVG | 0.3 KB |
+| `frames/corner-bronze-tr@2x.png` | 36×36 | 0.2 KB |
+| `frames/corner-bronze.svg` | SVG | 0.3 KB |
+| `frames/divider-medallion.png` | 44×14 | 0.6 KB |
+| `frames/divider-medallion.svg` | SVG | 0.3 KB |
+| `frames/divider-medallion@2x.png` | 88×28 | 1.3 KB |
+| `frames/divider-thread-medallion.png` | 712×14 | 0.8 KB |
+| `frames/divider-thread-medallion.svg` | SVG | 0.5 KB |
+| `frames/divider-thread-medallion@2x.png` | 1424×28 | 1.9 KB |
+| `frames/focus-ring-leather.png` | 176×56 | 0.9 KB |
+| `frames/focus-ring-leather.svg` | SVG | 0.3 KB |
+| `frames/focus-ring-leather@2x.png` | 352×112 | 2.0 KB |
+| `frames/focus-ring-parchment.png` | 176×56 | 0.6 KB |
+| `frames/focus-ring-parchment.svg` | SVG | 0.2 KB |
+| `frames/focus-ring-parchment@2x.png` | 352×112 | 1.2 KB |
 | `frames/nineslice.json` | JSON | 5.1 KB |
-| `frames/panel-activa-ancho.png` | 724×134 | 39.4 KB |
-| `frames/panel-activa-ancho.svg` | SVG | 2.5 KB |
-| `frames/panel-activa-ancho@2x.png` | 1448×268 | 97.6 KB |
-| `frames/panel-activa-medio.png` | 384×284 | 48.0 KB |
-| `frames/panel-activa-medio.svg` | SVG | 2.1 KB |
-| `frames/panel-activa-medio@2x.png` | 768×568 | 115.8 KB |
-| `frames/panel-hoja-ancho.png` | 724×134 | 39.3 KB |
-| `frames/panel-hoja-ancho.svg` | SVG | 1.7 KB |
-| `frames/panel-hoja-ancho@2x.png` | 1448×268 | 98.0 KB |
-| `frames/panel-hoja-medio.png` | 384×284 | 48.3 KB |
-| `frames/panel-hoja-medio.svg` | SVG | 1.4 KB |
-| `frames/panel-hoja-medio@2x.png` | 768×568 | 117.0 KB |
-| `frames/pestana-pergamino.png` | 228×64 | 6.5 KB |
-| `frames/pestana-pergamino.svg` | SVG | 0.2 KB |
-| `frames/pestana-pergamino@2x.png` | 456×128 | 14.7 KB |
-| `frames/ventana-marco.png` | 960×600 | 409.7 KB |
-| `frames/ventana-marco.svg` | SVG | 0.7 KB |
-| `frames/ventana-marco@2x.png` | 1920×1200 | 1.43 MB |
+| `frames/panel-active-medium.png` | 384×284 | 48.0 KB |
+| `frames/panel-active-medium.svg` | SVG | 2.1 KB |
+| `frames/panel-active-medium@2x.png` | 768×568 | 115.8 KB |
+| `frames/panel-active-wide.png` | 724×134 | 39.4 KB |
+| `frames/panel-active-wide.svg` | SVG | 2.5 KB |
+| `frames/panel-active-wide@2x.png` | 1448×268 | 97.6 KB |
+| `frames/panel-sheet-medium.png` | 384×284 | 48.3 KB |
+| `frames/panel-sheet-medium.svg` | SVG | 1.4 KB |
+| `frames/panel-sheet-medium@2x.png` | 768×568 | 117.0 KB |
+| `frames/panel-sheet-wide.png` | 724×134 | 39.3 KB |
+| `frames/panel-sheet-wide.svg` | SVG | 1.7 KB |
+| `frames/panel-sheet-wide@2x.png` | 1448×268 | 98.0 KB |
+| `frames/stitch-h-tile.png` | 10×4 | 0.1 KB |
+| `frames/stitch-h-tile.svg` | SVG | 0.1 KB |
+| `frames/stitch-h-tile@2x.png` | 20×8 | 0.1 KB |
+| `frames/stitch-v-tile.png` | 4×10 | 0.1 KB |
+| `frames/stitch-v-tile.svg` | SVG | 0.1 KB |
+| `frames/stitch-v-tile@2x.png` | 8×20 | 0.1 KB |
+| `frames/tab-parchment.png` | 228×64 | 6.5 KB |
+| `frames/tab-parchment.svg` | SVG | 0.2 KB |
+| `frames/tab-parchment@2x.png` | 456×128 | 14.7 KB |
+| `frames/window-frame.png` | 960×600 | 409.7 KB |
+| `frames/window-frame.svg` | SVG | 0.7 KB |
+| `frames/window-frame@2x.png` | 1920×1200 | 1.43 MB |
 
 ## 3. icons/
 
-### icons/app — icono de la aplicación (sello de lacre con arco-portal)
+### icons/app — application icon (wax seal with portal arch)
 
-| Archivo | Píxeles | Peso | Notas |
+| File | Pixels | Size | Notes |
 |---|---|---|---|
-| `icons/app/app-icon.svg` | SVG | 4.0 KB | vector plano 128×128 (aro de bronce sin textura) |
-| `icons/app/app-icon-simplificado.svg` | SVG | 3.4 KB | versión simplificada (trazos gruesos) para ≤32 px |
-| `icons/app/app-icon-512.png` | 512×512 | 68.5 KB | aro de bronce con textura Metal008 (CC0) en ≥64 px |
-| `icons/app/app-icon-256.png` | 256×256 | 27.9 KB | aro de bronce con textura Metal008 (CC0) en ≥64 px |
-| `icons/app/app-icon-128.png` | 128×128 | 11.7 KB | aro de bronce con textura Metal008 (CC0) en ≥64 px |
-| `icons/app/app-icon-64.png` | 64×64 | 5.0 KB | aro de bronce con textura Metal008 (CC0) en ≥64 px |
-| `icons/app/app-icon-48.png` | 48×48 | 3.3 KB | aro de bronce con textura Metal008 (CC0) en ≥64 px |
-| `icons/app/app-icon-simple-32.png` | 32×32 | 1.3 KB | simplificado, aro plano |
-| `icons/app/app-icon-simple-16.png` | 16×16 | 0.7 KB | simplificado, aro plano |
-| `icons/app/app-icon.ico` | ICO | 125.7 KB | ICO multi-tamaño: 256, 128, 64, 48, 32 (simplificado), 16 (simplificado) |
+| `icons/app/app-icon.svg` | SVG | 4.0 KB | flat 128×128 vector (bronze ring without texture) |
+| `icons/app/app-icon-simplified.svg` | SVG | 3.4 KB | simplified version (thick strokes) for ≤32 px |
+| `icons/app/app-icon-512.png` | 512×512 | 68.5 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
+| `icons/app/app-icon-256.png` | 256×256 | 27.9 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
+| `icons/app/app-icon-128.png` | 128×128 | 11.7 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
+| `icons/app/app-icon-64.png` | 64×64 | 5.0 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
+| `icons/app/app-icon-48.png` | 48×48 | 3.3 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
+| `icons/app/app-icon-simple-32.png` | 32×32 | 1.3 KB | simplified, flat ring |
+| `icons/app/app-icon-simple-16.png` | 16×16 | 0.7 KB | simplified, flat ring |
+| `icons/app/app-icon.ico` | ICO | 125.7 KB | multi-size ICO: 256, 128, 64, 48, 32 (simplified), 16 (simplified) |
 
-Las versiones de 48 px o más usan el diseño completo; 32 y 16 usan la simplificada (sello y arco con trazo grueso, sin costura). Las SVG tienen el aro de bronce plano (`#A8743F`); la textura de bronce solo está en los PNG ≥64.
+Versions of 48 px or more use the full design; 32 and 16 use the simplified one (seal and arch with thick strokes, no stitching). The SVGs have a flat bronze ring (`#A8743F`); the bronze texture exists only in the PNGs ≥64.
 
-### icons/sellos — sellos de estado (SVG 56×56, PNG 64 y 128)
+### icons/seals — status seals (SVG 56×56, PNG 64 and 128)
 
-| Estado | SVG | PNG | Color / glifo |
+| State | SVG | PNG | Color / glyph |
 |---|---|---|---|
-| activo | `icons/sellos/sello-activo.svg` | `sello-activo-64.png`, `sello-activo-128.png` | lacre · arco-portal |
-| listo | `icons/sellos/sello-listo.svg` | `sello-listo-64.png`, `sello-listo-128.png` | bosque · marca de verificación |
-| incompatible | `icons/sellos/sello-incompatible.svg` | `sello-incompatible-64.png`, `sello-incompatible-128.png` | ámbar · triángulo de aviso |
-| sin-respuesta | `icons/sellos/sello-sin-respuesta.svg` | `sello-sin-respuesta-64.png`, `sello-sin-respuesta-128.png` | apagado · cruz |
-| inactivo | `icons/sellos/sello-inactivo.svg` | `sello-inactivo-64.png`, `sello-inactivo-128.png` | apagado · arco-portal en hueso |
+| active | `icons/seals/seal-active.svg` | `seal-active-64.png`, `seal-active-128.png` | wax red · portal arch |
+| ready | `icons/seals/seal-ready.svg` | `seal-ready-64.png`, `seal-ready-128.png` | forest green · check mark |
+| incompatible | `icons/seals/seal-incompatible.svg` | `seal-incompatible-64.png`, `seal-incompatible-128.png` | amber · warning triangle |
+| no-response | `icons/seals/seal-no-response.svg` | `seal-no-response-64.png`, `seal-no-response-128.png` | muted · cross |
+| inactive | `icons/seals/seal-inactive.svg` | `seal-inactive-64.png`, `seal-inactive-128.png` | muted · portal arch in bone |
 
-El estado nunca va solo por color: cada sello lleva su glifo. «Incompatible» corresponde al sello llamado «Aviso» en Figma.
+State is never conveyed by color alone: every seal carries its glyph. "Incompatible" corresponds to the seal named "Aviso" (warning) in Figma.
 
-### icons/ui — 23 iconos de interfaz (SVG 24×24)
+### icons/ui — 23 interface icons (SVG 24×24)
 
-Trazo de 1.6–2 px, extremos cuadrados; sin relleno salvo `jugar` y `rombo`. `icons/ui/` en color hueso `#EFE5CD` (sobre cuero) e `icons/ui-tinta/` en `#2B2118` (sobre pergamino). Nombre del archivo → nombre del componente en Figma:
+1.6–2 px stroke, square caps; no fill except `play` and `diamond`. `icons/ui/` in bone color `#EFE5CD` (on leather) and `icons/ui-ink/` in `#2B2118` (on parchment). File name → Figma component name (the Figma file keeps its original component names; also in `icons/ui/_names.json`):
 
-| Archivo | Figma | Archivo | Figma | Archivo | Figma |
+| File | Figma | File | Figma | File | Figma |
 |---|---|---|---|---|---|
-| `servidores.svg` | Icono/servers | `carpeta.svg` | Icono/folder | `engranaje.svg` | Icono/gear |
-| `buscar.svg` | Icono/search | `mas.svg` | Icono/plus | `chevron-abajo.svg` | Icono/chev |
-| `aviso.svg` | Icono/warn | `info.svg` | Icono/info | `ok.svg` | Icono/check |
-| `error.svg` | Icono/x | `jugar.svg` | Icono/play | `rombo.svg` | Icono/diamond |
-| `candado.svg` | Icono/lock | `deshacer.svg` | Icono/undo | `minimizar.svg` | Icono/min |
-| `maximizar.svg` | Icono/max | `cerrar.svg` | Icono/close | `globo.svg` | Icono/globe |
-| `reloj.svg` | Icono/clock | `actualizar.svg` | Icono/refresh | `lapiz.svg` | Icono/pencil |
-| `copiar.svg` | Icono/copy | `lista.svg` | Icono/list |  |  |
+| `servers.svg` | Icono/servers | `folder.svg` | Icono/folder | `gear.svg` | Icono/gear |
+| `search.svg` | Icono/search | `plus.svg` | Icono/plus | `chevron-down.svg` | Icono/chev |
+| `warning.svg` | Icono/warn | `info.svg` | Icono/info | `ok.svg` | Icono/check |
+| `error.svg` | Icono/x | `play.svg` | Icono/play | `diamond.svg` | Icono/diamond |
+| `lock.svg` | Icono/lock | `undo.svg` | Icono/undo | `minimize.svg` | Icono/min |
+| `maximize.svg` | Icono/max | `close.svg` | Icono/close | `globe.svg` | Icono/globe |
+| `clock.svg` | Icono/clock | `refresh.svg` | Icono/refresh | `pencil.svg` | Icono/pencil |
+| `copy.svg` | Icono/copy | `list.svg` | Icono/list |  |  |
 
-**Procedencia**: dibujados a mano para este proyecto con un script del proyecto (no incluido en este repositorio) (no proceden del conector de Figma ni de Lucide/ISC; no hay material de terceros). Para cambiar de color, editar el atributo `stroke`/`fill` (Avalonia.Svg no garantiza `currentColor`).
+**Provenance**: drawn by hand for this project with a project script (not included in this repository); they do not come from the Figma connector or from Lucide (ISC), Feather, Heroicons or any other library, so there is no third-party attribution. To change the color, edit the `stroke`/`fill` attribute (Avalonia.Svg does not guarantee `currentColor`).
 
 ## 4. fonts/
 
-Ver `fonts/FONTS.md` (licencia OFL 1.1, URL de origen, tipos de archivo y comprobación de glifos á é í ó ú ñ ¿ ¡ ü).
+See `fonts/FONTS.md` (OFL 1.1 license, source URLs, file types and glyph check).
 
-## Limitaciones honestas
+## Honest limitations
 
-- Nada se ha probado dentro de Avalonia; la verificación es visual con Pillow/cairosvg (9-slice implementado en Python con los mismos insets). Cualquier diferencia de render (suavizado, DPI) se descubrirá en el spike.
-- Los SVG de `frames/` son planos (sin textura, sombras ni sombra interior): los efectos solo están en los PNG, porque cairosvg/Avalonia.Svg no garantizan `feGaussianBlur`/`<pattern>`. Hay que aceptar «dos looks» o usar los PNG.
-- El borde irregular de pergamino es una forma fija: al estirar el 9-slice se estira también la ondulación, y la zona decorada exige ≥72 px de lado. Los paneles de más de ~1000 px de ancho se verán con ondulación muy suave (no repetible por baldosa).
-- La costura punteada de botones y herraje se estira en el centro del 9-slice (no mantiene el periodo de 6 px).
-- El aro de bronce del icono con textura solo existe en PNG ≥64 px; la SVG y los tamaños 32/16 llevan bronce plano.
-- Los sellos y el icono de app no están ajustados al píxel en 16 px (el 16×16 es una reducción del diseño simplificado; legible como sello rojo con arco, pero sin detalle).
-- JetBrains Mono no incluye el glifo ✓ (U+2713); no usarlo en la UI de código (usar «OK» o un icono SVG).
-- No hay variante @2x de los iconos de interfaz ni de los sellos: son vectoriales; los PNG de sellos se dan a 64 y 128.
-- Las texturas se repiten visiblemente en pantallas muy grandes si se mosaican sin variación (el pergamino más que el cuero).
+- Nothing has been tested inside Avalonia; verification is visual with Pillow/cairosvg (9-slice implemented in Python with the same insets). Any rendering difference (anti-aliasing, DPI) will be discovered in the spike.
+- The SVGs in `frames/` are flat (no texture, shadows or inner shadow): the effects exist only in the PNGs, because cairosvg/Avalonia.Svg do not guarantee `feGaussianBlur`/`<pattern>`. Either accept "two looks" or use the PNGs.
+- The irregular parchment edge is a fixed shape: when stretched, the waviness stretches too, and the decorated zone requires ≥72 px per side. Panels wider than ~1000 px will show very soft waviness (it cannot be tiled).
+- The dotted stitching of buttons and hardware stretches in the 9-slice center (it does not keep the 6 px period).
+- The bronze ring of the icon with texture exists only as PNG ≥64 px; the SVG and the 32/16 sizes use flat bronze.
+- The seals and the app icon are not pixel-fitted at 16 px (the 16×16 is a reduction of the simplified design; legible as a red seal with an arch, but without detail).
+- JetBrains Mono does not include the ✓ glyph (U+2713); do not use it in code UI (use "OK" or an SVG icon).
+- There is no @2x variant of the interface icons or of the seals: they are vector; the seal PNGs are given at 64 and 128.
+- Textures visibly repeat on very large screens if tiled without variation (parchment more than leather).
