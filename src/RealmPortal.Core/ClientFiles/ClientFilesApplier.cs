@@ -85,7 +85,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             targets.Add(new Target(edit, path, original));
         }
 
-        var backupId = NewBackupId();
+        var backupId = NewBackupId(plan.InstallationId);
         var backupDir = Path.Combine(_backupRoot, plan.InstallationId, backupId);
         try
         {
@@ -336,8 +336,29 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
     }
 
-    private string NewBackupId() =>
-        $"{_clock().UtcDateTime:yyyyMMdd'T'HHmmssfff}Z-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(3))}";
+    /// <summary>
+    /// <c>yyyyMMddTHHmmssfffZ-NNNNNN</c>: the UTC time plus a sequence number. Called under the installation lock, it is always greater
+    /// than the newest existing id (same millisecond or a clock that went backwards bump the sequence), so ids sort in apply order.
+    /// </summary>
+    private string NewBackupId(string installationId)
+    {
+        var timestamp = $"{_clock().UtcDateTime:yyyyMMdd'T'HHmmssfff}Z";
+        var sequence = 0;
+        var dir = Path.Combine(_backupRoot, installationId);
+        var latest = Guard(() => Directory.EnumerateDirectories(dir).Select(Path.GetFileName).OfType<string>().Order(StringComparer.Ordinal).LastOrDefault(), dir, "list backups");
+        var dash = latest?.IndexOf('-') ?? -1;
+        if (latest is not null && dash > 0)
+        {
+            var latestTimestamp = latest[..dash];
+            if (string.CompareOrdinal(timestamp, latestTimestamp) <= 0)
+            {
+                timestamp = latestTimestamp;
+                sequence = int.TryParse(latest[(dash + 1)..], out var n) ? n + 1 : 0;
+            }
+        }
+
+        return $"{timestamp}-{sequence.ToString("D6", System.Globalization.CultureInfo.InvariantCulture)}";
+    }
 
     private static void RequireValidIds(string installationId, string profileId)
     {
