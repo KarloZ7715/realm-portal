@@ -1,0 +1,22 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Text styles of DESIGN.md section 5, applied with a style class on TextBlock (<TextBlock Classes="h2"/>).
+    Colour is not set here: it depends on the surface (bone on leather, ink on parchment).
+    Almendra only for titles; Marcellus SC only for buttons and short headers; addresses and paths always mono.
+  -->
+  <Style Selector="TextBlock.display"><Setter Property="FontFamily" Value="{StaticResource FontDisplay}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="34"/></Style>
+  <Style Selector="TextBlock.h1"><Setter Property="FontFamily" Value="{StaticResource FontDisplay}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="28"/></Style>
+  <Style Selector="TextBlock.h2"><Setter Property="FontFamily" Value="{StaticResource FontDisplay}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="20"/></Style>
+  <Style Selector="TextBlock.dropcap"><Setter Property="FontFamily" Value="{StaticResource FontDisplay}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="56"/></Style>
+  <Style Selector="TextBlock.button"><Setter Property="FontFamily" Value="{StaticResource FontCaps}"/><Setter Property="FontSize" Value="14"/></Style>
+  <Style Selector="TextBlock.section"><Setter Property="FontFamily" Value="{StaticResource FontCaps}"/><Setter Property="FontSize" Value="13"/></Style>
+  <Style Selector="TextBlock.body"><Setter Property="FontFamily" Value="{StaticResource FontBody}"/><Setter Property="FontSize" Value="17"/></Style>
+  <Style Selector="TextBlock.body-sm"><Setter Property="FontFamily" Value="{StaticResource FontBody}"/><Setter Property="FontSize" Value="16"/></Style>
+  <Style Selector="TextBlock.body-medium"><Setter Property="FontFamily" Value="{StaticResource FontBodyMedium}"/><Setter Property="FontSize" Value="16"/></Style>
+  <Style Selector="TextBlock.body-bold"><Setter Property="FontFamily" Value="{StaticResource FontBody}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="15"/></Style>
+  <Style Selector="TextBlock.footnote"><Setter Property="FontFamily" Value="{StaticResource FontSansMedium}"/><Setter Property="FontSize" Value="13"/></Style>
+  <Style Selector="TextBlock.status"><Setter Property="FontFamily" Value="{StaticResource FontSans}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="12"/></Style>
+  <Style Selector="TextBlock.address"><Setter Property="FontFamily" Value="{StaticResource FontMono}"/><Setter Property="FontSize" Value="13"/></Style>
+  <Style Selector="TextBlock.path"><Setter Property="FontFamily" Value="{StaticResource FontMono}"/><Setter Property="FontSize" Value="12"/></Style>
+</Styles>

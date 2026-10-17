@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.karloz7715.RealmPortal</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Realm Portal</name>
+  <summary>Switch between game realms with one click</summary>
+  <description>
+    <p>
+      Realm Portal is a desktop launcher for private game servers. You add the
+      servers you want and point the app to your own game client; Realm Portal
+      then switches the client to the realm you pick, with a single click.
+    </p>
+    <p>
+      The app does not download or distribute game clients or game content.
+      The interface is available in English and Spanish.
+    </p>
+    <p>
+      Not affiliated with or endorsed by Blizzard Entertainment.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.karloz7715.RealmPortal.desktop</launchable>
+  <url type="homepage">https://github.com/KarloZ7715/realm-portal</url>
+  <url type="bugtracker">https://github.com/KarloZ7715/realm-portal/issues</url>
+  <categories>
+    <category>Game</category>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>launcher</keyword>
+    <keyword>server</keyword>
+    <keyword>realm</keyword>
+  </keywords>
+  <content_rating type="oars-1.1"/>
+</component>
