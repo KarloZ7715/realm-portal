@@ -98,6 +98,8 @@
   "error.readonlyfs.body": "{0} is on a read-only file system. Nothing was changed.",
   "error.pathnotfound.title": "Folder not found",
   "error.pathnotfound.body": "{0} no longer exists or is not valid. Check the client in Clients.",
+  "error.pathescapesclient.title": "Unsafe client file path",
+  "error.pathescapesclient.body": "A path is outside the managed client files or the client folder. Nothing was restored.",
   "error.hashmismatch.title": "The files changed",
   "error.hashmismatch.body": "The client files changed while we were preparing the change. Try again.",
   "error.verifyfailed.title": "We could not verify the change",

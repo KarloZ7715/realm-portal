@@ -98,6 +98,8 @@
   "error.readonlyfs.body": "{0} está en un sistema de archivos de solo lectura. No se ha modificado nada.",
   "error.pathnotfound.title": "No encontramos la carpeta",
   "error.pathnotfound.body": "{0} ya no existe o no es válida. Revisa el cliente en Clientes.",
+  "error.pathescapesclient.title": "Ruta de archivo no segura",
+  "error.pathescapesclient.body": "Una ruta queda fuera de los archivos del cliente que gestionamos o de la carpeta del cliente. No se restauró nada.",
   "error.hashmismatch.title": "Los archivos cambiaron",
   "error.hashmismatch.body": "Los archivos del cliente cambiaron mientras preparábamos el cambio. Inténtalo de nuevo.",
   "error.verifyfailed.title": "No pudimos comprobar el cambio",
