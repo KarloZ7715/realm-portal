@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+        Opened += (_, _) => Platform.X11WindowIcon.TrySet(this);
         SizeChanged += (_, e) => UpdateSidebar(e.NewSize.Width);
     }
 

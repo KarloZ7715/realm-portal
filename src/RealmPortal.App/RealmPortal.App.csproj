@@ -26,6 +26,9 @@
   <ItemGroup>
     <AvaloniaResource Include="..\..\assets\branding\icon\png\realm-portal-256.png" Link="Assets/app-icon.png" />
   </ItemGroup>
+  <ItemGroup Label="Tesera icon sizes, drawn natively per size (micro, simplified, full); used for _NET_WM_ICON on X11">
+    <AvaloniaResource Include="..\..\assets\branding\icon\png\realm-portal-*.png" Exclude="..\..\assets\branding\icon\png\realm-portal-512.png" Link="Assets/Icons/%(Filename)%(Extension)" />
+  </ItemGroup>
   <ItemGroup Label="UI kit art (assets/ui, flattened to Assets/Ui), seals and textures. The legacy assets/frames are not bundled; the app keeps the system title bar, so no window frame.">
     <AvaloniaResource Include="..\..\assets\ui\**\*.png" Link="Assets/Ui/%(Filename)%(Extension)" />
     <AvaloniaResource Include="..\..\assets\icons\seals\*-64.png;..\..\assets\icons\seals\*-128.png" Link="Assets/Seals/%(Filename)%(Extension)" />
