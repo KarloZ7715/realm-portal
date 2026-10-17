@@ -6,6 +6,7 @@
     control, which strokes with the inherited Foreground, so one icon works on leather and on parchment.
     "IconPlay" and "IconDiamond" are filled shapes (Icon.IsFilled="True"); all others are strokes.
   -->
+  <StreamGeometry x:Key="IconChevronLeft">M15 6l-6 6 6 6</StreamGeometry>
   <StreamGeometry x:Key="IconChevronDown">M6 9l6 6 6-6</StreamGeometry>
   <StreamGeometry x:Key="IconClock">M3.0,12.0 a9.0,9.0 0 1 0 18.0,0 a9.0,9.0 0 1 0 -18.0,0 z M12 7v5l3.5 2</StreamGeometry>
   <StreamGeometry x:Key="IconClose">M6 6l12 12M18 6L6 18</StreamGeometry>

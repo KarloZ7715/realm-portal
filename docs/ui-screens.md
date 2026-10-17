@@ -37,6 +37,15 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 - The wide sidebar (960 px and up) and the clickable language toggle are not in the 720x480 mockups.
 - The status bar text: idle shows `realmlist · <active host>`; right after a switch `Activo: <name>`.
 
+## Settings (F4, compact-07)
+
+Reached from the sidebar gear. Cards: Language (radio ES/EN, applies at once and is persisted by Save), Launcher (command template, prefix, arguments, environment: the fields of the core's launch settings) and Backup (folder + Browse). Fixed header ("Back") and footer (Cancel, Save); the status bar says "Settings · unsaved changes" while something differs from the saved values. Cancel restores the saved values and language.
+
+- **Deviation: no "Cleanup" card.** The mockup has a cache-cleanup switch; the architect decided there is none in 0.1, so it is not built.
+- Language is one full-width card with the radios side by side (the mockup puts it next to the Cleanup card), and it has no "Active" badge or medallion in the footer rule (no art; see ART-GAPS).
+- Text boxes hold plain text: prefix and arguments are split like a shell would (quotes group words, nothing is executed); one `KEY=value` per line for variables. Whether the template is usable (it must contain `{exe}`) is the service's decision; the demo store applies the same rule.
+- Settings read and write through `ISettingsStore`; today the simulated `DemoSettingsStore` (memory only). It moves onto the application service once that exposes the backup folder (requested in the API review).
+
 ## Errors and dialogs (F4)
 
 - `ErrorText` turns the stable error codes of the core (`ClientFilesErrorCode`, plus `ProcessCheckFailed`, announced for 0.1) into a localized title and body; the core never supplies UI text. A code without strings shows a generic message; a test fails when a code lacks ES or EN text.

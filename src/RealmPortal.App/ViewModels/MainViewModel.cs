@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Settings;
 using RealmPortal.Core;
 
 namespace RealmPortal.App.ViewModels;
@@ -13,12 +14,13 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ViewModelBase[] _sections;
     private AddServerViewModel? _adding;
 
-    public MainViewModel(DemoBackend? backend = null, bool autoTick = true)
+    public MainViewModel(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null)
     {
         Backend = backend ?? new DemoBackend();
         Servers = new ServersViewModel(Backend, autoTick);
         Clients = new ClientsViewModel(Backend);
-        Settings = new PlaceholderViewModel("nav.settings");
+        Settings = new SettingsViewModel(settings ?? new DemoSettingsStore(), () => "/home/demo/.local/share/RealmPortal/backups-2");
+        Settings.BackRequested += () => SectionIndex = 0;
         _sections = [Servers, Clients, Settings];
         foreach (var section in _sections)
         {
@@ -35,7 +37,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ClientsViewModel Clients { get; }
 
-    public ViewModelBase Settings { get; }
+    public SettingsViewModel Settings { get; }
 
     /// <summary>Index in the sidebar: 0 servers, 1 clients, 2 settings.</summary>
     [ObservableProperty]
