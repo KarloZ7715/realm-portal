@@ -68,7 +68,7 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 | `ArgumentException` from `Server.Create` | `InvalidServerInput` with `Field` |
 | `GameLaunchSpec.Resolve` / settings | `InvalidLauncherSettings` |
 | process start failure after a successful switch (`Play` only) | `LaunchFailed` with `Consistency.AppliedLaunchFailed` (switch and active server stay; undo remains available) |
-| `Play` fails in `Plan`, `WriteFiles` or `Activate` (before `Launch` starts) | that step's own code (never `LaunchFailed`) with `Consistency.Unchanged` or `RolledBack` (`Inconsistent` if the rollback fails), exactly as for `SwitchServer` |
+| `Play` fails in `Plan`, `WriteFiles` or `Activate` (before `Launch` starts) | that step's own code (never `LaunchFailed`) with `Consistency.Unchanged` or `RolledBack`; if the rollback after a failed `Activate` also fails, `InconsistentState` with `Consistency.Inconsistent`, exactly as for `SwitchServer` |
 | incompatible build without `Force` | `IncompatibleClient` with `RequiredBuild`, `ClientBuild` |
 | anything else | `Unexpected` (with `Diagnostic`) |
 
