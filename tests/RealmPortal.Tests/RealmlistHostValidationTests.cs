@@ -12,7 +12,6 @@ public class RealmlistHostValidationTests
     [InlineData(":-1")]
     [InlineData(":abc")]
     [InlineData("host:1:2:3")]
-    [InlineData("::1")]
     [InlineData("a.example;calc")]
     [InlineData("$(id)`id`")]
     [InlineData("a..example")]
@@ -41,4 +40,24 @@ public class RealmlistHostValidationTests
     [Fact]
     public void Validate_AcceptsPatchlistHttpUrl() =>
         RealmlistText.Validate("set realmlist h.example.org\r\nset patchlist http://patch.example.org/files\r\n");
+
+    [Theory]
+    [InlineData("[:::]")]
+    [InlineData("[1]")]
+    public void Create_RejectsInvalidBracketedIpLiterals(string host) =>
+        Assert.Throws<InvalidRealmlistException>(() => Server.Create("n", host));
+
+    [Theory]
+    [InlineData("http://$(id)")]
+    [InlineData("http://a;calc")]
+    [InlineData("http://user:pass@patch.example.org/")]
+    [InlineData("http://patch.example.org:99999/")]
+    [InlineData("http://patch.example.org/?y=$(id)")]
+    public void Create_RejectsUnsafePatchlistUrls(string patchlistUrl) =>
+        Assert.Throws<InvalidRealmlistException>(() =>
+            Server.Create("n", "h.example.org", extraRealmlistLines: ["set patchlist " + patchlistUrl]));
+
+    [Fact]
+    public void TryParseHostAddress_RejectsShellMetacharactersInHost() =>
+        Assert.False(RealmlistAddress.TryParseHostAddress("a.example;calc", out _, out _));
 }

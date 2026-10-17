@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
@@ -98,27 +97,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private bool IsNameValid => Name.Trim().Length is > 0 and <= Server.MaxNameLength;
 
     /// <summary>host or host:port; the port defaults to <see cref="DefaultPort"/>.</summary>
-    public static bool TryParseAddress(string? text, out string host, out int port)
-    {
-        host = string.Empty;
-        port = DefaultPort;
-        var value = text?.Trim() ?? string.Empty;
-        var match = AddressPattern().Match(value);
-        if (!match.Success)
-        {
-            return false;
-        }
-
-        var parsedPort = DefaultPort;
-        if (match.Groups["port"].Success && (!int.TryParse(match.Groups["port"].Value, out parsedPort) || parsedPort is < 1 or > 65535))
-        {
-            return false;
-        }
-
-        host = match.Groups["host"].Value;
-        port = parsedPort;
-        return true;
-    }
+    public static bool TryParseAddress(string? text, out string host, out int port) =>
+        RealmlistAddress.TryParseHostAddress(text, out host, out port, DefaultPort);
 
     public override void RefreshText()
     {
@@ -177,6 +157,4 @@ public sealed partial class AddServerViewModel : ViewModelBase
         }
     }
 
-    [GeneratedRegex(@"^(?<host>[A-Za-z0-9](?:[A-Za-z0-9.\-]*[A-Za-z0-9])?)(?::(?<port>\d{1,5}))?$")]
-    private static partial Regex AddressPattern();
 }
