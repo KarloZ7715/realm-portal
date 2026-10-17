@@ -142,5 +142,12 @@ target/
 
 # ---- Large local design / prototype artifacts (keep out of the source repo) ----
 figma-build*/
-figma-exports/
+# Loose dumps in figma-exports/ stay local. The indexed screen exports listed
+# in figma-exports/README.md are tracked (each is under the 5 MiB file-size limit).
+figma-exports/*
+!figma-exports/README.md
+!figma-exports/compact-07-settings-no-cleanup@2x.png
+!figma-exports/compact-07-settings-no-cleanup-scrolled@2x.png
+!figma-exports/compact-09-backup-conflict@2x.png
+!figma-exports/compact-09b-backup-conflict-restore-anyway@2x.png
 figma-textures/
