@@ -20,7 +20,8 @@ public class Finding5BackupProbeSecurityTests
         var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch(), getVariable: _ => backups);
         Assert.True(service.SetStorageSettings(new StorageSettings(backups)).Succeeded);
         Assert.True(service.SetStorageSettings(new StorageSettings(backups)).Succeeded);
-        Assert.DoesNotContain(".realm-portal-write-test", Directory.GetFiles(backups).Select(Path.GetFileName));
+        Assert.DoesNotContain(Directory.GetFiles(backups).Select(Path.GetFileName),
+            name => name!.StartsWith(".realm-portal-probe-", StringComparison.Ordinal));
     }
 
     [Fact]
