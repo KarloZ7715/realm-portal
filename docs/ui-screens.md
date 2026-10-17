@@ -19,7 +19,7 @@ a pretend game process). No game client, no `~/.config/wow-servidores`, no netwo
 | Game running | `compact-06b-jugando` | after opening; the simulated game closes by itself after 20 s, then "Reintentar" is enabled |
 | Clients | `compact-01-clientes` | sidebar, second item; tick rows, "Elegir carpeta a mano" (adds an example folder), "Buscar de nuevo" |
 | Add server | `compact-03-anadir` | "Añadir" in the servers header; "Probar conexión" answers unless the address contains "offline" or ends in ".invalid" |
-| Settings | none | placeholder |
+| Settings | `compact-07` | sidebar, gear (third item) |
 
 The language toggle in the status bar ("ES · v0.1.0") switches Spanish and English at run time. The first language follows the system language.
 
@@ -39,12 +39,17 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 ## Settings (F4, compact-07)
 
-Reached from the sidebar gear. Cards: Language (radio ES/EN, applies at once and is persisted by Save), Launcher (command template, prefix, arguments, environment: the fields of the core's launch settings) and Backup (folder + Browse). Fixed header ("Back") and footer (Cancel, Save); the status bar says "Settings · unsaved changes" while something differs from the saved values. Cancel restores the saved values and language.
+Reached from the sidebar gear. The cards sit in one column and scroll; the header ("Back") and the footer (Cancel, Save) stay put. Back returns to the servers list and leaves the form as it is. Cancel restores the saved values and the saved language.
 
-- **Deviation: no "Cleanup" card.** The mockup has a cache-cleanup switch; the architect decided there is none in 0.1, so it is not built.
-- Language is one full-width card with the radios side by side (the mockup puts it next to the Cleanup card), and it has no "Active" badge or medallion in the footer rule (no art; see ART-GAPS).
-- Text boxes hold plain text: prefix and arguments are split like a shell would (quotes group words, nothing is executed); one `KEY=value` per line for variables. Whether the template is usable (it must contain `{exe}`) is the service's decision; the demo store applies the same rule.
-- Settings read and write through `ISettingsStore`; today the simulated `DemoSettingsStore` (memory only). It moves onto the application service once that exposes the backup folder (requested in the API review).
+- **Language.** Radios "Español" and "English", side by side. The card title is "Language" in English and "Idioma" in Spanish, and the card spans the full width (Figma note 48-6406, https://www.figma.com/design/6kBPmTavrfpbceMSUvvWl3?node-id=48-6406). Choosing a language switches the UI at once, and the status-bar language control stays on that same language. Save is what stores it.
+- **Launcher.** Command template, prefix, arguments, and environment variables (one `KEY=value` per line). These are the launcher fields of the core's launch settings. Prefix and arguments are split on spaces, with quotes grouping words; nothing is executed. A non-empty template must contain `{exe}` or Save refuses it and marks the field. A line that is not `KEY=value` is numbered on the environment field and blocks Save. An empty template is stored as none.
+- **Backup.** The backup folder, plus Browse. In the demo, Browse fills `/home/demo/.local/share/RealmPortal/backups-2`. An empty folder is refused on Save.
+
+Cache cleanup is not part of 0.1, so this screen has no cleanup card.
+
+Save is enabled only while a value differs from what was saved. The status bar then says "Settings · unsaved changes", and after a successful save "Settings · saved". Reads and writes go through `ISettingsStore`. The demo uses `DemoSettingsStore`, which keeps the values in memory only. It starts from `wine {exe}`, prefix `gamemoderun`, arguments `-windowed -nosound`, and backup folder `/home/demo/.local/share/RealmPortal/backups`.
+
+On parchment surfaces, buttons use border `#5A3D22` and focus color `#0F5561`.
 
 ## Errors and dialogs (F4)
 
