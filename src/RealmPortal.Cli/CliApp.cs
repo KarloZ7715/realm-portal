@@ -1,7 +1,7 @@
 using RealmPortal.Core;
 using RealmPortal.Core.Clients;
-using RealmPortal.Core.IO;
 using RealmPortal.Core.Launch;
+using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
 
 namespace RealmPortal.Cli;
@@ -63,22 +63,28 @@ public sealed class CliApp(
         try
         {
             var parsed = Parse(args);
-            var writer = new AtomicFileWriter();
             var configDir = parsed.Get("--config-dir") ?? PortalPaths.ConfigDirectory(getVariable);
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
             var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
-            var store = new ServerStore(configDir, writer);
-            var manager = new ActiveServerManager(store, configDir, projectionDir, writer);
+            var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher), getVariable: getVariable);
+            string? clientId = null;
+            if (clientDir is not null)
+            {
+                var reg = service.AddClient(clientDir);
+                if (!reg.Succeeded)
+                    return Fail(reg.Error!);
+                clientId = reg.Value!.Id;
+            }
 
             return command switch
             {
-                "add" => Add(parsed, store),
-                "remove" => Remove(parsed, store, manager),
-                "list" => List(parsed, store, manager, clientDir),
-                "switch" => SwitchCommand(parsed, store, manager, clientDir),
-                "undo" => Undo(parsed, manager),
-                "status" => Status(parsed, manager, clientDir),
-                "launch" => Launch(parsed, store, manager, clientDir),
+                "add" => Add(parsed, service),
+                "remove" => Remove(parsed, service),
+                "list" => List(parsed, service, clientId, clientDir),
+                "switch" => SwitchCommand(parsed, service, clientId, clientDir),
+                "undo" => Undo(parsed, service),
+                "status" => Status(parsed, service, clientId, clientDir),
+                "launch" => Launch(parsed, service, clientId, clientDir, parsed.Flags.Contains("--dry-run")),
                 _ => throw new UsageException($"unknown command '{command}'"),
             };
         }
@@ -88,13 +94,17 @@ public sealed class CliApp(
             error.WriteLine(Usage);
             return 1;
         }
-        catch (Exception ex) when (ex is StoreException or InvalidRealmlistException or ClientVersionException or ArgumentException or IOException
-                                       or UnauthorizedAccessException or InvalidOperationException
-                                       or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
         {
             error.WriteLine($"error: {ex.Message}");
             return 2;
         }
+    }
+
+    private int Fail(ServiceError serviceError)
+    {
+        error.WriteLine($"error: {ServiceCli.Describe(serviceError)}");
+        return 2;
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
@@ -139,7 +149,7 @@ public sealed class CliApp(
             throw new UsageException($"option {extra} does not apply to this command");
     }
 
-    private int Add(Parsed parsed, ServerStore store)
+    private int Add(Parsed parsed, PortalService service)
     {
         Expect(parsed, 2, 2, "<name> <host>");
         int? build = null;
@@ -150,95 +160,108 @@ public sealed class CliApp(
             build = n;
         }
 
-        var server = Server.Create(
+        var lines = parsed.Options.GetValueOrDefault("--line");
+
+        var result = service.AddServer(new NewServer(
             parsed.Positionals[0],
             parsed.Positionals[1],
             parsed.Get("--realm"),
-            parsed.Options.GetValueOrDefault("--line"),
+            null,
             build,
-            parsed.Get("--account"));
-        store.Add(server);
-        output.WriteLine($"Added '{server.Name}' ({server.Id})");
+            parsed.Get("--account"),
+            ExtraRealmlistLines: lines));
+        if (!result.Succeeded)
+            return Fail(result.Error!);
+        output.WriteLine($"Added '{result.Value!.Name}' ({result.Value.Id})");
         return 0;
     }
 
-    private int Remove(Parsed parsed, ServerStore store, ActiveServerManager manager)
+    private int Remove(Parsed parsed, PortalService service)
     {
         Expect(parsed, 1, 1, "<server>");
-        var server = FindOrThrow(store, parsed.Positionals[0]);
-        manager.Remove(server.Id);
+        var server = FindOrThrow(service, parsed.Positionals[0]);
+        var result = service.RemoveServer(server.Id);
+        if (!result.Succeeded)
+            return Fail(result.Error!);
         output.WriteLine($"Removed '{server.Name}'");
         return 0;
     }
 
-    private int List(Parsed parsed, ServerStore store, ActiveServerManager manager, string? clientDir)
+    private int List(Parsed parsed, PortalService service, string? clientId, string? clientDir)
     {
         Expect(parsed, 0, 0, "no arguments", "--all");
-        var servers = store.List();
-        var client = clientDir is null ? null : versionReader.Read(clientDir);
-        var activeId = manager.GetActive()?.Id;
-        var showAll = parsed.Flags.Contains("--all");
+        if (clientDir is not null && clientId is null)
+            return 2;
 
-        var rows = servers
-            .Select(s => (Server: s, Compatible: clientDir is null || CompatibilityFilter.IsCompatible(s, client)))
-            .Where(r => showAll || r.Compatible)
-            .ToList();
+        var showAll = parsed.Flags.Contains("--all");
+        var result = service.ListServers(clientId, compatibleOnly: !showAll && clientId is not null);
+        if (!result.Succeeded)
+            return Fail(result.Error!);
+
+        var rows = result.Value!;
         if (rows.Count == 0)
         {
-            output.WriteLine(servers.Count == 0 ? "No servers." : "No compatible servers.");
+            var all = service.ListServers();
+            output.WriteLine(all.Succeeded && all.Value!.Count == 0 ? "No servers." : "No compatible servers.");
             return 0;
         }
 
-        foreach (var (server, compatible) in rows)
+        foreach (var server in rows)
         {
             var build = server.RequiredClientBuild?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "any";
             output.WriteLine(
-                $"{(server.Id == activeId ? "*" : " ")} {server.Id}  {server.Name}  {server.Host}  build={build}"
-                + (compatible ? "" : "  [incompatible]"));
+                $"{(server.IsActive ? "*" : " ")} {server.Id}  {server.Name}  {server.Host}  build={build}"
+                + (server.IsCompatible ? "" : "  [incompatible]"));
         }
 
         return 0;
     }
 
-    private int SwitchCommand(Parsed parsed, ServerStore store, ActiveServerManager manager, string? clientDir)
+    private int SwitchCommand(Parsed parsed, PortalService service, string? clientId, string? clientDir)
     {
         Expect(parsed, 1, 1, "<server>", "--force");
-        var server = FindOrThrow(store, parsed.Positionals[0]);
-        SwitchTo(server, manager, clientDir, parsed.Flags.Contains("--force"));
+        var server = FindOrThrow(service, parsed.Positionals[0]);
+        var force = parsed.Flags.Contains("--force");
+
+        if (clientId is null)
+        {
+            if (server.RequiredClientBuild is not null)
+                error.WriteLine($"warning: no --client-dir given; compatibility with build {server.RequiredClientBuild} was not checked.");
+            var status = service.GetStatus();
+            var previousName = status.Succeeded ? status.Value!.Active?.Name : null;
+            var activated = service.ActivateWithoutClientFiles(server.Id);
+            if (!activated.Succeeded)
+                return Fail(activated.Error!);
+            output.WriteLine($"Switched to '{server.Name}'" + (previousName is null || previousName == server.Name ? "" : $" (previous: '{previousName}')"));
+            return 0;
+        }
+
+        var sw = service.SwitchServer(new SwitchRequest(clientId, server.Id, force));
+        if (!sw.Succeeded)
+            return Fail(sw.Error!);
+        var previous = sw.Value!.Previous?.Name;
+        output.WriteLine($"Switched to '{server.Name}'" + (previous is null || previous == server.Name ? "" : $" (previous: '{previous}')"));
         return 0;
     }
 
-    private void SwitchTo(Server server, ActiveServerManager manager, string? clientDir, bool force)
-    {
-        if (clientDir is not null)
-        {
-            var client = versionReader.Read(clientDir);
-            if (!CompatibilityFilter.IsCompatible(server, client) && !force)
-                throw new InvalidOperationException(
-                    $"'{server.Name}' requires client build {server.RequiredClientBuild}, but the client is {client} (use --force to switch anyway).");
-        }
-        else if (server.RequiredClientBuild is not null)
-        {
-            error.WriteLine($"warning: no --client-dir given; compatibility with build {server.RequiredClientBuild} was not checked.");
-        }
-
-        var previousName = manager.GetActive()?.Name;
-        manager.Switch(server);
-        output.WriteLine($"Switched to '{server.Name}'" + (previousName is null || previousName == server.Name ? "" : $" (previous: '{previousName}')"));
-    }
-
-    private int Undo(Parsed parsed, ActiveServerManager manager)
+    private int Undo(Parsed parsed, PortalService service)
     {
         Expect(parsed, 0, 0, "no arguments");
-        var restored = manager.Undo();
+        var result = service.Undo();
+        if (!result.Succeeded)
+            return Fail(result.Error!);
+        var restored = result.Value!.Active;
         output.WriteLine(restored is null ? "Undone: no active server." : $"Undone: restored '{restored.Name}'.");
         return 0;
     }
 
-    private int Status(Parsed parsed, ActiveServerManager manager, string? clientDir)
+    private int Status(Parsed parsed, PortalService service, string? clientId, string? clientDir)
     {
         Expect(parsed, 0, 0, "no arguments");
-        var status = manager.Status();
+        var result = service.GetStatus();
+        if (!result.Succeeded)
+            return Fail(result.Error!);
+        var status = result.Value!;
         if (status.Active is null)
         {
             output.WriteLine("Active server: none");
@@ -256,50 +279,92 @@ public sealed class CliApp(
         output.WriteLine($"Can undo: {(status.CanUndo ? "yes" : "no")}");
         if (clientDir is not null)
         {
-            var client = versionReader.Read(clientDir);
-            var compat = status.Active is null ? "" : CompatibilityFilter.IsCompatible(status.Active, client) ? " (compatible)" : " (INCOMPATIBLE)";
-            output.WriteLine($"Client: {client}{compat}");
+            try
+            {
+                var client = versionReader.Read(clientDir);
+                var compat = status.Active is null ? "" : status.Active.IsCompatible ? " (compatible)" : " (INCOMPATIBLE)";
+                output.WriteLine($"Client: {client}{compat}");
+            }
+            catch (ClientVersionException ex)
+            {
+                error.WriteLine($"error: {ex.Message}");
+                return 2;
+            }
         }
 
         return 0;
     }
 
-    private int Launch(Parsed parsed, ServerStore store, ActiveServerManager manager, string? clientDir)
+    private int Launch(Parsed parsed, PortalService service, string? clientId, string? clientDir, bool dryRun)
     {
         Expect(parsed, 0, 1, "[<server>]", "--force", "--dry-run");
-        if (clientDir is null)
+        if (clientDir is null || clientId is null)
             throw new UsageException("launch needs --client-dir (or REALM_PORTAL_CLIENT_DIR)");
 
         var force = parsed.Flags.Contains("--force");
-        Server server;
-        if (parsed.Positionals.Count == 1)
+        var wrapper = parsed.Get("--wrapper");
+        if (wrapper is not null)
         {
-            server = FindOrThrow(store, parsed.Positionals[0]);
-            SwitchTo(server, manager, clientDir, force);
-        }
-        else
-        {
-            server = manager.GetActive() ?? throw new InvalidOperationException("no active server; run 'switch <server>' or 'launch <server>'.");
-            var client = versionReader.Read(clientDir);
-            if (!CompatibilityFilter.IsCompatible(server, client) && !force)
-                throw new InvalidOperationException(
-                    $"'{server.Name}' requires client build {server.RequiredClientBuild}, but the client is {client} (use --force to launch anyway).");
+            var settings = service.GetLauncherSettings();
+            if (!settings.Succeeded)
+                return Fail(settings.Error!);
+            var merged = settings.Value! with { Prefix = [wrapper] };
+            var saved = service.SetLauncherSettings(merged);
+            if (!saved.Succeeded)
+                return Fail(saved.Error!);
         }
 
-        var executable = GameExecutable.Find(clientDir)
-                         ?? throw new InvalidOperationException($"{GameExecutable.FileName} not found in '{clientDir}'.");
-        var wrapper = parsed.Get("--wrapper");
-        if (parsed.Flags.Contains("--dry-run"))
+        ServerEntry server;
+        if (parsed.Positionals.Count == 1)
         {
+            server = FindOrThrow(service, parsed.Positionals[0]);
+            if (dryRun)
+            {
+                var executable = GameExecutable.Find(clientDir)
+                                 ?? throw new UsageException($"{GameExecutable.FileName} not found in '{clientDir}'.");
+                output.WriteLine($"Dry run: would launch {(wrapper is null ? "" : wrapper + " ")}{executable} for '{server.Name}'.");
+                return 0;
+            }
+
+            var play = service.Play(new SwitchRequest(clientId, server.Id, force));
+            if (!play.Succeeded)
+                return Fail(play.Error!);
+            output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
+            return 0;
+        }
+
+        var status = service.GetStatus();
+        if (!status.Succeeded)
+            return Fail(status.Error!);
+        server = status.Value!.Active ?? throw new InvalidOperationException("no active server; run 'switch <server>' or 'launch <server>'.");
+        if (!server.IsCompatible && !force)
+        {
+            error.WriteLine($"error: '{server.Name}' requires client build {server.RequiredClientBuild}, but the client is incompatible (use --force to launch anyway).");
+            return 2;
+        }
+
+        if (dryRun)
+        {
+            var executable = GameExecutable.Find(clientDir)
+                             ?? throw new UsageException($"{GameExecutable.FileName} not found in '{clientDir}'.");
             output.WriteLine($"Dry run: would launch {(wrapper is null ? "" : wrapper + " ")}{executable} for '{server.Name}'.");
             return 0;
         }
 
-        launcher.Launch(executable, clientDir, wrapper);
-        output.WriteLine($"Launched {executable} for '{server.Name}'.");
+        var launch = service.Play(new SwitchRequest(clientId, server.Id, force));
+        if (!launch.Succeeded)
+            return Fail(launch.Error!);
+        output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
         return 0;
     }
 
-    private static Server FindOrThrow(ServerStore store, string selector) =>
-        store.Find(selector) ?? throw new InvalidOperationException($"no server matches '{selector}'.");
+    private static ServerEntry FindOrThrow(PortalService service, string selector)
+    {
+        var list = service.ListServers();
+        if (!list.Succeeded)
+            throw new StoreException(list.Error!.Diagnostic);
+        var found = ServiceCli.FindServerEntry(list.Value!, selector)
+                    ?? throw new InvalidOperationException($"no server matches '{selector}'.");
+        return found;
+    }
 }
