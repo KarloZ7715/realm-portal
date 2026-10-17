@@ -73,12 +73,15 @@
     </StackPanel></Border>
 
     <TextBlock Classes="heading" Text="NAVIGATION TABS"/>
-    <Border Classes="surface"><StackPanel Orientation="Horizontal" Spacing="40">
+    <Border Classes="surface"><StackPanel Orientation="Horizontal" Spacing="48">
       <ListBox Classes="nav" Width="200" SelectedIndex="0">
-        <ListBoxItem>Servers</ListBoxItem><ListBoxItem dev:ForceState.States=":pointerover">Clients (hover)</ListBoxItem><ListBoxItem dev:ForceState.States=":focus-visible">Settings (focus)</ListBoxItem><ListBoxItem>About</ListBoxItem>
+        <ListBoxItem><StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconServers}" Width="18" Height="18"/><TextBlock Text="Servers"/></StackPanel></ListBoxItem><ListBoxItem dev:ForceState.States=":pointerover"><StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconFolder}" Width="18" Height="18"/><TextBlock Text="Clients (hover)"/></StackPanel></ListBoxItem><ListBoxItem dev:ForceState.States=":focus-visible"><StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconGear}" Width="18" Height="18"/><TextBlock Text="Settings (focus)"/></StackPanel></ListBoxItem><ListBoxItem><StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconInfo}" Width="18" Height="18"/><TextBlock Text="About"/></StackPanel></ListBoxItem>
       </ListBox>
       <ListBox Classes="nav" Width="200" SelectedIndex="2">
-        <ListBoxItem>Servers</ListBoxItem><ListBoxItem>Clients</ListBoxItem><ListBoxItem dev:ForceState.States=":focus-visible">Settings (selected, focus)</ListBoxItem><ListBoxItem>About</ListBoxItem>
+        <ListBoxItem><StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconServers}" Width="18" Height="18"/><TextBlock Text="Servers"/></StackPanel></ListBoxItem><ListBoxItem><StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconFolder}" Width="18" Height="18"/><TextBlock Text="Clients"/></StackPanel></ListBoxItem><ListBoxItem dev:ForceState.States=":focus-visible"><StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconGear}" Width="18" Height="18"/><TextBlock Text="Settings (sel, focus)"/></StackPanel></ListBoxItem><ListBoxItem><StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconInfo}" Width="18" Height="18"/><TextBlock Text="About"/></StackPanel></ListBoxItem>
+      </ListBox>
+      <ListBox Classes="nav compact" Width="56" SelectedIndex="1">
+        <ListBoxItem><c:Icon Data="{DynamicResource IconServers}" Width="18" Height="18"/></ListBoxItem><ListBoxItem><c:Icon Data="{DynamicResource IconFolder}" Width="18" Height="18"/></ListBoxItem><ListBoxItem dev:ForceState.States=":pointerover"><c:Icon Data="{DynamicResource IconGear}" Width="18" Height="18"/></ListBoxItem><ListBoxItem dev:ForceState.States=":focus-visible"><c:Icon Data="{DynamicResource IconInfo}" Width="18" Height="18"/></ListBoxItem>
       </ListBox>
     </StackPanel></Border>
 
