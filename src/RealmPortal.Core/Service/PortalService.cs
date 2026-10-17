@@ -223,7 +223,10 @@ public sealed class PortalService : IPortalService
         {
             var server = _servers.List().FirstOrDefault(s => s.Id == serverId)
                          ?? throw new StoreException($"No server matches '{serverId}'.");
+            var before = _active.GetActive();
             _active.Switch(server);
+            if (before?.Id != server.Id)
+                _journal.Save(new LastSwitchEntry(SoleRegisteredClientId(), null));
             return ServiceResult<ServerEntry>.Ok(ToServerEntry(server, server.Id, null, null));
         }
         catch (Exception ex)
@@ -236,21 +239,29 @@ public sealed class PortalService : IPortalService
     {
         try
         {
-            var journal = _journal.Load();
-            if (journal is null || !ComputeCanUndo())
+            if (!_active.Status().CanUndo)
                 return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
 
-            var client = _clients.FindById(journal.ClientId)
+            var journal = _journal.Load() ?? new LastSwitchEntry(SoleRegisteredClientId(), null);
+
+            StoredClient? client = null;
+            if (journal.BackupId is not null)
+            {
+                if (journal.ClientId is null)
+                    return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
+
+                client = _clients.FindById(journal.ClientId)
                          ?? throw new StoreException("The client of the last switch is no longer registered.");
 
-            try
-            {
-                if (_probe.IsGameRunning(client.Path))
-                    return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: client.Path));
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: client.Path, Diagnostic: ex.Message));
+                try
+                {
+                    if (_probe.IsGameRunning(client.Path))
+                        return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: client.Path));
+                }
+                catch (Exception ex)
+                {
+                    return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: client.Path, Diagnostic: ex.Message));
+                }
             }
 
             if (_active.PendingUndoServerId is { } missingId
@@ -272,13 +283,31 @@ public sealed class PortalService : IPortalService
                 }
             }
 
+            var syncClientId = journal.BackupId is null ? journal.ClientId ?? SoleRegisteredClientId() : null;
+            if (syncClientId is not null && journal.BackupId is null)
+            {
+                var syncClient = _clients.FindById(syncClientId);
+                if (syncClient is not null)
+                {
+                    try
+                    {
+                        if (_probe.IsGameRunning(syncClient.Path))
+                            return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: syncClient.Path));
+                    }
+                    catch (Exception ex)
+                    {
+                        return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: syncClient.Path, Diagnostic: ex.Message));
+                    }
+                }
+            }
+
             var applier = CreateApplier();
             IReadOnlyList<UndoFileResult> fileResults = [];
-            if (!journal.FilesUndone && journal.BackupId is not null)
+            if (!journal.FilesUndone && journal.BackupId is not null && client is not null)
             {
                 try
                 {
-                    var undoFiles = applier.Undo(journal.ClientId, client.Path, journal.BackupId, markUndone: false);
+                    var undoFiles = applier.Undo(journal.ClientId!, client.Path, journal.BackupId, markUndone: false);
                     fileResults = undoFiles.Files;
                     if (undoFiles.HasConflicts || !string.Equals(undoFiles.BackupId, journal.BackupId, StringComparison.Ordinal))
                     {
@@ -306,6 +335,9 @@ public sealed class PortalService : IPortalService
             {
                 try
                 {
+                    if (client is null || journal.ClientId is null)
+                        throw new InvalidOperationException("No client files were undone before the failed state undo.");
+
                     var active = _active.GetActive()
                                  ?? throw new InvalidOperationException("No active server to re-apply after a failed undo.");
                     var version = _versionReader.Read(client.Path);
@@ -321,8 +353,12 @@ public sealed class PortalService : IPortalService
                 return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex, Consistency.RolledBack));
             }
 
-            if (journal.BackupId is not null)
+            if (journal.BackupId is not null && journal.ClientId is not null)
                 applier.MarkBackupUndone(journal.ClientId, journal.BackupId);
+
+            if (journal.BackupId is null && restored is not null)
+                TrySyncClientToServer(restored, journal.ClientId ?? SoleRegisteredClientId(), applier);
+
             _journal.Clear();
             var entry = restored is null ? null : ToServerEntry(restored, restored.Id, journal.ClientId, null);
             return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults));
@@ -603,7 +639,7 @@ public sealed class PortalService : IPortalService
                 return;
 
             _active.Undo();
-            if (journal.BackupId is not null)
+            if (journal.BackupId is not null && journal.ClientId is not null)
                 CreateApplier().MarkBackupUndone(journal.ClientId, journal.BackupId);
             _journal.Clear();
         }
@@ -617,14 +653,56 @@ public sealed class PortalService : IPortalService
     {
         try
         {
-            var journal = _journal.Load();
-            if (journal is null || !_active.Status().CanUndo)
+            if (!_active.Status().CanUndo)
                 return false;
-            return journal.BackupId is null || BackupIsPending(journal.ClientId, journal.BackupId);
+            var journal = _journal.Load();
+            if (journal is null)
+                return true;
+            if (journal.BackupId is null)
+                return true;
+            return journal.ClientId is not null && BackupIsPending(journal.ClientId, journal.BackupId);
         }
         catch
         {
             return false;
+        }
+    }
+
+    private string? SoleRegisteredClientId()
+    {
+        var clients = _clients.List();
+        return clients.Count == 1 ? clients[0].Id : null;
+    }
+
+    private void TrySyncClientToServer(Server server, string? clientId, IClientFilesApplier applier)
+    {
+        if (clientId is null)
+            return;
+
+        var client = _clients.FindById(clientId);
+        if (client is null)
+            return;
+
+        try
+        {
+            if (_probe.IsGameRunning(client.Path))
+                return;
+        }
+        catch
+        {
+            return;
+        }
+
+        try
+        {
+            var version = _versionReader.Read(client.Path);
+            var plan = applier.Plan(BuildRequest(clientId, server, client.Path, version));
+            if (!plan.IsEmpty)
+                applier.Apply(plan);
+        }
+        catch
+        {
+            // Undo already restored active server; a failed sync leaves client drift for the user to repair.
         }
     }
 

@@ -84,15 +84,20 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 ## Consistency between the two undo stacks
 
 Two stacks must move together: the applier's backups (per installation) and `ActiveServerManager`'s one-level undo in `state.json`. The service
-keeps a tiny journal of the **last switch** (`last-switch.json` in the config folder: client id and the backup id, or none when the plan was empty)
-so undo knows whether the switch changed any client file. One level only, like the manager.
+keeps a tiny journal of the **last switch** (`last-switch.json` in the config folder: optional client id and optional backup id)
+so undo knows whether **that** switch changed client files. One level only, like the manager. Every successful switch writes the journal, including
+CLI switches without `--client-dir` (`backup_id` omitted, `client_id` omitted unless exactly one client is registered in `clients.json`). A later
+state-only switch **replaces** the journal so undo never replays a backup from an earlier `--client-dir` switch.
 
 - **Switch:** plan, apply, then activate. If *activate* fails after *apply* succeeded, the service runs `applier.Undo` (the backup it just made) and
   returns the activation error with `RolledBack`; if that rollback fails or reports conflicts the error is `InconsistentState` / `Inconsistent`.
   If plan or apply fails nothing changed (the applier reverts itself): `Unchanged`. The journal is written only after both succeed.
-- **Undo:** pre-flight first, changing nothing: a journal entry exists, the previous server still exists and its realmlist is valid, the game is not
-  running. Then `applier.Undo` (skipped when the switch made no backup), then `ActiveServerManager.Undo`. If the second step fails after the first
-  succeeded, the service re-applies the active server's files and reports `RolledBack`; if that fails, `InconsistentState`.
+- **Undo:** pre-flight first, changing nothing: `state.json` has a pending undo, the previous server still exists and its realmlist is valid, the game is not
+  running when client files would be touched. Then `applier.Undo` for the journal's `backup_id` only when that id is set (skipped for state-only switches),
+  then `ActiveServerManager.Undo`. When the undone switch had no `backup_id` but a client is known (journal `client_id` or a single registered client),
+  the service **applies the restored server's realmlist** after activate undo so `activo.json` and the game folder stay aligned (state-only switches never
+  wrote files, so there is no applier backup to restore). If the second step fails after file undo succeeded, the service re-applies the active server's
+  files and reports `RolledBack`; if that fails, `InconsistentState`.
 - **Conflicts:** when `applier.Undo` reports conflicts the app state is **not** touched and the undo stays pending. The call fails with `UndoConflict`,
   `ConflictingFiles` (the files that differ from what the switch wrote, never overwritten) and `Consistency.Pending`. Note the applier restores the files that
   did not conflict before it reports the others, so the client may be partially restored; `Undo()` again after the user fixed the files finishes the job.

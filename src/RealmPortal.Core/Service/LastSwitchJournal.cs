@@ -101,20 +101,21 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
 
     internal static void ValidateEntry(LastSwitchEntry entry)
     {
-        if (!ClientFilesRequest.IsValidId(entry.ClientId))
+        if (entry.ClientId is not null && !ClientFilesRequest.IsValidId(entry.ClientId))
             throw new StoreException("last-switch client_id is not valid.");
         if (entry.BackupId is not null && !BackupIdFormat.IsValid(entry.BackupId))
             throw new StoreException("last-switch backup_id is not valid.");
+        if (entry.BackupId is not null && entry.ClientId is null)
+            throw new StoreException("last-switch backup_id requires client_id.");
     }
 
     private static LastSwitchEntry Parse(JournalFile file)
     {
         if (file.Version != FormatVersion)
             throw new StoreException($"Unsupported last-switch format version {file.Version}.");
-        if (string.IsNullOrWhiteSpace(file.ClientId))
-            throw new StoreException("last-switch is missing client_id.");
+        var clientId = string.IsNullOrWhiteSpace(file.ClientId) ? null : file.ClientId;
 
-        var entry = new LastSwitchEntry(file.ClientId, file.BackupId, file.FilesUndone);
+        var entry = new LastSwitchEntry(clientId, file.BackupId, file.FilesUndone);
         ValidateEntry(entry);
         return entry;
     }
@@ -128,4 +129,4 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
     }
 }
 
-internal sealed record LastSwitchEntry(string ClientId, string? BackupId, bool FilesUndone = false);
+internal sealed record LastSwitchEntry(string? ClientId, string? BackupId, bool FilesUndone = false);

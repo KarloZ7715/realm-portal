@@ -183,6 +183,42 @@ public class PortalServiceTests
     }
 
     [Fact]
+    public void ActivateWithoutClientFiles_ThenUndo_RestoresPreviousActiveServer()
+    {
+        using var env = new Env();
+        var wotlk = Add("Wotlk", "wotlk.example.org", env.Service);
+        var second = Add("Second", "second.example.org", env.Service);
+
+        Assert.True(env.Service.ActivateWithoutClientFiles(wotlk.Id).Succeeded);
+        Assert.True(env.Service.ActivateWithoutClientFiles(second.Id).Succeeded);
+        var undo = env.Service.Undo();
+        Assert.True(undo.Succeeded);
+        Assert.Equal("Wotlk", undo.Value!.Active?.Name);
+    }
+
+    [Fact]
+    public void StaleJournal_StateOnlySwitchesAfterClientSwitch_UndoDoesNotReplayOldBackup()
+    {
+        using var env = new Env();
+        var clientId = env.ClientId;
+        var a = env.Service.AddServer(new NewServer("StaleA", "stale-a.example.org")).Value!;
+        var b = env.Service.AddServer(new NewServer("StaleB", "stale-b.example.org")).Value!;
+
+        env.PutRealmlist("set realmlist orig.example.org\r\n");
+        Assert.True(env.Service.SwitchServer(new SwitchRequest(clientId, a.Id)).Succeeded);
+        Assert.Contains("stale-a.example.org", env.ReadRealmlist());
+
+        Assert.True(env.Service.ActivateWithoutClientFiles(b.Id).Succeeded);
+        Assert.True(env.Service.ActivateWithoutClientFiles(a.Id).Succeeded);
+
+        var undo = env.Service.Undo();
+        Assert.True(undo.Succeeded);
+        Assert.Equal(b.Id, undo.Value!.Active?.Id);
+        Assert.Contains("stale-b.example.org", env.ReadRealmlist());
+        Assert.DoesNotContain("orig.example.org", env.ReadRealmlist());
+    }
+
+    [Fact]
     public void ClientIds_AreStable()
     {
         using var env = new Env();
