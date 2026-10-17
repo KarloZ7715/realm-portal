@@ -10,7 +10,7 @@ Checked against the restored packages' `.nuspec` files (Phase 1, 2026-10-17).
 
 | Package | Version | License | Use |
 |---|---|---|---|
-| Avalonia, Avalonia.Desktop, Avalonia.Themes.Fluent | 11.3.22 | MIT (© The AvaloniaUI Project) | cross-platform UI (`RealmPortal.App`) |
+| Avalonia, Avalonia.Desktop, Avalonia.Themes.Simple | 11.3.22 | MIT (© The AvaloniaUI Project) | cross-platform UI (`RealmPortal.App`) |
 | Avalonia.Headless, Avalonia.Headless.XUnit, Avalonia.Skia | 11.3.22 | MIT (© The AvaloniaUI Project) | headless UI tests and screenshots (development only) |
 | Microsoft.NET.Test.Sdk | 17.12.0 | MIT | tests (development only) |
 | xunit | 2.9.3 | Apache-2.0 | tests (development only) |

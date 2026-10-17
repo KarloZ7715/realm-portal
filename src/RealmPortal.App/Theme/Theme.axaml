@@ -1,0 +1,15 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Realm Portal theme, direction B "Parchment and bronze". The structural base is Avalonia's Simple theme (window,
+    popups, scroll bars); every visible control that the app uses is restyled here. Resources (tokens, fonts,
+    icons, textures) are merged in App.axaml so styles can use {DynamicResource}.
+  -->
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Typography.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Window.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Button.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Card.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/NavTab.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Badge.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Inputs.axaml"/>
+</Styles>

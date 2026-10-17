@@ -1,0 +1,79 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Button. Default = primary (wax leather plate). Style classes:
+      secondary        dark leather plate with bronze edge
+      ghost            text only, on leather (hover/pressed tint)
+      ghost parchment  text only, on parchment (class "parchment" switches ink colours and the teal focus ring)
+      compact          36 px high instead of 40
+    Plates are the designer's 160x40 9-slice PNGs (inset 14); stretching beyond about 240 px wide smears the stitching (see ART-GAPS.md).
+    States: normal, :pointerover, :pressed, :disabled, :focus-visible (outer ring art, margin 8).
+  -->
+  <Styles.Resources>
+    <!-- The focus ring layer has ZIndex 3: without it the ring is not drawn above the 9-slice art. -->
+    <ControlTheme x:Key="RpButton" TargetType="Button">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontCaps}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Foreground" Value="{DynamicResource IvoryBrush}"/>
+      <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="Padding" Value="20,0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <c:NineSlice Name="Ring" Source="focus-ring-leather" Insets="14" ShadowMargin="8"
+                         Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+            <Border Name="Tint" CornerRadius="{DynamicResource RadiusControl}" Opacity="0"
+                    Background="{DynamicResource Wood700Brush}">
+              <Border.Transitions>
+                <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12"/></Transitions>
+              </Border.Transitions>
+            </Border>
+            <c:NineSlice Name="Plate" Source="button-primary-normal" Insets="14"/>
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Padding="{TemplateBinding Padding}"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                              FontFamily="{TemplateBinding FontFamily}"
+                              FontSize="{TemplateBinding FontSize}"
+                              Foreground="{TemplateBinding Foreground}"
+                              RecognizesAccessKey="True"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+
+      <!-- primary -->
+      <Style Selector="^:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-hover"/></Style>
+      <Style Selector="^:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-pressed"/></Style>
+      <Style Selector="^:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-disabled"/></Style>
+      <!-- secondary -->
+      <Style Selector="^.secondary /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-normal"/></Style>
+      <Style Selector="^.secondary:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-hover"/></Style>
+      <Style Selector="^.secondary:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-pressed"/></Style>
+      <Style Selector="^.secondary:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-disabled"/></Style>
+      <!-- shared -->
+      <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="RenderTransform" Value="translate(0px,1px)"/></Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^.compact"><Setter Property="MinHeight" Value="36"/></Style>
+
+      <!-- ghost: no plate art exists yet (see ART-GAPS.md), so a flat tint layer stands in for hover and pressed -->
+      <Style Selector="^.ghost /template/ c|NineSlice#Plate"><Setter Property="IsVisible" Value="False"/></Style>
+      <Style Selector="^.ghost:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/></Style>
+      <Style Selector="^.ghost:pointerover /template/ Border#Tint"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^.ghost:pressed /template/ Border#Tint"><Setter Property="Background" Value="{DynamicResource Wood600Brush}"/><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^.ghost:disabled /template/ Border#Tint"><Setter Property="Opacity" Value="0"/></Style>
+      <Style Selector="^.ghost.parchment:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.ghost.parchment /template/ Border#Tint"><Setter Property="Background" Value="#33000000"/></Style>
+      <Style Selector="^.ghost.parchment:pressed /template/ Border#Tint"><Setter Property="Background" Value="#55000000"/></Style>
+      <Style Selector="^.ghost.parchment /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-parchment"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="Button"><Setter Property="Theme" Value="{StaticResource RpButton}"/></Style>
+</Styles>
