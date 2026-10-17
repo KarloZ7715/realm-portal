@@ -7,5 +7,5 @@
         MinWidth="720" MinHeight="480"
         Background="#1A110C"
         WindowStartupLocation="CenterScreen">
-  <!-- Phase 1: intentionally empty. Background = token cuero/900 (#1A110C). -->
+  <!-- Phase 1: intentionally empty. Background = token leather/900 (#1A110C). -->
 </Window>
