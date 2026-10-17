@@ -7,11 +7,13 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://RealmPortal.App/Theme/Tokens.axaml"/>
         <ResourceInclude Source="avares://RealmPortal.App/Theme/Fonts.axaml"/>
+        <ResourceInclude Source="avares://RealmPortal.App/Theme/Icons.axaml"/>
+        <ResourceInclude Source="avares://RealmPortal.App/Theme/Textures.axaml"/>
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
-    <FluentTheme />
-    <StyleInclude Source="avares://RealmPortal.App/Theme/Typography.axaml"/>
+    <SimpleTheme />
+    <StyleInclude Source="avares://RealmPortal.App/Theme/Theme.axaml"/>
   </Application.Styles>
 </Application>

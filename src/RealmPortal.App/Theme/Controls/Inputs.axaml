@@ -1,0 +1,162 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Form controls, drawn in code (no art exists for them; see ART-GAPS.md).
+    TextBox: dark field with bronze edge by default (on leather); class "parchment" for a field on parchment.
+             States: normal, :focus (2 px focus-colour edge, no outer ring), class "error", :disabled.
+    CheckBox / RadioButton: bronze box or ring; :checked fills with wax. ToggleButton.switch: pill switch.
+    Focus on check / radio / switch: outer ring (:focus-visible), 2 px, colour per surface.
+  -->
+  <Styles.Resources>
+    <ControlTheme x:Key="RpTextBox" TargetType="TextBox">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontBody}"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="CaretBrush" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="SelectionBrush" Value="#88A8743F"/>
+      <Setter Property="SelectionForegroundBrush" Value="{DynamicResource IvoryBrush}"/>
+      <Setter Property="MinHeight" Value="36"/>
+      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Hidden"/>
+      <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Hidden"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="PART_Border" CornerRadius="{DynamicResource RadiusControl}" BorderThickness="1"
+                    BorderBrush="{DynamicResource BronzeBrush}" Background="{DynamicResource Leather950Brush}"/>
+            <Border Name="FocusEdge" CornerRadius="{DynamicResource RadiusControl}" BorderThickness="2"
+                    BorderBrush="{DynamicResource FocusLeatherBrush}" Opacity="0" IsHitTestVisible="False"/>
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="{TemplateBinding Padding}">
+              <ContentPresenter Grid.Column="0" Content="{TemplateBinding InnerLeftContent}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+              <ScrollViewer Grid.Column="1" Name="PART_ScrollViewer"
+                            HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                            VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}">
+                <Panel VerticalAlignment="Center">
+                  <TextBlock Name="PART_Watermark" Text="{TemplateBinding Watermark}" Opacity="0.9"
+                             Foreground="{DynamicResource BoneSoftBrush}"
+                             IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+                  <TextPresenter Name="PART_TextPresenter"
+                                 Text="{TemplateBinding Text, Mode=TwoWay}"
+                                 CaretBrush="{TemplateBinding CaretBrush}"
+                                 SelectionBrush="{TemplateBinding SelectionBrush}"
+                                 SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"/>
+                </Panel>
+              </ScrollViewer>
+              <ContentPresenter Grid.Column="2" Content="{TemplateBinding InnerRightContent}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </Grid>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:focus /template/ Border#FocusEdge"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^.error /template/ Border#PART_Border"><Setter Property="BorderBrush" Value="{DynamicResource WaxLightBrush}"/><Setter Property="BorderThickness" Value="2"/></Style>
+      <Style Selector="^.error:focus /template/ Border#FocusEdge"><Setter Property="BorderBrush" Value="{DynamicResource WaxLightBrush}"/></Style>
+      <Style Selector="^:disabled /template/ Border#PART_Border"><Setter Property="Background" Value="#99120C08"/><Setter Property="BorderBrush" Value="{DynamicResource Wood600Brush}"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+      <Style Selector="^:disabled /template/ TextBlock#PART_Watermark"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+
+      <!-- on parchment -->
+      <Style Selector="^.parchment"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.parchment /template/ Border#PART_Border"><Setter Property="Background" Value="{DynamicResource ParchmentLightBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BronzeDarkBrush}"/></Style>
+      <Style Selector="^.parchment /template/ Border#FocusEdge"><Setter Property="BorderBrush" Value="{DynamicResource FocusParchmentBrush}"/></Style>
+      <Style Selector="^.parchment /template/ TextBlock#PART_Watermark"><Setter Property="Foreground" Value="{DynamicResource InkSoftBrush}"/></Style>
+      <Style Selector="^.parchment.error /template/ Border#PART_Border"><Setter Property="BorderBrush" Value="{DynamicResource WaxTextBrush}"/></Style>
+      <Style Selector="^.parchment.error:focus /template/ Border#FocusEdge"><Setter Property="BorderBrush" Value="{DynamicResource WaxTextBrush}"/></Style>
+      <Style Selector="^.parchment:disabled /template/ Border#PART_Border"><Setter Property="Background" Value="#66E9DDBF"/><Setter Property="BorderBrush" Value="#885A3D22"/></Style>
+      <Style Selector="^.parchment:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpCheckBox" TargetType="CheckBox">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontBody}"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="10" Background="Transparent">
+            <Panel Width="20" Height="20" VerticalAlignment="Center">
+              <Border Name="Ring" Margin="-4" BorderThickness="2" CornerRadius="6" BorderBrush="{DynamicResource FocusLeatherBrush}" Opacity="0" IsHitTestVisible="False"/>
+              <Border Name="Box" CornerRadius="3" BorderThickness="1.5" BorderBrush="{DynamicResource BronzeBrush}" Background="{DynamicResource Leather950Brush}">
+                <c:Icon Name="Mark" Data="{DynamicResource IconCheckMark}" Width="12" Height="12" StrokeThickness="2.6"
+                        Foreground="{DynamicResource IvoryBrush}" IsVisible="False"/>
+              </Border>
+            </Panel>
+            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+          </StackPanel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ Border#Box"><Setter Property="Background" Value="{DynamicResource WaxBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BronzeLightBrush}"/></Style>
+      <Style Selector="^:checked /template/ c|Icon#Mark"><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^:pointerover /template/ Border#Box"><Setter Property="BorderBrush" Value="{DynamicResource BronzeLightBrush}"/></Style>
+      <Style Selector="^:focus-visible /template/ Border#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^:disabled /template/ Border#Box"><Setter Property="BorderBrush" Value="{DynamicResource Wood600Brush}"/><Setter Property="Opacity" Value="0.7"/></Style>
+      <Style Selector="^.parchment"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.parchment /template/ Border#Box"><Setter Property="Background" Value="{DynamicResource ParchmentLightBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BronzeDarkBrush}"/></Style>
+      <Style Selector="^.parchment:checked /template/ Border#Box"><Setter Property="Background" Value="{DynamicResource WaxBrush}"/></Style>
+      <Style Selector="^.parchment /template/ Border#Ring"><Setter Property="BorderBrush" Value="{DynamicResource FocusParchmentBrush}"/></Style>
+      <Style Selector="^.parchment:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpRadioButton" TargetType="RadioButton">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontBody}"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="10" Background="Transparent">
+            <Panel Width="20" Height="20" VerticalAlignment="Center">
+              <Ellipse Name="Ring" Margin="-4" StrokeThickness="2" Stroke="{DynamicResource FocusLeatherBrush}" Opacity="0" IsHitTestVisible="False"/>
+              <Ellipse Name="Outer" StrokeThickness="1.5" Stroke="{DynamicResource BronzeBrush}" Fill="{DynamicResource Leather950Brush}"/>
+              <Ellipse Name="Dot" Width="10" Height="10" Fill="{DynamicResource WaxLightBrush}" IsVisible="False"/>
+            </Panel>
+            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+          </StackPanel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ Ellipse#Dot"><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^:checked /template/ Ellipse#Outer"><Setter Property="Stroke" Value="{DynamicResource BronzeLightBrush}"/></Style>
+      <Style Selector="^:pointerover /template/ Ellipse#Outer"><Setter Property="Stroke" Value="{DynamicResource BronzeLightBrush}"/></Style>
+      <Style Selector="^:focus-visible /template/ Ellipse#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^:disabled /template/ Ellipse#Outer"><Setter Property="Stroke" Value="{DynamicResource Wood600Brush}"/></Style>
+      <Style Selector="^:disabled /template/ Ellipse#Dot"><Setter Property="Fill" Value="{DynamicResource MutedBrush}"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpSwitch" TargetType="ToggleButton">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel Width="40" Height="22" Background="Transparent">
+            <Border Name="Ring" Margin="-4" BorderThickness="2" CornerRadius="15" BorderBrush="{DynamicResource FocusLeatherBrush}" Opacity="0" IsHitTestVisible="False"/>
+            <Border Name="Track" CornerRadius="11" BorderThickness="1.5" BorderBrush="{DynamicResource BronzeBrush}" Background="{DynamicResource Leather950Brush}"/>
+            <Ellipse Name="Knob" Width="14" Height="14" HorizontalAlignment="Left" Margin="4,0,0,0" Fill="{DynamicResource BronzeLightBrush}">
+              <Ellipse.Transitions>
+                <Transitions><ThicknessTransition Property="Margin" Duration="0:0:0.12"/></Transitions>
+              </Ellipse.Transitions>
+            </Ellipse>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ Border#Track"><Setter Property="Background" Value="{DynamicResource WaxBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BronzeLightBrush}"/></Style>
+      <Style Selector="^:checked /template/ Ellipse#Knob"><Setter Property="Margin" Value="22,0,0,0"/><Setter Property="Fill" Value="{DynamicResource IvoryBrush}"/></Style>
+      <Style Selector="^:pointerover /template/ Border#Track"><Setter Property="BorderBrush" Value="{DynamicResource BronzeLightBrush}"/></Style>
+      <Style Selector="^:focus-visible /template/ Border#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^:disabled /template/ Border#Track"><Setter Property="BorderBrush" Value="{DynamicResource Wood600Brush}"/></Style>
+      <Style Selector="^:disabled /template/ Ellipse#Knob"><Setter Property="Fill" Value="{DynamicResource MutedBrush}"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="TextBox"><Setter Property="Theme" Value="{StaticResource RpTextBox}"/></Style>
+  <Style Selector="CheckBox"><Setter Property="Theme" Value="{StaticResource RpCheckBox}"/></Style>
+  <Style Selector="RadioButton"><Setter Property="Theme" Value="{StaticResource RpRadioButton}"/></Style>
+  <Style Selector="ToggleButton.switch"><Setter Property="Theme" Value="{StaticResource RpSwitch}"/></Style>
+</Styles>

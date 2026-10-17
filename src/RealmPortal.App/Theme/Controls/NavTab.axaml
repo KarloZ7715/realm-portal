@@ -1,0 +1,51 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Sidebar navigation: ListBox.nav ListBoxItem. The selected item is a parchment tab (designer art, inset 18,
+    baked shadow 10 px) in ink-coloured Alegreya Medium; other items are bone text on leather with a soft hover wash.
+  -->
+  <Styles.Resources>
+    <!-- The focus ring layer has ZIndex 3: without it the ring is not drawn above the 9-slice art. -->
+    <ControlTheme x:Key="RpNavTab" TargetType="ListBoxItem">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="Height" Value="44"/>
+      <Setter Property="Margin" Value="0,0,0,4"/>
+      <Setter Property="Padding" Value="22,0,12,0"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontBody}"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Hover" CornerRadius="0,6,6,0" Background="#22EFE5CD" Opacity="0"/>
+            <c:NineSlice Name="Tab" Source="tab-parchment" Insets="18" ShadowMargin="10" IsVisible="False" IsHitTestVisible="False"/>
+            <c:NineSlice Name="Ring" Source="focus-ring-leather" Insets="14" ShadowMargin="8" Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Padding="{TemplateBinding Padding}"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              VerticalContentAlignment="Center"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover /template/ Border#Hover"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:selected /template/ c|NineSlice#Tab"><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^:selected /template/ Border#Hover"><Setter Property="Opacity" Value="0"/></Style>
+      <Style Selector="^:selected">
+        <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource FontBodyMedium}"/>
+      </Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:selected:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-parchment"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="ListBox.nav ListBoxItem"><Setter Property="Theme" Value="{StaticResource RpNavTab}"/></Style>
+  <Style Selector="ListBox.nav">
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    <!-- Room for the 10 px baked shadow of the tab; the negative margin hands it back to the layout. -->
+    <Setter Property="Padding" Value="0,10,10,10"/>
+    <Setter Property="Margin" Value="0,-10,-10,-10"/>
+  </Style>
+</Styles>

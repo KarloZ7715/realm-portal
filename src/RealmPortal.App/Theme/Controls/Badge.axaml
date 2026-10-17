@@ -1,0 +1,39 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Status badge: ivory pill with a thin border, a glyph and an upper-case Alegreya Sans Bold 12 label.
+    Colour and glyph follow Badge.Status; the state is never colour alone (each has its own glyph).
+    Text colours are the "text" variants of the tokens, all at 4.5:1 or better on ivory/parchment (DESIGN-TOKENS-B.md).
+  -->
+  <Styles.Resources>
+    <ControlTheme x:Key="RpBadge" TargetType="c:Badge">
+      <Setter Property="Foreground" Value="{DynamicResource WaxTextBrush}"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{DynamicResource IvoryBrush}"
+                  BorderBrush="{DynamicResource ParchmentShadowBrush}" BorderThickness="1"
+                  CornerRadius="3" Padding="8,3" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <c:Icon Name="Glyph" Width="12" Height="12" VerticalAlignment="Center"
+                      StrokeThickness="2" Foreground="{TemplateBinding Foreground}"
+                      Data="{DynamicResource IconDiamond}" IsFilled="True"/>
+              <TextBlock Text="{TemplateBinding DisplayText}" VerticalAlignment="Center"
+                         FontFamily="{DynamicResource FontSans}" FontWeight="Bold" FontSize="12"
+                         LetterSpacing="0.6" Foreground="{TemplateBinding Foreground}"/>
+            </StackPanel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:ready"><Setter Property="Foreground" Value="{DynamicResource ForestTextBrush}"/></Style>
+      <Style Selector="^:ready /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconOk}"/><Setter Property="IsFilled" Value="False"/></Style>
+      <Style Selector="^:incompatible"><Setter Property="Foreground" Value="{DynamicResource AmberTextBrush}"/></Style>
+      <Style Selector="^:incompatible /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconWarning}"/><Setter Property="IsFilled" Value="False"/></Style>
+      <Style Selector="^:no-response"><Setter Property="Foreground" Value="{DynamicResource WaxTextBrush}"/></Style>
+      <Style Selector="^:no-response /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconError}"/><Setter Property="IsFilled" Value="False"/></Style>
+      <Style Selector="^:inactive"><Setter Property="Foreground" Value="{DynamicResource InkSoftBrush}"/></Style>
+      <Style Selector="^:inactive /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconInfo}"/><Setter Property="IsFilled" Value="False"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="c|Badge"><Setter Property="Theme" Value="{StaticResource RpBadge}"/></Style>
+</Styles>

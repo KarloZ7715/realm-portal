@@ -10,7 +10,7 @@ Checked against the restored packages' `.nuspec` files (Phase 1, 2026-10-17).
 
 | Package | Version | License | Use |
 |---|---|---|---|
-| Avalonia, Avalonia.Desktop, Avalonia.Themes.Fluent | 11.3.22 | MIT (© The AvaloniaUI Project) | cross-platform UI (`RealmPortal.App`) |
+| Avalonia, Avalonia.Desktop, Avalonia.Themes.Simple | 11.3.22 | MIT (© The AvaloniaUI Project) | cross-platform UI (`RealmPortal.App`) |
 | PeNet | 5.1.0 | Apache-2.0 | reads the version resource of `Wow.exe` (`RealmPortal.Core`) |
 | Avalonia.Headless, Avalonia.Headless.XUnit, Avalonia.Skia | 11.3.22 | MIT (© The AvaloniaUI Project) | headless UI tests and screenshots (development only) |
 | Microsoft.NET.Test.Sdk | 17.12.0 | MIT | tests (development only) |

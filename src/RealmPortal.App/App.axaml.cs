@@ -11,7 +11,10 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            desktop.MainWindow = new MainWindow();
+        {
+            // "--gallery" opens the development-only component gallery instead of the app.
+            desktop.MainWindow = desktop.Args?.Contains("--gallery") == true ? new Dev.GalleryWindow() : new MainWindow();
+        }
 
         base.OnFrameworkInitializationCompleted();
     }

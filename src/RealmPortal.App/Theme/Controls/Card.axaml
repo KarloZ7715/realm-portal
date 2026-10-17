@@ -1,0 +1,83 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Parchment panel / card, with torn edges, as the designer's 9-slice PNGs (inset 36, baked shadow 12 px).
+    Two ways to use it:
+      ContentControl.card         static panel
+      ListBox.cards ListBoxItem   selectable card: :selected = active art, :pointerover lifts 1 px, :focus-visible shows the ring
+    Style class "medium" selects the 384x284 art instead of the 724x134 one. The art overflows the body by 12 px on
+    every side; the ListBox.cards style adds the matching padding so the shadow is not clipped by the list's scroll viewer.
+    The body must be at least 48 px high and wide (the corners need 36 px of art on each side, 12 of them shadow).
+  -->
+  <Styles.Resources>
+    <!-- The focus ring layer has ZIndex 3: without it the ring is not drawn above the 9-slice art. -->
+    <ControlTheme x:Key="RpCard" TargetType="ContentControl">
+      <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+      <Setter Property="Padding" Value="28,20"/>
+      <Setter Property="MinWidth" Value="48"/>
+      <Setter Property="MinHeight" Value="48"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <c:NineSlice Name="Sheet" Source="panel-sheet-wide" Insets="36" ShadowMargin="12">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Padding="{TemplateBinding Padding}"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+          </c:NineSlice>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^.medium /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-sheet-medium"/></Style>
+      <Style Selector="^.active /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-active-wide"/></Style>
+      <Style Selector="^.active.medium /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-active-medium"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpCardItem" TargetType="ListBoxItem">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+      <Setter Property="Margin" Value="0,0,0,18"/>
+      <Setter Property="Padding" Value="28,20"/>
+      <Setter Property="MinHeight" Value="48"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel Name="Root">
+            <Panel.Transitions>
+              <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/></Transitions>
+            </Panel.Transitions>
+            <c:NineSlice Name="Sheet" Source="panel-sheet-wide" Insets="36" ShadowMargin="12">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Padding="{TemplateBinding Padding}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+            </c:NineSlice>
+            <c:NineSlice Name="Ring" Source="focus-ring-leather" Insets="14" ShadowMargin="8"
+                         Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:selected /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-active-wide"/></Style>
+      <Style Selector="^.medium /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-sheet-medium"/></Style>
+      <Style Selector="^.medium:selected /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-active-medium"/></Style>
+      <!-- Card hover art does not exist yet (ART-GAPS.md): lift by 1 px. -->
+      <Style Selector="^:pointerover /template/ Panel#Root"><Setter Property="RenderTransform" Value="translate(0px,-1px)"/></Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="ContentControl.card"><Setter Property="Theme" Value="{StaticResource RpCard}"/></Style>
+  <Style Selector="ListBox.cards ListBoxItem"><Setter Property="Theme" Value="{StaticResource RpCardItem}"/></Style>
+  <!-- Room for the 12 px baked shadow (and the focus ring) around the cards; the negative margin hands the space back to the layout. -->
+  <Style Selector="ListBox.cards">
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="Padding" Value="12,12,12,0"/>
+    <Setter Property="Margin" Value="-12,-12,-12,0"/>
+  </Style>
+  <Style Selector="ListBox">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+</Styles>
