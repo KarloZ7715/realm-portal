@@ -34,7 +34,7 @@ internal readonly record struct FilePermissionSnapshot(int? UnixMode, bool? Wind
     {
         if (!File.Exists(path))
             return;
-        if (UnixMode is int unix)
+        if (UnixMode is int unix && (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS()))
             File.SetUnixFileMode(path, (UnixFileMode)unix);
         if (WindowsReadOnly is bool readOnly)
         {
