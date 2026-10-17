@@ -39,7 +39,7 @@ public class ActiveProjectionTests
     [Fact]
     public void Serialize_UsesEmptyStringForMissingRealm_AndNoBom()
     {
-        var bytes = ActiveProjection.Serialize(Server.Create("n", "h", id: "a"));
+        var bytes = ActiveProjection.Serialize(Server.Create("n", "h"));
 
         Assert.Equal((byte)'{', bytes[0]);
         Assert.Contains("\"realm\": \"\",", Encoding.UTF8.GetString(bytes));
