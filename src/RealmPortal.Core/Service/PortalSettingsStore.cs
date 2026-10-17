@@ -124,7 +124,7 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
         var full = Path.GetFullPath(folder);
         try
         {
-            ClientPathSecurity.EnsureTrustedDirectoryPath(full);
+            ClientPathSecurity.EnsureNoLinkOnPath(full);
         }
         catch (StoreException ex)
         {

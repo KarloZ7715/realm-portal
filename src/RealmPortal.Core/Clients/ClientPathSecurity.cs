@@ -16,8 +16,24 @@ public static class ClientPathSecurity
         return (attributes & FileAttributes.ReparsePoint) != 0;
     }
 
-    /// <summary>Rejects paths with a symlink or reparse point on any path prefix (including parents).</summary>
+    /// <summary>
+    /// Rejects a folder that is itself a symlink or reparse point.
+    /// Ancestors above that folder may be links (for example <c>/home</c> pointing at <c>/var/home</c>, or a
+    /// client that lives under a symlinked mount). Their targets are not resolved and are not stored: the
+    /// path returned to the caller stays <see cref="Path.GetFullPath(string)"/> of the path that was given.
+    /// Links at or below the folder are not accepted here; managed writes compare the resolved parent with
+    /// the resolved client root and refuse a link that leaves the client.
+    /// </summary>
     public static void EnsureTrustedDirectoryPath(string directoryPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directoryPath);
+        var full = Path.GetFullPath(directoryPath);
+        if (IsReparsePointOrSymlink(full))
+            throw new StoreException($"Path '{full}' cannot be used because '{full}' is a symbolic link or reparse point.");
+    }
+
+    /// <summary>Rejects paths with a symlink or reparse point on any path prefix (including parents).</summary>
+    public static void EnsureNoLinkOnPath(string directoryPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directoryPath);
         var full = Path.GetFullPath(directoryPath);
