@@ -113,6 +113,12 @@ public enum Consistency
     /// restored, the active server did not change, and the undo can be finished or discarded.
     /// </summary>
     Pending,
+
+    /// <summary>
+    /// Only <see cref="IPortalService.Play"/>: plan, apply and activate succeeded but launch failed. The client is configured, the new server is active,
+    /// and undo is still available. Pair with <see cref="ServiceErrorCode.LaunchFailed"/>.
+    /// </summary>
+    AppliedLaunchFailed,
 }
 
 /// <summary>A failure as data: a stable code plus the parameters the UI needs for its message. Everything except <see cref="Code"/> is optional.</summary>

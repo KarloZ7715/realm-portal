@@ -5,8 +5,8 @@ namespace RealmPortal.Core.Service;
 /// </summary>
 /// <remarks>
 /// <para><b>Synchronous.</b> Everything underneath is synchronous file and process work (applier, store, version reader), so the
-/// service is too; the UI calls it with <c>Task.Run</c>. <see cref="IProgress{T}"/> callbacks run on the calling (worker) thread:
-/// the UI marshals them itself.</para>
+/// service is too; the UI calls it with <c>Task.Run</c>. The service calls <see cref="IProgress{T}.Report"/> on the worker thread; where the handler runs
+/// depends on the <see cref="IProgress{T}"/> implementation (for example <c>Progress&lt;T&gt;</c> posts to the <c>SynchronizationContext</c> captured at construction).</para>
 /// <para><b>No exceptions.</b> Every failure is a <see cref="ServiceResult{T}"/> with a <see cref="ServiceError"/> (stable code +
 /// parameters, no text). Only a programming error (null argument) throws.</para>
 /// <para><b>No half states.</b> A multi-step operation either completes, or reports <see cref="ServiceError.Consistency"/>
@@ -54,7 +54,7 @@ public interface IPortalService
     /// <summary>
     /// Switch, then start the game with the saved <see cref="LauncherSettings"/> ("Play"). Same steps as <see cref="SwitchServer"/> plus
     /// <see cref="ServiceStep.Launch"/>. If the launch fails, the switch stays done (the client is configured) and the error is
-    /// <see cref="ServiceErrorCode.LaunchFailed"/> with <see cref="Consistency.Unchanged"/> relative to the switch.
+    /// <see cref="ServiceErrorCode.LaunchFailed"/> with <see cref="Consistency.AppliedLaunchFailed"/> (the switch is kept; refresh active server and undo from status).
     /// </summary>
     ServiceResult<SwitchOutcome> Play(SwitchRequest request, IProgress<ServiceProgress>? progress = null);
 

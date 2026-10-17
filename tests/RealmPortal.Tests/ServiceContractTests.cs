@@ -82,6 +82,21 @@ public class ServiceContractTests
     }
 
     [Fact]
+    public void PlayLaunchFailure_UsesAppliedLaunchFailedConsistency()
+    {
+        var error = new ServiceError(ServiceErrorCode.LaunchFailed, Consistency: Consistency.AppliedLaunchFailed);
+        var result = ServiceResult<SwitchOutcome>.Fail(error);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ServiceErrorCode.LaunchFailed, result.Error!.Code);
+        Assert.Equal(Consistency.AppliedLaunchFailed, result.Error.Consistency);
+        Assert.NotEqual(Consistency.Unchanged, result.Error.Consistency);
+        Assert.NotEqual(Consistency.RolledBack, result.Error.Consistency);
+        Assert.NotEqual(Consistency.Inconsistent, result.Error.Consistency);
+        Assert.NotEqual(Consistency.Pending, result.Error.Consistency);
+    }
+
+    [Fact]
     public void ServiceError_CarriesVersionAndConflictingFiles()
     {
         var conflict = new ServiceError(ServiceErrorCode.UndoConflict, ConflictingFiles: ["Data/enUS/realmlist.wtf"], Consistency: Consistency.Pending);
