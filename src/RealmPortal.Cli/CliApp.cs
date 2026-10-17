@@ -88,7 +88,7 @@ public sealed class CliApp(
             error.WriteLine(Usage);
             return 1;
         }
-        catch (Exception ex) when (ex is StoreException or ClientVersionException or ArgumentException or IOException
+        catch (Exception ex) when (ex is StoreException or InvalidRealmlistException or ClientVersionException or ArgumentException or IOException
                                        or UnauthorizedAccessException or InvalidOperationException
                                        or System.ComponentModel.Win32Exception)
         {

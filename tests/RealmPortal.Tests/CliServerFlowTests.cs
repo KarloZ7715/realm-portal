@@ -246,4 +246,55 @@ public class CliServerFlowTests
         Assert.True(File.Exists(box.ActivoPath));
         Assert.Contains("Client: 12340", o.ToString());
     }
+
+    [Theory]
+    [InlineData("--line", "set portal p.example.org", "ForbiddenKey")]
+    [InlineData("--line", "set patchlist \"x\"", "InvalidValue")]
+    [InlineData("--line", "hello", "MalformedLine")]
+    public void Add_WithInvalidRealmlistLine_FailsWithMessage_AndStoresNothing(string option, string line, string kind)
+    {
+        using var box = new Sandbox();
+
+        var result = box.Run("add", "Bad", "h.example.org", option, line);
+
+        Assert.Equal(2, result.Code);
+        Assert.Contains("Invalid realmlist", result.Err);
+        Assert.Contains($"[{kind}]", result.Err);
+        Assert.Contains("No servers.", box.Run("list").Out);
+    }
+
+    [Fact]
+    public void Add_WithNonAsciiHost_Fails()
+    {
+        using var box = new Sandbox();
+
+        var result = box.Run("add", "Bad", "h\u00f3st.example.org");
+
+        Assert.Equal(2, result.Code);
+        Assert.Contains("[NotAscii]", result.Err);
+        Assert.False(File.Exists(new ServerStore(box.Config, new RealmPortal.Core.IO.AtomicFileWriter()).FilePath));
+    }
+
+    [Fact]
+    public void Switch_ToHandEditedServerWithInvalidRealmlist_FailsAndWritesNothing()
+    {
+        using var box = new Sandbox();
+        box.Run("add", "Good", "g.example.org");
+        box.Run("add", "Bad", "b.example.org");
+        box.Run("switch", "Good");
+        var storePath = new ServerStore(box.Config, new RealmPortal.Core.IO.AtomicFileWriter()).FilePath;
+        File.WriteAllText(storePath, File.ReadAllText(storePath).Replace("set realmlist b.example.org", "SET REALMLIST b.example.org"));
+        var activoBefore = File.ReadAllBytes(box.ActivoPath);
+        var storeBefore = File.ReadAllBytes(storePath);
+
+        var result = box.Run("switch", "Bad");
+
+        Assert.Equal(2, result.Code);
+        Assert.Contains("Server 'Bad' has an invalid realmlist", result.Err);
+        Assert.Contains("[WrongFirstLine]", result.Err);
+        Assert.Equal(activoBefore, File.ReadAllBytes(box.ActivoPath));
+        Assert.Equal(storeBefore, File.ReadAllBytes(storePath));
+        Assert.Equal(2, box.Run("launch", "Bad").Code);
+        Assert.Empty(box.Launcher.Calls);
+    }
 }
