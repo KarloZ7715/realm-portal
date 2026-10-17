@@ -59,10 +59,19 @@ public interface IPortalService
     ServiceResult<SwitchOutcome> Play(SwitchRequest request, IProgress<ServiceProgress>? progress = null);
 
     /// <summary>
-    /// Undoes the last switch (one level): restores the client files of the client that was switched, byte for byte, and the previously
-    /// active server, together. Client files changed since the switch are reported in <see cref="UndoOutcome.Files"/> and never overwritten.
+    /// Undoes the last switch (one level only): restores the client files of the client that was switched, byte for byte, and the previously
+    /// active server, together. Nothing to undo: <see cref="ServiceErrorCode.NothingToUndo"/>. Client files that changed since the switch are
+    /// never overwritten: the call fails with <see cref="ServiceErrorCode.UndoConflict"/> and <see cref="ServiceError.ConflictingFiles"/>, the
+    /// active server stays and the undo remains pending, so the UI can offer to fix the files and retry, or <see cref="DiscardUndo"/>.
     /// </summary>
     ServiceResult<UndoOutcome> Undo();
+
+    /// <summary>
+    /// Gives up the pending undo (the "Discard" button of the conflict dialog): the change can no longer be undone from the app, the client files
+    /// are not touched, the active server stays, and the next state is <see cref="ServiceErrorCode.NothingToUndo"/> (<c>CanUndo == false</c>). There is
+    /// no "next pending backup": undo is single-level. The backup folder is left to the applier's retention.
+    /// </summary>
+    ServiceResult<PortalStatus> DiscardUndo();
 
     // ------------------------------------------------------------ status and settings
 
@@ -71,6 +80,15 @@ public interface IPortalService
 
     /// <summary>The saved launcher settings (defaults when none were saved).</summary>
     ServiceResult<LauncherSettings> GetLauncherSettings();
+
+    /// <summary>The configured backup folder (what the Settings screen shows).</summary>
+    ServiceResult<StorageSettings> GetStorageSettings();
+
+    /// <summary>
+    /// Validates and saves the backup folder (<see cref="ServiceErrorCode.PathNotFound"/>, <see cref="ServiceErrorCode.PermissionDenied"/>,
+    /// <see cref="ServiceErrorCode.ReadOnlyFs"/>). Applies from the next start. The UI language is not stored by the service: the UI keeps its own file.
+    /// </summary>
+    ServiceResult<Unit> SetStorageSettings(StorageSettings settings);
 
     /// <summary>Validates and saves the launcher settings; an unusable combination fails with <see cref="ServiceErrorCode.InvalidLauncherSettings"/> and nothing is saved.</summary>
     ServiceResult<Unit> SetLauncherSettings(LauncherSettings settings);

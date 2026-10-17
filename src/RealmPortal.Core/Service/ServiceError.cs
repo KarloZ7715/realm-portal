@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using RealmPortal.Core.Servers;
 
 namespace RealmPortal.Core.Service;
@@ -26,14 +27,20 @@ public enum ServiceErrorCode
 
     VerifyFailed,
 
-    /// <summary>The client version has no known file layout.</summary>
+    /// <summary>The client version has no known file layout; <see cref="ServiceError.ClientVersion"/> says which version was found.</summary>
     UnsupportedClient,
 
     /// <summary>The server's realmlist breaks the contract; see <see cref="ServiceError.RealmlistKind"/>, <see cref="ServiceError.LineNumber"/>, <see cref="ServiceError.ServerName"/>.</summary>
     InvalidRealmlist,
 
-    /// <summary>Nothing was applied that could be undone.</summary>
+    /// <summary>Nothing was applied that could be undone (also the state after <see cref="IPortalService.DiscardUndo"/>).</summary>
     NothingToUndo,
+
+    /// <summary>
+    /// Undo found client files that changed after the switch. They were not overwritten; <see cref="ServiceError.ConflictingFiles"/> lists them.
+    /// The undo stays pending (<see cref="Consistency.Pending"/>): fix the files and call <c>Undo</c> again, or <see cref="IPortalService.DiscardUndo"/>.
+    /// </summary>
+    UndoConflict,
 
     // ---- reading a client's version ----
     /// <summary>The folder has no <c>Wow.exe</c>.</summary>
@@ -91,6 +98,12 @@ public enum Consistency
 
     /// <summary>The operation could not be rolled back; the user should be told to review the client.</summary>
     Inconsistent,
+
+    /// <summary>
+    /// The operation stopped on purpose and is still pending (only <see cref="ServiceErrorCode.UndoConflict"/>): some client files may already be
+    /// restored, the active server did not change, and the undo can be finished or discarded.
+    /// </summary>
+    Pending,
 }
 
 /// <summary>A failure as data: a stable code plus the parameters the UI needs for its message. Everything except <see cref="Code"/> is optional.</summary>
@@ -102,6 +115,8 @@ public enum Consistency
 /// <param name="Field">Offending field of <see cref="NewServer"/> (<see cref="ServiceErrorCode.InvalidServerInput"/>).</param>
 /// <param name="RequiredBuild">Build the server needs (<see cref="ServiceErrorCode.IncompatibleClient"/>).</param>
 /// <param name="ClientBuild">Build of the selected client (<see cref="ServiceErrorCode.IncompatibleClient"/>).</param>
+/// <param name="ClientVersion">Version found in the client (file version, e.g. <c>6.2.4.20779</c>) for <see cref="ServiceErrorCode.UnsupportedClient"/>.</param>
+/// <param name="ConflictingFiles">Client files that differ from what the switch wrote, relative to the client folder with <c>/</c> separators (<see cref="ServiceErrorCode.UndoConflict"/>).</param>
 /// <param name="Consistency">What the failed operation left behind.</param>
 /// <param name="Diagnostic">English exception text for logs. Not UI text and not stable.</param>
 public sealed record ServiceError(
@@ -113,6 +128,8 @@ public sealed record ServiceError(
     string? Field = null,
     int? RequiredBuild = null,
     int? ClientBuild = null,
+    string? ClientVersion = null,
+    IReadOnlyList<string>? ConflictingFiles = null,
     Consistency Consistency = Consistency.Unchanged,
     string Diagnostic = "");
 
@@ -132,6 +149,8 @@ public sealed record ServiceResult<T>
 
     public ServiceError? Error { get; }
 
+    [MemberNotNullWhen(true, nameof(Value))]
+    [MemberNotNullWhen(false, nameof(Error))]
     public bool Succeeded => Error is null;
 
     public static ServiceResult<T> Ok(T value) => new(value, null);

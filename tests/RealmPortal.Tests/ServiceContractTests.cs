@@ -42,7 +42,7 @@ public class ServiceContractTests
     }
 
     [Fact]
-    public void LauncherSettings_ToSpec_AddsTheClientsExecutableAndFolder()
+    public void ToSpec_AddsTheClientsExecutableAndFolder()
     {
         var settings = new LauncherSettings(
             "wine {exe}",
@@ -65,5 +65,29 @@ public class ServiceContractTests
 
         Assert.Equal("/g/Wow.exe", launch.FileName);
         Assert.Empty(launch.Arguments);
+    }
+
+    [Fact]
+    public void ServiceStep_HasNoAccountStep()
+    {
+        Assert.Equal(["Plan", "WriteFiles", "Activate", "Launch"], Enum.GetNames<ServiceStep>());
+    }
+
+    [Fact]
+    public void StableCodesTheUiMapsExist()
+    {
+        string[] names = ["UndoConflict", "ProcessCheckFailed", "UnsupportedClient", "NothingToUndo", "GameRunning", "InvalidRealmlist"];
+
+        Assert.All(names, n => Assert.True(Enum.TryParse<ServiceErrorCode>(n, out _), n));
+    }
+
+    [Fact]
+    public void ServiceError_CarriesVersionAndConflictingFiles()
+    {
+        var conflict = new ServiceError(ServiceErrorCode.UndoConflict, ConflictingFiles: ["Data/enUS/realmlist.wtf"], Consistency: Consistency.Pending);
+        var unsupported = new ServiceError(ServiceErrorCode.UnsupportedClient, ClientVersion: "6.2.4.20779");
+
+        Assert.Equal(["Data/enUS/realmlist.wtf"], conflict.ConflictingFiles);
+        Assert.Equal("6.2.4.20779", unsupported.ClientVersion);
     }
 }

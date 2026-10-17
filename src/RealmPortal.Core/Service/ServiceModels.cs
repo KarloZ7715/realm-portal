@@ -16,6 +16,7 @@ public sealed record ClientEntry(string Id, string Path, ClientVersion? Version,
 // ---------------------------------------------------------------- servers
 
 /// <summary>A server as the UI shows it.</summary>
+/// <param name="ClientId">The client the server was assigned to when it was added (<see cref="NewServer.ClientId"/>); <c>null</c> when none, or when that client was removed.</param>
 /// <param name="IsActive">True for the active server.</param>
 /// <param name="IsCompatible">True when the selected client can play on it; always true when no client was selected.</param>
 public sealed record ServerEntry(
@@ -26,6 +27,7 @@ public sealed record ServerEntry(
     string Realmlist,
     string? Account,
     int? RequiredClientBuild,
+    string? ClientId,
     bool IsActive,
     bool IsCompatible);
 
@@ -36,13 +38,15 @@ public sealed record ServerEntry(
 /// <param name="PatchlistHost">Value of an optional <c>set patchlist</c> line; <c>null</c> for none.</param>
 /// <param name="RequiredClientBuild">Client build the server needs (e.g. 12340); <c>null</c> for any.</param>
 /// <param name="Account">Remembered account name (never a password); <c>null</c> for none.</param>
+/// <param name="ClientId">Preferred client for this server (<see cref="ClientEntry.Id"/>), shown on its card; <c>null</c> for none. Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
 public sealed record NewServer(
     string Name,
     string Host,
     string? Realm = null,
     string? PatchlistHost = null,
     int? RequiredClientBuild = null,
-    string? Account = null);
+    string? Account = null,
+    string? ClientId = null);
 
 // ---------------------------------------------------------------- switch, play, undo
 
@@ -89,14 +93,13 @@ public sealed record SwitchOutcome(
     string? BackupId,
     IReadOnlyList<string> ChangedFiles);
 
-/// <summary>Result of an undo that did not fail.</summary>
+/// <summary>
+/// Result of a completed undo: the client files are back to what they were before the switch and the previous server is active again.
+/// Client files that changed after the switch are not a success: see <see cref="ServiceErrorCode.UndoConflict"/>.
+/// </summary>
 /// <param name="Active">The server that is active after the undo; <c>null</c> when none is.</param>
 /// <param name="Files">What happened to each client file.</param>
-/// <param name="HasConflicts">
-/// True when some client files changed after the switch and were left untouched. In that case the app state was NOT rolled
-/// back either: the undo is still pending and the UI decides what to do (see docs/app-service.md).
-/// </param>
-public sealed record UndoOutcome(ServerEntry? Active, IReadOnlyList<UndoFileResult> Files, bool HasConflicts);
+public sealed record UndoOutcome(ServerEntry? Active, IReadOnlyList<UndoFileResult> Files);
 
 // ---------------------------------------------------------------- status and settings
 
@@ -104,7 +107,12 @@ public sealed record UndoOutcome(ServerEntry? Active, IReadOnlyList<UndoFileResu
 /// <param name="Active">The active server; <c>null</c> when none.</param>
 /// <param name="CanUndo">True when <see cref="IPortalService.Undo"/> has something to undo.</param>
 /// <param name="ProjectionInSync">False when <c>activo.json</c> does not match the active server (edited or deleted by hand).</param>
-public sealed record PortalStatus(ServerEntry? Active, bool CanUndo, bool ProjectionInSync);
+/// <param name="BackupFolder">The folder where client-file backups are written right now.</param>
+public sealed record PortalStatus(ServerEntry? Active, bool CanUndo, bool ProjectionInSync, string BackupFolder);
+
+/// <summary>Where backups are kept, set from the Settings screen.</summary>
+/// <param name="BackupFolder">Folder for backups. A change applies from the next start of the app (<see cref="PortalStatus.BackupFolder"/> shows the one in use); existing backups are not moved or deleted.</param>
+public sealed record StorageSettings(string BackupFolder);
 
 /// <summary>
 /// How to start the game, set from the Settings screen. Everything of a <see cref="GameLaunchSpec"/> except the
