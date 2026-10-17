@@ -52,6 +52,29 @@ public sealed class ActiveServerManager(
         return new ActiveStatus(active, IsProjectionInSync(active), state.Undo is not null);
     }
 
+    /// <summary>The <c>server_id</c> recorded for undo, or <c>null</c> when undo would deactivate; unset when there is nothing to undo.</summary>
+    public string? PendingUndoServerId => LoadState().Undo?.ServerId;
+
+    /// <summary>The server that <see cref="Undo"/> would restore, or <c>null</c> when undo would deactivate; <c>null</c> when there is nothing to undo.</summary>
+    public Server? GetUndoTarget()
+    {
+        var state = LoadState();
+        if (state.Undo is null)
+            return null;
+        return state.Undo.ServerId is { } id
+            ? store.List().FirstOrDefault(s => s.Id == id)
+            : null;
+    }
+
+    /// <summary>Clears the one-level undo record without changing the active server or projection.</summary>
+    public void DiscardPendingUndo()
+    {
+        var state = LoadState();
+        if (state.Undo is null)
+            return;
+        SaveState(state with { Undo = null });
+    }
+
     /// <summary>
     /// Makes <paramref name="server"/> the active one and writes <c>activo.json</c>. Switching to the server that is
     /// already active rewrites the projection but keeps the undo information unchanged.
