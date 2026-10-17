@@ -1,70 +1,62 @@
-# Realm Portal
+<p align="center">
+  <img src="assets/branding/icon/png/realm-portal-256.png" alt="Realm Portal logo: a bronze coin split in two halves, joined by a red wax key" width="128" height="128">
+</p>
 
-Desktop launcher for World of Warcraft private servers. You add your own servers and your own game client: Realm Portal **does not download or distribute game clients or game content**. Linux first, then Windows. Built with C# / .NET 9 and Avalonia, with a "Parchment and bronze" visual style. The user interface is available in Spanish and English.
+<h1 align="center">Realm Portal</h1>
 
-> Not affiliated with or endorsed by Blizzard Entertainment.
+<p align="center"><em>Switch between your World of Warcraft private servers with one click.</em></p>
 
-## Status
+## What it is
 
-Phase 3a (in progress): visual layer "Parchment and bronze" (tokens, fonts, themed controls, component gallery).
+If you play on more than one World of Warcraft private server, changing between them usually means editing game files by hand. Realm Portal is a desktop app that aims to do that for you: you add the servers you play on, pick one, and the game is pointed at it.
 
-## Layout
+It is made for players, not programmers. You bring your own game client and your own servers. The app is available in English and Spanish.
 
-```
-src/RealmPortal.Core     core library
-src/RealmPortal.Cli      command-line tool
-src/RealmPortal.App      Avalonia desktop app
-tests/RealmPortal.Tests  xunit tests (core)
-tests/RealmPortal.App.Tests  headless Avalonia tests and screenshots (UI)
-assets/                  textures, frames, icons, fonts (see assets/ASSETS.md)
-```
+<!-- TODO: add a screenshot of the main window here once the app has one.
+     There is no app screenshot in the repository yet. -->
 
-## Command line
+## Status: early development
 
-`realm-portal` manages servers without the UI (all output is in English; exit codes: 0 ok, 1 usage, 2 failure):
+Realm Portal is **not ready for everyday use yet**.
 
-```bash
-realm-portal add Wotlk wotlk.example.org --build 12340 --line "set patchlist patch.example.org"
-realm-portal list --client-dir /path/to/client     # only servers this client can play on (--all shows every one)
-realm-portal switch Wotlk --client-dir /path/to/client
-realm-portal undo
-realm-portal status --client-dir /path/to/client
-realm-portal launch --client-dir /path/to/client --dry-run
-```
+- The desktop window is still being built, so there is nothing to click yet.
+- There are no downloads yet.
+- The command-line tool works today for managing your server list (see [Using it today](#using-it-today)). It does not edit your game files yet.
 
-Where files go: `--config-dir` / `REALM_PORTAL_CONFIG_DIR` (default `<app data>/realm-portal`: `servers.json`, `state.json`),
-`--projection-dir` / `REALM_PORTAL_PROJECTION_DIR` (default `~/.config/wow-servidores`: `activo.json`) and
-`--client-dir` / `REALM_PORTAL_CLIENT_DIR`. Always point them at temporary folders when testing.
+## Install
 
-## Component gallery (development)
+**Coming soon.** Linux first (AppImage and `.deb`), Windows later. This page will link to the downloads when they exist.
 
-Every themed control in every state, rendered with the real theme:
+## Using it today
 
-```bash
-dotnet run --project src/RealmPortal.App -- --gallery
-```
+Only the command-line tool can be used right now, and it has to be built from source first (see [CONTRIBUTING.md](CONTRIBUTING.md#build-and-test)). With it you can:
 
-Headless screenshots of the gallery at render scales 1.0, 1.5 and 2.0 (plus seam checks at 1.25 and 1.75) come from the UI tests:
+1. **Add a server you play on:** `realm-portal add "My server" logon.example.org`
+2. **See your servers:** `realm-portal list`. Add `--client-dir "/path/to/your/game"` to show only the servers that match your game version.
+3. **Pick the active one:** `realm-portal switch "My server"`
+4. **Check what is selected:** `realm-portal status`
 
-```bash
-RP_SCREENSHOT_DIR=/tmp/rp-shots dotnet test tests/RealmPortal.App.Tests -c Release --filter GalleryScreenshotTests
-```
+You can also start the game with `realm-portal launch "My server" --client-dir "/path/to/your/game"`.
 
-The theme draws the designer's UI kit (`assets/ui`, inventory in the kit's `ASSETS.md`); what is still missing is listed in `assets/ART-GAPS.md`.
+The planned graphical app will do these same steps with buttons.
 
-## Build
+## Undoing a change
 
-Requires the .NET 9 SDK (see `global.json`).
+`realm-portal undo` goes back to the server that was selected before your last switch (or to "no server selected" if there was none). It remembers one step only.
 
-```bash
-dotnet restore
-dotnet build -c Release
-dotnet test -c Release
-dotnet run --project src/RealmPortal.App
-```
+A safer way to change the game's own files is already built into the engine: before any file is changed, a backup is made, and everything can be restored exactly as it was. It is not connected to the app or the command-line tool yet. See [docs/client-files-backup.md](docs/client-files-backup.md) for the details.
 
-On Linux the app needs an X11 server (or XWayland) and `libfontconfig1`, `libfreetype6`, `libx11-6`, `libice6`, `libsm6`.
+## Good to know
+
+- **Not affiliated with Blizzard.** Realm Portal is not affiliated with or endorsed by Blizzard Entertainment.
+- **No game downloads.** It never downloads or distributes game clients or game content. You use your own copy of the game.
+- **No server list included.** You add the servers you want to play on.
+- **Private servers only, for now.**
 
 ## License
 
-Code is released under the MIT license (see `LICENSE`). Third-party licenses (NuGet packages, textures, fonts): `THIRD_PARTY_LICENSES.md`. Asset inventory: `assets/ASSETS.md`.
+MIT. See [LICENSE](LICENSE). Licenses of third-party components (packages, textures, fonts) are in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+## For developers
+
+Build instructions, tests, the command-line reference and the project layout are in [CONTRIBUTING.md](CONTRIBUTING.md).
