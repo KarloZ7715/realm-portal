@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <!-- compact-07 settings: fixed header and footer, the cards scroll. No cache-cleanup card (architect: not in 0.1). -->
+  <Grid RowDefinitions="Auto,*,Auto" Margin="20,10,20,0">
+    <Grid ColumnDefinitions="*,Auto" Height="44">
+      <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T nav.settings}"/>
+      <Button Grid.Column="1" Name="BackButton" Classes="link caps" VerticalAlignment="Center" Command="{Binding BackCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <c:Icon Data="{DynamicResource IconChevronLeft}" Width="12" Height="12" StrokeThickness="2.6"/>
+          <TextBlock Text="{loc:T settings.back}"/>
+        </StackPanel>
+      </Button>
+    </Grid>
+
+    <ScrollViewer Grid.Row="1" Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,6,14,12">
+      <StackPanel Spacing="18">
+        <!-- Language -->
+        <ContentControl Classes="card thin" Padding="22,12,22,14">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="sheet-title" Text="{loc:T settings.language}"/>
+            <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+            <StackPanel Orientation="Horizontal" Spacing="40" Margin="0,4,0,0">
+              <RadioButton Name="SpanishOption" Classes="parchment" GroupName="lang" IsChecked="{Binding IsSpanish, Mode=TwoWay}" Content="{loc:T settings.lang.es}"/>
+              <RadioButton Name="EnglishOption" Classes="parchment" GroupName="lang" IsChecked="{Binding IsEnglish, Mode=TwoWay}" Content="{loc:T settings.lang.en}"/>
+            </StackPanel>
+          </StackPanel>
+        </ContentControl>
+
+        <!-- Launcher -->
+        <ContentControl Classes="card" Padding="26,16,26,18">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="sheet-title" Text="{loc:T settings.launcher}"/>
+            <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="22" Margin="0,4,0,0">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T settings.template}"/>
+                <TextBox Name="TemplateBox" Classes="parchment mono" Classes.error="{Binding TemplateError, Converter={x:Static ObjectConverters.IsNotNull}}"
+                         Text="{Binding Template, Mode=TwoWay}" Watermark="{loc:T settings.template.watermark}"/>
+                <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.template.hint}"/>
+                <TextBlock Name="TemplateError" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
+                           IsVisible="{Binding TemplateError, Converter={x:Static ObjectConverters.IsNotNull}}" Text="{Binding TemplateError}"/>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="6">
+                <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T settings.prefix}"/>
+                <TextBox Name="PrefixBox" Classes="parchment mono" Text="{Binding Prefix, Mode=TwoWay}" Watermark="gamemoderun"/>
+                <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.prefix.hint}"/>
+              </StackPanel>
+            </Grid>
+            <StackPanel Spacing="6" Margin="0,4,0,0">
+              <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T settings.args}"/>
+              <TextBox Name="ArgumentsBox" Classes="parchment mono" Text="{Binding Arguments, Mode=TwoWay}" Watermark="-windowed"/>
+            </StackPanel>
+            <StackPanel Spacing="6" Margin="0,4,0,0">
+              <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T settings.env}"/>
+              <TextBox Name="EnvironmentBox" Classes="parchment mono" Classes.error="{Binding EnvironmentError, Converter={x:Static ObjectConverters.IsNotNull}}"
+                       AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="76" Height="76" Padding="12,8" VerticalContentAlignment="Top"
+                       Text="{Binding Environment, Mode=TwoWay}" Watermark="WINEPREFIX=/home/user/.wine"/>
+              <TextBlock Name="EnvironmentError" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
+                         IsVisible="{Binding EnvironmentError, Converter={x:Static ObjectConverters.IsNotNull}}" Text="{Binding EnvironmentError}"/>
+            </StackPanel>
+          </StackPanel>
+        </ContentControl>
+
+        <!-- Backup -->
+        <ContentControl Classes="card thin" Padding="26,12,26,16">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="sheet-title" Text="{loc:T settings.backup}"/>
+            <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+            <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Margin="0,4,0,0" Text="{loc:T settings.backup.folder}"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <TextBox Name="BackupBox" Classes="parchment mono" Classes.error="{Binding BackupError, Converter={x:Static ObjectConverters.IsNotNull}}"
+                       Text="{Binding BackupFolder, Mode=TwoWay}"/>
+              <Button Grid.Column="1" Name="BrowseButton" Classes="secondary compact" Command="{Binding BrowseCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <c:Icon Data="{DynamicResource IconFolder}" Width="16" Height="16" StrokeThickness="2"/>
+                  <TextBlock Text="{loc:T settings.backup.browse}"/>
+                </StackPanel>
+              </Button>
+            </Grid>
+            <TextBlock Name="BackupError" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
+                       IsVisible="{Binding BackupError, Converter={x:Static ObjectConverters.IsNotNull}}" Text="{Binding BackupError}"/>
+          </StackPanel>
+        </ContentControl>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Footer -->
+    <StackPanel Grid.Row="2" Margin="0,0,0,10">
+      <Line Classes="stitch" Stroke="{DynamicResource BronzeBrush}" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,4,0,8"/>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="22">
+        <Button Name="CancelButton" Classes="link caps" VerticalAlignment="Center" Command="{Binding CancelCommand}">
+          <TextBlock Text="{loc:T settings.cancel}"/>
+        </Button>
+        <Button Name="SaveButton" Width="172" Command="{Binding SaveCommand}">
+          <TextBlock Text="{loc:T settings.save}"/>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </Grid>
+</UserControl>
