@@ -83,8 +83,26 @@
                     <TextBlock Text="{loc:T card.play}"/>
                   </StackPanel>
                   <SplitButton.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedRight">
-                      <MenuItem Header="{loc:T card.switchonly}" Command="{Binding SwitchOnlyCommand}"/>
+                    <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterClasses="parchment">
+                      <MenuItem Name="MenuPlay" Classes="two-line" Command="{Binding PlayCommand}">
+                        <MenuItem.Icon><c:Icon Data="{DynamicResource IconPlay}" IsFilled="True" Width="12" Height="12"/></MenuItem.Icon>
+                        <MenuItem.Header>
+                          <StackPanel>
+                            <TextBlock Classes="menu-title" Text="{loc:T card.play}"/>
+                            <TextBlock Classes="menu-hint" Text="{loc:T menu.play.hint}"/>
+                          </StackPanel>
+                        </MenuItem.Header>
+                      </MenuItem>
+                      <Separator/>
+                      <MenuItem Name="MenuSwitchOnly" Classes="two-line" Command="{Binding SwitchOnlyCommand}">
+                        <MenuItem.Icon><c:Icon Data="{DynamicResource IconRefresh}" Width="14" Height="14" StrokeThickness="2.2"/></MenuItem.Icon>
+                        <MenuItem.Header>
+                          <StackPanel>
+                            <TextBlock Classes="menu-title" Text="{loc:T card.switchonly}"/>
+                            <TextBlock Classes="menu-hint" Text="{Binding SwitchOnlyHint}"/>
+                          </StackPanel>
+                        </MenuItem.Header>
+                      </MenuItem>
                     </MenuFlyout>
                   </SplitButton.Flyout>
                 </SplitButton>

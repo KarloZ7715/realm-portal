@@ -184,6 +184,13 @@
   <Style Selector="MenuItem"><Setter Property="Theme" Value="{StaticResource RpMenuItem}"/></Style>
   <Style Selector="ComboBox"><Setter Property="Theme" Value="{StaticResource RpComboBox}"/></Style>
   <Style Selector="ComboBoxItem"><Setter Property="Theme" Value="{StaticResource RpComboBoxItem}"/></Style>
+  <!-- Two-line menu item (title + hint), as in the play menu mockup. -->
+  <Style Selector="TextBlock.menu-title"><Setter Property="FontFamily" Value="{DynamicResource FontBodyMedium}"/><Setter Property="FontSize" Value="16"/></Style>
+  <Style Selector="TextBlock.menu-hint"><Setter Property="FontFamily" Value="{DynamicResource FontBody}"/><Setter Property="FontSize" Value="13"/><Setter Property="Opacity" Value="0.8"/></Style>
+  <Style Selector="MenuItem.two-line"><Setter Property="MinHeight" Value="52"/></Style>
+  <Style Selector="Separator">
+    <Setter Property="Height" Value="1"/><Setter Property="Margin" Value="8,2"/><Setter Property="Background" Value="#33000000"/>
+  </Style>
   <!-- Flat hover inside a parchment menu. -->
   <Style Selector="MenuFlyoutPresenter.parchment MenuItem:selected /template/ Border#Root, ContextMenu.parchment MenuItem:selected /template/ Border#Root">
     <Setter Property="Background" Value="{DynamicResource HoverFillParchmentBrush}"/>

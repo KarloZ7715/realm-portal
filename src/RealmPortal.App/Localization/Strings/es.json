@@ -115,5 +115,8 @@
   "dialog.cancel": "Cancelar",
   "discard.title": "¿Descartar esta copia de seguridad?",
   "discard.body": "Se conservarán los archivos actuales del cliente. No se restaurará nada y ya no podrás deshacer este cambio desde Realm Portal.",
-  "discard.confirm": "Descartar"
+  "discard.confirm": "Descartar",
+  "menu.play.hint": "Cambia de servidor y abre el juego.",
+  "menu.switchonly.hint": "Cambia el realmlist sin abrir el juego.",
+  "menu.switchonly.active": "Ya es el servidor activo."
 }
