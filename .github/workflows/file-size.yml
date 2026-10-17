@@ -1,0 +1,62 @@
+name: File size
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: the workflow only needs to read the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: file-size-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  file-size:
+    name: file-size
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    env:
+      # Maximum size of a single tracked file: 5 MiB.
+      MAX_FILE_BYTES: "5242880"
+      ALLOWLIST: .github/file-size-allowlist.txt
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check tracked file sizes
+        run: |
+          set -euo pipefail
+
+          # Load the allowlist (exact paths; blank lines and '#' comments ignored).
+          declare -A allowed=()
+          if [ -f "$ALLOWLIST" ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+              line="${line%$'\r'}"
+              case "$line" in ''|'#'*) continue ;; esac
+              allowed["$line"]=1
+            done < "$ALLOWLIST"
+          fi
+
+          failed=0
+          while IFS= read -r -d '' file; do
+            [ -f "$file" ] || continue          # skip submodules / symlinks to nowhere
+            size=$(stat -c %s -- "$file")
+            if [ "$size" -gt "$MAX_FILE_BYTES" ]; then
+              if [ -n "${allowed[$file]:-}" ]; then
+                echo "::notice file=$file::$size bytes exceeds the limit but is allowlisted."
+              else
+                echo "::error file=$file::$size bytes exceeds the $MAX_FILE_BYTES byte (5 MiB) limit. Reduce it, use Git LFS / an external download, or add it to $ALLOWLIST with a justification."
+                failed=1
+              fi
+            fi
+          done < <(git ls-files -z)
+
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "All tracked files are within the 5 MiB limit."
