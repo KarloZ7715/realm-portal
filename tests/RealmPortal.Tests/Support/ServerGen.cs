@@ -18,9 +18,12 @@ public static class ServerGen
     private static readonly Gen<string> HostGen =
         Gen.Elements("logon.example.org", "10.0.0.5:3724", "localhost", "wow.example.net:8085", "xn--n-1ga.example.org");
 
+    // At most one patchlist line: the contract allows each key once.
     private static readonly Gen<string[]> ExtraLinesGen =
-        Gen.Elements("set patchlist patch.example.org", "set realmname \"My & Realm\"", "-- comment", "set x y")
-            .ArrayOf();
+        Gen.OneOf(
+            Gen.Constant(Array.Empty<string>()),
+            Gen.Elements("patch.example.org", "http://patch.example.org/files", "auth.gamefreedom.org")
+                .Select(v => new[] { "set patchlist " + v }));
 
     private static readonly Gen<int?> BuildGen =
         Gen.OneOf(Gen.Constant<int?>(null), Gen.Elements<int?>(5875, 8606, 12340, 15595));
