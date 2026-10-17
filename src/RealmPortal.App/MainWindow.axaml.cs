@@ -1,5 +1,6 @@
 using Avalonia.LogicalTree;
 using Avalonia.Controls;
+using RealmPortal.App.Portal;
 using RealmPortal.App.ViewModels;
 
 namespace RealmPortal.App;
@@ -9,7 +10,7 @@ public partial class MainWindow : Window
     /// <summary>Width from which the sidebar shows labels and the non-affiliation note.</summary>
     public const double WideFrom = 960;
 
-    public MainWindow() : this(new MainViewModel())
+    public MainWindow() : this(new MainViewModel(Portal.PortalSession.Create()))
     {
     }
 

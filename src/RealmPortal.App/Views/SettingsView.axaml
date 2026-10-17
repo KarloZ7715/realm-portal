@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <StackPanel Margin="20,10,20,0" Spacing="12">
+    <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Height="44" Text="{loc:T settings.title}"/>
+    <TextBlock Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}" Text="{loc:T settings.backup.help}"/>
+    <TextBox Classes="parchment" Text="{Binding BackupFolder, Mode=TwoWay}" Watermark="{loc:T settings.backup.placeholder}"/>
+    <TextBlock Classes="body-sm" Foreground="{DynamicResource AmberBrush}" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"/>
+    <Button Classes="secondary compact" HorizontalAlignment="Left" Width="140" Command="{Binding SaveCommand}">
+      <TextBlock Text="{loc:T settings.save}"/>
+    </Button>
+  </StackPanel>
+</UserControl>

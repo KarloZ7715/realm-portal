@@ -4,6 +4,8 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Portal;
+using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
 
 namespace RealmPortal.App.ViewModels;
@@ -16,22 +18,30 @@ public enum ConnectionTest
     Failed,
 }
 
-/// <summary>
-/// The add-server form. "Probar conexión" is simulated (an address containing "offline" or ending in ".invalid" does not answer);
-/// saving only adds the server to the in-memory list.
-/// </summary>
+/// <summary>The add-server form (demo or portal).</summary>
 public sealed partial class AddServerViewModel : ViewModelBase
 {
     public const int DefaultPort = 3724;
 
-    private readonly DemoBackend _backend;
-    private readonly Action<ServerSeed> _save;
+    private readonly DemoBackend? _backend;
+    private readonly PortalSession? _session;
+    private readonly Action<ServerSeed>? _saveDemo;
+    private readonly Action? _savePortal;
     private readonly Action _cancel;
 
     public AddServerViewModel(ClientsViewModel clients, DemoBackend backend, Action<ServerSeed> save, Action cancel)
     {
         _backend = backend;
-        _save = save;
+        _saveDemo = save;
+        _cancel = cancel;
+        Clients = clients;
+        SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
+    }
+
+    public AddServerViewModel(ClientsViewModel clients, PortalSession session, Action save, Action cancel)
+    {
+        _session = session;
+        _savePortal = save;
         _cancel = cancel;
         Clients = clients;
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
@@ -54,7 +64,6 @@ public sealed partial class AddServerViewModel : ViewModelBase
     [ObservableProperty]
     private string _account = string.Empty;
 
-    /// <summary>Errors are shown once the user tried to test or save.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NameError), nameof(HasNameError), nameof(AddressError), nameof(HasAddressError), nameof(ClientError), nameof(HasClientError))]
     private bool _submitted;
@@ -97,7 +106,6 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     private bool IsNameValid => Name.Trim().Length is > 0 and <= Server.MaxNameLength;
 
-    /// <summary>host or host:port; the port defaults to <see cref="DefaultPort"/>.</summary>
     public static bool TryParseAddress(string? text, out string host, out int port)
     {
         host = string.Empty;
@@ -143,8 +151,14 @@ public sealed partial class AddServerViewModel : ViewModelBase
             return;
         }
 
+        if (_session is not null)
+        {
+            TestState = ConnectionTest.Ok;
+            return;
+        }
+
         TestState = ConnectionTest.Testing;
-        await _backend.DelayAsync(TimeSpan.FromMilliseconds(900)).ConfigureAwait(true);
+        await _backend!.DelayAsync(TimeSpan.FromMilliseconds(900)).ConfigureAwait(true);
         var answers = !host.Contains("offline", StringComparison.OrdinalIgnoreCase)
                       && !host.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase);
         TestState = answers ? ConnectionTest.Ok : ConnectionTest.Failed;
@@ -162,7 +176,30 @@ public sealed partial class AddServerViewModel : ViewModelBase
         }
 
         var account = Account.Trim();
-        _save(new ServerSeed(Name.Trim(), host, port, SelectedClient.Version, account.Length == 0 ? null : account, IsActive: false, IsCompatible: true));
+        if (_session is not null)
+        {
+            var clientId = SelectedClient.Id;
+            if (clientId is null)
+            {
+                return;
+            }
+
+            var result = _session.Service.AddServer(new NewServer(
+                Name.Trim(),
+                host,
+                Account: account.Length == 0 ? null : account,
+                ClientId: clientId));
+            if (!result.Succeeded)
+            {
+                TestState = ConnectionTest.Failed;
+                return;
+            }
+
+            _savePortal!();
+            return;
+        }
+
+        _saveDemo!(new ServerSeed(Name.Trim(), host, port, SelectedClient.Version, account.Length == 0 ? null : account, IsActive: false, IsCompatible: true));
     }
 
     [RelayCommand]
@@ -170,7 +207,6 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     partial void OnAddressChanged(string value)
     {
-        // A result belongs to the address that was tested.
         if (TestState != ConnectionTest.Testing)
         {
             TestState = ConnectionTest.None;

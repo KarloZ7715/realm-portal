@@ -84,7 +84,7 @@
                   </StackPanel>
                   <SplitButton.Flyout>
                     <MenuFlyout Placement="BottomEdgeAlignedRight">
-                      <MenuItem Header="{loc:T card.switchonly}" Command="{Binding SwitchOnlyCommand}"/>
+                      <MenuItem Header="{Binding SwitchMenuText}" Command="{Binding SwitchOnlyCommand}" IsVisible="{Binding ShowSwitchMenu}"/>
                     </MenuFlyout>
                   </SplitButton.Flyout>
                 </SplitButton>
@@ -116,9 +116,14 @@
       <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
         <c:Icon Data="{DynamicResource IconUndo}" Width="22" Height="22" Foreground="{DynamicResource BronzeLightBrush}" Margin="0,0,14,0"/>
         <TextBlock Grid.Column="1" Classes="body-sm" VerticalAlignment="Center" Foreground="{DynamicResource BoneBrush}" Text="{Binding ToastText}" TextTrimming="CharacterEllipsis"/>
-        <Button Grid.Column="2" Name="UndoButton" Classes="secondary compact" Command="{Binding UndoCommand}" Margin="12,0,0,0">
-          <TextBlock Text="{loc:T toast.undo}"/>
-        </Button>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
+          <Button Name="DiscardUndoButton" Classes="secondary compact" Command="{Binding DiscardUndoCommand}" IsVisible="{Binding ShowDiscardUndo}">
+            <TextBlock Text="{loc:T discard.confirm}"/>
+          </Button>
+          <Button Name="UndoButton" Classes="secondary compact" Command="{Binding UndoCommand}" IsVisible="{Binding !ShowDiscardUndo}">
+            <TextBlock Text="{loc:T toast.undo}"/>
+          </Button>
+        </StackPanel>
         <c:CountdownLine Grid.Row="1" Grid.ColumnSpan="3" Height="2" Margin="0,8,0,-6" Fraction="{Binding ToastFraction}" Brush="{DynamicResource BronzeBrush}"/>
       </Grid>
     </ContentControl>
