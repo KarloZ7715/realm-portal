@@ -41,7 +41,12 @@ public class StorageSettingsStartupTests
         var settings = service.GetStorageSettings();
         Assert.True(settings.Succeeded);
         Assert.Equal(Path.GetFullPath(repaired), settings.Value!.BackupFolder);
-        Assert.Contains(Path.GetFullPath(repaired), File.ReadAllText(path));
+        using (var document = JsonDocument.Parse(File.ReadAllText(path)))
+        {
+            Assert.Equal(
+                Path.GetFullPath(repaired),
+                document.RootElement.GetProperty("backup_folder").GetString());
+        }
 
         var restarted = Create(config, dir.Combine("projection"), defaults);
         var restartedStatus = restarted.GetStatus();
