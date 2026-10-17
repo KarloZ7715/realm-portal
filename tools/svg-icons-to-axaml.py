@@ -19,6 +19,8 @@ HEADER = '''<ResourceDictionary xmlns="https://github.com/avaloniaui"
 '''
 FOOTER = '''  <!-- Check mark for checkboxes (the circled "ok" icon is too busy at 12 px). Hand-written, not generated. -->
   <StreamGeometry x:Key="IconCheckMark">M5,12.5 L10,17.5 L19,7</StreamGeometry>
+  <!-- Back chevron for the Settings header. Hand-written, not generated. -->
+  <StreamGeometry x:Key="IconChevronLeft">M15 6l-6 6 6 6</StreamGeometry>
 </ResourceDictionary>
 '''
 
