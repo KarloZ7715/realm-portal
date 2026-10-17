@@ -20,6 +20,8 @@ public static class Program
         IGameLauncher? launcher = null,
         Func<string, string?>? getVariable = null)
     {
+        args = StripGlobalOptions(args, out var verbose);
+
         if (args.Length == 1 && args[0] is "--version" or "-v")
         {
             output.WriteLine($"{AppInfo.Name} {AppInfo.Version}");
@@ -42,10 +44,28 @@ public static class Program
 
         var app = new CliApp(output, error, versionReader, launcher ?? new ProcessGameLauncher(), getVariable ?? Environment.GetEnvironmentVariable);
         if (args.Length >= 1 && app.IsCommand(args[0]))
-            return app.Run(args[0], args[1..]);
+            return app.Run(args[0], args[1..], verbose);
 
         output.WriteLine($"{AppInfo.Name} {AppInfo.Version}");
         output.WriteLine(CliApp.Usage);
         return args.Length == 0 ? 0 : 1;
+    }
+
+    private static string[] StripGlobalOptions(string[] args, out bool verbose)
+    {
+        verbose = false;
+        var list = new List<string>(args.Length);
+        foreach (var arg in args)
+        {
+            if (arg == "--verbose")
+            {
+                verbose = true;
+                continue;
+            }
+
+            list.Add(arg);
+        }
+
+        return list.ToArray();
     }
 }
