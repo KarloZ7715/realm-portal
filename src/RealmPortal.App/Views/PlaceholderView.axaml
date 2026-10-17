@@ -1,0 +1,10 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             x:Class="RealmPortal.App.Views.PlaceholderView"
+             x:DataType="vm:PlaceholderViewModel">
+  <StackPanel Margin="20,10,20,0" Spacing="8">
+    <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Height="44" Text="{Binding Title}"/>
+    <TextBlock Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}" Text="{Binding Body}"/>
+  </StackPanel>
+</UserControl>

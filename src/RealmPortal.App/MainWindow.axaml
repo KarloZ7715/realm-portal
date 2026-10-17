@@ -1,11 +1,59 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls"
+        xmlns:vm="using:RealmPortal.App.ViewModels"
+        xmlns:v="using:RealmPortal.App.Views"
+        xmlns:loc="using:RealmPortal.App.Localization"
         x:Class="RealmPortal.App.MainWindow"
+        x:DataType="vm:MainViewModel"
         Title="Realm Portal"
         Icon="avares://RealmPortal.App/Assets/app-icon.png"
-        Width="960" Height="600"
-        MinWidth="720" MinHeight="480"
-        Background="#1A110C"
+        Width="720" Height="440"
+        MinWidth="720" MinHeight="440"
         WindowStartupLocation="CenterScreen">
-  <!-- Phase 1: intentionally empty. Background = token leather/900 (#1A110C). -->
+  <!-- The system title bar is kept. The client area of the compact mockups (720x480 with their drawn title bar) is 720x440. -->
+  <Window.Styles>
+    <!-- Compact tab: 64 px wide like the mockup (it reaches past the 56 px sidebar), icon centred in the sidebar. -->
+    <Style Selector="ListBox.nav.compact ListBoxItem"><Setter Property="Padding" Value="0,0,8,0"/></Style>
+  </Window.Styles>
+  <Window.DataTemplates>
+    <DataTemplate DataType="vm:ServersViewModel"><v:ServersView/></DataTemplate>
+    <DataTemplate DataType="vm:PlaceholderViewModel"><v:PlaceholderView/></DataTemplate>
+  </Window.DataTemplates>
+  <Grid RowDefinitions="*,Auto">
+    <Grid ColumnDefinitions="Auto,*">
+      <!-- Sidebar: icons only below 960 px wide, icons + labels + the non-affiliation note above. -->
+      <Panel Name="Sidebar" Width="56" ZIndex="1">
+        <Line Name="SidebarEdge" Classes="stitch" StartPoint="0,0" EndPoint="0,1" Stretch="Fill" HorizontalAlignment="Right" Margin="0,10,9,10"/>
+        <ListBox Name="Nav" Classes="nav compact" Margin="0,8,-20,0" VerticalAlignment="Top" SelectedIndex="{Binding SectionIndex, Mode=TwoWay}">
+          <ListBoxItem AutomationProperties.Name="{loc:T nav.servers}" ToolTip.Tip="{loc:T nav.servers}">
+            <StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconServers}" Width="20" Height="20"/><TextBlock Classes="navlabel" IsVisible="False" Text="{loc:T nav.servers}"/></StackPanel>
+          </ListBoxItem>
+          <ListBoxItem AutomationProperties.Name="{loc:T nav.clients}" ToolTip.Tip="{loc:T nav.clients}">
+            <StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconFolder}" Width="20" Height="20"/><TextBlock Classes="navlabel" IsVisible="False" Text="{loc:T nav.clients}"/></StackPanel>
+          </ListBoxItem>
+          <ListBoxItem AutomationProperties.Name="{loc:T nav.settings}" ToolTip.Tip="{loc:T nav.settings}">
+            <StackPanel Orientation="Horizontal" Spacing="12"><c:Icon Data="{DynamicResource IconGear}" Width="20" Height="20"/><TextBlock Classes="navlabel" IsVisible="False" Text="{loc:T nav.settings}"/></StackPanel>
+          </ListBoxItem>
+        </ListBox>
+        <TextBlock Name="DisclaimerText" Classes="footnote" IsVisible="False" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="20,0,24,16"
+                   Foreground="{DynamicResource BoneSoftBrush}" Text="{Binding Disclaimer}"/>
+      </Panel>
+      <ContentControl Grid.Column="1" Content="{Binding Content}"/>
+    </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="1" Classes="statusbar" Height="26">
+      <Grid ColumnDefinitions="*,Auto" Margin="14,0,8,0">
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <c:Icon Data="{DynamicResource IconDiamond}" IsFilled="True" Width="9" Height="9" Foreground="{DynamicResource ForestLightBrush}"/>
+          <TextBlock Name="StatusText" Classes="path" FontSize="11.5" Foreground="{DynamicResource BoneBrush}" Text="{Binding StatusText}"/>
+        </StackPanel>
+        <Button Grid.Column="1" Name="LanguageButton" Classes="link mono" Padding="6,2" Command="{Binding ToggleLanguageCommand}"
+                AutomationProperties.Name="{loc:T status.language.tooltip}" ToolTip.Tip="{loc:T status.language.tooltip}">
+          <TextBlock Text="{Binding LanguageLabel}"/>
+        </Button>
+      </Grid>
+    </Border>
+  </Grid>
 </Window>

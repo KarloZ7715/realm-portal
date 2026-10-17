@@ -1,0 +1,43 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Window furniture drawn without kit art:
+      Button.link     text-only button (status-bar language toggle, "clear search", the search box cross): no plate, brighter text on hover,
+                      a thin bronze outline for keyboard focus. Add class "caps" for Marcellus SC 14.
+      Border.statusbar   bottom bar: leather/950 with a bronze-dark top rule.
+  -->
+  <Styles.Resources>
+    <ControlTheme x:Key="RpLinkButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="Padding" Value="8,4"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Focus" CornerRadius="3" BorderBrush="{DynamicResource BronzeLightBrush}" BorderThickness="1" IsVisible="False" IsHitTestVisible="False"/>
+            <ContentPresenter Name="PART_ContentPresenter" Background="Transparent" Padding="{TemplateBinding Padding}"
+                              Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                              FontFamily="{TemplateBinding FontFamily}" FontSize="{TemplateBinding FontSize}"
+                              Foreground="{TemplateBinding Foreground}" RecognizesAccessKey="True"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover"><Setter Property="Foreground" Value="{DynamicResource IvoryBrush}"/></Style>
+      <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="RenderTransform" Value="translate(0px,1px)"/></Style>
+      <Style Selector="^:focus-visible /template/ Border#Focus"><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^.caps"><Setter Property="FontFamily" Value="{DynamicResource FontCaps}"/><Setter Property="FontSize" Value="14"/></Style>
+      <Style Selector="^.mono"><Setter Property="FontFamily" Value="{DynamicResource FontMono}"/><Setter Property="FontSize" Value="11.5"/></Style>
+      <Style Selector="^.ink"><Setter Property="Foreground" Value="{DynamicResource InkSoftBrush}"/></Style>
+      <Style Selector="^.ink:pointerover"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="Button.link"><Setter Property="Theme" Value="{StaticResource RpLinkButton}"/></Style>
+  <Style Selector="Border.statusbar">
+    <Setter Property="Background" Value="{DynamicResource Leather950Brush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BronzeDarkBrush}"/>
+    <Setter Property="BorderThickness" Value="0,1,0,0"/>
+  </Style>
+</Styles>

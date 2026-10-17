@@ -17,4 +17,5 @@
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/ProgressBar.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Notices.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Popups.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Shell.axaml"/>
 </Styles>

@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.ServersView"
+             x:DataType="vm:ServersViewModel">
+  <UserControl.Styles>
+    <!-- Cards sit closer together than the default list rows (mockups: about 8 px) and have a little more room on the left. -->
+    <Style Selector="ListBox.cards ListBoxItem"><Setter Property="Margin" Value="0,0,0,8"/><Setter Property="Padding" Value="28,12,22,12"/></Style>
+  </UserControl.Styles>
+  <Grid Margin="20,10,20,0">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+      <!-- Header: title, search, add. The search and add button are hidden while the app is busy (mockups 04, 06). -->
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Height="44" Margin="0,0,0,4">
+        <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T servers.title}"/>
+        <TextBox Grid.Column="1" Name="Search" Classes="parchment" Width="238" MinHeight="36" Margin="0,0,12,0" VerticalAlignment="Center"
+                 IsVisible="{Binding IsIdle}" Text="{Binding SearchText, Mode=TwoWay}" Watermark="{loc:T servers.search.placeholder}"
+                 AutomationProperties.Name="{loc:T servers.search.placeholder}">
+          <TextBox.InnerLeftContent>
+            <c:Icon Data="{DynamicResource IconSearch}" Width="18" Height="18" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2.2"/>
+          </TextBox.InnerLeftContent>
+          <TextBox.InnerRightContent>
+            <Button Classes="link ink" Padding="2" Command="{Binding ClearSearchCommand}" IsVisible="{Binding HasQuery}"
+                    AutomationProperties.Name="{loc:T servers.search.clear}" ToolTip.Tip="{loc:T servers.search.clear}">
+              <c:Icon Data="{DynamicResource IconClose}" Width="14" Height="14" StrokeThickness="2.8"/>
+            </Button>
+          </TextBox.InnerRightContent>
+        </TextBox>
+        <Button Grid.Column="2" Name="AddButton" Classes="secondary compact" Width="112" VerticalAlignment="Center" IsVisible="{Binding IsIdle}"
+                Command="{Binding AddServerCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <c:Icon Data="{DynamicResource IconPlus}" Width="14" Height="14" StrokeThickness="2.4"/>
+            <TextBlock Text="{loc:T servers.add}"/>
+          </StackPanel>
+        </Button>
+      </Grid>
+
+      <TextBlock Grid.Row="1" Classes="body-sm" FontSize="14" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,0,0,10"
+                 IsVisible="{Binding ShowResults}" Text="{Binding ResultsText}"/>
+
+      <!-- Switching / opening / running -->
+      <c:Banner Grid.Row="2" Name="PhaseBanner" Margin="0,2,0,12" IsVisible="{Binding ShowBanner}"
+                Severity="{Binding BannerSeverity}" Header="{Binding BannerHeader}" Content="{Binding BannerBody}"/>
+      <StackPanel Grid.Row="3" Spacing="12" Margin="0,0,0,12" IsVisible="{Binding ShowSteps}">
+        <ItemsControl ItemsSource="{Binding Steps}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:StepViewModel">
+              <c:StepIndicator Width="{Binding SlotWidth}" Label="{Binding Label}" State="{Binding State}" ShowConnector="{Binding ShowConnector}"/>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ProgressBar Classes="switching" Minimum="0" Maximum="100" Value="{Binding Progress}"/>
+      </StackPanel>
+      <Button Grid.Row="3" Name="RetryButton" Classes="secondary compact" HorizontalAlignment="Right" Width="150" Margin="0,0,0,12"
+              IsVisible="{Binding IsRunning}" Command="{Binding RetryCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <c:Icon Data="{DynamicResource IconRefresh}" Width="14" Height="14" StrokeThickness="2.2"/>
+          <TextBlock Text="{loc:T run.retry}"/>
+        </StackPanel>
+      </Button>
+
+      <!-- Cards -->
+      <ListBox Grid.Row="4" Name="Cards" Classes="cards" ItemsSource="{Binding Visible}" SelectedItem="{Binding SelectedCard, Mode=TwoWay}"
+               IsVisible="{Binding !ShowEmpty}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:ServerItemViewModel">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="20" MinHeight="64">
+              <c:Seal Status="{Binding SealStatus}" Width="54" Height="54" VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                <TextBlock Classes="h2" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Classes="address" FontSize="14" Foreground="{DynamicResource InkBrush}" Text="{Binding Address}"/>
+                <TextBlock Classes="body-sm" FontSize="15" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding DetailText}" TextTrimming="CharacterEllipsis"/>
+              </StackPanel>
+              <StackPanel Grid.Column="2" VerticalAlignment="Stretch" Spacing="6" HorizontalAlignment="Right">
+                <c:Badge Status="{Binding BadgeStatus}" Text="{Binding BadgeText}" HorizontalAlignment="Right"/>
+                <SplitButton Width="176" Command="{Binding PlayCommand}" HorizontalAlignment="Right">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <c:Icon Data="{DynamicResource IconPlay}" IsFilled="True" Width="12" Height="12"/>
+                    <TextBlock Text="{loc:T card.play}"/>
+                  </StackPanel>
+                  <SplitButton.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                      <MenuItem Header="{loc:T card.switchonly}" Command="{Binding SwitchOnlyCommand}"/>
+                    </MenuFlyout>
+                  </SplitButton.Flyout>
+                </SplitButton>
+              </StackPanel>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <!-- No results -->
+      <StackPanel Grid.Row="4" Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Margin="0,0,0,24" IsVisible="{Binding ShowEmpty}">
+        <c:Seal Status="Inactive" Width="68" Height="68" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+        <TextBlock Classes="h1" FontSize="24" Foreground="{DynamicResource IvoryBrush}" HorizontalAlignment="Center" Text="{Binding EmptyTitle}"/>
+        <TextBlock Classes="body-sm" FontSize="15" Foreground="{DynamicResource BoneSoftBrush}" HorizontalAlignment="Center" TextAlignment="Center" Text="{loc:T servers.empty.hint}"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="40" Margin="0,30,0,0">
+          <Button Classes="link caps" Command="{Binding ClearSearchCommand}" VerticalAlignment="Center"><TextBlock Text="{loc:T servers.empty.clear}"/></Button>
+          <Button Classes="secondary" Command="{Binding AddServerCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Data="{DynamicResource IconPlus}" Width="14" Height="14" StrokeThickness="2.4"/>
+              <TextBlock Text="{loc:T servers.empty.add}"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+
+    <!-- Undo notice over the bottom of the list -->
+    <ContentControl Name="Toast" Classes="toast" IsVisible="{Binding ToastVisible}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Width="440" Margin="0,0,0,10">
+      <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+        <c:Icon Data="{DynamicResource IconUndo}" Width="22" Height="22" Foreground="{DynamicResource BronzeLightBrush}" Margin="0,0,14,0"/>
+        <TextBlock Grid.Column="1" Classes="body-sm" VerticalAlignment="Center" Foreground="{DynamicResource BoneBrush}" Text="{Binding ToastText}" TextTrimming="CharacterEllipsis"/>
+        <Button Grid.Column="2" Name="UndoButton" Classes="secondary compact" Command="{Binding UndoCommand}" Margin="12,0,0,0">
+          <TextBlock Text="{loc:T toast.undo}"/>
+        </Button>
+        <c:CountdownLine Grid.Row="1" Grid.ColumnSpan="3" Height="2" Margin="0,8,0,-6" Fraction="{Binding ToastFraction}" Brush="{DynamicResource BronzeBrush}"/>
+      </Grid>
+    </ContentControl>
+  </Grid>
+</UserControl>
