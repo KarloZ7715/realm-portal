@@ -1,0 +1,11 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RealmPortal.App.MainWindow"
+        Title="Realm Portal"
+        Icon="avares://RealmPortal.App/Assets/app-icon.png"
+        Width="960" Height="600"
+        MinWidth="720" MinHeight="480"
+        Background="#1A110C"
+        WindowStartupLocation="CenterScreen">
+  <!-- Phase 1: intentionally empty. Background = token cuero/900 (#1A110C). -->
+</Window>
