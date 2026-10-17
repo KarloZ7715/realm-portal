@@ -1,0 +1,2004 @@
+{
+ "version": 2,
+ "units": "CSS px at 1x. Every piece has <name>.png (1x) and <name>@2x.png (exactly 2x the pixels, rendered natively, never resampled). Insets are [left, top, right, bottom] in 1x px; multiply by 2 for the @2x file.",
+ "modes": {
+  "stretch": "classic 9-slice: corners fixed, edges and centre stretched",
+  "tile": "corners fixed; edge cells and centre cell are TILED (not stretched). 'tile_axes' tells on which axes ('x' = only horizontally; absent = both). 'tile' gives the repeating cell size in 1x px (null = use the cell as it is on that axis)."
+ },
+ "path": "assets/ui/<group>/<name>.png",
+ "pieces": {
+  "panel-thin-normal": {
+   "group": "panels",
+   "png": [
+    112,
+    64
+   ],
+   "kind": "9slice",
+   "insets": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "mode": "stretch",
+   "min_size": [
+    40,
+    40
+   ],
+   "body": [
+    112,
+    64
+   ],
+   "shadow_margin": 0,
+   "svg": true,
+   "note": "thin torn-edge parchment plate, NO baked shadow. For rows/cards >= 40 px and popovers. Centre/edges are stretched: fine up to ~1.5x native (168x96); beyond that use panel-tile-*."
+  },
+  "panel-thin-hover": {
+   "group": "panels",
+   "png": [
+    112,
+    64
+   ],
+   "kind": "9slice",
+   "insets": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "mode": "stretch",
+   "min_size": [
+    40,
+    40
+   ],
+   "body": [
+    112,
+    64
+   ],
+   "shadow_margin": 0,
+   "svg": true,
+   "note": "thin torn-edge parchment plate, NO baked shadow. For rows/cards >= 40 px and popovers. Centre/edges are stretched: fine up to ~1.5x native (168x96); beyond that use panel-tile-*."
+  },
+  "panel-thin-selected": {
+   "group": "panels",
+   "png": [
+    112,
+    64
+   ],
+   "kind": "9slice",
+   "insets": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "mode": "stretch",
+   "min_size": [
+    40,
+    40
+   ],
+   "body": [
+    112,
+    64
+   ],
+   "shadow_margin": 0,
+   "svg": true,
+   "note": "thin torn-edge parchment plate, NO baked shadow. For rows/cards >= 40 px and popovers. Centre/edges are stretched: fine up to ~1.5x native (168x96); beyond that use panel-tile-*."
+  },
+  "panel-thin-selected-hover": {
+   "group": "panels",
+   "png": [
+    112,
+    64
+   ],
+   "kind": "9slice",
+   "insets": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "mode": "stretch",
+   "min_size": [
+    40,
+    40
+   ],
+   "body": [
+    112,
+    64
+   ],
+   "shadow_margin": 0,
+   "svg": true,
+   "note": "thin torn-edge parchment plate, NO baked shadow. For rows/cards >= 40 px and popovers. Centre/edges are stretched: fine up to ~1.5x native (168x96); beyond that use panel-tile-*."
+  },
+  "panel-tile-normal": {
+   "group": "panels",
+   "png": [
+    296,
+    296
+   ],
+   "kind": "9slice",
+   "insets": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "mode": "tile",
+   "tile": [
+    256,
+    256
+   ],
+   "min_size": [
+    40,
+    40
+   ],
+   "shadow_margin": 0,
+   "svg": false,
+   "note": "tileable parchment: the 4 corners are fixed, the 4 edge cells and the centre cell are TILED (not stretched), so panels of any size keep native grain. Atlas = 20 + 256 + 20 px. No baked shadow."
+  },
+  "panel-tile-hover": {
+   "group": "panels",
+   "png": [
+    296,
+    296
+   ],
+   "kind": "9slice",
+   "insets": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "mode": "tile",
+   "tile": [
+    256,
+    256
+   ],
+   "min_size": [
+    40,
+    40
+   ],
+   "shadow_margin": 0,
+   "svg": false,
+   "note": "tileable parchment: the 4 corners are fixed, the 4 edge cells and the centre cell are TILED (not stretched), so panels of any size keep native grain. Atlas = 20 + 256 + 20 px. No baked shadow."
+  },
+  "panel-tile-selected": {
+   "group": "panels",
+   "png": [
+    296,
+    296
+   ],
+   "kind": "9slice",
+   "insets": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "mode": "tile",
+   "tile": [
+    256,
+    256
+   ],
+   "min_size": [
+    40,
+    40
+   ],
+   "shadow_margin": 0,
+   "svg": false,
+   "note": "tileable parchment: the 4 corners are fixed, the 4 edge cells and the centre cell are TILED (not stretched), so panels of any size keep native grain. Atlas = 20 + 256 + 20 px. No baked shadow."
+  },
+  "panel-tile-selected-hover": {
+   "group": "panels",
+   "png": [
+    296,
+    296
+   ],
+   "kind": "9slice",
+   "insets": [
+    20,
+    20,
+    20,
+    20
+   ],
+   "mode": "tile",
+   "tile": [
+    256,
+    256
+   ],
+   "min_size": [
+    40,
+    40
+   ],
+   "shadow_margin": 0,
+   "svg": false,
+   "note": "tileable parchment: the 4 corners are fixed, the 4 edge cells and the centre cell are TILED (not stretched), so panels of any size keep native grain. Atlas = 20 + 256 + 20 px. No baked shadow."
+  },
+  "shadow-soft": {
+   "group": "shadows",
+   "png": [
+    48,
+    48
+   ],
+   "kind": "9slice",
+   "insets": [
+    18,
+    18,
+    18,
+    18
+   ],
+   "mode": "stretch",
+   "body": [
+    24,
+    24
+   ],
+   "shadow_margin": 12,
+   "svg": false,
+   "note": "shadow only (alpha black, 0 3 / blur 3.5 / 50 %). Draw it UNDER any flat plate, inflated by 12 px on every side (dest = body rect +-12). Same look as the shadow baked into the legacy panel/tab PNGs. Alternative in code: BoxShadow \"0 3 7 0 #80000000\"."
+  },
+  "tab-parchment-flat": {
+   "group": "panels",
+   "png": [
+    208,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    18,
+    18,
+    18,
+    18
+   ],
+   "mode": "stretch",
+   "body": [
+    208,
+    44
+   ],
+   "shadow_margin": 0,
+   "svg": true,
+   "note": "selected sidebar tab, NO shadow margin: place it flush with the window edge (x = 0). Pair with shadow-soft if a shadow is wanted."
+  },
+  "button-primary-normal": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "leather button with TILEABLE centre: the 126 px centre cell is repeated horizontally (start at the left edge of the centre cell), caps (17 px) are fixed, rows 14..26 stretch vertically. Texture and stitch are periodic, so any width >= 34 looks native; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-hover": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "leather button with TILEABLE centre: the 126 px centre cell is repeated horizontally (start at the left edge of the centre cell), caps (17 px) are fixed, rows 14..26 stretch vertically. Texture and stitch are periodic, so any width >= 34 looks native; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-pressed": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "leather button with TILEABLE centre: the 126 px centre cell is repeated horizontally (start at the left edge of the centre cell), caps (17 px) are fixed, rows 14..26 stretch vertically. Texture and stitch are periodic, so any width >= 34 looks native; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-disabled": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "leather button with TILEABLE centre: the 126 px centre cell is repeated horizontally (start at the left edge of the centre cell), caps (17 px) are fixed, rows 14..26 stretch vertically. Texture and stitch are periodic, so any width >= 34 looks native; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-normal": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "leather button with TILEABLE centre: the 126 px centre cell is repeated horizontally (start at the left edge of the centre cell), caps (17 px) are fixed, rows 14..26 stretch vertically. Texture and stitch are periodic, so any width >= 34 looks native; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-hover": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "leather button with TILEABLE centre: the 126 px centre cell is repeated horizontally (start at the left edge of the centre cell), caps (17 px) are fixed, rows 14..26 stretch vertically. Texture and stitch are periodic, so any width >= 34 looks native; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-pressed": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "leather button with TILEABLE centre: the 126 px centre cell is repeated horizontally (start at the left edge of the centre cell), caps (17 px) are fixed, rows 14..26 stretch vertically. Texture and stitch are periodic, so any width >= 34 looks native; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-disabled": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "leather button with TILEABLE centre: the 126 px centre cell is repeated horizontally (start at the left edge of the centre cell), caps (17 px) are fixed, rows 14..26 stretch vertically. Texture and stitch are periodic, so any width >= 34 looks native; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "split-primary-normal": {
+   "group": "buttons",
+   "png": [
+    200,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    14,
+    58,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    74,
+    28
+   ],
+   "split": {
+    "menu_width": 44,
+    "seam_from_right": 43.5,
+    "note": "action segment = x < W-43.5, menu segment = x >= W-43.5 (dest px). Draw the NORMAL plate, then draw the hover/pressed plate clipped to the hovered segment only."
+   },
+   "svg": true,
+   "note": "ONE joined plate for Play + chevron (action 159 px + menu 44 px overlapping 1 px: shared seam). Menu width fixed at 44; the action part grows by tiling. Chevron/label are not baked in."
+  },
+  "split-primary-hover": {
+   "group": "buttons",
+   "png": [
+    200,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    14,
+    58,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    74,
+    28
+   ],
+   "split": {
+    "menu_width": 44,
+    "seam_from_right": 43.5,
+    "note": "action segment = x < W-43.5, menu segment = x >= W-43.5 (dest px). Draw the NORMAL plate, then draw the hover/pressed plate clipped to the hovered segment only."
+   },
+   "svg": true,
+   "note": "ONE joined plate for Play + chevron (action 159 px + menu 44 px overlapping 1 px: shared seam). Menu width fixed at 44; the action part grows by tiling. Chevron/label are not baked in."
+  },
+  "split-primary-pressed": {
+   "group": "buttons",
+   "png": [
+    200,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    14,
+    58,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    74,
+    28
+   ],
+   "split": {
+    "menu_width": 44,
+    "seam_from_right": 43.5,
+    "note": "action segment = x < W-43.5, menu segment = x >= W-43.5 (dest px). Draw the NORMAL plate, then draw the hover/pressed plate clipped to the hovered segment only."
+   },
+   "svg": true,
+   "note": "ONE joined plate for Play + chevron (action 159 px + menu 44 px overlapping 1 px: shared seam). Menu width fixed at 44; the action part grows by tiling. Chevron/label are not baked in."
+  },
+  "split-primary-disabled": {
+   "group": "buttons",
+   "png": [
+    200,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    14,
+    58,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    74,
+    28
+   ],
+   "split": {
+    "menu_width": 44,
+    "seam_from_right": 43.5,
+    "note": "action segment = x < W-43.5, menu segment = x >= W-43.5 (dest px). Draw the NORMAL plate, then draw the hover/pressed plate clipped to the hovered segment only."
+   },
+   "svg": true,
+   "note": "ONE joined plate for Play + chevron (action 159 px + menu 44 px overlapping 1 px: shared seam). Menu width fixed at 44; the action part grows by tiling. Chevron/label are not baked in."
+  },
+  "split-secondary-normal": {
+   "group": "buttons",
+   "png": [
+    200,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    14,
+    58,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    74,
+    28
+   ],
+   "split": {
+    "menu_width": 44,
+    "seam_from_right": 43.5,
+    "note": "action segment = x < W-43.5, menu segment = x >= W-43.5 (dest px). Draw the NORMAL plate, then draw the hover/pressed plate clipped to the hovered segment only."
+   },
+   "svg": true,
+   "note": "ONE joined plate for Play + chevron (action 159 px + menu 44 px overlapping 1 px: shared seam). Menu width fixed at 44; the action part grows by tiling. Chevron/label are not baked in."
+  },
+  "split-secondary-hover": {
+   "group": "buttons",
+   "png": [
+    200,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    14,
+    58,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    74,
+    28
+   ],
+   "split": {
+    "menu_width": 44,
+    "seam_from_right": 43.5,
+    "note": "action segment = x < W-43.5, menu segment = x >= W-43.5 (dest px). Draw the NORMAL plate, then draw the hover/pressed plate clipped to the hovered segment only."
+   },
+   "svg": true,
+   "note": "ONE joined plate for Play + chevron (action 159 px + menu 44 px overlapping 1 px: shared seam). Menu width fixed at 44; the action part grows by tiling. Chevron/label are not baked in."
+  },
+  "split-secondary-pressed": {
+   "group": "buttons",
+   "png": [
+    200,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    14,
+    58,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    74,
+    28
+   ],
+   "split": {
+    "menu_width": 44,
+    "seam_from_right": 43.5,
+    "note": "action segment = x < W-43.5, menu segment = x >= W-43.5 (dest px). Draw the NORMAL plate, then draw the hover/pressed plate clipped to the hovered segment only."
+   },
+   "svg": true,
+   "note": "ONE joined plate for Play + chevron (action 159 px + menu 44 px overlapping 1 px: shared seam). Menu width fixed at 44; the action part grows by tiling. Chevron/label are not baked in."
+  },
+  "split-secondary-disabled": {
+   "group": "buttons",
+   "png": [
+    200,
+    44
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    14,
+    58,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    74,
+    28
+   ],
+   "split": {
+    "menu_width": 44,
+    "seam_from_right": 43.5,
+    "note": "action segment = x < W-43.5, menu segment = x >= W-43.5 (dest px). Draw the NORMAL plate, then draw the hover/pressed plate clipped to the hovered segment only."
+   },
+   "svg": true,
+   "note": "ONE joined plate for Play + chevron (action 159 px + menu 44 px overlapping 1 px: shared seam). Menu width fixed at 44; the action part grows by tiling. Chevron/label are not baked in."
+  },
+  "focus-ring-leather": {
+   "group": "focus",
+   "png": [
+    64,
+    56
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "element_margin": 8,
+   "svg": true,
+   "note": "keyboard focus ring for buttons, fields, cards, split-button segments. Element is centred with an 8 px margin; ring is 3 px outside the element edge. Min element 28x28 (use a 44 px menu segment, or the whole plate). Double ring (dark outline + light) on leather, single teal ring on parchment. Needs ClipToBounds=False on the host."
+  },
+  "focus-ring-control-leather": {
+   "group": "focus",
+   "png": [
+    32,
+    32
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "mode": "stretch",
+   "element_margin": 5,
+   "svg": true,
+   "note": "focus ring for 22 px controls (checkbox/radio, 5 px margin => 32x32) and for switches (56x34) and search fields: stretch it, corners stay fixed."
+  },
+  "focus-ring-parchment": {
+   "group": "focus",
+   "png": [
+    64,
+    56
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "element_margin": 8,
+   "svg": true,
+   "note": "keyboard focus ring for buttons, fields, cards, split-button segments. Element is centred with an 8 px margin; ring is 3 px outside the element edge. Min element 28x28 (use a 44 px menu segment, or the whole plate). Double ring (dark outline + light) on leather, single teal ring on parchment. Needs ClipToBounds=False on the host."
+  },
+  "focus-ring-control-parchment": {
+   "group": "focus",
+   "png": [
+    32,
+    32
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "mode": "stretch",
+   "element_margin": 5,
+   "svg": true,
+   "note": "focus ring for 22 px controls (checkbox/radio, 5 px margin => 32x32) and for switches (56x34) and search fields: stretch it, corners stay fixed."
+  },
+  "ghost-parchment-normal": {
+   "group": "buttons",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "outline only (Figma \"Parchment text/Normal\"). Label #2B2118, Marcellus SC 14."
+  },
+  "ghost-parchment-hover": {
+   "group": "buttons",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "hover: #C2AE84 @50 % + outline"
+  },
+  "ghost-parchment-pressed": {
+   "group": "buttons",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "pressed: #C2AE84 @90 % + outline"
+  },
+  "ghost-parchment-disabled": {
+   "group": "buttons",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "disabled: outline at 45 %; dim the label to 45 % too."
+  },
+  "ghost-leather-hover": {
+   "group": "buttons",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "OPTIONAL extension (the Figma ghost button on leather has no plate, only a lighter label): faint wood-brown plate, same tone as the nav-rail hover (#33241A @85 %)."
+  },
+  "ghost-leather-pressed": {
+   "group": "buttons",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "OPTIONAL extension: darker plate with a thin inner shadow."
+  },
+  "input-leather-normal": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field on leather; border is drawn inside the bounds, so no layout shift between 1 px and 2 px states. Text #EFE5CD (disabled: 45 %)."
+  },
+  "input-leather-hover": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field on leather; border is drawn inside the bounds, so no layout shift between 1 px and 2 px states. Text #EFE5CD (disabled: 45 %)."
+  },
+  "input-leather-focus": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field on leather; border is drawn inside the bounds, so no layout shift between 1 px and 2 px states. Text #EFE5CD (disabled: 45 %)."
+  },
+  "input-leather-error": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field on leather; border is drawn inside the bounds, so no layout shift between 1 px and 2 px states. Text #EFE5CD (disabled: 45 %)."
+  },
+  "input-leather-disabled": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field on leather; border is drawn inside the bounds, so no layout shift between 1 px and 2 px states. Text #EFE5CD (disabled: 45 %)."
+  },
+  "input-parchment-normal": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field / search field on parchment. Text #2B2118, placeholder #54442F."
+  },
+  "input-parchment-hover": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field / search field on parchment. Text #2B2118, placeholder #54442F."
+  },
+  "input-parchment-focus": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field / search field on parchment. Text #2B2118, placeholder #54442F."
+  },
+  "input-parchment-error": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field / search field on parchment. Text #2B2118, placeholder #54442F."
+  },
+  "input-parchment-disabled": {
+   "group": "fields",
+   "png": [
+    64,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "text field / search field on parchment. Text #2B2118, placeholder #54442F."
+  },
+  "popup-leather": {
+   "group": "popups",
+   "png": [
+    96,
+    64
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    16,
+    16,
+    16
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "dropdown / context menu / tooltip plate on leather. NO shadow baked: put shadow-soft under it. Item hover = flat #33241A @85 %."
+  },
+  "popup-parchment": {
+   "group": "popups",
+   "png": [
+    96,
+    64
+   ],
+   "kind": "9slice",
+   "insets": [
+    16,
+    16,
+    16,
+    16
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "popover / menu plate on parchment with straight edges (use panel-thin-* if a torn edge is wanted). NO shadow baked. Item hover = #C2AE84 @50 %."
+  },
+  "scrollbar-v-track-leather": {
+   "group": "controls",
+   "png": [
+    12,
+    48
+   ],
+   "kind": "9slice",
+   "insets": [
+    5,
+    8,
+    5,
+    8
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "vertical track, 12 px wide, stretch vertically. Horizontal version: scrollbar-h-track-leather (same art rotated)."
+  },
+  "scrollbar-v-thumb-leather-normal": {
+   "group": "controls",
+   "png": [
+    8,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    4,
+    8,
+    4,
+    8
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "vertical thumb, 8 px wide inside the 12 px track (2 px margin each side). Stretch vertically; min height 16. Horizontal version available."
+  },
+  "scrollbar-v-thumb-leather-hover": {
+   "group": "controls",
+   "png": [
+    8,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    4,
+    8,
+    4,
+    8
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "vertical thumb, 8 px wide inside the 12 px track (2 px margin each side). Stretch vertically; min height 16. Horizontal version available."
+  },
+  "scrollbar-v-thumb-leather-pressed": {
+   "group": "controls",
+   "png": [
+    8,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    4,
+    8,
+    4,
+    8
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "vertical thumb, 8 px wide inside the 12 px track (2 px margin each side). Stretch vertically; min height 16. Horizontal version available."
+  },
+  "scrollbar-grip-leather": {
+   "group": "controls",
+   "png": [
+    8,
+    10
+   ],
+   "kind": "image",
+   "svg": true,
+   "note": "3-line grip, centre it on the thumb (hide when thumb < 28 px)."
+  },
+  "scrollbar-v-track-parchment": {
+   "group": "controls",
+   "png": [
+    12,
+    48
+   ],
+   "kind": "9slice",
+   "insets": [
+    5,
+    8,
+    5,
+    8
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "vertical track, 12 px wide, stretch vertically. Horizontal version: scrollbar-h-track-parchment (same art rotated)."
+  },
+  "scrollbar-v-thumb-parchment-normal": {
+   "group": "controls",
+   "png": [
+    8,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    4,
+    8,
+    4,
+    8
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "vertical thumb, 8 px wide inside the 12 px track (2 px margin each side). Stretch vertically; min height 16. Horizontal version available."
+  },
+  "scrollbar-v-thumb-parchment-hover": {
+   "group": "controls",
+   "png": [
+    8,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    4,
+    8,
+    4,
+    8
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "vertical thumb, 8 px wide inside the 12 px track (2 px margin each side). Stretch vertically; min height 16. Horizontal version available."
+  },
+  "scrollbar-v-thumb-parchment-pressed": {
+   "group": "controls",
+   "png": [
+    8,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    4,
+    8,
+    4,
+    8
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "vertical thumb, 8 px wide inside the 12 px track (2 px margin each side). Stretch vertically; min height 16. Horizontal version available."
+  },
+  "scrollbar-grip-parchment": {
+   "group": "controls",
+   "png": [
+    8,
+    10
+   ],
+   "kind": "image",
+   "svg": true,
+   "note": "3-line grip, centre it on the thumb (hide when thumb < 28 px)."
+  },
+  "scrollbar-h-track-leather": {
+   "group": "controls",
+   "png": [
+    48,
+    12
+   ],
+   "kind": "9slice",
+   "insets": [
+    8,
+    5,
+    8,
+    5
+   ],
+   "mode": "stretch",
+   "svg": false,
+   "note": "horizontal track-leather: the vertical art rotated 90 degrees counter-clockwise (stretch horizontally)."
+  },
+  "scrollbar-h-thumb-leather-normal": {
+   "group": "controls",
+   "png": [
+    40,
+    8
+   ],
+   "kind": "9slice",
+   "insets": [
+    8,
+    4,
+    8,
+    4
+   ],
+   "mode": "stretch",
+   "svg": false,
+   "note": "horizontal thumb-leather-normal: the vertical art rotated 90 degrees counter-clockwise (stretch horizontally)."
+  },
+  "scrollbar-h-thumb-leather-hover": {
+   "group": "controls",
+   "png": [
+    40,
+    8
+   ],
+   "kind": "9slice",
+   "insets": [
+    8,
+    4,
+    8,
+    4
+   ],
+   "mode": "stretch",
+   "svg": false,
+   "note": "horizontal thumb-leather-hover: the vertical art rotated 90 degrees counter-clockwise (stretch horizontally)."
+  },
+  "scrollbar-h-thumb-leather-pressed": {
+   "group": "controls",
+   "png": [
+    40,
+    8
+   ],
+   "kind": "9slice",
+   "insets": [
+    8,
+    4,
+    8,
+    4
+   ],
+   "mode": "stretch",
+   "svg": false,
+   "note": "horizontal thumb-leather-pressed: the vertical art rotated 90 degrees counter-clockwise (stretch horizontally)."
+  },
+  "scrollbar-h-track-parchment": {
+   "group": "controls",
+   "png": [
+    48,
+    12
+   ],
+   "kind": "9slice",
+   "insets": [
+    8,
+    5,
+    8,
+    5
+   ],
+   "mode": "stretch",
+   "svg": false,
+   "note": "horizontal track-parchment: the vertical art rotated 90 degrees counter-clockwise (stretch horizontally)."
+  },
+  "scrollbar-h-thumb-parchment-normal": {
+   "group": "controls",
+   "png": [
+    40,
+    8
+   ],
+   "kind": "9slice",
+   "insets": [
+    8,
+    4,
+    8,
+    4
+   ],
+   "mode": "stretch",
+   "svg": false,
+   "note": "horizontal thumb-parchment-normal: the vertical art rotated 90 degrees counter-clockwise (stretch horizontally)."
+  },
+  "scrollbar-h-thumb-parchment-hover": {
+   "group": "controls",
+   "png": [
+    40,
+    8
+   ],
+   "kind": "9slice",
+   "insets": [
+    8,
+    4,
+    8,
+    4
+   ],
+   "mode": "stretch",
+   "svg": false,
+   "note": "horizontal thumb-parchment-hover: the vertical art rotated 90 degrees counter-clockwise (stretch horizontally)."
+  },
+  "scrollbar-h-thumb-parchment-pressed": {
+   "group": "controls",
+   "png": [
+    40,
+    8
+   ],
+   "kind": "9slice",
+   "insets": [
+    8,
+    4,
+    8,
+    4
+   ],
+   "mode": "stretch",
+   "svg": false,
+   "note": "horizontal thumb-parchment-pressed: the vertical art rotated 90 degrees counter-clockwise (stretch horizontally)."
+  },
+  "progress-track": {
+   "group": "controls",
+   "png": [
+    48,
+    12
+   ],
+   "kind": "9slice",
+   "insets": [
+    6,
+    6,
+    6,
+    6
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "track, 12 px high; fill sits 2 px inside (fill height 8). Stretch horizontally."
+  },
+  "progress-fill": {
+   "group": "controls",
+   "png": [
+    32,
+    8
+   ],
+   "kind": "9slice",
+   "insets": [
+    4,
+    4,
+    4,
+    4
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "bronze fill, 8 px high. Place at (2,2) inside the track, width = value * (track width - 4); min width 8."
+  },
+  "progress-stripes-tile": {
+   "group": "controls",
+   "png": [
+    12,
+    8
+   ],
+   "kind": "tile",
+   "tile": [
+    12,
+    8
+   ],
+   "svg": true,
+   "note": "indeterminate / \"switching\" overlay: tile it horizontally over progress-fill and animate its x offset 0 -> 12 px (period 12, loops seamlessly). Light stripes, alpha <= 30 %."
+  },
+  "checkbox-leather-unchecked-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "checkbox-leather-checked-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "checkbox-leather-indeterminate-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "radio-leather-off-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-leather."
+  },
+  "radio-leather-on-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-leather."
+  },
+  "switch-track-leather-off-normal": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-track-leather-on-normal": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "checkbox-leather-unchecked-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "checkbox-leather-checked-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "checkbox-leather-indeterminate-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "radio-leather-off-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-leather."
+  },
+  "radio-leather-on-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-leather."
+  },
+  "switch-track-leather-off-hover": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-track-leather-on-hover": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "checkbox-leather-unchecked-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "checkbox-leather-checked-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "checkbox-leather-indeterminate-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "radio-leather-off-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-leather."
+  },
+  "radio-leather-on-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-leather."
+  },
+  "switch-track-leather-off-disabled": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-track-leather-on-disabled": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "checkbox-parchment-unchecked-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "checkbox-parchment-checked-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "checkbox-parchment-indeterminate-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "radio-parchment-off-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-parchment."
+  },
+  "radio-parchment-on-normal": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-parchment."
+  },
+  "switch-track-parchment-off-normal": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-track-parchment-on-normal": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "checkbox-parchment-unchecked-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "checkbox-parchment-checked-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "checkbox-parchment-indeterminate-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "radio-parchment-off-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-parchment."
+  },
+  "radio-parchment-on-hover": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-parchment."
+  },
+  "switch-track-parchment-off-hover": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-track-parchment-on-hover": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "checkbox-parchment-unchecked-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "checkbox-parchment-checked-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "checkbox-parchment-indeterminate-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "radio-parchment-off-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-parchment."
+  },
+  "radio-parchment-on-disabled": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-parchment."
+  },
+  "switch-track-parchment-off-disabled": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-track-parchment-on-disabled": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-thumb-on": {
+   "group": "controls",
+   "png": [
+    16,
+    16
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "thumb, 16 px circle. Disabled: 50 % opacity."
+  },
+  "switch-thumb-off-leather": {
+   "group": "controls",
+   "png": [
+    16,
+    16
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "thumb, 16 px circle. Disabled: 50 % opacity."
+  },
+  "switch-thumb-off-parchment": {
+   "group": "controls",
+   "png": [
+    16,
+    16
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "thumb, 16 px circle. Disabled: 50 % opacity."
+  }
+ }
+}
