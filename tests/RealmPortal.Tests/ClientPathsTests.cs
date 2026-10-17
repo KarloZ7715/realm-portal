@@ -75,7 +75,9 @@ public class ClientPathsTests
         File.WriteAllBytes(manifestPath, stream.ToArray());
 
         var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
-        Assert.Equal(ClientFilesErrorCode.VerifyFailed, ex.Code);
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+        Assert.Contains("different client folder", ex.Message);
+        Assert.Contains("before changing any file", ex.Message);
         Assert.Equal("victim", File.ReadAllText(victimFile));
     }
 

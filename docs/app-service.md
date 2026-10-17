@@ -70,6 +70,7 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 | `InvalidRealmlistException` | `InvalidRealmlist` with `RealmlistKind`, `LineNumber`, `ServerName` |
 | `ClientVersionException.Kind` | `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `ClientUnreadable` (a missing folder: `PathNotFound`), with `Path` |
 | `StoreException` | `StoreCorrupt`, `ServerNameTaken`, `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing` |
+| undo backup made for another client folder (manifest `client_root` differs from the registered client) | `PathEscapesClient`, `Diagnostic` names both folders; nothing is written |
 | undo finds changed client files | `UndoConflict` with `ConflictingFiles`, `Consistency.Pending` |
 | backup folder cannot be used | `PathNotFound`, `PermissionDenied`, `ReadOnlyFs` |
 | `ArgumentException` from `Server.Create` | `InvalidServerInput` with `Field` |

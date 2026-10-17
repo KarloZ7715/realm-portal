@@ -21,8 +21,8 @@ public static class ClientPaths
     {
         var manifestCanonical = TrimTrailingSeparators(Path.GetFullPath(manifestRoot));
         if (!RootsEqual(trustedRoot, manifestCanonical))
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, manifestPath,
-                "The backup manifest client_root does not match the installation's client directory.");
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, manifestPath,
+                $"The backup to undo belongs to a different client folder ('{manifestCanonical}'), not '{trustedRoot}'; undo stopped before changing any file.");
     }
 
     public static string ResolveManagedPath(string canonicalRoot, string relativePath)
