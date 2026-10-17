@@ -656,14 +656,21 @@ public sealed class PortalService : IPortalService
         IReadOnlyList<UndoFileResult> fileResults,
         StoredClient? switchedClient)
     {
+        var lines = new List<string>();
+        var restoredLine = fileResults.Count == 0
+            ? null
+            : switchedClient is not null
+                ? $"Client files: restored '{switchedClient.Path}' to its state before the switch."
+                : "Client files: restored to their state before the switch.";
+
+        // Undo back to "no active server" still restored the switched client; say so (there is no active server to drift from).
         if (restoredActive is null)
-            return null;
+            return restoredLine;
 
         var drift = ListClientsNotMatchingActive(restoredActive);
-        var lines = new List<string>();
 
-        if (fileResults.Count > 0 && switchedClient is not null)
-            lines.Add($"Client files: restored '{switchedClient.Path}' to its state before the switch.");
+        if (restoredLine is not null)
+            lines.Add(restoredLine);
         else if (journal.BackupId is null && drift.Count > 0)
             lines.Add("Client files: not changed.");
 
