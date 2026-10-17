@@ -74,15 +74,15 @@ public class ActiveProjectionTests
 
 public class ActiveProjectionOnDiskTests
 {
-    // The documented real-world example (auth.gamefreedom.org with a patchlist line).
+    // Documented example with a patchlist line (example.org).
     private const string ServerId = "5f0c9a1e7b3d4c28a6e1d0b94f7a3c52";
 
-    private static Server GameFreedom() =>
+    private static Server ExampleServer() =>
         Server.Create(
-            "GameFreedom",
-            "auth.gamefreedom.org",
-            "GameFreedom",
-            ["set patchlist auth.gamefreedom.org"],
+            "Example",
+            "example.org",
+            "Example",
+            ["set patchlist example.org"],
             id: ServerId);
 
     [Fact]
@@ -93,7 +93,7 @@ public class ActiveProjectionOnDiskTests
         var projection = dir.Combine("projection");
         var writer = new RealmPortal.Core.IO.AtomicFileWriter();
         var store = new ServerStore(config, writer);
-        var server = store.Add(GameFreedom());
+        var server = store.Add(ExampleServer());
 
         new ActiveServerManager(store, config, projection, writer).Switch(server);
 
@@ -102,10 +102,10 @@ public class ActiveProjectionOnDiskTests
         byte[] expected = Encoding.ASCII.GetBytes(
             "{\n" +
             "  \"server_id\": \"5f0c9a1e7b3d4c28a6e1d0b94f7a3c52\",\n" +
-            "  \"name\": \"GameFreedom\",\n" +
-            "  \"host\": \"auth.gamefreedom.org\",\n" +
-            "  \"realm\": \"GameFreedom\",\n" +
-            "  \"realmlist\": \"set realmlist auth.gamefreedom.org\\r\\nset patchlist auth.gamefreedom.org\\r\\n\"\n" +
+            "  \"name\": \"Example\",\n" +
+            "  \"host\": \"example.org\",\n" +
+            "  \"realm\": \"Example\",\n" +
+            "  \"realmlist\": \"set realmlist example.org\\r\\nset patchlist example.org\\r\\n\"\n" +
             "}\n");
         var path = Path.Combine(projection, "activo.json");
         var actual = File.ReadAllBytes(path);
@@ -117,7 +117,7 @@ public class ActiveProjectionOnDiskTests
         // The decoded realmlist is the exact text with real CR LF characters.
         using var doc = JsonDocument.Parse(actual);
         Assert.Equal(
-            "set realmlist auth.gamefreedom.org\r\nset patchlist auth.gamefreedom.org\r\n",
+            "set realmlist example.org\r\nset patchlist example.org\r\n",
             doc.RootElement.GetProperty("realmlist").GetString());
     }
 }

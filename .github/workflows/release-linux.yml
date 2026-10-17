@@ -1,0 +1,139 @@
+name: Release (Linux packages)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version (defaults to the project Version in Directory.Build.props)
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - .github/workflows/release-linux.yml
+      - packaging/linux/**
+      - src/RealmPortal.App/**
+      - src/RealmPortal.Core/**
+      - Directory.Build.props
+      - global.json
+      - Directory.Packages.props
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-linux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  APP_PROJECT: src/RealmPortal.App/RealmPortal.App.csproj
+  # AppImageKit release 13 ships appimagetool under the obsolete-* asset names.
+  APPIMAGETOOL_VERSION: "13"
+  APPIMAGETOOL_SHA256: "df3baf5ca5facbecfc2f3fa6713c29ab9cefa8fd8c1eac5d283b79cab33e4acb"
+
+jobs:
+  linux-packages:
+    name: linux-x64 packages
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      REF_NAME: ${{ github.ref_name }}
+      INPUT_VERSION: ${{ inputs.version }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve package version
+        id: version
+        env:
+          VALIDATE_VERSION: packaging/linux/validate-version.sh
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ -z "${PR_NUMBER:-}" ]; then
+              echo "::error::Missing pull request number"
+              exit 1
+            fi
+            ver="0.0.0-pr.${PR_NUMBER}"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            ver="${REF_NAME#v}"
+          elif [ -n "$INPUT_VERSION" ]; then
+            ver="$INPUT_VERSION"
+          else
+            ver="$(grep -E '<Version>' Directory.Build.props | head -1 | sed -E 's/.*<Version>([^<]+)<\/Version>.*/\1/')"
+          fi
+          if [ -z "$ver" ]; then
+            echo "::error::Could not determine package version"
+            exit 1
+          fi
+          "$VALIDATE_VERSION" "$ver"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "PACKAGE_VERSION=$ver" >> "$GITHUB_ENV"
+          echo "Package version: $ver"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 9.0.x
+
+      # TODO(#51): After NuGet lock files land on main, use `dotnet restore --locked-mode` (and publish --no-restore).
+      - name: Publish (linux-x64, self-contained, trimmed, ReadyToRun)
+        run: |
+          set -euo pipefail
+          publish_dir="$RUNNER_TEMP/publish"
+          dotnet publish "$APP_PROJECT" \
+            -c Release \
+            -r linux-x64 \
+            --self-contained true \
+            -p:Version="$PACKAGE_VERSION" \
+            -p:InformationalVersion="$PACKAGE_VERSION" \
+            -p:PublishTrimmed=true \
+            -p:TrimMode=partial \
+            -p:PublishReadyToRun=true \
+            -o "$publish_dir" \
+            2>&1 | tee "$RUNNER_TEMP/publish.log"
+          if grep -E 'error (IL|NETSDK)' "$RUNNER_TEMP/publish.log"; then
+            echo "::error::Publish reported trim errors"
+            exit 1
+          fi
+          echo "PUBLISH_DIR=$publish_dir" >> "$GITHUB_ENV"
+
+      - name: Install packaging tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends dpkg-dev
+          archive="obsolete-appimagetool-x86_64.AppImage"
+          url="https://github.com/AppImage/AppImageKit/releases/download/${APPIMAGETOOL_VERSION}/${archive}"
+          curl -sSfL --retry 3 -o "$RUNNER_TEMP/$archive" "$url"
+          echo "${APPIMAGETOOL_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          chmod +x "$RUNNER_TEMP/$archive"
+          echo "APPIMAGETOOL=$RUNNER_TEMP/$archive" >> "$GITHUB_ENV"
+
+      - name: Build .deb and AppImage
+        run: |
+          set -euo pipefail
+          out_dir="$RUNNER_TEMP/packages"
+          mkdir -p "$out_dir"
+          packaging/linux/build-packages.sh "$PUBLISH_DIR" "$PACKAGE_VERSION" "$out_dir"
+          echo "PACKAGE_DIR=$out_dir" >> "$GITHUB_ENV"
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: realm-portal-linux-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.PACKAGE_DIR }}/*.deb
+            ${{ env.PACKAGE_DIR }}/*.AppImage
+            ${{ env.PACKAGE_DIR }}/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
