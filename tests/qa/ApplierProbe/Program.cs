@@ -56,7 +56,7 @@ try
 
     if (args[0] == "undo")
     {
-        var undone = applier.Undo(install);
+        var undone = applier.Undo(install, client);
         foreach (var f in undone.Files)
             Console.WriteLine($"{f.Status} {f.RelativePath}");
         Console.WriteLine($"BACKUP {undone.BackupId}");
