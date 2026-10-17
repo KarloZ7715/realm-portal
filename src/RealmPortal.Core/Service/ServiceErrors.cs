@@ -120,9 +120,9 @@ internal static class ServiceErrors
             _ => null,
         };
         if (field is not null)
-            return new(ServiceErrorCode.InvalidServerInput, Field: field, Consistency: consistency, Diagnostic: ex.Message);
+            return new(ServiceErrorCode.InvalidServerInput, Field: field, Consistency: consistency, Diagnostic: UserFacingMessages.Sanitize(ex.Message));
 
-        return new(ServiceErrorCode.Unexpected, Consistency: consistency, Diagnostic: ex.Message);
+        return new(ServiceErrorCode.Unexpected, Consistency: consistency, Diagnostic: UserFacingMessages.Sanitize(ex.Message));
     }
 
     public static ServiceError UndoConflict(IReadOnlyList<string> conflictingFiles) =>

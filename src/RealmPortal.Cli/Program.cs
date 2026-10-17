@@ -46,6 +46,18 @@ public static class Program
         if (args.Length >= 1 && app.IsCommand(args[0]))
             return app.Run(args[0], args[1..], verbose);
 
+        var commandIndex = Array.FindIndex(args, static a => CliApp.Commands.Contains(a));
+        var optionLimit = commandIndex < 0 ? args.Length : commandIndex;
+        for (var i = 0; i < optionLimit; i++)
+        {
+            if (args[i].StartsWith("--", StringComparison.Ordinal) && !CliApp.IsKnownLeadingOption(args[i]))
+            {
+                error.WriteLine($"error: unknown option {args[i]}");
+                error.WriteLine(CliApp.Usage);
+                return 1;
+            }
+        }
+
         output.WriteLine($"{AppInfo.Name} {AppInfo.Version}");
         output.WriteLine(CliApp.Usage);
         return args.Length == 0 ? 0 : 1;

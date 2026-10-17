@@ -63,6 +63,10 @@ public sealed class CliApp(
 
     public bool IsCommand(string name) => Commands.Contains(name);
 
+    /// <summary>Options that may appear before the subcommand in <see cref="Program.Run"/>.</summary>
+    public static bool IsKnownLeadingOption(string arg) =>
+        arg is "--config-dir" or "--projection-dir" or "--client-dir" or "--verbose";
+
     public int Run(string command, string[] args, bool globalVerbose = false)
     {
         try
@@ -293,8 +297,7 @@ public sealed class CliApp(
         if (status.ClientsNotMatchingActive.Count > 0 && status.Active is not null)
         {
             foreach (var client in status.ClientsNotMatchingActive)
-                output.WriteLine(
-                    $"Client folder out of sync: {client.Path} (run 'switch {status.Active.Name} --client-dir <folder>')");
+                output.WriteLine(ClientSyncMessages.DriftLine(status.Active.Name, client.Path));
         }
 
         output.WriteLine($"Can undo: {(status.CanUndo ? "yes" : "no")}");

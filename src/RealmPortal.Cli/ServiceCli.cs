@@ -15,7 +15,7 @@ internal static class ServiceCli
                 or ServiceErrorCode.Unexpected
                 or ServiceErrorCode.InconsistentState)
         {
-            return error.Diagnostic;
+            return UserFacingMessages.Sanitize(error.Diagnostic);
         }
 
         return error.Code switch
@@ -79,7 +79,7 @@ internal static class ServiceCli
     private static string FormatInvalidServerInput(ServiceError error)
     {
         if (!string.IsNullOrEmpty(error.Diagnostic))
-            return error.Diagnostic;
+            return UserFacingMessages.Sanitize(error.Diagnostic);
         return error.Field switch
         {
             "name" => "Server name is invalid.",
