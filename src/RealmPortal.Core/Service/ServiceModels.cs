@@ -101,7 +101,11 @@ public sealed record SwitchOutcome(
 /// </summary>
 /// <param name="Active">The server that is active after the undo; <c>null</c> when none is.</param>
 /// <param name="Files">What happened to each client file.</param>
-public sealed record UndoOutcome(ServerEntry? Active, IReadOnlyList<UndoFileResult> Files);
+/// <param name="ClientFilesNotice">English line for the CLI when undo touched (or skipped) registered client folders.</param>
+public sealed record UndoOutcome(
+    ServerEntry? Active,
+    IReadOnlyList<UndoFileResult> Files,
+    string? ClientFilesNotice = null);
 
 // ---------------------------------------------------------------- status and settings
 
@@ -110,7 +114,13 @@ public sealed record UndoOutcome(ServerEntry? Active, IReadOnlyList<UndoFileResu
 /// <param name="CanUndo">True when <see cref="IPortalService.Undo"/> has something to undo.</param>
 /// <param name="ProjectionInSync">False when <c>activo.json</c> does not match the active server (edited or deleted by hand).</param>
 /// <param name="BackupFolder">The folder where client-file backups are written right now.</param>
-public sealed record PortalStatus(ServerEntry? Active, bool CanUndo, bool ProjectionInSync, string BackupFolder);
+/// <param name="ClientsNotMatchingActive">Registered clients whose on-disk realmlist does not match the active server (empty when none active).</param>
+public sealed record PortalStatus(
+    ServerEntry? Active,
+    bool CanUndo,
+    bool ProjectionInSync,
+    string BackupFolder,
+    IReadOnlyList<ClientEntry> ClientsNotMatchingActive);
 
 /// <summary>Where backups are kept, set from the Settings screen.</summary>
 /// <param name="BackupFolder">Folder for backups. A change applies from the next start of the app (<see cref="PortalStatus.BackupFolder"/> shows the one in use); existing backups are not moved or deleted.</param>
