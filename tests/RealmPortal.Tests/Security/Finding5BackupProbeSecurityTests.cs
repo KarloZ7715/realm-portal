@@ -1,6 +1,8 @@
+using System.Runtime.InteropServices;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
+using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests.Security;
 
@@ -9,7 +11,7 @@ public class Finding5BackupProbeSecurityTests
     [Fact]
     public void SetStorageSettings_LeavesUniqueProbeFilesOnly()
     {
-        using var dir = new Support.TempDirectory();
+        using var dir = new TempDirectory();
         var config = dir.Combine("config");
         var backups = dir.Combine("backups");
         Directory.CreateDirectory(config);
@@ -19,6 +21,25 @@ public class Finding5BackupProbeSecurityTests
         Assert.True(service.SetStorageSettings(new StorageSettings(backups)).Succeeded);
         Assert.True(service.SetStorageSettings(new StorageSettings(backups)).Succeeded);
         Assert.DoesNotContain(".realm-portal-write-test", Directory.GetFiles(backups).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public void SetStorageSettings_RejectsBackupFolderUnderSymlinkAncestor()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return;
+
+        using var dir = new TempDirectory();
+        var config = dir.Combine("config");
+        var real = dir.Combine("real");
+        var link = dir.Combine("link");
+        Directory.CreateDirectory(Path.Combine(real, "backups"));
+        File.CreateSymbolicLink(link, real);
+
+        var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch());
+        var result = service.SetStorageSettings(new StorageSettings(Path.Combine(link, "backups")));
+        Assert.False(result.Succeeded);
+        Assert.Equal(ServiceErrorCode.PathNotFound, result.Error!.Code);
     }
 
     private sealed class NoLaunch : IGameLaunchService

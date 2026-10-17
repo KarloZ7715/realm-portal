@@ -37,7 +37,7 @@ public class Finding7PortalConfigFileSecurityTests
         Assert.True(service.SetStorageSettings(new StorageSettings(backups)).Succeeded);
 
         var mode = File.GetUnixFileMode(Path.Combine(config, "storage-settings.json"));
-        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, mode & (UnixFileMode.UserRead | UnixFileMode.UserWrite));
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, mode);
     }
 
     private sealed class NoLaunch : IGameLaunchService
