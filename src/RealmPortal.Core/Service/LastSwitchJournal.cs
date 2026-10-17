@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.IO;
 using RealmPortal.Core.Servers;
 
@@ -30,53 +31,92 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
         if (!File.Exists(_path))
             return null;
 
-        try
+        return PortalConfigFile.WithConfigLock(() =>
         {
-            var file = JsonSerializer.Deserialize<JournalFile>(File.ReadAllBytes(_path), JsonOptions)
-                       ?? throw new StoreException($"'{_path}' is empty.");
-            if (file.Version != FormatVersion)
-                throw new StoreException($"'{_path}' has unsupported format version {file.Version}.");
-            if (string.IsNullOrWhiteSpace(file.ClientId))
-                throw new StoreException($"'{_path}' is missing client_id.");
-            return new LastSwitchEntry(file.ClientId, file.BackupId);
-        }
-        catch (JsonException ex)
-        {
-            throw new StoreException($"'{_path}' is not valid: {ex.Message}", ex);
-        }
-        catch (IOException ex)
-        {
-            throw new StoreException($"'{_path}' cannot be read: {ex.Message}", ex);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            throw new StoreException($"'{_path}' cannot be read: {ex.Message}", ex);
-        }
+            try
+            {
+                var file = JsonSerializer.Deserialize<JournalFile>(PortalConfigFile.ReadBounded(_path), JsonOptions)
+                           ?? throw new StoreException($"'{_path}' is empty.");
+                return Parse(file);
+            }
+            catch (JsonException ex)
+            {
+                throw new StoreException($"'{_path}' is not valid: {ex.Message}", ex);
+            }
+            catch (IOException ex)
+            {
+                throw new StoreException($"'{_path}' cannot be read: {ex.Message}", ex);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new StoreException($"'{_path}' cannot be read: {ex.Message}", ex);
+            }
+        });
     }
 
     public void Save(LastSwitchEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        var file = new JournalFile { Version = FormatVersion, ClientId = entry.ClientId, BackupId = entry.BackupId };
-        var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
-        writer.WriteAllBytes(_path, new System.Text.UTF8Encoding(false).GetBytes(json));
+        ValidateEntry(entry);
+        PortalConfigFile.WithConfigLock(() =>
+        {
+            var file = new JournalFile
+            {
+                Version = FormatVersion,
+                ClientId = entry.ClientId,
+                BackupId = entry.BackupId,
+                FilesUndone = entry.FilesUndone,
+            };
+            var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
+            writer.WriteAllBytes(_path, new System.Text.UTF8Encoding(false).GetBytes(json));
+            PortalConfigFile.AfterWrite(_path);
+        });
+    }
+
+    public void MarkFilesUndone()
+    {
+        var entry = Load() ?? throw new StoreException("No last-switch journal entry to update.");
+        Save(entry with { FilesUndone = true });
     }
 
     public void Clear()
     {
-        try
+        PortalConfigFile.WithConfigLock(() =>
         {
-            if (File.Exists(_path))
-                File.Delete(_path);
-        }
-        catch (IOException ex)
-        {
-            throw new StoreException($"Cannot delete '{_path}': {ex.Message}", ex);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            throw new StoreException($"Cannot delete '{_path}': {ex.Message}", ex);
-        }
+            try
+            {
+                if (File.Exists(_path))
+                    File.Delete(_path);
+            }
+            catch (IOException ex)
+            {
+                throw new StoreException($"Cannot delete '{_path}': {ex.Message}", ex);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new StoreException($"Cannot delete '{_path}': {ex.Message}", ex);
+            }
+        });
+    }
+
+    internal static void ValidateEntry(LastSwitchEntry entry)
+    {
+        if (!ClientFilesRequest.IsValidId(entry.ClientId))
+            throw new StoreException("last-switch client_id is not valid.");
+        if (entry.BackupId is not null && !BackupIdFormat.IsValid(entry.BackupId))
+            throw new StoreException("last-switch backup_id is not valid.");
+    }
+
+    private static LastSwitchEntry Parse(JournalFile file)
+    {
+        if (file.Version != FormatVersion)
+            throw new StoreException($"Unsupported last-switch format version {file.Version}.");
+        if (string.IsNullOrWhiteSpace(file.ClientId))
+            throw new StoreException("last-switch is missing client_id.");
+
+        var entry = new LastSwitchEntry(file.ClientId, file.BackupId, file.FilesUndone);
+        ValidateEntry(entry);
+        return entry;
     }
 
     private sealed class JournalFile
@@ -84,7 +124,8 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
         [JsonPropertyName("version")] public int Version { get; init; }
         [JsonPropertyName("client_id")] public string? ClientId { get; init; }
         [JsonPropertyName("backup_id")] public string? BackupId { get; init; }
+        [JsonPropertyName("files_undone")] public bool FilesUndone { get; init; }
     }
 }
 
-internal sealed record LastSwitchEntry(string ClientId, string? BackupId);
+internal sealed record LastSwitchEntry(string ClientId, string? BackupId, bool FilesUndone = false);
