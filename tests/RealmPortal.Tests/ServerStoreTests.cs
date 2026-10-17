@@ -51,10 +51,10 @@ public class ServerStoreTests
     {
         using var dir = new TempDirectory();
         var store = NewStore(dir.Path);
-        var a = store.Add(Server.Create("Alpha", "a", id: "abc111"));
-        var b = store.Add(Server.Create("Beta", "b", id: "abc222"));
+        var a = store.Add(Server.Create("Alpha", "a", id: "abc11100000000000000000000000000"));
+        var b = store.Add(Server.Create("Beta", "b", id: "abc22200000000000000000000000000"));
 
-        Assert.Equal(a, store.Find("abc111"));
+        Assert.Equal(a, store.Find("abc11100000000000000000000000000"));
         Assert.Equal(b, store.Find("beta"));
         Assert.Equal(b, store.Find("abc2"));
         Assert.Null(store.Find("abc")); // ambiguous prefix
@@ -67,14 +67,14 @@ public class ServerStoreTests
     {
         using var dir = new TempDirectory();
         var store = NewStore(dir.Path);
-        store.Add(Server.Create("Ñandú", "h.example.org", "R&1", ["set patchlist p.example.org"], 12340, "carlos", id: "id1"));
+        store.Add(Server.Create("Ñandú", "h.example.org", "R&1", ["set patchlist p.example.org"], 12340, "carlos", id: "11111111111111111111111111111111"));
 
         var expected =
             "{\n" +
             "  \"version\": 1,\n" +
             "  \"servers\": [\n" +
             "    {\n" +
-            "      \"id\": \"id1\",\n" +
+            "      \"id\": \"11111111111111111111111111111111\",\n" +
             "      \"name\": \"Ñandú\",\n" +
             "      \"host\": \"h.example.org\",\n" +
             "      \"realm\": \"R&1\",\n" +
