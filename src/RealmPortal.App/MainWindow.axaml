@@ -57,5 +57,12 @@
         </Button>
       </Grid>
     </Border>
+
+    <!-- Modal question (e.g. discard a conflicting backup) over everything, status bar included. -->
+    <ContentControl Grid.RowSpan="2" Name="DialogHost" Content="{Binding Dialog}" IsVisible="{Binding Dialog, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:ConfirmDialogViewModel"><v:ConfirmDialogView/></DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
   </Grid>
 </Window>
