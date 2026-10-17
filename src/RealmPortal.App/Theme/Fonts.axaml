@@ -1,0 +1,15 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Bundled typefaces (SIL OFL 1.1, see assets/fonts/FONTS.md and THIRD_PARTY_LICENSES.md).
+    The Medium weights are registered as their own families ("Alegreya Medium", "Alegreya Sans Medium"):
+    their internal family name is the one shown here, so Avalonia does not need to resolve weight 500.
+  -->
+  <FontFamily x:Key="FontDisplay">avares://RealmPortal.App/Assets/Fonts#Almendra</FontFamily>
+  <FontFamily x:Key="FontCaps">avares://RealmPortal.App/Assets/Fonts#Marcellus SC</FontFamily>
+  <FontFamily x:Key="FontBody">avares://RealmPortal.App/Assets/Fonts#Alegreya</FontFamily>
+  <FontFamily x:Key="FontBodyMedium">avares://RealmPortal.App/Assets/Fonts#Alegreya Medium</FontFamily>
+  <FontFamily x:Key="FontSans">avares://RealmPortal.App/Assets/Fonts#Alegreya Sans</FontFamily>
+  <FontFamily x:Key="FontSansMedium">avares://RealmPortal.App/Assets/Fonts#Alegreya Sans Medium</FontFamily>
+  <FontFamily x:Key="FontMono">avares://RealmPortal.App/Assets/Fonts#JetBrains Mono</FontFamily>
+</ResourceDictionary>
