@@ -66,21 +66,38 @@ public class ControlTests
     }
 
     [AvaloniaFact]
-    public void ParchmentGhostButtonUsesTheTealRing()
+    public void LeatherSurfaceKeepsLeatherPlatesAndFocusRing()
     {
-        var button = Host(new Button { Content = "Label", Classes = { "ghost", "parchment" } });
-        Assert.Equal("focus-ring-parchment", Source(button, "Ring"));
+        var primary = Host(new Button { Content = "Save" });
+        Assert.Equal("button-primary-normal", Source(primary, "Plate"));
+        Assert.Equal("focus-ring-leather", Source(primary, "Ring"));
+        ButtonSurface.SetSurface(primary, ButtonSurfaceKind.Leather);
+        Screenshots.Settle();
+        Assert.Equal("button-primary-normal", Source(primary, "Plate"));
+        var secondary = Host(new Button { Content = "Cancel", Classes = { "secondary" } });
+        Assert.Equal("button-secondary-normal", Source(secondary, "Plate"));
+        var text = Host(new Button { Content = "Label", Classes = { "ghost" } });
+        Assert.False(text.GetVisualDescendants().OfType<NineSlice>().First(n => n.Name == "Plate").IsVisible);
     }
 
     [AvaloniaFact]
-    public void ParchmentPrimaryAndSecondaryButtonsUseDarkBronzePlatesAndTealFocusRing()
+    public void ParchmentSurfaceUsesDarkBronzePlatesAndParchmentFocusRing()
     {
-        var primary = Host(new Button { Content = "Discard", Classes = { "parchment" } });
+        var primary = Host(new Button { Content = "Discard" });
+        ButtonSurface.SetSurface(primary, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
         Assert.Equal("button-primary-parchment-normal", Source(primary, "Plate"));
         Assert.Equal("focus-ring-parchment", Source(primary, "Ring"));
-        var secondary = Host(new Button { Content = "Cancel", Classes = { "secondary", "parchment" } });
+        var secondary = Host(new Button { Content = "Cancel", Classes = { "secondary" } });
+        ButtonSurface.SetSurface(secondary, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
         Assert.Equal("button-secondary-parchment-normal", Source(secondary, "Plate"));
         Assert.Equal("focus-ring-parchment", Source(secondary, "Ring"));
+        var text = Host(new Button { Content = "Label", Classes = { "ghost" } });
+        ButtonSurface.SetSurface(text, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
+        Assert.Equal("ghost-parchment-normal", Source(text, "Plate"));
+        Assert.Equal("focus-ring-parchment", Source(text, "Ring"));
     }
 
     [AvaloniaFact]
@@ -165,7 +182,9 @@ public class ControlTests
     [InlineData(":pointerover :pressed", "ghost-parchment-pressed")]
     public void ParchmentGhostAlwaysHasItsOutlinePlate(string states, string expected)
     {
-        var button = Host(new Button { Content = "Label", Classes = { "ghost", "parchment" } });
+        var button = Host(new Button { Content = "Label", Classes = { "ghost" } });
+        ButtonSurface.SetSurface(button, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
         ForceState.SetStates(button, states);
         Screenshots.Settle();
         Assert.Equal(expected, Source(button, "Plate"));

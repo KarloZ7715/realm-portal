@@ -17,7 +17,7 @@ Conventions for new files (same as the kit): PNG @1x + `@2x` (exactly double the
 | Joined split-button plate | `split-{primary,secondary}-*` | `SplitPlate` draws the plate and re-draws the hovered/pressed segment from the state plate, clipped to it (`Theme/Controls/SplitButton.axaml`, on Avalonia's `SplitButton`). |
 | Card hover | `panel-thin-hover`, `panel-tile-hover` (+ `-selected-hover`) | Replaces the 1 px lift. |
 | Ghost button plate | `ghost-parchment-*`, `ghost-leather-{hover,pressed}` | `Button.ghost` / `.ghost.parchment`. |
-| Parchment primary/secondary borders | `button-{primary,secondary}-parchment-{normal,hover,pressed,disabled}` | `Button.parchment` on wax primary or dark secondary (confirm dialogs); bronze/dark 1.5 px border + `focus-ring-parchment`. Leather Save in settings keeps `border/medium` bronze. |
+| Parchment button surface (WCAG 1.4.11) | `button-{primary,secondary}-parchment-*`, `ghost-parchment-*`, `focus-ring-parchment` (teal + leather/950 outer) | `ButtonSurface.Surface="Parchment"` on primary, secondary or ghost (text); default `Leather`. Confirm dialogs set Surface on all buttons. Leather Save in settings stays default. |
 | Compact (56 px) tab | `tab-parchment-flat` (inset 18) | `ListBox.nav.compact`; renders cleanly at 56 px wide. |
 | Fields, checkbox, radio, switch, scroll bar, progress | `fields/*`, `controls/*` | `Inputs.axaml`, `ScrollBar.axaml`, `ProgressBar.axaml`; checkbox/radio/switch via `StateArt`. |
 
