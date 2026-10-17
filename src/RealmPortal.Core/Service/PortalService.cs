@@ -49,6 +49,7 @@ public sealed class PortalService : IPortalService
         _journal = new LastSwitchJournal(configDirectory, _writer);
         _settings = new PortalSettingsStore(configDirectory, _writer, _getVariable);
         _activeBackupRoot = _settings.ActiveBackupFolder;
+        TryRecoverPendingStateUndo();
     }
 
     public ServiceResult<IReadOnlyList<ClientEntry>> ListClients()
@@ -236,7 +237,7 @@ public sealed class PortalService : IPortalService
         try
         {
             var journal = _journal.Load();
-            if (journal is null || !_active.Status().CanUndo)
+            if (journal is null || !ComputeCanUndo())
                 return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
 
             var client = _clients.FindById(journal.ClientId)
@@ -273,13 +274,13 @@ public sealed class PortalService : IPortalService
 
             var applier = CreateApplier();
             IReadOnlyList<UndoFileResult> fileResults = [];
-            if (journal.BackupId is not null)
+            if (!journal.FilesUndone && journal.BackupId is not null)
             {
                 try
                 {
-                    var undoFiles = applier.Undo(journal.ClientId);
+                    var undoFiles = applier.Undo(journal.ClientId, client.Path, journal.BackupId, markUndone: false);
                     fileResults = undoFiles.Files;
-                    if (undoFiles.HasConflicts)
+                    if (undoFiles.HasConflicts || !string.Equals(undoFiles.BackupId, journal.BackupId, StringComparison.Ordinal))
                     {
                         var conflicts = undoFiles.Files
                             .Where(f => f.Status == UndoFileStatus.Conflict)
@@ -287,6 +288,8 @@ public sealed class PortalService : IPortalService
                             .ToList();
                         return ServiceResult<UndoOutcome>.Fail(ServiceErrors.UndoConflict(conflicts));
                     }
+
+                    _journal.MarkFilesUndone();
                 }
                 catch (ClientFilesException ex)
                 {
@@ -318,6 +321,8 @@ public sealed class PortalService : IPortalService
                 return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex, Consistency.RolledBack));
             }
 
+            if (journal.BackupId is not null)
+                applier.MarkBackupUndone(journal.ClientId, journal.BackupId);
             _journal.Clear();
             var entry = restored is null ? null : ToServerEntry(restored, restored.Id, journal.ClientId, null);
             return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults));
@@ -332,8 +337,8 @@ public sealed class PortalService : IPortalService
     {
         try
         {
-            _journal.Clear();
             _active.DiscardPendingUndo();
+            _journal.Clear();
             return GetStatus();
         }
         catch (Exception ex)
@@ -348,7 +353,7 @@ public sealed class PortalService : IPortalService
         {
             var status = _active.Status();
             var active = status.Active is null ? null : ToServerEntry(status.Active, status.Active.Id, null, null);
-            var canUndo = _journal.Load() is not null;
+            var canUndo = ComputeCanUndo();
             return ServiceResult<PortalStatus>.Ok(new PortalStatus(active, canUndo, status.ProjectionInSync, _activeBackupRoot));
         }
         catch (Exception ex)
@@ -462,12 +467,14 @@ public sealed class PortalService : IPortalService
 
             string? backupId = null;
             IReadOnlyList<string> changedFiles = [];
+            InstallationLock? installationLock = null;
             progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Started));
             try
             {
                 if (!plan.IsEmpty)
                 {
-                    var applied = applier.Apply(plan);
+                    installationLock = applier.AcquireInstallationLock(request.ClientId);
+                    var applied = applier.Apply(plan, installationLock);
                     backupId = applied.BackupId;
                     changedFiles = applied.Edits.Select(e => e.RelativePath.Replace('\\', '/')).ToList();
                 }
@@ -476,27 +483,43 @@ public sealed class PortalService : IPortalService
             }
             catch (Exception ex)
             {
+                installationLock?.Dispose();
                 var error = ServiceErrors.FromException(ex, Consistency.Unchanged);
                 progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Failed, error));
                 return ServiceResult<SwitchOutcome>.Fail(error);
             }
 
-            if (!RunStep(progress, ServiceStep.Activate, () => _active.Switch(server), out var activateError))
+            try
             {
-                if (backupId is not null)
+                if (!RunStep(progress, ServiceStep.Activate, () => _active.Switch(server), out var activateError))
                 {
-                    try
+                    if (backupId is not null)
                     {
-                        applier.Undo(request.ClientId);
+                        var rollback = RollbackSwitchApply(applier, request.ClientId, client.Path, backupId, installationLock);
+                        if (!rollback.Succeeded)
+                        {
+                            installationLock?.Dispose();
+                            return ServiceResult<SwitchOutcome>.Fail(rollback.Error!);
+                        }
                     }
-                    catch (Exception rollbackEx)
-                    {
-                        return ServiceResult<SwitchOutcome>.Fail(ServiceErrors.Inconsistent(ServiceErrors.FromException(rollbackEx, Consistency.Inconsistent)));
-                    }
-                }
 
-                return ServiceResult<SwitchOutcome>.Fail(activateError! with { Consistency = Consistency.RolledBack });
+                    if (!sameServerActive)
+                        TryRevertActiveServer(active);
+
+                    installationLock?.Dispose();
+                    return ServiceResult<SwitchOutcome>.Fail(activateError! with
+                    {
+                        Consistency = backupId is not null ? Consistency.RolledBack : Consistency.Unchanged,
+                    });
+                }
             }
+            catch
+            {
+                installationLock?.Dispose();
+                throw;
+            }
+
+            installationLock?.Dispose();
 
             if (!sameServerActive)
                 _journal.Save(new LastSwitchEntry(request.ClientId, backupId));
@@ -568,6 +591,94 @@ public sealed class PortalService : IPortalService
         catch (ClientVersionException ex)
         {
             return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromClientVersion(ex));
+        }
+    }
+
+    private void TryRecoverPendingStateUndo()
+    {
+        try
+        {
+            var journal = _journal.Load();
+            if (journal is not { FilesUndone: true } || !_active.Status().CanUndo)
+                return;
+
+            _active.Undo();
+            if (journal.BackupId is not null)
+                CreateApplier().MarkBackupUndone(journal.ClientId, journal.BackupId);
+            _journal.Clear();
+        }
+        catch
+        {
+            // Leave the journal for the user; never re-run file undo on startup.
+        }
+    }
+
+    private bool ComputeCanUndo()
+    {
+        try
+        {
+            var journal = _journal.Load();
+            if (journal is null || !_active.Status().CanUndo)
+                return false;
+            return journal.BackupId is null || BackupIsPending(journal.ClientId, journal.BackupId);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool BackupIsPending(string installationId, string backupId)
+    {
+        var manifestPath = Path.Combine(_activeBackupRoot, installationId, backupId, "manifest.json");
+        if (!File.Exists(manifestPath))
+            return false;
+
+        try
+        {
+            var bytes = File.ReadAllBytes(manifestPath);
+            var manifest = BackupManifest.FromJson(bytes, manifestPath);
+            return manifest.UndoneAt is null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void TryRevertActiveServer(Server? previous)
+    {
+        if (previous is null)
+            return;
+
+        try
+        {
+            _active.Switch(previous);
+        }
+        catch
+        {
+            // State may already be inconsistent; the caller returns RolledBack or Unchanged for files.
+        }
+    }
+
+    private static ServiceResult<Unit> RollbackSwitchApply(
+        IClientFilesApplier applier,
+        string installationId,
+        string clientRoot,
+        string backupId,
+        InstallationLock? installationLock)
+    {
+        try
+        {
+            var undo = applier.Undo(installationId, clientRoot, backupId, markUndone: true, installationLock);
+            if (undo.HasConflicts || !string.Equals(undo.BackupId, backupId, StringComparison.Ordinal))
+                return ServiceResult<Unit>.Fail(ServiceErrors.Inconsistent(new ServiceError(ServiceErrorCode.InconsistentState, Consistency: Consistency.Inconsistent, Diagnostic: "Rollback reported conflicts or the wrong backup id.")));
+
+            return ServiceResult<Unit>.Ok(default);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<Unit>.Fail(ServiceErrors.Inconsistent(ServiceErrors.FromException(ex, Consistency.Inconsistent)));
         }
     }
 

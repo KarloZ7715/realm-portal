@@ -19,7 +19,7 @@ public sealed record ActiveStatus(Server? Active, bool ProjectionInSync, bool Ca
 /// <c>state.json</c> (same byte conventions as <c>servers.json</c>):
 /// <c>{ "version": 1, "active_id": string|null, "undo": null | { "server_id": string|null } }</c>.
 /// <c>undo.server_id</c> is the server that was active before the last switch (<c>null</c> = none was active).
-/// Order of writes: <c>activo.json</c> first, then <c>state.json</c>, so a failed projection changes nothing.
+/// Order of writes: <c>state.json</c> first, then <c>activo.json</c>, so a failed projection leaves state ahead of the projection.
 /// </remarks>
 public sealed class ActiveServerManager(
     ServerStore store,
@@ -90,10 +90,20 @@ public sealed class ActiveServerManager(
         var state = LoadState();
         var previous = Resolve(state);
 
-        writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
-        SaveState(previous?.Id == stored.Id
+        try
+        {
+            RealmlistText.Validate(stored.Realmlist);
+        }
+        catch (InvalidRealmlistException ex)
+        {
+            throw ex.ForServer(stored.Name);
+        }
+
+        var next = previous?.Id == stored.Id
             ? state with { ActiveId = stored.Id }
-            : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } });
+            : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } };
+        SaveState(next);
+        writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
     }
 
     /// <summary>
@@ -116,12 +126,24 @@ public sealed class ActiveServerManager(
                      ?? throw new StoreException("The previous server no longer exists; cannot undo.");
         }
 
+        if (target is not null)
+        {
+            try
+            {
+                RealmlistText.Validate(target.Realmlist);
+            }
+            catch (InvalidRealmlistException ex)
+            {
+                throw ex.ForServer(target.Name);
+            }
+        }
+
+        SaveState(new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null });
         if (target is null)
             DeleteProjection();
         else
             writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
 
-        SaveState(new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null });
         return target;
     }
 
@@ -135,8 +157,8 @@ public sealed class ActiveServerManager(
         var state = LoadState();
         if (state.ActiveId == id)
         {
-            DeleteProjection();
             SaveState(new State { Version = FormatVersion, ActiveId = null, Undo = null });
+            DeleteProjection();
         }
         else if (state.Undo?.ServerId == id)
         {
