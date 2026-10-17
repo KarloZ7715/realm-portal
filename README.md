@@ -6,6 +6,8 @@
 
 <p align="center"><em>Switch between your World of Warcraft private servers with one click.</em></p>
 
+<p align="center">English · <a href="README.es.md">Español</a></p>
+
 ## What it is
 
 If you play on more than one World of Warcraft private server, changing between them usually means editing game files by hand. Realm Portal is a desktop app that aims to do that for you: you add the servers you play on, pick one, and the game is pointed at it.

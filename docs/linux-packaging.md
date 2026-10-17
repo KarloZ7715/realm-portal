@@ -1,4 +1,56 @@
-# Linux packaging notes (for F6)
+# Linux packaging notes (F6)
+
+## CI workflow
+
+The [Release (Linux packages)](https://github.com/KarloZ7715/realm-portal/actions/workflows/release-linux.yml) workflow (`.github/workflows/release-linux.yml`) builds installable artifacts on `ubuntu-22.04`:
+
+| Trigger | Version used |
+| --- | --- |
+| `pull_request` (path-filtered) | `0.0.0-pr.<PR number>` (artifacts only; no release) |
+| `workflow_dispatch` | Input `version`, or `Version` from `Directory.Build.props` when empty |
+| Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix (e.g. `v0.1.0` → `0.1.0`); validated against `^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$` |
+
+It does **not** create a GitHub Release. Outputs are uploaded as a single workflow artifact named `realm-portal-linux-<version>` containing:
+
+- `realm-portal_<version>_amd64.deb`
+- `RealmPortal-<version>-x86_64.AppImage`
+- `SHA256SUMS` (checksums for the `.deb` and AppImage)
+
+### Build steps (summary)
+
+1. `dotnet publish` `src/RealmPortal.App/RealmPortal.App.csproj` for `linux-x64`, self-contained, `PublishTrimmed=true`, `TrimMode=partial`, `PublishReadyToRun=true`.
+2. `packaging/linux/build-packages.sh` lays out the `.deb` and AppImage from that publish directory (see below).
+3. `appimagetool` (AppImageKit release 13, pinned SHA in the workflow) produces the AppImage.
+
+Local reproduction (after publish):
+
+```bash
+export APPIMAGETOOL=/path/to/obsolete-appimagetool-x86_64.AppImage
+packaging/linux/build-packages.sh /path/to/publish 0.1.0 ./artifacts/linux
+```
+
+## Install layout
+
+Both packages install the self-contained publish output under `/opt/realm-portal` (`.deb`) or `usr/lib/realm-portal` inside the AppImage, and expose a `realm-portal` launcher on `PATH` that runs `RealmPortal.App`. This matches `Exec=realm-portal` in the desktop file.
+
+Desktop entry, AppStream metainfo, and hicolor icons come from `packaging/linux/`.
+
+### `.deb` dependencies
+
+The control file declares runtime libraries expected on typical Debian/Ubuntu desktops (Avalonia/Skia/X11):
+
+`Depends: libfontconfig1, libfreetype6, libx11-6, libice6, libsm6`
+
+## Trimming
+
+Publishing uses **partial** trimming to reduce size while keeping Avalonia viable. Expect IL2026/IL2104 analyzer warnings for:
+
+- `System.Text.Json` in Core and localization (reflection-based serializers).
+- Avalonia reflection bindings in a few places (most XAML uses compiled bindings).
+
+`Directory.Build.props` sets `JsonSerializerIsReflectionEnabledByDefault=true` when `PublishTrimmed` is enabled so trimmed builds can still load JSON config and locale tables. Long term, source-generated `JsonSerializerContext` types would remove that trade-off.
+
+CI fails only on publish **errors**, not trim warnings. Manual smoke tests on real desktops (e.g. Linux Mint) are still required after download.
 
 ## Window icon on X11
 
@@ -9,12 +61,8 @@ Avalonia sets. The PNGs are bundled from `assets/branding/icon/png` as `Assets/I
 still an X11 window and works the same; on a native Wayland session or without `libX11.so.6` nothing is written and the Avalonia icon stays.
 Checked on a real X server (Xvfb) with `xprop -len 1000000 -name "Realm Portal" _NET_WM_ICON`.
 
-## Open points for the packages
+## Desktop entry
 
-- **`Exec=realm-portal` does not match the binary.** `packaging/linux/com.karloz7715.RealmPortal.desktop` starts `realm-portal`, which is the name of the
-  CLI. The app's executable is `RealmPortal.App` (assembly name). The package must install a launcher called `realm-portal` for the app (a symlink or
-  a wrapper), or the `.desktop` must use `Exec=RealmPortal.App`; the CLI would then need another name or live in another package.
-- **No `StartupWMClass`.** The X11 `WM_CLASS` of the window is `RealmPortal.App` (res_class) when the app is started from its own executable (it
-  is `dotnet` / `RealmPortal.App` when started with `dotnet RealmPortal.App.dll`). Docks match windows with their `.desktop` entry through that value,
-  so add `StartupWMClass=RealmPortal.App` to the `.desktop` file.
-- The `.desktop` icon name is `com.karloz7715.RealmPortal`; the hicolor icons under `packaging/linux/icons` already follow that name.
+- **`Exec=realm-portal`** is satisfied by the `realm-portal` launcher installed by the packages (see above).
+- **`StartupWMClass=RealmPortal.App`** is set so docks can match the window (`WM_CLASS` / `res_class` is `RealmPortal.App` when started from the published executable).
+- The `.desktop` icon name is `com.karloz7715.RealmPortal`; the hicolor icons under `packaging/linux/icons` follow that name.

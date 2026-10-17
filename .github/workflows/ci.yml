@@ -45,7 +45,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', '**/*.csproj', '**/Directory.Packages.props', '**/Directory.Build.props', '**/packages.lock.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'nuget.config', '**/*.csproj', '**/Directory.Packages.props', '**/Directory.Build.props', '**/packages.lock.json') }}
           restore-keys: |
             nuget-${{ runner.os }}-
 
@@ -73,7 +73,7 @@ jobs:
         if: steps.sln.outputs.solution != ''
         env:
           SOLUTION: ${{ steps.sln.outputs.solution }}
-        run: dotnet restore "$SOLUTION"
+        run: dotnet restore "$SOLUTION" --locked-mode
 
       - name: Build
         if: steps.sln.outputs.solution != ''
