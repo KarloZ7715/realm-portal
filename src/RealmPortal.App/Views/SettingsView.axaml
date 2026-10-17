@@ -40,7 +40,7 @@
               <StackPanel Spacing="6">
                 <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T settings.template}"/>
                 <TextBox Name="TemplateBox" Classes="parchment mono" Classes.error="{Binding TemplateError, Converter={x:Static ObjectConverters.IsNotNull}}"
-                         Text="{Binding Template, Mode=TwoWay}" Watermark="wine {exe}"/>
+                         Text="{Binding Template, Mode=TwoWay}" Watermark="{loc:T settings.template.watermark}"/>
                 <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.template.hint}"/>
                 <TextBlock Name="TemplateError" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
                            IsVisible="{Binding TemplateError, Converter={x:Static ObjectConverters.IsNotNull}}" Text="{Binding TemplateError}"/>

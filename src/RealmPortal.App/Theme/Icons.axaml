@@ -6,7 +6,6 @@
     control, which strokes with the inherited Foreground, so one icon works on leather and on parchment.
     "IconPlay" and "IconDiamond" are filled shapes (Icon.IsFilled="True"); all others are strokes.
   -->
-  <StreamGeometry x:Key="IconChevronLeft">M15 6l-6 6 6 6</StreamGeometry>
   <StreamGeometry x:Key="IconChevronDown">M6 9l6 6 6-6</StreamGeometry>
   <StreamGeometry x:Key="IconClock">M3.0,12.0 a9.0,9.0 0 1 0 18.0,0 a9.0,9.0 0 1 0 -18.0,0 z M12 7v5l3.5 2</StreamGeometry>
   <StreamGeometry x:Key="IconClose">M6 6l12 12M18 6L6 18</StreamGeometry>
@@ -32,4 +31,6 @@
   <StreamGeometry x:Key="IconWarning">M12 3.5L22 20.5H2z M12 10v5M12 17.2v1.6</StreamGeometry>
   <!-- Check mark for checkboxes (the circled "ok" icon is too busy at 12 px). Hand-written, not generated. -->
   <StreamGeometry x:Key="IconCheckMark">M5,12.5 L10,17.5 L19,7</StreamGeometry>
+  <!-- Back chevron for the Settings header. Hand-written, not generated. -->
+  <StreamGeometry x:Key="IconChevronLeft">M15 6l-6 6 6 6</StreamGeometry>
 </ResourceDictionary>
