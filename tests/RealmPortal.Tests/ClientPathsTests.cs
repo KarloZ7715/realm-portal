@@ -94,6 +94,24 @@ public class ClientPathsTests
     }
 
     [Fact]
+    public void Undo_RejectsManifestAddonPathOutsideAllowList_DoesNotOverwriteFile()
+    {
+        using var env = new ApplierEnv();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        env.Put("Interface/AddOns/keep.txt", "user addon data must survive");
+        var keepPath = Path.Combine(env.Client, "Interface", "AddOns", "keep.txt");
+        var keepBefore = File.ReadAllText(keepPath);
+        var result = env.Applier.Apply(env.Plan());
+        var manifestPath = Path.Combine(env.Backups, "install-1", result.BackupId!, "manifest.json");
+        var text = File.ReadAllText(manifestPath).Replace("Data/enUS/realmlist.wtf", "Interface/AddOns/keep.txt");
+        File.WriteAllText(manifestPath, text);
+
+        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+        Assert.Equal(keepBefore, File.ReadAllText(keepPath));
+    }
+
+    [Fact]
     public void Undo_WithInvalidLaterManifestPath_DoesNotPartiallyRestore()
     {
         using var env = new ApplierEnv();

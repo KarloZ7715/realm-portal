@@ -16,8 +16,9 @@ public class Bug8ServiceCliDescribeAllCodesTests
         Directory.CreateDirectory(dir.Combine("projection"));
         var stderr = new StringWriter();
         var app = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), _ => null);
-        Assert.Equal(2, app.Run("add", ["Bad", "a.example.org", "--build", "0", "--config-dir", dir.Combine("config"), "--projection-dir", dir.Combine("projection")]));
-        Assert.Contains("positive number", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, app.Run("add", ["Bad", "a.example.org", "--build", "0", "--config-dir", dir.Combine("config"), "--projection-dir", dir.Combine("projection")]));
+        Assert.Contains("positive integer", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Usage:", stderr.ToString());
         Assert.DoesNotContain("InvalidServerInput", stderr.ToString());
     }
 

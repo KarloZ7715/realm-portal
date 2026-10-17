@@ -28,6 +28,9 @@ public enum ServiceErrorCode
     /// <summary>The client directory or a path inside it does not exist.</summary>
     PathNotFound,
 
+    /// <summary>A path is outside the managed client-file allow-list (apply/undo refuse to touch it).</summary>
+    PathEscapesClient,
+
     /// <summary>A client file changed since it was planned or backed up (user or game).</summary>
     HashMismatch,
 

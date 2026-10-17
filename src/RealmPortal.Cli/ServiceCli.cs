@@ -43,6 +43,9 @@ internal static class ServiceCli
             ServiceErrorCode.PathNotFound => string.IsNullOrEmpty(error.Path)
                 ? "A required path was not found."
                 : $"Path not found: '{error.Path}'.",
+            ServiceErrorCode.PathEscapesClient => string.IsNullOrEmpty(error.Diagnostic)
+                ? "The path is not a managed client file."
+                : error.Diagnostic,
             ServiceErrorCode.HashMismatch => "A client file changed since it was planned or backed up.",
             ServiceErrorCode.VerifyFailed => "A client file could not be verified after writing.",
             ServiceErrorCode.UnsupportedClient => string.IsNullOrEmpty(error.ClientVersion)
