@@ -50,6 +50,13 @@ also the `installationId` of the backups. The server id is the `profileId`. Both
 Each step emits `Started`, then `Completed`, or `Failed` with the `ServiceError`. After a failure no later step starts. A plan with no edits (the client
 already has this configuration) still reports `WriteFiles` Started/Completed with `SwitchOutcome.BackupId == null`.
 
+**Re-switching the server that is already active** for the chosen client is valid (not an error). The service still runs `Plan`. When the plan has edits
+(client files drifted), it applies them as a repair. When the plan is empty, it still reports `WriteFiles` Started/Completed with `BackupId == null`. In both
+cases it does **not** replace the pending single-level undo or the `last-switch.json` journal with a no-op entry: a no-op re-switch must not erase the undo
+from the previous real switch to a different server. `ActiveServerManager.Switch` is still called (projection refresh; undo in `state.json` is unchanged when
+the server was already active). In `SwitchOutcome`, `Previous` equals `Active` (the same server). When the re-switch repairs drifted files, the journal's
+`backup_id` is updated so undo still restores the correct bytes.
+
 **There is no `Account` step.** The applier never writes the account name (`Config.wtf` `accountName` is explicitly left alone, and `ClientFilesRequest` has
 no account). `Server.Account` is only a remembered label. See "Open questions".
 

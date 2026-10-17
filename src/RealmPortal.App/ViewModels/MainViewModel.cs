@@ -16,7 +16,7 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel(DemoBackend? backend = null, bool autoTick = true)
     {
         Backend = backend ?? new DemoBackend();
-        Servers = new ServersViewModel(Backend, autoTick);
+        Servers = new ServersViewModel(Backend, autoTick: autoTick);
         Clients = new ClientsViewModel(Backend);
         Settings = new PlaceholderViewModel("nav.settings");
         _sections = [Servers, Clients, Settings];
