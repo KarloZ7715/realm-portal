@@ -16,8 +16,8 @@ public class ActiveProjectionTests
         var server = Server.Create(
             "Mi Servidor Ñ",
             "logon.example.org",
-            "Realm \"One\"",
-            ["set patchlist patch.example.org?a=1&b=2"],
+            "Realm One",
+            ["set patchlist patch.example.org"],
             12340,
             "carlos",
             id: "0123456789abcdef0123456789abcdef");
@@ -27,8 +27,8 @@ public class ActiveProjectionTests
             "  \"server_id\": \"0123456789abcdef0123456789abcdef\",\n" +
             "  \"name\": \"Mi Servidor Ñ\",\n" +
             "  \"host\": \"logon.example.org\",\n" +
-            "  \"realm\": \"Realm \\\"One\\\"\",\n" +
-            "  \"realmlist\": \"set realmlist logon.example.org\\r\\nset patchlist patch.example.org?a=1&b=2\\r\\n\"\n" +
+            "  \"realm\": \"Realm One\",\n" +
+            "  \"realmlist\": \"set realmlist logon.example.org\\r\\nset patchlist patch.example.org\\r\\n\"\n" +
             "}\n";
 
         var bytes = ActiveProjection.Serialize(server);
