@@ -1,0 +1,95 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    ScrollBar from the kit (assets/ui/controls): a 12 px track with an 8 px bronze thumb and a grip, no arrow buttons.
+    Leather by default; inside any element with class "parchment" the parchment art is used. Normal, hover and
+    pressed thumb states. The grip is not hidden on very short thumbs (the kit asks to hide it under 28 px).
+  -->
+  <Styles.Resources>
+    <ControlTheme x:Key="RpScrollThumbV" TargetType="Thumb">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <c:NineSlice Name="Art" Source="scrollbar-v-thumb-leather-normal" Insets="4,8,4,8"/>
+            <c:NineSlice Name="Grip" Source="scrollbar-grip-leather" Width="8" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-v-thumb-leather-hover"/></Style>
+      <Style Selector="^:pressed /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-v-thumb-leather-pressed"/></Style>
+      <Style Selector="^[Tag=parchment] /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-v-thumb-parchment-normal"/></Style>
+      <Style Selector="^[Tag=parchment]:pointerover /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-v-thumb-parchment-hover"/></Style>
+      <Style Selector="^[Tag=parchment]:pressed /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-v-thumb-parchment-pressed"/></Style>
+      <Style Selector="^[Tag=parchment] /template/ c|NineSlice#Grip"><Setter Property="Source" Value="scrollbar-grip-parchment"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpScrollThumbH" TargetType="Thumb">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <c:NineSlice Name="Art" Source="scrollbar-h-thumb-leather-normal" Insets="8,4,8,4"/>
+            <c:NineSlice Name="Grip" Source="scrollbar-grip-leather" Width="8" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-h-thumb-leather-hover"/></Style>
+      <Style Selector="^:pressed /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-h-thumb-leather-pressed"/></Style>
+      <Style Selector="^[Tag=parchment] /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-h-thumb-parchment-normal"/></Style>
+      <Style Selector="^[Tag=parchment]:pointerover /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-h-thumb-parchment-hover"/></Style>
+      <Style Selector="^[Tag=parchment]:pressed /template/ c|NineSlice#Art"><Setter Property="Source" Value="scrollbar-h-thumb-parchment-pressed"/></Style>
+      <Style Selector="^[Tag=parchment] /template/ c|NineSlice#Grip"><Setter Property="Source" Value="scrollbar-grip-parchment"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpScrollTrackButton" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template"><ControlTemplate><Border Background="Transparent"/></ControlTemplate></Setter>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpScrollBar" TargetType="ScrollBar">
+      <Setter Property="Cursor" Value="Arrow"/>
+      <Style Selector="^:vertical">
+        <Setter Property="Width" Value="12"/>
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Panel>
+              <c:NineSlice Name="TrackArt" Source="scrollbar-v-track-leather" Insets="5,8,5,8" IsHitTestVisible="False"/>
+              <Track IsDirectionReversed="True"
+                     Maximum="{TemplateBinding Maximum}" Minimum="{TemplateBinding Minimum}"
+                     Orientation="{TemplateBinding Orientation}" ViewportSize="{TemplateBinding ViewportSize}"
+                     DeferThumbDrag="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
+                     Value="{TemplateBinding Value, Mode=TwoWay}">
+                <Track.DecreaseButton><RepeatButton Name="PART_PageUpButton" Theme="{StaticResource RpScrollTrackButton}"/></Track.DecreaseButton>
+                <Track.IncreaseButton><RepeatButton Name="PART_PageDownButton" Theme="{StaticResource RpScrollTrackButton}"/></Track.IncreaseButton>
+                <Thumb Name="thumb" Theme="{StaticResource RpScrollThumbV}" Width="8" MinHeight="16" HorizontalAlignment="Center"/>
+              </Track>
+            </Panel>
+          </ControlTemplate>
+        </Setter>
+      </Style>
+      <Style Selector="^:horizontal">
+        <Setter Property="Height" Value="12"/>
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Panel>
+              <c:NineSlice Name="TrackArt" Source="scrollbar-h-track-leather" Insets="8,5,8,5" IsHitTestVisible="False"/>
+              <Track Maximum="{TemplateBinding Maximum}" Minimum="{TemplateBinding Minimum}"
+                     Orientation="{TemplateBinding Orientation}" ViewportSize="{TemplateBinding ViewportSize}"
+                     DeferThumbDrag="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
+                     Value="{TemplateBinding Value, Mode=TwoWay}">
+                <Track.DecreaseButton><RepeatButton Name="PART_PageUpButton" Theme="{StaticResource RpScrollTrackButton}"/></Track.DecreaseButton>
+                <Track.IncreaseButton><RepeatButton Name="PART_PageDownButton" Theme="{StaticResource RpScrollTrackButton}"/></Track.IncreaseButton>
+                <Thumb Name="thumb" Theme="{StaticResource RpScrollThumbH}" Height="8" MinWidth="16" VerticalAlignment="Center"/>
+              </Track>
+            </Panel>
+          </ControlTemplate>
+        </Setter>
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="ScrollBar"><Setter Property="Theme" Value="{StaticResource RpScrollBar}"/></Style>
+  <!-- surface switch: a scroll bar inside an element with class "parchment" -->
+  <Style Selector=".parchment ScrollBar:vertical /template/ c|NineSlice#TrackArt"><Setter Property="Source" Value="scrollbar-v-track-parchment"/></Style>
+  <Style Selector=".parchment ScrollBar:horizontal /template/ c|NineSlice#TrackArt"><Setter Property="Source" Value="scrollbar-h-track-parchment"/></Style>
+  <Style Selector=".parchment ScrollBar /template/ Thumb#thumb"><Setter Property="Tag" Value="parchment"/></Style>
+</Styles>

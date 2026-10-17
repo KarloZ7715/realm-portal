@@ -1,0 +1,163 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Form controls, drawn with the kit's art (assets/ui/fields and assets/ui/controls).
+    TextBox: input plate on leather by default, class "parchment" for a field on parchment.
+             States: normal, :pointerover, :focus (2 px edge drawn inside the plate: no outer ring, no layout shift),
+             class "error", :disabled.
+    CheckBox / RadioButton / ToggleButton.switch: fixed-size art (22x22, 22x22, 46x24 track + 16 px thumb) via StateArt;
+             normal, hover, disabled (the kit has no pressed art for them; pressed uses the hover art).
+             Class "parchment" selects the parchment surface. Keyboard focus draws focus-ring-control-* around the art.
+  -->
+  <Styles.Resources>
+    <ControlTheme x:Key="RpTextBox" TargetType="TextBox">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontBody}"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="CaretBrush" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="SelectionBrush" Value="#88A8743F"/>
+      <Setter Property="SelectionForegroundBrush" Value="{DynamicResource IvoryBrush}"/>
+      <Setter Property="MinHeight" Value="36"/>
+      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Hidden"/>
+      <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Hidden"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <c:NineSlice Name="Plate" Source="input-leather-normal" Insets="14" IsHitTestVisible="False"/>
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="{TemplateBinding Padding}">
+              <ContentPresenter Grid.Column="0" Content="{TemplateBinding InnerLeftContent}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+              <ScrollViewer Grid.Column="1" Name="PART_ScrollViewer"
+                            HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                            VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}">
+                <Panel VerticalAlignment="Center">
+                  <TextBlock Name="PART_Watermark" Text="{TemplateBinding Watermark}" Opacity="0.9"
+                             Foreground="{DynamicResource BoneSoftBrush}"
+                             IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+                  <TextPresenter Name="PART_TextPresenter"
+                                 Text="{TemplateBinding Text, Mode=TwoWay}"
+                                 CaretBrush="{TemplateBinding CaretBrush}"
+                                 SelectionBrush="{TemplateBinding SelectionBrush}"
+                                 SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"/>
+                </Panel>
+              </ScrollViewer>
+              <ContentPresenter Grid.Column="2" Content="{TemplateBinding InnerRightContent}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </Grid>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-leather-hover"/></Style>
+      <Style Selector="^:focus /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-leather-focus"/></Style>
+      <Style Selector="^.error /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-leather-error"/></Style>
+      <Style Selector="^:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-leather-disabled"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+      <Style Selector="^:disabled /template/ TextBlock#PART_Watermark"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+
+      <!-- on parchment -->
+      <Style Selector="^.parchment"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.parchment /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-parchment-normal"/></Style>
+      <Style Selector="^.parchment:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-parchment-hover"/></Style>
+      <Style Selector="^.parchment:focus /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-parchment-focus"/></Style>
+      <Style Selector="^.parchment.error /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-parchment-error"/></Style>
+      <Style Selector="^.parchment:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="input-parchment-disabled"/></Style>
+      <Style Selector="^.parchment /template/ TextBlock#PART_Watermark"><Setter Property="Foreground" Value="{DynamicResource InkSoftBrush}"/></Style>
+      <Style Selector="^.parchment:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpCheckBox" TargetType="CheckBox">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontBody}"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="10" Background="Transparent">
+            <Panel Width="22" Height="22" VerticalAlignment="Center">
+              <c:NineSlice Name="Ring" Source="focus-ring-control-leather" Insets="12" ShadowMargin="5" Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+              <c:StateArt Name="Box" Family="checkbox" Value="unchecked" IsHitTestVisible="False"/>
+            </Panel>
+            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+          </StackPanel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ c|StateArt#Box"><Setter Property="Value" Value="checked"/></Style>
+      <Style Selector="^:indeterminate /template/ c|StateArt#Box"><Setter Property="Value" Value="indeterminate"/></Style>
+      <Style Selector="^:pointerover /template/ c|StateArt#Box"><Setter Property="IsHover" Value="True"/></Style>
+      <Style Selector="^:disabled /template/ c|StateArt#Box"><Setter Property="IsDimmed" Value="True"/></Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^.parchment"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.parchment /template/ c|StateArt#Box"><Setter Property="Surface" Value="parchment"/></Style>
+      <Style Selector="^.parchment /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-control-parchment"/></Style>
+      <Style Selector="^.parchment:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpRadioButton" TargetType="RadioButton">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontBody}"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/>
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="10" Background="Transparent">
+            <Panel Width="22" Height="22" VerticalAlignment="Center">
+              <c:NineSlice Name="Ring" Source="focus-ring-control-leather" Insets="12" ShadowMargin="5" Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+              <c:StateArt Name="Dot" Family="radio" Value="off" IsHitTestVisible="False"/>
+            </Panel>
+            <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+          </StackPanel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ c|StateArt#Dot"><Setter Property="Value" Value="on"/></Style>
+      <Style Selector="^:pointerover /template/ c|StateArt#Dot"><Setter Property="IsHover" Value="True"/></Style>
+      <Style Selector="^:disabled /template/ c|StateArt#Dot"><Setter Property="IsDimmed" Value="True"/></Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^.parchment"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.parchment /template/ c|StateArt#Dot"><Setter Property="Surface" Value="parchment"/></Style>
+      <Style Selector="^.parchment /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-control-parchment"/></Style>
+      <Style Selector="^.parchment:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+    </ControlTheme>
+
+    <!-- Switch: 46x24 track, 16 px thumb 4 px from the track end (x = 4 off, 26 on). -->
+    <ControlTheme x:Key="RpSwitch" TargetType="ToggleButton">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel Width="46" Height="24" Background="Transparent">
+            <c:NineSlice Name="Ring" Source="focus-ring-control-leather" Insets="12" ShadowMargin="5" Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+            <c:StateArt Name="Track" Family="switch-track" Value="off" Insets="12,0,12,0" IsHitTestVisible="False"/>
+            <c:NineSlice Name="Thumb" Source="switch-thumb-off-leather" Width="16" Height="16" HorizontalAlignment="Left" Margin="4,0,0,0" IsHitTestVisible="False">
+              <c:NineSlice.Transitions>
+                <Transitions><ThicknessTransition Property="Margin" Duration="0:0:0.12"/></Transitions>
+              </c:NineSlice.Transitions>
+            </c:NineSlice>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ c|StateArt#Track"><Setter Property="Value" Value="on"/></Style>
+      <Style Selector="^:checked /template/ c|NineSlice#Thumb"><Setter Property="Margin" Value="26,0,0,0"/><Setter Property="Source" Value="switch-thumb-on"/></Style>
+      <Style Selector="^:pointerover /template/ c|StateArt#Track"><Setter Property="IsHover" Value="True"/></Style>
+      <Style Selector="^:disabled /template/ c|StateArt#Track"><Setter Property="IsDimmed" Value="True"/></Style>
+      <Style Selector="^:disabled /template/ c|NineSlice#Thumb"><Setter Property="Opacity" Value="0.5"/></Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^.parchment /template/ c|StateArt#Track"><Setter Property="Surface" Value="parchment"/></Style>
+      <Style Selector="^.parchment /template/ c|NineSlice#Thumb"><Setter Property="Source" Value="switch-thumb-off-parchment"/></Style>
+      <Style Selector="^.parchment:checked /template/ c|NineSlice#Thumb"><Setter Property="Source" Value="switch-thumb-on"/></Style>
+      <Style Selector="^.parchment /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-control-parchment"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="TextBox"><Setter Property="Theme" Value="{StaticResource RpTextBox}"/></Style>
+  <Style Selector="CheckBox"><Setter Property="Theme" Value="{StaticResource RpCheckBox}"/></Style>
+  <Style Selector="RadioButton"><Setter Property="Theme" Value="{StaticResource RpRadioButton}"/></Style>
+  <Style Selector="ToggleButton.switch"><Setter Property="Theme" Value="{StaticResource RpSwitch}"/></Style>
+</Styles>

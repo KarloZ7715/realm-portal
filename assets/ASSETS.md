@@ -11,6 +11,7 @@ assets/
   preview-composition.png    test composition
   textures/                  3 tileable CC0 JPG textures + tiling check image
   frames/                    frames, panels, buttons, dividers (PNG @1x/@2x + SVG) + nineslice.json
+  ui/                        UI kit for the Avalonia theme (114 pieces + nineslice.json v2); see ui/README.md
   branding/                  app icon "Tesera" (SVG, PNG 16–512, ICO) — see Branding section
   icons/seals/               5 status seals (SVG, PNG 64/128)
   icons/ui/, icons/ui-ink/   23 interface icons as SVG (bone color / ink color)
@@ -33,7 +34,7 @@ assets/
 | `textures/tex-bronze.jpg` | 512×512 | 67.3 KB | yes; ratio 1.2–1.3×, no visible seam in a 2×2 tiling | Metal008 (ambientCG) · CC0 1.0 |
 | `textures/preview-tiling-2x2.png` | 1840×600 | 889.2 KB | — | visual check (leather, parchment and bronze in a 2×2 tiling) |
 
-Notes: the three textures were already tileable at the source (ambientCG publishes them that way) and are unmodified relative to the ambientCG originals (only re-encoded as JPEG q90). Verified with a 2×2 tiling (with ×2.2 contrast at the junction) and with the edge-jump metric against the interior gradient. In the mockups they are used with partial opacity over the token base color: parchment 50% over `#D8C7A0` (512 css px tile), leather 34–40% (512 css px tile), bronze 35% in Figma (the app icon no longer uses it). The parchment has large recognizable blotches: a 2×2 repetition shows the pattern; in panels up to ~700 px it does not repeat.
+Notes: the three textures were already tileable at the source (ambientCG publishes them that way) and are unmodified relative to the ambientCG originals (only re-encoded as JPEG q90). Verified with a 2×2 tiling (with ×2.2 contrast at the junction) and with the edge-jump metric against the interior gradient. In the mockups they are used with partial opacity over the token base color: parchment 50% over `#D8C7A0` (512 css px tile), leather 34–40% (512 css px tile), bronze 35% in Figma (the app icon no longer uses it; the UI kit bakes it at 25% into scrollbar thumbs and the progress fill). The parchment has large recognizable blotches: a 2×2 repetition shows the pattern; in panels up to ~700 px it does not repeat.
 
 ## 2. frames/
 
@@ -144,6 +145,14 @@ Full listing of `frames/`:
 | `frames/window-frame.png` | 960×600 | 409.7 KB |
 | `frames/window-frame.svg` | SVG | 0.7 KB |
 | `frames/window-frame@2x.png` | 1920×1200 | 1.43 MB |
+
+## UI kit (`assets/ui/`)
+
+A second, larger art set for the Avalonia theme (F3a): 114 pieces in `assets/ui/<group>/` (`panels`, `buttons`, `fields`, `focus`, `popups`, `controls`, `shadows`), each as `name.png` (@1x), `name@2x.png` and, where it exists, a flat `name.svg`. Metadata is in `assets/ui/nineslice.json` (version 2). The full inventory, insets, usage rules, design corrections, verification results and limitations are in `assets/ui/README.md`.
+
+It sits **next to** the legacy pieces in `assets/frames/` and does not replace them yet. Overlap: `panel-*` / `tab-parchment` (legacy, baked 12/10 px shadow), `button-{primary,secondary}-*` and `focus-ring-*` (same names exist in both sets, in different folders, with different insets). The kit has no baked shadows; use `shadows/shadow-soft` as a separate layer. Not wired into the app yet and not tested inside Avalonia.
+
+License: own artwork, MIT. Third-party material baked into some PNGs: ambientCG Leather037 (leather buttons and popup) and Metal008 (scrollbar thumbs, progress fill), both CC0 1.0; the parchment grain is procedural. Generator and verification scripts are not in the repository (see `assets/ui/README.md`, section 7).
 
 ## Branding (`assets/branding/`)
 

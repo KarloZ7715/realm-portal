@@ -36,6 +36,22 @@ Where files go: `--config-dir` / `REALM_PORTAL_CONFIG_DIR` (default `<app data>/
 `--projection-dir` / `REALM_PORTAL_PROJECTION_DIR` (default `~/.config/wow-servidores`: `activo.json`) and
 `--client-dir` / `REALM_PORTAL_CLIENT_DIR`. Always point them at temporary folders when testing.
 
+## Component gallery (development)
+
+Every themed control in every state, rendered with the real theme:
+
+```bash
+dotnet run --project src/RealmPortal.App -- --gallery
+```
+
+Headless screenshots of the gallery at render scales 1.0, 1.5 and 2.0 (plus seam checks at 1.25 and 1.75) come from the UI tests:
+
+```bash
+RP_SCREENSHOT_DIR=/tmp/rp-shots dotnet test tests/RealmPortal.App.Tests -c Release --filter GalleryScreenshotTests
+```
+
+The theme draws the designer's UI kit (`assets/ui`, inventory in the kit's `ASSETS.md`); what is still missing is listed in `assets/ART-GAPS.md`.
+
 ## Build
 
 Requires the .NET 9 SDK (see `global.json`).

@@ -1,0 +1,78 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Button. Default = primary (wax leather plate). Style classes:
+      secondary        dark leather plate with bronze edge
+      ghost            no plate; the kit's optional wood-brown plate appears on hover and pressed (on leather)
+      ghost parchment  outline plate on parchment (class "parchment" also switches ink colours and the teal focus ring)
+      compact          36 px high instead of 40
+    Plates are the kit's 160x40 leather pieces (insets 17,14,17,14), tiled on x so the stitching never stretches. For a
+    perfect stitch make the width 160 + 6k; other widths can shorten one stitch dash near the right cap.
+    States: normal, :pointerover, :pressed, :disabled, :focus-visible (outer ring art, margin 8).
+  -->
+  <Styles.Resources>
+    <!-- The focus ring layer has ZIndex 3: without it the ring is not drawn above the 9-slice art. -->
+    <ControlTheme x:Key="RpButton" TargetType="Button">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontCaps}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Foreground" Value="{DynamicResource IvoryBrush}"/>
+      <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="Padding" Value="20,0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <c:NineSlice Name="Ring" Source="focus-ring-leather" Insets="14" ShadowMargin="8"
+                         Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+            <c:NineSlice Name="Plate" Source="button-primary-normal" Insets="17,14,17,14" TileX="True"/>
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Padding="{TemplateBinding Padding}"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                              FontFamily="{TemplateBinding FontFamily}"
+                              FontSize="{TemplateBinding FontSize}"
+                              Foreground="{TemplateBinding Foreground}"
+                              RecognizesAccessKey="True"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+
+      <!-- primary -->
+      <Style Selector="^:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-hover"/></Style>
+      <Style Selector="^:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-pressed"/></Style>
+      <Style Selector="^:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-disabled"/></Style>
+      <!-- secondary -->
+      <Style Selector="^.secondary /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-normal"/></Style>
+      <Style Selector="^.secondary:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-hover"/></Style>
+      <Style Selector="^.secondary:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-pressed"/></Style>
+      <Style Selector="^.secondary:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-disabled"/></Style>
+      <!-- shared -->
+      <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="RenderTransform" Value="translate(0px,1px)"/></Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^.compact"><Setter Property="MinHeight" Value="36"/></Style>
+
+      <!-- ghost: plate art only on hover/pressed (leather) or always (parchment) -->
+      <Style Selector="^.ghost /template/ c|NineSlice#Plate">
+        <Setter Property="Insets" Value="14"/><Setter Property="TileX" Value="False"/><Setter Property="IsVisible" Value="False"/>
+      </Style>
+      <Style Selector="^.ghost:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/></Style>
+      <Style Selector="^.ghost:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-leather-hover"/><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^.ghost:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-leather-pressed"/><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^.ghost:disabled /template/ c|NineSlice#Plate"><Setter Property="IsVisible" Value="False"/></Style>
+      <Style Selector="^.ghost.parchment:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.ghost.parchment /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-parchment-normal"/><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^.ghost.parchment:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-parchment-hover"/></Style>
+      <Style Selector="^.ghost.parchment:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-parchment-pressed"/></Style>
+      <Style Selector="^.ghost.parchment:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-parchment-disabled"/></Style>
+      <Style Selector="^.ghost.parchment /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-parchment"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="Button"><Setter Property="Theme" Value="{StaticResource RpButton}"/></Style>
+</Styles>

@@ -1,0 +1,92 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    Parchment panel / card from the kit: torn-edge 9-slice plates (insets 20, no baked shadow) with the separate
+    shadow-soft layer underneath (12 px, drawn outside the bounds).
+      thin art  panel-thin-*  stretched, for rows and cards up to about 72 px high (fine up to ~1.5x its native 112x64)
+      tile art  panel-tile-*  tiled on both axes, for any size: big cards and dialogs
+    Two ways to use it:
+      ContentControl.card         static panel, tile art; add class "thin" for the thin art
+      ListBox.cards ListBoxItem   selectable row, thin art; add class "tile" on the item for the tile art.
+                                  :pointerover = hover art, :selected = selected art (bronze corner brackets), both = selected-hover;
+                                  :focus-visible shows the ring.
+    The ListBox.cards style adds 12 px of padding (handed back by a negative margin) so the shadow is not clipped by the
+    list's scroll viewer. The body must be at least 40 px high and wide.
+  -->
+  <Styles.Resources>
+    <!-- The focus ring layer has ZIndex 3: without it the ring is not drawn above the 9-slice art. -->
+    <ControlTheme x:Key="RpCard" TargetType="ContentControl">
+      <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+      <Setter Property="Padding" Value="24,16"/>
+      <Setter Property="MinWidth" Value="40"/>
+      <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <c:NineSlice Source="shadow-soft" Insets="18" ShadowMargin="12" IsHitTestVisible="False"/>
+            <c:NineSlice Name="Sheet" Source="panel-tile-normal" Insets="20" TileX="True" TileY="True">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Padding="{TemplateBinding Padding}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+            </c:NineSlice>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^.thin /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-thin-normal"/><Setter Property="TileX" Value="False"/><Setter Property="TileY" Value="False"/></Style>
+      <Style Selector="^.active /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-tile-selected"/></Style>
+      <Style Selector="^.thin.active /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-thin-selected"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpCardItem" TargetType="ListBoxItem">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+      <Setter Property="Margin" Value="0,0,0,16"/>
+      <Setter Property="Padding" Value="24,12"/>
+      <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel Name="Root">
+            <c:NineSlice Source="shadow-soft" Insets="18" ShadowMargin="12" IsHitTestVisible="False"/>
+            <c:NineSlice Name="Sheet" Source="panel-thin-normal" Insets="20">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Padding="{TemplateBinding Padding}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+            </c:NineSlice>
+            <c:NineSlice Name="Ring" Source="focus-ring-leather" Insets="14" ShadowMargin="8"
+                         Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <!-- thin art -->
+      <Style Selector="^:pointerover /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-thin-hover"/></Style>
+      <Style Selector="^:selected /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-thin-selected"/></Style>
+      <Style Selector="^:selected:pointerover /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-thin-selected-hover"/></Style>
+      <!-- tile art -->
+      <Style Selector="^.tile /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-tile-normal"/><Setter Property="TileX" Value="True"/><Setter Property="TileY" Value="True"/></Style>
+      <Style Selector="^.tile:pointerover /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-tile-hover"/></Style>
+      <Style Selector="^.tile:selected /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-tile-selected"/></Style>
+      <Style Selector="^.tile:selected:pointerover /template/ c|NineSlice#Sheet"><Setter Property="Source" Value="panel-tile-selected-hover"/></Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="ContentControl.card"><Setter Property="Theme" Value="{StaticResource RpCard}"/></Style>
+  <Style Selector="ListBox.cards ListBoxItem"><Setter Property="Theme" Value="{StaticResource RpCardItem}"/></Style>
+  <!-- Room for the 12 px shadow layer (and the focus ring) around the cards; the negative margin hands the space back to the layout. -->
+  <Style Selector="ListBox.cards">
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="Padding" Value="12,12,12,0"/>
+    <Setter Property="Margin" Value="-12,-12,-12,0"/>
+  </Style>
+  <Style Selector="ListBox">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+</Styles>
