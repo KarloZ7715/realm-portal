@@ -22,6 +22,9 @@ public enum ServiceErrorCode
     /// <summary>The client directory or a path inside it does not exist.</summary>
     PathNotFound,
 
+    /// <summary>A path would leave the client directory or is not managed by Realm Portal.</summary>
+    PathEscapesClient,
+
     /// <summary>A client file changed since it was planned or backed up (user or game).</summary>
     HashMismatch,
 

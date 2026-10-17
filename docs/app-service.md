@@ -59,7 +59,7 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 
 | Source | Codes |
 |---|---|
-| `ClientFilesException.Code` | mapped **by name**: `GameRunning`, `PermissionDenied`, `ReadOnlyFs`, `PathNotFound`, `HashMismatch`, `VerifyFailed`, `UnsupportedClient` (with `ClientVersion`), `InvalidRealmlist`, `NothingToUndo`; also `ProcessCheckFailed` once the applier raises it (the service already returns it from `IsGameRunning` when the probe throws). A test fails if the applier gets a code the service lacks. |
+| `ClientFilesException.Code` | mapped **by name**: `GameRunning`, `PermissionDenied`, `ReadOnlyFs`, `PathNotFound`, `PathEscapesClient`, `HashMismatch`, `VerifyFailed`, `UnsupportedClient` (with `ClientVersion`), `InvalidRealmlist`, `NothingToUndo`; also `ProcessCheckFailed` once the applier raises it (the service already returns it from `IsGameRunning` when the probe throws). A test fails if the applier gets a code the service lacks. |
 | `InvalidRealmlistException` | `InvalidRealmlist` with `RealmlistKind`, `LineNumber`, `ServerName` |
 | `ClientVersionException.Kind` | `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `ClientUnreadable` (a missing folder: `PathNotFound`), with `Path` |
 | `StoreException` | `StoreCorrupt`, `ServerNameTaken`, `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing` |
