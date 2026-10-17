@@ -224,12 +224,17 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             throw new ArgumentException("Invalid backup id.", nameof(backupId));
 
         using var installationLock = AcquireInstallationLock(installationId);
-        var found = FindBackup(installationId, backupId)
-                    ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
-                        $"Backup '{backupId}' was not found for '{installationId}'.");
-        if (found.Manifest.UndoneAt is not null)
+        // FindBackup hides already-undone backups. A missing or already-marked manifest is success so Undo can clear the journal.
+        var manifestPath = Path.Combine(_backupRoot, installationId, backupId, ManifestName);
+        var bytes = ReadIfExists(manifestPath);
+        if (bytes is null)
             return;
-        WriteUndoneAt(found.ManifestPath, found.Manifest);
+
+        var manifest = BackupManifest.FromJson(bytes, manifestPath);
+        if (manifest.UndoneAt is not null)
+            return;
+
+        WriteUndoneAt(manifestPath, manifest);
     }
 
     private void WriteUndoneAt(string manifestPath, BackupManifest manifest)

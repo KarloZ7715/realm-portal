@@ -70,6 +70,9 @@ public interface IClientFilesApplier
     /// <exception cref="ClientFilesException"><see cref="ClientFilesErrorCode.NothingToUndo"/> when no change is pending.</exception>
     UndoResult Undo(string installationId, string clientRoot, string? backupId = null, bool markUndone = true, InstallationLock? installationLock = null);
 
-    /// <summary>Marks a backup as fully undone after the application state undo has been committed.</summary>
+    /// <summary>
+    /// Marks a backup as fully undone after the application state undo has been committed.
+    /// A backup that is already marked undone, or whose manifest is already gone, is left as it is.
+    /// </summary>
     void MarkBackupUndone(string installationId, string backupId);
 }

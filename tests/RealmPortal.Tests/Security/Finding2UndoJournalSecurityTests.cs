@@ -56,6 +56,45 @@ public class Finding2UndoJournalSecurityTests
         Assert.True(File.Exists(journalPath));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Undo_WhenBackupAlreadySettled_SucceedsAndClearsJournal(bool deleteManifest)
+    {
+        using var env = new UndoEnv();
+        env.SwitchToB();
+
+        var journalPath = Path.Combine(env.Config, "last-switch.json");
+        var journal = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(journalPath));
+        var backupId = journal.GetProperty("backup_id").GetString()!;
+        var manifestPath = Path.Combine(env.Backups, env.ClientId, backupId, "manifest.json");
+
+        var applier = new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new NeverRunning(), env.Backups);
+        applier.Undo(env.ClientId, env.Client, backupId, markUndone: false);
+        if (deleteManifest)
+            File.Delete(manifestPath);
+        else
+            applier.MarkBackupUndone(env.ClientId, backupId);
+
+        File.WriteAllText(journalPath, JsonSerializer.Serialize(new
+        {
+            version = 1,
+            client_id = env.ClientId,
+            backup_id = backupId,
+            files_undone = true,
+        }) + "\n");
+
+        var undo = env.Service.Undo();
+        Assert.True(undo.Succeeded, undo.Error?.Diagnostic);
+        Assert.Equal(env.ServerA.Id, undo.Value!.Active?.Id);
+        Assert.False(File.Exists(journalPath));
+        if (!deleteManifest)
+        {
+            var manifest = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(manifestPath));
+            Assert.True(manifest.TryGetProperty("undone_at", out var undone) && undone.ValueKind != JsonValueKind.Null);
+        }
+    }
+
     private sealed class UndoEnv : IDisposable
     {
         private readonly TempDirectory _dir = new();
