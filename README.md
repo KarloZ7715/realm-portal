@@ -33,7 +33,7 @@ Headless screenshots of the gallery at render scales 1.0, 1.5 and 2.0 (plus seam
 RP_SCREENSHOT_DIR=/tmp/rp-shots dotnet test tests/RealmPortal.App.Tests -c Release --filter GalleryScreenshotTests
 ```
 
-Missing art for the designer is listed in `assets/ART-GAPS.md`.
+The theme draws the designer's UI kit (`assets/ui`, inventory in the kit's `ASSETS.md`); what is still missing is listed in `assets/ART-GAPS.md`.
 
 ## Build
 
