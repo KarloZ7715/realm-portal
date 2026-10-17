@@ -51,6 +51,13 @@ public sealed partial class ServerItemViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(SealStatus), nameof(BadgeStatus), nameof(BadgeText))]
     private bool _isActive;
 
+    partial void OnIsActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanSwitchOnly));
+        OnPropertyChanged(nameof(SwitchOnlyHint));
+        SwitchOnlyCommand.NotifyCanExecuteChanged();
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BadgeStatus), nameof(BadgeText))]
     private ServerOverlay _overlay;
@@ -96,12 +103,19 @@ public sealed partial class ServerItemViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanPlay))]
     private void Play() => _play(this);
 
-    [RelayCommand(CanExecute = nameof(CanPlay))]
+    /// <summary>"Switch only" makes no sense for the server that is already active.</summary>
+    public bool CanSwitchOnly => CanPlay && !IsActive;
+
+    /// <summary>The line under "Switch only" in the play menu: what it does, or why it is unavailable.</summary>
+    public string SwitchOnlyHint => Loc.Get(IsActive ? "menu.switchonly.active" : "menu.switchonly.hint");
+
+    [RelayCommand(CanExecute = nameof(CanSwitchOnly))]
     private void SwitchOnly() => _switchOnly(this);
 
     partial void OnCanActChanged(bool value)
     {
         OnPropertyChanged(nameof(CanPlay));
+        OnPropertyChanged(nameof(CanSwitchOnly));
         PlayCommand.NotifyCanExecuteChanged();
         SwitchOnlyCommand.NotifyCanExecuteChanged();
     }
@@ -111,5 +125,6 @@ public sealed partial class ServerItemViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(BadgeText));
         OnPropertyChanged(nameof(DetailText));
+        OnPropertyChanged(nameof(SwitchOnlyHint));
     }
 }

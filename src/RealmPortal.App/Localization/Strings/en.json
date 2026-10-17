@@ -115,5 +115,8 @@
   "dialog.cancel": "Cancel",
   "discard.title": "Discard this backup?",
   "discard.body": "Current client files will be kept. Nothing will be restored and you will no longer be able to undo this change from Realm Portal.",
-  "discard.confirm": "Discard"
+  "discard.confirm": "Discard",
+  "menu.play.hint": "Switches server and opens the game.",
+  "menu.switchonly.hint": "Changes the realmlist without opening the game.",
+  "menu.switchonly.active": "This is already the active server."
 }
