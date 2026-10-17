@@ -12,12 +12,16 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     public const string BackupDirectoryVariable = "REALM_PORTAL_BACKUP_DIR";
     private const string ManifestName = "manifest.json";
 
+    /// <summary>How many backups are kept per installation by default.</summary>
+    public const int DefaultKeepBackups = 10;
+
     private readonly IClientFilesPlanner _planner;
     private readonly IAtomicFileWriter _writer;
     private readonly IGameProcessProbe _probe;
     private readonly string _backupRoot;
     private readonly Func<DateTimeOffset> _clock;
     private readonly TimeSpan _lockTimeout;
+    private readonly int _keepBackups;
 
     public ClientFilesApplier(
         IClientFilesPlanner planner,
@@ -25,7 +29,8 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         IGameProcessProbe probe,
         string backupRoot,
         Func<DateTimeOffset>? clock = null,
-        TimeSpan? lockTimeout = null)
+        TimeSpan? lockTimeout = null,
+        int keepBackups = DefaultKeepBackups)
     {
         ArgumentNullException.ThrowIfNull(planner);
         ArgumentNullException.ThrowIfNull(writer);
@@ -37,6 +42,8 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         _backupRoot = Path.GetFullPath(backupRoot);
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _lockTimeout = lockTimeout ?? TimeSpan.FromSeconds(10);
+        ArgumentOutOfRangeException.ThrowIfLessThan(keepBackups, 1);
+        _keepBackups = keepBackups;
     }
 
     /// <summary>Where backups live by default: <c>$REALM_PORTAL_BACKUP_DIR</c>, else <c>realm-portal/backups</c> under the platform local app-data folder.</summary>
@@ -78,7 +85,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             targets.Add(new Target(edit, path, original));
         }
 
-        var backupId = NewBackupId();
+        var backupId = NewBackupId(plan.InstallationId);
         var backupDir = Path.Combine(_backupRoot, plan.InstallationId, backupId);
         try
         {
@@ -110,6 +117,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             throw;
         }
 
+        Prune(plan.InstallationId);
         return new ApplyResult(backupId, plan.Edits);
     }
 
@@ -295,6 +303,28 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
     }
 
+    /// <summary>
+    /// Keeps the newest <c>keepBackups</c> backups of the installation and deletes the older ones (best effort: a failure only leaves them for next time).
+    /// The newest backup that is still pending undo is never deleted. Folders without a manifest are not ours and stay.
+    /// </summary>
+    private void Prune(string installationId)
+    {
+        try
+        {
+            var dir = Path.Combine(_backupRoot, installationId);
+            var ids = Directory.EnumerateDirectories(dir).Select(Path.GetFileName).OfType<string>()
+                .Where(id => File.Exists(Path.Combine(dir, id, ManifestName)))
+                .Order(StringComparer.Ordinal).Reverse().ToList();
+            var pending = FindPending(installationId)?.Manifest.BackupId;
+            foreach (var id in ids.Skip(_keepBackups).Where(id => id != pending))
+                TryDeleteDirectory(Path.Combine(dir, id));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ClientFilesException)
+        {
+            // Retention is housekeeping; never fail an apply that already succeeded.
+        }
+    }
+
     private static void TryDeleteDirectory(string path)
     {
         try
@@ -306,8 +336,29 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
     }
 
-    private string NewBackupId() =>
-        $"{_clock().UtcDateTime:yyyyMMdd'T'HHmmssfff}Z-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(3))}";
+    /// <summary>
+    /// <c>yyyyMMddTHHmmssfffZ-NNNNNN</c>: the UTC time plus a sequence number. Called under the installation lock, it is always greater
+    /// than the newest existing id (same millisecond or a clock that went backwards bump the sequence), so ids sort in apply order.
+    /// </summary>
+    private string NewBackupId(string installationId)
+    {
+        var timestamp = $"{_clock().UtcDateTime:yyyyMMdd'T'HHmmssfff}Z";
+        var sequence = 0;
+        var dir = Path.Combine(_backupRoot, installationId);
+        var latest = Guard(() => Directory.EnumerateDirectories(dir).Select(Path.GetFileName).OfType<string>().Order(StringComparer.Ordinal).LastOrDefault(), dir, "list backups");
+        var dash = latest?.IndexOf('-') ?? -1;
+        if (latest is not null && dash > 0)
+        {
+            var latestTimestamp = latest[..dash];
+            if (string.CompareOrdinal(timestamp, latestTimestamp) <= 0)
+            {
+                timestamp = latestTimestamp;
+                sequence = int.TryParse(latest[(dash + 1)..], out var n) ? n + 1 : 0;
+            }
+        }
+
+        return $"{timestamp}-{sequence.ToString("D6", System.Globalization.CultureInfo.InvariantCulture)}";
+    }
 
     private static void RequireValidIds(string installationId, string profileId)
     {

@@ -42,12 +42,13 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 <backupRoot>/<installationId>/<backupId>/files/<n>      original bytes of the n-th file of the manifest
 ```
 
-`backupId` is `yyyyMMddTHHmmssfffZ-<6 hex>` (UTC), so ids sort by time.
+`backupId` is `yyyyMMddTHHmmssfffZ-NNNNNN` (UTC time plus a sequence number). It is always greater than the newest existing id of the installation
+(the same millisecond or a clock that went backwards bump the sequence), so ids sort in apply order.
 
 ```json
 {
   "version": 1,
-  "backup_id": "20261017T120001000Z-a1b2c3",
+  "backup_id": "20261017T120001000Z-000000",
   "installation_id": "install-1",
   "profile_id": "profile-1",
   "client_root": "/path/to/client",
@@ -78,9 +79,15 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 
 A backup copy whose hash no longer matches `sha256_before` is never restored (`HashMismatch`). The backup is marked undone only when
 no file had a conflict; otherwise it stays pending and the next `Undo` reports the same conflicts instead of undoing something older.
-Successive applies are undone one by one, newest first. No backup pending: `NothingToUndo`. Undo also refuses while the game runs.
+Successive applies are undone one by one, newest first, as long as their backups are kept. No backup pending: `NothingToUndo`. Undo also refuses while the game runs.
 
 ## Game process probe
 
 `GameProcessProbe` looks for a process named `Wow`, `Wow-64`, `WowB`, `WowT` or `WowClassic` (`.exe` ignored, so Wine works). It does not
 compare folders, so a game running from another folder also blocks, which errs on the safe side.
+
+## Retention
+
+After a successful apply the newest `keepBackups` backups of the installation are kept (default 10, constructor parameter) and older
+ones are deleted. The newest backup that is still pending undo is never deleted, and folders without a `manifest.json` are left alone.
+Pruning is best effort and never fails an apply.
