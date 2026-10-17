@@ -40,7 +40,9 @@ public class Bug9UndoClientFilesUxTests
         var app = new CliApp(stdout, stderr, new PeClientVersionReader(), new FakeLauncher(), _ => null);
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
         var outText = stdout.ToString();
-        Assert.Contains("Client files: not changed (2 clients registered", outText);
+        Assert.Contains("Client files: not changed.", outText);
+        Assert.Contains("Client folder out of sync:", outText);
+        Assert.DoesNotContain("run 'switch A --client-dir", outText);
 
         var statusOut = new StringWriter();
         var statusApp = new CliApp(statusOut, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
@@ -49,7 +51,7 @@ public class Bug9UndoClientFilesUxTests
     }
 
     [Fact]
-    public void Undo_WithOneRegisteredClient_PrintsUpdatedLine()
+    public void Undo_StateOnly_WhenClientAlreadyMatchesActive_PrintsNoClientFilesLine()
     {
         using var dir = new TempDirectory();
         var config = dir.Combine("config");
@@ -64,17 +66,16 @@ public class Bug9UndoClientFilesUxTests
         File.WriteAllBytes(Path.Combine(client, "Data", "enUS", "realmlist.wtf"), "set realmlist a.example.org\r\n"u8.ToArray());
 
         var service = new PortalService(config, projection, new PeClientVersionReader(), new NoLaunch(), new NeverRunning(), _ => backups);
-        service.AddClient(client);
+        var clientId = service.AddClient(client).Value!.Id;
         var a = service.AddServer(new NewServer("A", "a.example.org")).Value!;
         var b = service.AddServer(new NewServer("B", "b.example.org")).Value!;
-        service.ActivateWithoutClientFiles(a.Id);
+        Assert.True(service.SwitchServer(new SwitchRequest(clientId, a.Id)).Succeeded);
         service.ActivateWithoutClientFiles(b.Id);
-        service.ActivateWithoutClientFiles(a.Id);
 
         var stdout = new StringWriter();
         var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
-        Assert.Contains("Client files: not changed (1 client registered", stdout.ToString());
+        Assert.DoesNotContain("Client files:", stdout.ToString());
     }
 
     private sealed class NeverRunning : IGameProcessProbe
