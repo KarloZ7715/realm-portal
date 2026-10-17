@@ -1,0 +1,41 @@
+# .NET build output
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+artifacts/
+publish/
+*.nupkg
+*.snupkg
+TestResults/
+*.trx
+coverage/
+*.coverage
+*.log
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Avalonia / packaging
+*.AppImage
+*.deb
+*.msi
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+
+# Local only
+*.pyc
+__pycache__/
+.env
+.env.*
