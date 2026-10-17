@@ -1,41 +1,145 @@
-# .NET build output
-bin/
-obj/
+# ---- Build output ----
 [Bb]in/
 [Oo]bj/
-artifacts/
+[Dd]ebug/
+[Rr]elease/
+[Pp]ublish/
 publish/
-*.nupkg
-*.snupkg
-TestResults/
-*.trx
-coverage/
-*.coverage
+artifacts/
+[Ll]og/
+[Ll]ogs/
 *.log
+msbuild.log
+msbuild.err
+msbuild.wrn
+*.binlog
 
-# Visual Studio / Rider / VS Code
+# ---- Test / coverage ----
+TestResults/
+[Tt]est[Rr]esult*/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+*.cobertura.xml
+.coverage/
+
+# ---- Visual Studio / Rider / VS Code ----
 .vs/
-.idea/
 *.user
 *.suo
-*.userprefs
+*.userosscache
+*.sln.docstates
 *.DotSettings.user
+*.rsuser
+*.VC.db
+*.VC.VC.opendb
+_ReSharper*/
+*.[Rr]e[Ss]harper
+.idea/
+*.iml
+.fleet/
 .vscode/*
-!.vscode/extensions.json
 !.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.history/
 
-# Avalonia / packaging
+# ---- NuGet ----
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+.nuget/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ---- Avalonia / packaging outputs ----
 *.AppImage
 *.deb
+*.rpm
 *.msi
+*.msix
+*.msixbundle
+*.appx
+*.dmg
+*.pkg
+*.exe
+AppDir/
+*.AppDir/
+pkg-deb/
 
-# OS
-.DS_Store
-Thumbs.db
-*~
-
-# Local only
-*.pyc
-__pycache__/
+# ---- Secrets and credentials (never commit) ----
 .env
 .env.*
+!.env.example
+!.env.sample
+*.pfx
+*.p12
+*.pem
+*.key
+*.keystore
+*.jks
+*.gpg
+*.asc
+id_rsa*
+id_ed25519*
+*.pvk
+*.cer
+*.crt
+# Strong-name private key; if a PUBLIC key is needed, commit it as *.public.snk with "git add -f"
+*.snk
+secrets*.json
+appsettings.*.local.json
+appsettings.Local.json
+launchSettings.local.json
+local.settings.json
+*.publishsettings
+*.PublishSettings
+*.pubxml.user
+.secrets/
+secrets/
+.aws/
+.pypirc
+.netrc
+credentials*.json
+service-account*.json
+token*.txt
+
+# ---- Local user config / tools ----
+*.local
+*.local.json
+*.local.yml
+*.local.yaml
+.dotnet/
+.claude/
+.cursor/
+.gh-*/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*~
+*.swp
+
+# ---- Node / Python / Rust (spikes & tooling) ----
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+target/
+*.whl
+
+# ---- Large local design / prototype artifacts (keep out of the source repo) ----
+figma-build*/
+figma-exports/
+figma-textures/
