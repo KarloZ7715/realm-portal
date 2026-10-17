@@ -93,4 +93,43 @@ public class ClientPathsTests
         Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
     }
 
+    [Fact]
+    public void Undo_WithInvalidLaterManifestPath_DoesNotPartiallyRestore()
+    {
+        using var env = new ApplierEnv();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        env.Put("WTF/Config.wtf", "SET x \"y\"\r\n");
+        var plan = env.Applier.Plan(new ClientFilesRequest(
+            "install-1", "profile-1", env.Client, V3, BlobA, "Realm"));
+        var result = env.Applier.Apply(plan);
+        var appliedRealmlist = File.ReadAllText(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf"));
+
+        var manifestPath = Path.Combine(env.Backups, "install-1", result.BackupId!, "manifest.json");
+        var text = File.ReadAllText(manifestPath).Replace("WTF/Config.wtf", "secrets/passwords.txt");
+        File.WriteAllText(manifestPath, text);
+
+        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+        Assert.Equal(appliedRealmlist, File.ReadAllText(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf")));
+    }
+
+    [Fact]
+    public void CanonicalRoot_PreservesUnixFilesystemRoot()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+            return;
+
+        Assert.Equal("/", ClientPaths.CanonicalRoot("/"));
+    }
+
+    [Fact]
+    public void CanonicalRoot_PreservesWindowsDriveRoot()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        var drive = Path.GetPathRoot(Environment.SystemDirectory)!;
+        Assert.Equal(drive.TrimEnd('\\') + '\\', ClientPaths.CanonicalRoot(drive));
+    }
+
 }

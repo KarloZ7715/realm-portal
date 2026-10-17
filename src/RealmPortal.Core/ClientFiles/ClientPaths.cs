@@ -91,6 +91,22 @@ public static class ClientPaths
             ? string.Equals(a, b, StringComparison.OrdinalIgnoreCase)
             : string.Equals(a, b, StringComparison.Ordinal);
 
-    private static string TrimTrailingSeparators(string path) =>
-        path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    private static string TrimTrailingSeparators(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return path;
+
+        var end = path.Length;
+        while (end > 0 && IsDirectorySeparator(path[end - 1]))
+            end--;
+
+        var rootLength = Path.GetPathRoot(path)?.Length ?? 0;
+        if (end < rootLength)
+            end = rootLength;
+
+        return path[..end];
+    }
+
+    private static bool IsDirectorySeparator(char c) =>
+        c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar;
 }
