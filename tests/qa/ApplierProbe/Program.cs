@@ -22,22 +22,30 @@ string Need(string key) => opts.TryGetValue(key, out var v) ? v : throw new Argu
 
 try
 {
-    // Directory-boundary check: normalize both sides and require the temp root itself or "<root>/" as a prefix,
-    // so sibling paths such as /tmp-work or /tmp/work-evil (for TMPDIR=/tmp/work) are rejected.
-    var tmp = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
-    var tmpPrefix = tmp + Path.DirectorySeparatorChar;
-    bool IsUnderTemp(string path)
+    // Directory-boundary check. Path.GetFullPath alone does not resolve symlinks, so "<temp>/link/client" with link -> /elsewhere
+    // would pass. Both sides are therefore resolved component by component: every existing symlink (absolute or relative target,
+    // chained links included) is followed, ".." is applied after resolution like the OS does, and the part of a path that does not
+    // exist yet (e.g. a new backup dir) is appended unresolved to its resolved existing ancestor. The temp root is resolved the same
+    // way (on macOS /tmp -> /private/tmp). Then the temp root itself or "<root>/" must be a prefix, so sibling paths such as
+    // /tmp-work or /tmp/work-evil (for TMPDIR=/tmp/work) are rejected too. Any resolution error fails closed (exit 1).
+    string tmp, client, backup;
+    try
     {
-        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
-        return full == tmp || full.StartsWith(tmpPrefix, StringComparison.Ordinal);
+        tmp = ResolveSymlinks(Path.GetTempPath());
+        client = ResolveSymlinks(Need("--client"));
+        backup = ResolveSymlinks(Need("--backup"));
     }
-    var client = Path.GetFullPath(Need("--client"));
-    var backup = Path.GetFullPath(Need("--backup"));
-    foreach (var p in new[] { client, backup })
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
     {
-        if (!IsUnderTemp(p))
+        Console.Error.WriteLine($"refusing to run: cannot resolve paths safely ({ex.Message})");
+        return 1;
+    }
+    var tmpPrefix = tmp + Path.DirectorySeparatorChar;
+    foreach (var (name, p) in new[] { ("--client", client), ("--backup", backup) })
+    {
+        if (p != tmp && !p.StartsWith(tmpPrefix, StringComparison.Ordinal))
         {
-            Console.Error.WriteLine($"refusing to touch '{p}': not under {tmp}");
+            Console.Error.WriteLine($"refusing to touch {name} '{p}' (symlinks resolved): not under {tmp}");
             return 1;
         }
     }
@@ -76,4 +84,54 @@ catch (Exception ex) when (ex is ArgumentException or ClientVersionException)
 {
     Console.WriteLine($"ERROR {ex.GetType().Name} :: {ex.Message}");
     return 1;
+}
+
+// Returns the absolute, symlink-free form of `path`. Existing components are resolved through their link targets
+// (relative targets are taken relative to the link's directory); components that do not exist are appended as-is.
+// Throws IOException on a symlink loop (more than 40 links followed).
+static string ResolveSymlinks(string path)
+{
+    var hops = 0;
+    var absolute = Path.IsPathRooted(path) ? path : Path.Combine(Directory.GetCurrentDirectory(), path);
+    return Path.TrimEndingDirectorySeparator(Walk(absolute));
+
+    string Walk(string abs)
+    {
+        var root = Path.GetPathRoot(abs)!;
+        var current = root;
+        var parts = abs[root.Length..].Split(
+            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var part = parts[i];
+            if (part == ".")
+                continue;
+            if (part == "..")
+            {
+                current = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(current)) ?? root;
+                continue;
+            }
+            var candidate = Path.Combine(current, part);
+            var target = new FileInfo(candidate).LinkTarget;
+            if (target != null)
+            {
+                if (++hops > 40)
+                    throw new IOException($"too many symbolic links while resolving '{path}'");
+                current = Walk(Path.IsPathRooted(target) ? target : Path.Combine(current, target));
+            }
+            else if (Directory.Exists(candidate) || File.Exists(candidate))
+            {
+                current = candidate;
+            }
+            else
+            {
+                // First missing component: nothing below it can be a symlink yet, so keep the rest unresolved.
+                foreach (var rest in parts[i..])
+                    current = rest == ".." ? Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(current)) ?? root
+                            : rest == "." ? current : Path.Combine(current, rest);
+                break;
+            }
+        }
+        return current;
+    }
 }
