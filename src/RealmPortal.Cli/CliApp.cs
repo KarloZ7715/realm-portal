@@ -22,7 +22,9 @@ public sealed class CliApp(
     private static readonly HashSet<string> ValueOptions =
         ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper"];
 
-    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run"];
+    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose"];
+
+    private bool _verbose;
 
     public static readonly string[] Commands = ["add", "remove", "list", "switch", "undo", "status", "launch"];
 
@@ -63,6 +65,7 @@ public sealed class CliApp(
         try
         {
             var parsed = Parse(args);
+            _verbose = parsed.Flags.Contains("--verbose");
             var configDir = parsed.Get("--config-dir") ?? PortalPaths.ConfigDirectory(getVariable);
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
             var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
@@ -103,7 +106,7 @@ public sealed class CliApp(
 
     private int Fail(ServiceError serviceError)
     {
-        error.WriteLine($"error: {ServiceCli.Describe(serviceError)}");
+        error.WriteLine($"error: {ServiceCli.Describe(serviceError, _verbose)}");
         return 2;
     }
 
@@ -179,7 +182,8 @@ public sealed class CliApp(
     private int Remove(Parsed parsed, PortalService service)
     {
         Expect(parsed, 1, 1, "<server>");
-        var server = FindOrThrow(service, parsed.Positionals[0]);
+        if (FindServer(service, parsed.Positionals[0], out var server) != 0)
+            return 2;
         var result = service.RemoveServer(server.Id);
         if (!result.Succeeded)
             return Fail(result.Error!);
@@ -220,7 +224,8 @@ public sealed class CliApp(
     private int SwitchCommand(Parsed parsed, PortalService service, string? clientId, string? clientDir)
     {
         Expect(parsed, 1, 1, "<server>", "--force");
-        var server = FindOrThrow(service, parsed.Positionals[0]);
+        if (FindServer(service, parsed.Positionals[0], out var server) != 0)
+            return 2;
         var force = parsed.Flags.Contains("--force");
 
         if (clientId is null)
@@ -317,7 +322,8 @@ public sealed class CliApp(
         ServerEntry server;
         if (parsed.Positionals.Count == 1)
         {
-            server = FindOrThrow(service, parsed.Positionals[0]);
+            if (FindServer(service, parsed.Positionals[0], out server) != 0)
+                return 2;
             if (dryRun)
             {
                 var executable = GameExecutable.Find(clientDir)
@@ -358,13 +364,22 @@ public sealed class CliApp(
         return 0;
     }
 
-    private static ServerEntry FindOrThrow(PortalService service, string selector)
+    /// <summary>Resolves a server selector. Returns 0 on success, or 2 after writing an error.</summary>
+    private int FindServer(PortalService service, string selector, out ServerEntry server)
     {
+        server = null!;
         var list = service.ListServers();
         if (!list.Succeeded)
-            throw new StoreException(list.Error!.Diagnostic);
-        var found = ServiceCli.FindServerEntry(list.Value!, selector)
-                    ?? throw new InvalidOperationException($"no server matches '{selector}'.");
-        return found;
+            return Fail(list.Error!);
+
+        var found = ServiceCli.FindServerEntry(list.Value!, selector);
+        if (found is null)
+        {
+            error.WriteLine($"error: no server matches '{selector}'.");
+            return 2;
+        }
+
+        server = found;
+        return 0;
     }
 }
