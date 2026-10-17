@@ -51,8 +51,8 @@ public sealed record Server(
             throw new ArgumentException("Client build must be a positive number.", nameof(requiredClientBuild));
 
         id ??= Guid.NewGuid().ToString("N");
-        if (id.Length == 0 || id.Any(c => !(c is >= '0' and <= '9' or >= 'a' and <= 'z' or '-')))
-            throw new ArgumentException("Id must be non-empty and use only lowercase letters, digits and '-'.", nameof(id));
+        if (id.Length != 32 || id.Any(c => !(c is >= '0' and <= '9' or >= 'a' and <= 'f')))
+            throw new ArgumentException("Id must be exactly 32 lowercase hexadecimal characters.", nameof(id));
 
         return new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account);
     }

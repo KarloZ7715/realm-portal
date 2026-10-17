@@ -52,6 +52,14 @@ public class ServerTests
         Assert.Throws<ArgumentException>(() => Server.Create(new string('x', Server.MaxNameLength + 1), "h"));
 
     [Fact]
+    public void Create_AcceptsExplicitValidId() =>
+        Assert.Equal("0123456789abcdef0123456789abcdef", Server.Create("n", "h", id: "0123456789abcdef0123456789abcdef").Id);
+
+    [Fact]
+    public void Build_RejectsHostWithLineBreak() =>
+        Assert.Throws<ArgumentException>(() => RealmlistText.Build("h\r\nset patchlist evil"));
+
+    [Fact]
     public void Create_RejectsExtraLineWithLineBreak() =>
         Assert.Throws<ArgumentException>(() => Server.Create("n", "h", extraRealmlistLines: ["a\r\nb"]));
 
@@ -65,6 +73,11 @@ public class ServerTests
     [InlineData("UPPER")]
     [InlineData("has space")]
     [InlineData("")]
+    [InlineData("abc")]
+    [InlineData("0123456789abcdef0123456789abcde")]
+    [InlineData("0123456789abcdef0123456789abcdef0")]
+    [InlineData("0123456789abcdef0123456789abcdeg")]
+    [InlineData("0123456789abcdef-123456789abcdef")]
     public void Create_RejectsInvalidId(string id) =>
         Assert.Throws<ArgumentException>(() => Server.Create("n", "h", id: id));
 }
