@@ -22,16 +22,17 @@ wotlk_client() {
 }
 
 echo "--- CF-01 byte-identical undo (3.3.5a, 2 locales, existing Config.wtf)"
-C="$(wotlk_client c1)"; T0="$(tree_hash "$C")"
+C="$(wotlk_client c1)"; T0="$(tree_hash "$C")"; EXE0="$(sha "$C/Wow.exe")"
 probe plan --client "$C" --backup "$BK" --realmlist "$RL_B" --realm "New Realm"; expect_rc CF-01a "plan succeeds" 0
 [ "$(tree_hash "$C")" = "$T0" ] && [ ! -e "$BK" ]; check CF-01b "plan writes nothing (client untouched, no backup root)" $?
 probe apply --client "$C" --backup "$BK" --realmlist "$RL_B" --realm "New Realm"; expect_rc CF-01c "apply succeeds" 0
-expect_out CF-01d "apply edited both locale files + Config.wtf" 'Replace Data/enUS/realmlist.wtf[\s\S]*|Replace Data/esES'
+grep -qx 'PLAN Replace Data/enUS/realmlist.wtf' <<<"$OUT" && grep -qx 'PLAN Replace Data/esES/realmlist.wtf' <<<"$OUT" \
+  && grep -qx 'PLAN Replace WTF/Config.wtf' <<<"$OUT"; check CF-01d "apply edited both locale files + Config.wtf" $? "out=[$OUT]"
 grep -q 'logon-b.example.org' "$C/Data/enUS/realmlist.wtf" && grep -q 'logon-b.example.org' "$C/Data/esES/realmlist.wtf"; check CF-01e "both realmlist.wtf now point at the new server" $?
 grep -q 'SET accountName "MYACCOUNT"' "$C/WTF/Config.wtf" && grep -q 'SET locale "enUS"' "$C/WTF/Config.wtf"; check CF-01f "Config.wtf: accountName/locale lines preserved" $?
 grep -q 'SET realmName "New Realm"' "$C/WTF/Config.wtf"; check CF-01g "Config.wtf: realmName updated" $?
 [ "$(tree_hash "$C")" != "$T0" ]; check CF-01h "client really changed" $?
-[ "$(sha "$C/Wow.exe")" = "$(sha "$WORK/clients/c1/Wow.exe")" ] && [ -f "$C/Interface/AddOns/keep.txt" ]; check CF-01i "unrelated files untouched" $?
+[ "$(sha "$C/Wow.exe")" = "$EXE0" ] && [ "$(cat "$C/Interface/AddOns/keep.txt")" = "addon data" ]; check CF-01i "unrelated files untouched" $?
 probe undo --client "$C" --backup "$BK"; expect_rc CF-01j "undo succeeds" 0
 [ "$(tree_hash "$C")" = "$T0" ]; check CF-01k "client tree byte-identical after undo (sha256 of every file)" $? "before=$T0 after=$(tree_hash "$C")"
 probe undo --client "$C" --backup "$BK"; expect_out CF-01l "second undo -> NothingToUndo" 'NothingToUndo'

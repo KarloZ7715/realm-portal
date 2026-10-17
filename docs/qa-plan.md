@@ -2,7 +2,8 @@
 
 Scope: what a player must be able to do with Realm Portal, and how each step is checked. The plan covers what exists on `main` today
 (Core, CLI, `ClientFilesApplier`, simulated UI) and marks what has to wait for F4 (the application service that connects the UI and the CLI to the real engine).
-Results of the last run are in [qa-results.md](qa-results.md).
+Results are not committed: `tests/qa/run_all.sh` writes one `PASS | FAIL | KNOWN-FAIL` line per scenario to
+`$QA_OUT/qa-cli-results.txt` and `$QA_OUT/qa-engine-results.txt` (`QA_OUT` defaults to `/tmp`).
 
 ## Safety rules
 

@@ -19,12 +19,20 @@ string Need(string key) => opts.TryGetValue(key, out var v) ? v : throw new Argu
 
 try
 {
-    var tmp = Path.GetFullPath(Path.GetTempPath());
+    // Directory-boundary check: normalize both sides and require the temp root itself or "<root>/" as a prefix,
+    // so sibling paths such as /tmp-work or /tmp/work-evil (for TMPDIR=/tmp/work) are rejected.
+    var tmp = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
+    var tmpPrefix = tmp + Path.DirectorySeparatorChar;
+    bool IsUnderTemp(string path)
+    {
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        return full == tmp || full.StartsWith(tmpPrefix, StringComparison.Ordinal);
+    }
     var client = Path.GetFullPath(Need("--client"));
     var backup = Path.GetFullPath(Need("--backup"));
     foreach (var p in new[] { client, backup })
     {
-        if (!p.StartsWith(tmp, StringComparison.Ordinal))
+        if (!IsUnderTemp(p))
         {
             Console.Error.WriteLine($"refusing to touch '{p}': not under {tmp}");
             return 1;

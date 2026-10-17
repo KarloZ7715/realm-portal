@@ -9,10 +9,12 @@ export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 [ -x "$HOME/.dotnet/dotnet" ] && export PATH="$HOME/.dotnet:$PATH" DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 
 CLI_DLL="$REPO_ROOT/src/RealmPortal.Cli/bin/Release/net9.0/realm-portal.dll"
-PROBE_DLL="${QA_PROBE_BIN:-/tmp/qa-probe-bin}/applier-probe.dll"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/rp-qa.XXXXXX")"
 case "$WORK" in /tmp/*|"${TMPDIR:-/tmp}"/*) ;; *) echo "refusing: bad work dir $WORK"; exit 99;; esac
+# The probe is built per run (under $WORK) so parallel runs never overwrite each other's applier-probe.dll.
+PROBE_BIN="${QA_PROBE_BIN:-$WORK/probe-bin}"
+PROBE_DLL="$PROBE_BIN/applier-probe.dll"
 FAKE_HOME="$WORK/home"; mkdir -p "$FAKE_HOME"
 CONFIG_DIR="$WORK/config"; PROJ_DIR="$WORK/projection"; mkdir -p "$CONFIG_DIR" "$PROJ_DIR"
 trap 'chmod -R u+rwX "$WORK" 2>/dev/null; [ -n "${QA_KEEP:-}" ] || rm -rf "$WORK"' EXIT
@@ -20,8 +22,8 @@ trap 'chmod -R u+rwX "$WORK" 2>/dev/null; [ -n "${QA_KEEP:-}" ] || rm -rf "$WORK
 PASS=0; FAIL=0; RESULTS=()
 
 build_all() {
-  ( cd "$REPO_ROOT" && dotnet build src/RealmPortal.Cli -c Release -v q 2>&1 | tail -3 \
-    && dotnet build tests/qa/ApplierProbe -c Release -o "${QA_PROBE_BIN:-/tmp/qa-probe-bin}" -v q 2>&1 | tail -3 )
+  ( set -o pipefail; cd "$REPO_ROOT" && dotnet build src/RealmPortal.Cli -c Release -v q 2>&1 | tail -3 \
+    && dotnet build tests/qa/ApplierProbe -c Release -o "$PROBE_BIN" -v q 2>&1 | tail -3 )
 }
 
 # rp <args...>: runs the CLI with all config redirected into $WORK. Captures stdout in $OUT, stderr in $ERR, status in $RC.

@@ -100,7 +100,7 @@ grep -q $'\r' "$F"; [ $? -ne 0 ]; check QA-12g "JSON file itself uses LF only (n
 [ "$(tail -c1 "$F" | od -An -tx1 | tr -d " \n")" = "0a" ] && [ "$(tail -c2 "$F" | od -An -tx1 | tr -d " \n")" != "0a0a" ]; check QA-12h "ends with exactly one trailing newline" $?
 jq -e '.realmlist | endswith("\r\n")' "$F" >/dev/null; check QA-12i "every realmlist line terminated (ends with CR LF)" $?
 [ "$(jq -r '.realm' "$F")" = "Realm Two" ]; check QA-12j "realm carried through" $?
-ls "$PROJ_DIR" | grep -q '\.tmp$'; [ $? -ne 0 ]; check QA-12k "no leftover temp files in projection dir" $? "$(ls -a "$PROJ_DIR")"
+[ -z "$(find "$PROJ_DIR" -maxdepth 1 -name '*.tmp' -print -quit)" ]; check QA-12k "no leftover temp files in projection dir" $? "$(ls -a "$PROJ_DIR")"
 rp status; expect_out QA-12l "status says in sync" "in sync"
 echo '{"tampered":1}' > "$F"; rp status; expect_out QA-12m "status detects tampered activo.json" "OUT OF SYNC"
 rp switch Second >/dev/null; rp status; expect_out QA-12n "switch repairs activo.json" "in sync"
