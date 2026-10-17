@@ -7,6 +7,15 @@ on:
         description: Package version (defaults to the project Version in Directory.Build.props)
         required: false
         type: string
+  pull_request:
+    paths:
+      - .github/workflows/release-linux.yml
+      - packaging/linux/**
+      - src/RealmPortal.App/**
+      - src/RealmPortal.Core/**
+      - Directory.Build.props
+      - global.json
+      - Directory.Packages.props
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*"
@@ -36,6 +45,7 @@ jobs:
       EVENT_NAME: ${{ github.event_name }}
       REF_NAME: ${{ github.ref_name }}
       INPUT_VERSION: ${{ inputs.version }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,7 +58,13 @@ jobs:
           VALIDATE_VERSION: packaging/linux/validate-version.sh
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "push" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ -z "${PR_NUMBER:-}" ]; then
+              echo "::error::Missing pull request number"
+              exit 1
+            fi
+            ver="0.0.0-pr.${PR_NUMBER}"
+          elif [ "$EVENT_NAME" = "push" ]; then
             ver="${REF_NAME#v}"
           elif [ -n "$INPUT_VERSION" ]; then
             ver="$INPUT_VERSION"

@@ -6,6 +6,7 @@ The [Release (Linux packages)](https://github.com/KarloZ7715/realm-portal/action
 
 | Trigger | Version used |
 | --- | --- |
+| `pull_request` (path-filtered) | `0.0.0-pr.<PR number>` (artifacts only; no release) |
 | `workflow_dispatch` | Input `version`, or `Version` from `Directory.Build.props` when empty |
 | Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix (e.g. `v0.1.0` → `0.1.0`); validated against `^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$` |
 
