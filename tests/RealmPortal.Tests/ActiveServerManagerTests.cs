@@ -209,4 +209,90 @@ public class ActiveServerManagerTests
                     : File.ReadAllBytes(env.ActivoPath).SequenceEqual(ActiveProjection.Serialize(restored));
                 return restored == beforeLastChange && manager.GetActive() == beforeLastChange && activoMatches;
             });
+
+    private static void OverwriteRealmlist(Env env, string serverId, string badRealmlist)
+    {
+        // Simulates a hand-edited servers.json.
+        var path = env.Store.FilePath;
+        var json = File.ReadAllText(path);
+        var good = System.Text.Json.JsonSerializer.Serialize(env.Store.List().Single(s => s.Id == serverId).Realmlist);
+        var bad = System.Text.Json.JsonSerializer.Serialize(badRealmlist);
+        Assert.Contains(good[1..^1], json);
+        File.WriteAllText(path, json.Replace(good[1..^1], bad[1..^1]));
+    }
+
+    [Theory]
+    [InlineData("SET REALMLIST h.example.org\r\n", InvalidRealmlistKind.WrongFirstLine)]
+    [InlineData("set realmlist h\u00f3st.example.org\r\n", InvalidRealmlistKind.NotAscii)]
+    [InlineData("set realmlist h.example.org\r\nset portal p.example.org\r\n", InvalidRealmlistKind.ForbiddenKey)]
+    [InlineData("set realmlist h.example.org\r\nset realmname Foo\r\n", InvalidRealmlistKind.ForbiddenKey)]
+    [InlineData("set realmlist h.example.org\r\nhello\r\n", InvalidRealmlistKind.MalformedLine)]
+    [InlineData("set realmlist h.example.org\r\nset patchlist a b\r\n", InvalidRealmlistKind.InvalidValue)]
+    [InlineData("set realmlist h.example.org\r\nset patchlist \\\"x\\\"\r\n", InvalidRealmlistKind.InvalidValue)]
+    [InlineData("set realmlist h.example.org\n", InvalidRealmlistKind.BadLineEnding)]
+    public void Switch_ToServerWithInvalidRealmlist_ThrowsTypedError_AndWritesNothing(string badRealmlist, InvalidRealmlistKind kind)
+    {
+        using var env = new Env();
+        var good = env.Add("Good");
+        var bad = env.Add("Bad");
+        env.Manager.Switch(good);
+        var activoBefore = File.ReadAllBytes(env.ActivoPath);
+        var statePath = Path.Combine(env.Config, ActiveServerManager.StateFileName);
+        var stateBefore = File.ReadAllBytes(statePath);
+        OverwriteRealmlist(env, bad.Id, badRealmlist);
+        var storeBefore = File.ReadAllBytes(env.Store.FilePath);
+
+        var ex = Assert.Throws<InvalidRealmlistException>(() => env.Manager.Switch(env.Store.Find("Bad")!));
+
+        Assert.Equal(kind, ex.Kind);
+        Assert.Equal("Bad", ex.ServerName);
+        Assert.StartsWith("Server 'Bad' has an invalid realmlist", ex.Message);
+        Assert.Equal(activoBefore, File.ReadAllBytes(env.ActivoPath));
+        Assert.Equal(stateBefore, File.ReadAllBytes(statePath));
+        Assert.Equal(storeBefore, File.ReadAllBytes(env.Store.FilePath));
+        Assert.Equal(good, env.Manager.GetActive());
+    }
+
+    [Fact]
+    public void Switch_ToInvalidServerWhenNothingIsActive_CreatesNoActivoJsonAndNoState()
+    {
+        using var env = new Env();
+        var bad = env.Add("Bad");
+        OverwriteRealmlist(env, bad.Id, "SET REALMLIST h\r\n");
+
+        Assert.Throws<InvalidRealmlistException>(() => env.Manager.Switch(env.Store.Find("Bad")!));
+
+        Assert.False(File.Exists(env.ActivoPath));
+        Assert.False(File.Exists(Path.Combine(env.Config, ActiveServerManager.StateFileName)));
+    }
+
+    [Fact]
+    public void Undo_ToServerWithInvalidRealmlist_Throws_AndChangesNothing()
+    {
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        var b = env.Add("Beta");
+        env.Manager.Switch(a);
+        env.Manager.Switch(b);
+        var activoBefore = File.ReadAllBytes(env.ActivoPath);
+        OverwriteRealmlist(env, a.Id, "set realmlist caf\u00e9.example.org\r\n");
+
+        Assert.Throws<InvalidRealmlistException>(() => env.Manager.Undo());
+
+        Assert.Equal(activoBefore, File.ReadAllBytes(env.ActivoPath));
+        Assert.True(env.Manager.Status().CanUndo);
+    }
+
+    [Fact]
+    public void Status_WithInvalidActiveRealmlist_DoesNotThrow_AndReportsOutOfSync()
+    {
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        env.Manager.Switch(a);
+        OverwriteRealmlist(env, a.Id, "SET REALMLIST h\r\n");
+
+        var status = env.Manager.Status();
+
+        Assert.False(status.ProjectionInSync);
+    }
 }

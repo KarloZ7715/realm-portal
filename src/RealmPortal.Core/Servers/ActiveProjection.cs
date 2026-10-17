@@ -9,7 +9,7 @@ namespace RealmPortal.Core.Servers;
 /// </summary>
 /// <remarks>
 /// Exact schema: <c>{ "server_id", "name", "host", "realm", "realmlist" }</c>, always in that order, all strings.
-/// <c>realmlist</c> is the full realmlist text with <c>\r\n</c> line endings (JSON-escaped as <c>\r\n</c>),
+/// <c>realmlist</c> is the full validated realmlist text (pure ASCII, first line <c>set realmlist &lt;host&gt;</c> in lowercase, only <c>realmlist</c>/<c>patchlist</c> lines) with <c>\r\n</c> line endings (JSON-escaped as <c>\r\n</c>),
 /// including extra lines such as <c>set patchlist</c>. <c>realm</c> is <c>""</c> when the server has no realm name.
 /// Bytes: UTF-8 without BOM, 2-space indent, <c>\n</c> newlines between JSON lines, one trailing <c>\n</c>.
 /// Non-ASCII text is written as-is (not <c>\uXXXX</c>-escaped); only <c>"</c>, <c>\</c> and control characters are escaped.
@@ -26,9 +26,22 @@ public static class ActiveProjection
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    /// <summary>Serializes the projection of <paramref name="server"/>.</summary>
+    /// <exception cref="InvalidRealmlistException">
+    /// The server's realmlist breaks the realmlist contract (see <see cref="RealmlistText"/>); this happens for servers
+    /// edited by hand in <c>servers.json</c>. The error names the server; nothing is serialized or written.
+    /// </exception>
     public static byte[] Serialize(Server server)
     {
         ArgumentNullException.ThrowIfNull(server);
+        try
+        {
+            RealmlistText.Validate(server.Realmlist);
+        }
+        catch (InvalidRealmlistException ex)
+        {
+            throw ex.ForServer(server.Name);
+        }
 
         using var buffer = new MemoryStream();
         using (var json = new Utf8JsonWriter(buffer, WriterOptions))
