@@ -12,14 +12,17 @@ If you play on more than one World of Warcraft private server, changing between 
 
 It is made for players, not programmers. You bring your own game client and your own servers. The app is available in English and Spanish.
 
-<!-- TODO: add a screenshot of the main window here once the app has one.
-     There is no app screenshot in the repository yet. -->
+<p align="center">
+  <img src="docs/screenshots/servers.png" alt="The Realm Portal servers screen: a list of example servers, each with a status badge and a Play button" width="720">
+  <br>
+  <em>The servers screen, shown with made-up example servers.</em>
+</p>
 
 ## Status: early development
 
 Realm Portal is **not ready for everyday use yet**.
 
-- The desktop window is still being built, so there is nothing to click yet.
+- The desktop window exists, but it only shows made-up example servers. It does not change your game yet.
 - There are no downloads yet.
 - The command-line tool works today for managing your server list (see [Using it today](#using-it-today)). It does not edit your game files yet.
 
@@ -29,7 +32,7 @@ Realm Portal is **not ready for everyday use yet**.
 
 ## Using it today
 
-Only the command-line tool can be used right now, and it has to be built from source first (see [CONTRIBUTING.md](CONTRIBUTING.md#build-and-test)). With it you can:
+Only the command-line tool does real work right now, and it has to be built from source first (see [CONTRIBUTING.md](CONTRIBUTING.md#build-and-test)). With it you can:
 
 1. **Add a server you play on:** `realm-portal add "My server" logon.example.org`
 2. **See your servers:** `realm-portal list`. Add `--client-dir "/path/to/your/game"` to show only the servers that match your game version.
@@ -38,7 +41,7 @@ Only the command-line tool can be used right now, and it has to be built from so
 
 You can also start the game with `realm-portal launch "My server" --client-dir "/path/to/your/game"`.
 
-The planned graphical app will do these same steps with buttons.
+The desktop app will do these same steps with buttons once it is connected to the real engine.
 
 ## Undoing a change
 
