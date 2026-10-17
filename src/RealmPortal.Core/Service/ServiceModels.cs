@@ -39,6 +39,7 @@ public sealed record ServerEntry(
 /// <param name="RequiredClientBuild">Client build the server needs (e.g. 12340); <c>null</c> for any.</param>
 /// <param name="Account">Remembered account name (never a password); <c>null</c> for none.</param>
 /// <param name="ClientId">Preferred client for this server (<see cref="ClientEntry.Id"/>), shown on its card; <c>null</c> for none. Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
+/// <param name="ExtraRealmlistLines">Extra realmlist lines after <c>set realmlist</c> (for example <c>set patchlist …</c>).</param>
 public sealed record NewServer(
     string Name,
     string Host,
@@ -46,7 +47,8 @@ public sealed record NewServer(
     string? PatchlistHost = null,
     int? RequiredClientBuild = null,
     string? Account = null,
-    string? ClientId = null);
+    string? ClientId = null,
+    IReadOnlyList<string>? ExtraRealmlistLines = null);
 
 // ---------------------------------------------------------------- switch, play, undo
 
