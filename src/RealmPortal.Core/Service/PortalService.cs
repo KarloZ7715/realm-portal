@@ -71,7 +71,7 @@ public sealed class PortalService : IPortalService
 
         try
         {
-            var version = _versionReader.Read(folder);
+            var version = ReadStoredClientVersion(folder);
             var stored = _clients.Add(folder);
             return ServiceResult<ClientEntry>.Ok(new ClientEntry(stored.Id, stored.Path, version, null));
         }
@@ -133,9 +133,9 @@ public sealed class PortalService : IPortalService
                              ?? throw new StoreException($"No registered client with id '{clientId}'.");
                 try
                 {
-                    clientVersion = _versionReader.Read(client.Path);
+                    clientVersion = ReadStoredClientVersion(client.Path);
                 }
-                catch (ClientVersionException)
+                catch (Exception ex) when (ex is ClientVersionException or StoreException)
                 {
                     clientVersion = null;
                 }
@@ -289,6 +289,7 @@ public sealed class PortalService : IPortalService
             {
                 try
                 {
+                    ClientPathSecurity.EnsureTrustedDirectoryPath(client.Path);
                     var undoFiles = applier.Undo(journal.ClientId!, client.Path, journal.BackupId, markUndone: false);
                     fileResults = undoFiles.Files;
                     if (undoFiles.HasConflicts || !string.Equals(undoFiles.BackupId, journal.BackupId, StringComparison.Ordinal))
@@ -322,7 +323,7 @@ public sealed class PortalService : IPortalService
 
                     var active = _active.GetActive()
                                  ?? throw new InvalidOperationException("No active server to re-apply after a failed undo.");
-                    var version = _versionReader.Read(client.Path);
+                    var version = ReadStoredClientVersion(client.Path);
                     var plan = applier.Plan(BuildRequest(journal.ClientId, active, client.Path, version));
                     if (!plan.IsEmpty)
                     {
@@ -464,7 +465,7 @@ public sealed class PortalService : IPortalService
             ClientVersion version;
             try
             {
-                version = _versionReader.Read(client.Path);
+                version = ReadStoredClientVersion(client.Path);
             }
             catch (ClientVersionException ex)
             {
@@ -603,16 +604,30 @@ public sealed class PortalService : IPortalService
     private static ClientFilesRequest BuildRequest(string installationId, Server server, string clientRoot, ClientVersion version) =>
         new(installationId, server.Id, clientRoot, version, server.Realmlist, server.Realm);
 
+    /// <summary>
+    /// Version read for a stored client. Symlink and reparse checks run here; a missing folder stays a
+    /// <see cref="ClientVersionException"/> so list and status can report that one client as unavailable.
+    /// </summary>
+    private ClientVersion ReadStoredClientVersion(string path)
+    {
+        ClientPathSecurity.EnsureTrustedDirectoryPath(path);
+        return _versionReader.Read(path);
+    }
+
     private ClientEntry ToClientEntry(StoredClient stored)
     {
         try
         {
-            var version = _versionReader.Read(stored.Path);
+            var version = ReadStoredClientVersion(stored.Path);
             return new ClientEntry(stored.Id, stored.Path, version, null);
         }
         catch (ClientVersionException ex)
         {
             return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromClientVersion(ex));
+        }
+        catch (StoreException ex)
+        {
+            return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromException(ex));
         }
     }
 
@@ -696,6 +711,7 @@ public sealed class PortalService : IPortalService
 
         try
         {
+            ClientPathSecurity.EnsureTrustedDirectoryPath(client.Path);
             var manifest = BackupManifest.FromJson(File.ReadAllBytes(manifestPath), manifestPath);
             foreach (var file in manifest.Files)
             {
@@ -732,12 +748,12 @@ public sealed class PortalService : IPortalService
         {
             try
             {
-                var version = _versionReader.Read(stored.Path);
+                var version = ReadStoredClientVersion(stored.Path);
                 var plan = applier.Plan(BuildRequest(stored.Id, active, stored.Path, version));
                 if (!plan.IsEmpty)
                     drift.Add(ToClientEntry(stored));
             }
-            catch (ClientVersionException)
+            catch (Exception ex) when (ex is ClientVersionException or StoreException)
             {
                 drift.Add(ToClientEntry(stored));
             }

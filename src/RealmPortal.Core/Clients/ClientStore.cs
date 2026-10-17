@@ -110,7 +110,8 @@ public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer
         if (string.IsNullOrWhiteSpace(r.Id) || string.IsNullOrWhiteSpace(r.Path))
             throw new StoreException("A stored client is missing id or path.");
 
-        var full = ClientPathSecurity.CanonicalizeTrustedFolder(r.Path);
+        // Existence and symlink checks happen when the folder is used, not when the record is loaded.
+        var full = ClientPathSecurity.NormalizeStoredFolder(r.Path);
         var expectedId = ClientIds.FromFolderPath(full);
         if (!string.Equals(expectedId, r.Id, StringComparison.Ordinal))
             throw new StoreException($"Stored client id '{r.Id}' does not match folder '{full}'.");

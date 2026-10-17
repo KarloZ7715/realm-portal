@@ -28,11 +28,23 @@ public static class ClientPathSecurity
         }
     }
 
+    /// <summary>
+    /// Full path for a record in <c>clients.json</c>. Does not require the folder to exist and does not
+    /// reject symlinks, so one missing or unmounted client cannot make the store unreadable.
+    /// Callers that use the folder must call <see cref="CanonicalizeTrustedFolder"/> or
+    /// <see cref="EnsureTrustedDirectoryPath"/>.
+    /// </summary>
+    public static string NormalizeStoredFolder(string folderPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
+        return Path.GetFullPath(folderPath);
+    }
+
     /// <summary>Canonical folder path that must match <see cref="ClientIds.FromFolderPath"/> for the stored id.</summary>
     public static string CanonicalizeTrustedFolder(string folderPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
-        var full = Path.GetFullPath(folderPath);
+        var full = NormalizeStoredFolder(folderPath);
         EnsureTrustedDirectoryPath(full);
         if (!Directory.Exists(full))
             throw new StoreException($"Client folder '{full}' does not exist.");
