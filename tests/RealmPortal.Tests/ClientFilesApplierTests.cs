@@ -58,7 +58,7 @@ public class ClientFilesApplierTests
             Backups = _temp.Combine("backups");
             Directory.CreateDirectory(Path.Combine(Client, "Data", "enUS"));
             Writer = new FaultyWriter(Client);
-            Applier = new ClientFilesApplier(new ClientFilesPlanner(), Writer, Probe, Backups, () => _now = _now.AddSeconds(1));
+            Applier = new ClientFilesApplier(new ClientFilesPlanner(), Writer, Probe, Backups, () => _now = _now.AddSeconds(1), TimeSpan.FromMilliseconds(300));
         }
 
         public string Client { get; }
@@ -88,8 +88,11 @@ public class ClientFilesApplierTests
         public void Dispose() => _temp.Dispose();
     }
 
+    private static string[] BackupFolders(Env env) =>
+        Directory.Exists(env.Backups) ? Directory.GetDirectories(env.Backups).SelectMany(d => Directory.GetDirectories(d)).ToArray() : [];
+
     [Fact]
-    public void ApplyThenUndo_RestoresEveryFileByteForByte()
+    public void Undo_AfterApply_RestoresEveryFileByteForByte()
     {
         using var env = new Env();
         env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
@@ -156,7 +159,7 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
-    public void GameRunning_BlocksApplyAndUndo_WithoutTouchingAnything()
+    public void Apply_AndUndo_WhenGameRunning_BlockWithoutTouchingAnything()
     {
         using var env = new Env();
         env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
@@ -168,7 +171,7 @@ public class ClientFilesApplierTests
 
         Assert.Equal(ClientFilesErrorCode.GameRunning, ex.Code);
         Assert.Equal(before, env.Files());
-        Assert.False(Directory.Exists(env.Backups));
+        Assert.Empty(BackupFolders(env));
 
         env.Probe.Running = false;
         env.Applier.Apply(plan);
@@ -190,7 +193,7 @@ public class ClientFilesApplierTests
 
         Assert.Equal(ClientFilesErrorCode.HashMismatch, ex.Code);
         Assert.Equal(before, env.Files());
-        Assert.False(Directory.Exists(env.Backups));
+        Assert.Empty(BackupFolders(env));
     }
 
     [Fact]
@@ -208,7 +211,7 @@ public class ClientFilesApplierTests
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
-    public void MidWriteFailure_RevertsEverything_AndLeavesNoBackup(int failingWrite)
+    public void Apply_OnMidWriteFailure_RevertsEverythingAndLeavesNoBackup(int failingWrite)
     {
         using var env = new Env();
         env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
@@ -226,7 +229,7 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
-    public void MidWriteFailure_OnNewFiles_RemovesTheOnesAlreadyCreated()
+    public void Apply_OnMidWriteFailureOnNewFiles_RemovesTheOnesAlreadyCreated()
     {
         using var env = new Env();
         var before = env.Files();
@@ -238,7 +241,7 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
-    public void CorruptedWrite_IsDetectedAndReverted()
+    public void Apply_OnCorruptedWrite_IsDetectedAndReverted()
     {
         using var env = new Env();
         env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
@@ -253,7 +256,7 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
-    public void WhenTheRevertFailsToo_TheBackupStaysAndUndoFinishesTheJob()
+    public void Apply_WhenRevertFails_BackupStaysForUndo()
     {
         using var env = new Env();
         env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
@@ -359,7 +362,7 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
-    public void Manifest_IsWrittenBeforeTheClientChanges_AndDescribesTheBackup()
+    public void Apply_WritesManifestBeforeClientChanges_AndDescribesTheBackup()
     {
         using var env = new Env();
         env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
@@ -399,7 +402,7 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
-    public void UnsafePaths_AndIds_AreRejected()
+    public void Apply_AndUndo_WithUnsafePathsOrIds_Reject()
     {
         using var env = new Env();
         var plan = env.Plan();
@@ -411,12 +414,42 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
-    public void BackupsOfDifferentInstallations_AreIndependent()
+    public void Apply_AndUndo_ForDifferentInstallations_AreIndependent()
     {
         using var env = new Env();
         env.Applier.Apply(env.Plan());
 
         Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-2")).Code);
+    }
+
+    [Fact]
+    public void Apply_AndUndo_WhileAnotherOperationHoldsTheInstallationLock_FailWithoutChanges()
+    {
+        using var env = new Env();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        var plan = env.Plan();
+        var before = env.Files();
+        Directory.CreateDirectory(Path.Combine(env.Backups, "install-1"));
+
+        using (new FileStream(Path.Combine(env.Backups, "install-1", ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            Assert.Throws<ClientFilesException>(() => env.Applier.Apply(plan));
+            Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1"));
+        }
+
+        Assert.Equal(before, env.Files());
+        Assert.NotNull(env.Applier.Apply(plan).BackupId); // the lock is released afterwards
+    }
+
+    [Fact]
+    public void Undo_WithAnIncompleteManifest_FailsWithVerifyFailed()
+    {
+        using var env = new Env();
+        env.Applier.Apply(env.Plan());
+        var manifest = Directory.GetFiles(Path.Combine(env.Backups, "install-1"), "manifest.json", SearchOption.AllDirectories).Single();
+        File.WriteAllText(manifest, File.ReadAllText(manifest).Replace("\"sha256_after\"", "\"sha256_afterx\""));
+
+        Assert.Equal(ClientFilesErrorCode.VerifyFailed, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1")).Code);
     }
 
     [Fact]
@@ -437,7 +470,7 @@ public class ClientFilesApplierTests
                 .Select(b => (byte[]?)b));
 
     [Property(MaxTest = 150)]
-    public Property ApplyThenUndo_IsByteIdentical_ForAnyStartingFiles() =>
+    public Property Undo_AfterApply_IsByteIdentical_ForAnyStartingFiles() =>
         Prop.ForAll(FileGen.ToArbitrary(), FileGen.ToArbitrary(), Gen.Elements(BlobA, BlobB).ToArbitrary(), (realmlist, config, blob) =>
         {
             using var env = new Env();

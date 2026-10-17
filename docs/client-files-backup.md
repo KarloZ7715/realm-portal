@@ -31,6 +31,10 @@ The backup root is `$REALM_PORTAL_BACKUP_DIR`, else `realm-portal/backups` under
 6. On any failure every touched file is put back (created files are deleted) and the backup folder is removed, since nothing changed.
    If the revert itself fails, the backup stays so `Undo` can finish the job.
 
+Apply and Undo of one installation are serialized, also across processes, with an exclusive lock file
+`<backupRoot>/<installationId>/.lock`; a call that cannot get it within 10 s fails with `PermissionDenied`.
+An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
+
 ## Backup layout
 
 ```
