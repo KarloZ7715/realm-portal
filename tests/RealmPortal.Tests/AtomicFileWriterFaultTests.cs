@@ -69,6 +69,7 @@ public class AtomicFileWriterFaultTests
 
     private static readonly ClientVersion V3 = new(new Version(3, 3, 5, 12340));
 
+    /// <summary>Checks that failed applies revert and successful applies can be undone byte-for-byte despite an injected write fault.</summary>
     [Property(MaxTest = 200)]
     public Property ApplyThenUndo_WithAFaultAnywhere_EndsByteIdenticalToTheStart() =>
         Prop.ForAll(

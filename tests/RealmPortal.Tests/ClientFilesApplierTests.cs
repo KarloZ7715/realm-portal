@@ -91,6 +91,7 @@ public class ClientFilesApplierTests
     private static string[] BackupFolders(Env env) =>
         Directory.Exists(env.Backups) ? Directory.GetDirectories(env.Backups).SelectMany(d => Directory.GetDirectories(d)).ToArray() : [];
 
+    /// <summary>Verifies that undo restores every original byte and reports each file as restored.</summary>
     [Fact]
     public void Undo_AfterApply_RestoresEveryFileByteForByte()
     {
@@ -113,6 +114,7 @@ public class ClientFilesApplierTests
         Assert.Equal(before, env.Files());
     }
 
+    /// <summary>Verifies that undo deletes files created by apply while retaining their parent folders.</summary>
     [Fact]
     public void Undo_DeletesFilesThatDidNotExist_AndKeepsFolders()
     {
@@ -158,6 +160,7 @@ public class ClientFilesApplierTests
         Assert.False(Directory.Exists(env.Backups));
     }
 
+    /// <summary>Verifies that apply and undo refuse to modify client files while the game probe reports a running game.</summary>
     [Fact]
     public void Apply_AndUndo_WhenGameRunning_BlockWithoutTouchingAnything()
     {
@@ -208,6 +211,7 @@ public class ClientFilesApplierTests
         Assert.Equal(ClientFilesErrorCode.HashMismatch, ex.Code);
     }
 
+    /// <summary>Verifies that a failure at either client write restores the original files and leaves no pending backup.</summary>
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -255,6 +259,7 @@ public class ClientFilesApplierTests
         Assert.Equal(before, env.Files());
     }
 
+    /// <summary>Verifies that a failed rollback retains its backup so a later undo can finish restoring the files.</summary>
     [Fact]
     public void Apply_WhenRevertFails_BackupStaysForUndo()
     {
@@ -276,6 +281,7 @@ public class ClientFilesApplierTests
         Assert.Contains(undo.Files, f => f.Status == UndoFileStatus.AlreadyRestored);
     }
 
+    /// <summary>Verifies that undo restores unchanged targets, preserves conflicting edits, and keeps that backup pending.</summary>
     [Fact]
     public void Undo_ReportsConflicts_AndNeverOverwritesAChangedFile()
     {
@@ -299,6 +305,7 @@ public class ClientFilesApplierTests
         Assert.Equal(undo.BackupId, again.BackupId);
     }
 
+    /// <summary>Verifies that undo reports NothingToUndo both before any apply and after the last backup is undone.</summary>
     [Fact]
     public void Undo_WithNothingApplied_ThrowsNothingToUndo_AndAlsoAfterTheLastUndo()
     {
@@ -311,6 +318,7 @@ public class ClientFilesApplierTests
         Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client)).Code);
     }
 
+    /// <summary>Verifies that successive undo calls restore applied states in reverse order.</summary>
     [Fact]
     public void Undo_UnwindsSuccessiveAppliesOneByOne()
     {
@@ -329,6 +337,7 @@ public class ClientFilesApplierTests
         Assert.Equal(original, env.Files());
     }
 
+    /// <summary>Verifies that retrying an interrupted undo recognizes files that already contain their original bytes.</summary>
     [Fact]
     public void Undo_OfAnInterruptedUndo_ReportsAlreadyRestored()
     {
@@ -345,6 +354,7 @@ public class ClientFilesApplierTests
         Assert.Equal(before, env.Files());
     }
 
+    /// <summary>Verifies that a modified backup copy causes HashMismatch without changing client files.</summary>
     [Fact]
     public void Undo_RefusesATamperedBackupCopy()
     {
@@ -361,6 +371,7 @@ public class ClientFilesApplierTests
         Assert.Equal(current, env.Files());
     }
 
+    /// <summary>Verifies that the backup manifest precedes client writes, describes their original state, and records a completed undo.</summary>
     [Fact]
     public void Apply_WritesManifestBeforeClientChanges_AndDescribesTheBackup()
     {
@@ -401,6 +412,7 @@ public class ClientFilesApplierTests
         Assert.NotEqual(JsonValueKind.Null, undone.RootElement.GetProperty("undone_at").ValueKind);
     }
 
+    /// <summary>Verifies that apply rejects path traversal and that apply and undo reject unsafe installation ids.</summary>
     [Fact]
     public void Apply_AndUndo_WithUnsafePathsOrIds_Reject()
     {
@@ -413,6 +425,7 @@ public class ClientFilesApplierTests
         Assert.Throws<ArgumentException>(() => env.Applier.Undo("..", env.Client));
     }
 
+    /// <summary>Verifies that applying to one installation leaves another installation with nothing to undo.</summary>
     [Fact]
     public void Apply_AndUndo_ForDifferentInstallations_AreIndependent()
     {
@@ -422,6 +435,7 @@ public class ClientFilesApplierTests
         Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-2", env.Client)).Code);
     }
 
+    /// <summary>Verifies that an installation lock blocks apply and undo without file changes and permits apply after release.</summary>
     [Fact]
     public void Apply_AndUndo_WhileAnotherOperationHoldsTheInstallationLock_FailWithoutChanges()
     {
@@ -441,6 +455,7 @@ public class ClientFilesApplierTests
         Assert.NotNull(env.Applier.Apply(plan).BackupId); // the lock is released afterwards
     }
 
+    /// <summary>Verifies that undo rejects a manifest missing a required hash with VerifyFailed.</summary>
     [Fact]
     public void Undo_WithAnIncompleteManifest_FailsWithVerifyFailed()
     {
@@ -467,6 +482,7 @@ public class ClientFilesApplierTests
         Assert.Equal(ClientFilesApplier.DefaultKeepBackups, 10);
     }
 
+    /// <summary>Verifies that a custom retention limit keeps two backups and allows undo of the newest change.</summary>
     [Fact]
     public void Retention_IsConfigurable_AndUndoStillWorksOnTheNewestBackup()
     {
@@ -502,6 +518,7 @@ public class ClientFilesApplierTests
         Assert.Equal(2, ids.Length); // the foreign folder and the newest backup
     }
 
+    /// <summary>Verifies that backup ids preserve apply order despite a stalled or backwards clock, keeping the latest backup available for undo.</summary>
     [Theory]
     [InlineData(0)] // same instant for every apply
     [InlineData(-5)] // the clock goes backwards
@@ -540,6 +557,7 @@ public class ClientFilesApplierTests
                 .ArrayOf()
                 .Select(b => (byte[]?)b));
 
+    /// <summary>Checks that apply followed by undo restores arbitrary original bytes and the original absence of files.</summary>
     [Property(MaxTest = 150)]
     public Property Undo_AfterApply_IsByteIdentical_ForAnyStartingFiles() =>
         Prop.ForAll(FileGen.ToArbitrary(), FileGen.ToArbitrary(), Gen.Elements(BlobA, BlobB).ToArbitrary(), (realmlist, config, blob) =>

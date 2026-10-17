@@ -19,6 +19,7 @@ public class ClientPathsTests
         public string Backups { get; }
         public ClientFilesApplier Applier { get; }
 
+        /// <summary>Creates isolated client and backup paths with an applier whose game probe is always idle.</summary>
         public ApplierEnv()
         {
             Client = _temp.Combine("client");
@@ -27,9 +28,11 @@ public class ClientPathsTests
             Applier = new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new NeverRunningProbe(), Backups);
         }
 
+        /// <summary>Plans the fixture's realm-address change for its version 3 client.</summary>
         public ClientFilesPlan Plan() =>
             Applier.Plan(new ClientFilesRequest("install-1", "profile-1", Client, V3, BlobA, ""));
 
+        /// <summary>Seeds a file below the client directory, creating its parent folders.</summary>
         public void Put(string relative, string text)
         {
             var path = Path.Combine([Client, .. relative.Split('/')]);
@@ -37,14 +40,17 @@ public class ClientPathsTests
             File.WriteAllText(path, text);
         }
 
+        /// <summary>Removes the fixture's temporary client and backup files.</summary>
         public void Dispose() => _temp.Dispose();
     }
 
     private sealed class NeverRunningProbe : IGameProcessProbe
     {
+        /// <summary>Always reports an idle game so tests can exercise file validation.</summary>
         public bool IsGameRunning(string clientRoot) => false;
     }
 
+    /// <summary>Verifies that a substituted manifest root fails verification without changing files in the substituted directory.</summary>
     [Fact]
     public void Undo_RejectsTamperedClientRoot_InManifest()
     {
@@ -79,6 +85,7 @@ public class ClientPathsTests
         Assert.Equal("victim", File.ReadAllText(victimFile));
     }
 
+    /// <summary>Verifies that undo rejects a manifest entry outside the managed client paths.</summary>
     [Fact]
     public void Undo_RejectsManifestPathOutsideAllowList()
     {
@@ -93,6 +100,7 @@ public class ClientPathsTests
         Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
     }
 
+    /// <summary>Verifies that an invalid later manifest entry blocks undo before an earlier valid file is restored.</summary>
     [Fact]
     public void Undo_WithInvalidLaterManifestPath_DoesNotPartiallyRestore()
     {
@@ -113,6 +121,7 @@ public class ClientPathsTests
         Assert.Equal(appliedRealmlist, File.ReadAllText(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf")));
     }
 
+    /// <summary>Verifies that canonicalization preserves the root separator on Unix platforms.</summary>
     [Fact]
     public void CanonicalRoot_PreservesUnixFilesystemRoot()
     {
@@ -122,6 +131,7 @@ public class ClientPathsTests
         Assert.Equal("/", ClientPaths.CanonicalRoot("/"));
     }
 
+    /// <summary>Verifies that canonicalization preserves the trailing separator of a Windows drive root.</summary>
     [Fact]
     public void CanonicalRoot_PreservesWindowsDriveRoot()
     {

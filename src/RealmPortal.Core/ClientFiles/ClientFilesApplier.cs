@@ -57,6 +57,8 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     public ClientFilesPlan Plan(ClientFilesRequest request) => _planner.Plan(request);
 
+    /// <summary>Validates managed targets and their hashes, backs up original bytes, then writes and verifies the planned edits.</summary>
+    /// <returns>The backup id and written edits, or an empty result when no edits are needed.</returns>
     public ApplyResult Apply(ClientFilesPlan plan)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -122,6 +124,10 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         return new ApplyResult(backupId, plan.Edits);
     }
 
+    /// <summary>Undoes the newest pending backup after checking its root and all managed paths, leaving changed files as conflicts.</summary>
+    /// <param name="installationId">The installation whose most recent pending backup is restored.</param>
+    /// <param name="clientRoot">The caller's trusted client directory, which must match the backup manifest.</param>
+    /// <returns>The processed backup id and the restore status of each file.</returns>
     public UndoResult Undo(string installationId, string clientRoot)
     {
         RequireValidIds(installationId, "-");
@@ -190,6 +196,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     // ---- backup ----
 
+    /// <summary>Writes original file bytes, then a manifest containing the canonical client root, before any client edits.</summary>
     private void WriteBackup(ClientFilesPlan plan, string clientRoot, string backupId, string backupDir, List<Target> targets)
     {
         var files = new List<ManifestFile>();
