@@ -1,0 +1,3 @@
+# Confirmed false positive: generic-api-key matches the XAML resource key "Leather950Brush"
+# (a design-token name, not a credential). See CONTRIBUTING.md (Secret scanning).
+8553abefa9634d31785eefde5b1e5956e1c3fa40:src/RealmPortal.App/Theme/Tokens.axaml:generic-api-key:46
