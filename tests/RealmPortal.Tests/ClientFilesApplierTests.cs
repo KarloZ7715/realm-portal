@@ -502,6 +502,23 @@ public class ClientFilesApplierTests
         Assert.Equal(2, ids.Length); // the foreign folder and the newest backup
     }
 
+    [Theory]
+    [InlineData(0)] // same instant for every apply
+    [InlineData(-5)] // the clock goes backwards
+    public void BackupIds_FollowApplyOrder_EvenWithAStuckOrBackwardsClock_SoRetentionKeepsTheLatest(int stepSeconds)
+    {
+        using var env = new Env();
+        var now = new DateTimeOffset(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
+        var applier = new ClientFilesApplier(new ClientFilesPlanner(), env.Writer, env.Probe, env.Backups, () => now = now.AddSeconds(stepSeconds), keepBackups: 1);
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        string? last = null;
+        for (var i = 0; i < 5; i++)
+            last = applier.Apply(env.Plan(i % 2 == 0 ? BlobA : BlobB)).BackupId;
+
+        Assert.Equal([last!], BackupIds(env));
+        Assert.All(applier.Undo("install-1").Files, f => Assert.Equal(UndoFileStatus.Restored, f.Status));
+    }
+
     [Fact]
     public void Retention_ValueBelowOne_IsRejected() =>
         Assert.Throws<ArgumentOutOfRangeException>(() => new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new FakeProbe(), "/x", keepBackups: 0));

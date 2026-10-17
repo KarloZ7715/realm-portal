@@ -42,12 +42,13 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 <backupRoot>/<installationId>/<backupId>/files/<n>      original bytes of the n-th file of the manifest
 ```
 
-`backupId` is `yyyyMMddTHHmmssfffZ-<6 hex>` (UTC), so ids sort by time.
+`backupId` is `yyyyMMddTHHmmssfffZ-NNNNNN` (UTC time plus a sequence number). It is always greater than the newest existing id of the installation
+(the same millisecond or a clock that went backwards bump the sequence), so ids sort in apply order.
 
 ```json
 {
   "version": 1,
-  "backup_id": "20261017T120001000Z-a1b2c3",
+  "backup_id": "20261017T120001000Z-000000",
   "installation_id": "install-1",
   "profile_id": "profile-1",
   "client_root": "/path/to/client",
