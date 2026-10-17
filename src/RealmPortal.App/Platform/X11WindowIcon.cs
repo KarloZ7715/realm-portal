@@ -25,6 +25,8 @@ internal static class X11WindowIcon
 
     private const int XaCardinal = 6;
     private const int PropModeReplace = 0;
+    private const int PropModeAppend = 2;
+    private const int ChunkLength = 16384; // 64 KiB of 32-bit values (128 KiB with 8-byte longs)
 
     /// <summary>
     /// The value of the property: for each image <c>width, height, pixels…</c> as 32-bit values
@@ -131,9 +133,17 @@ internal static class X11WindowIcon
             try
             {
                 var atom = XInternAtom(display, name, false);
-                var status = XChangeProperty(display, window, atom, XaCardinal, 32, PropModeReplace, pin.AddrOfPinnedObject(), values.Length);
+                // Chunks keep each request under the 256 KiB core-protocol limit for servers without BIG-REQUESTS.
+                var ok = true;
+                for (var offset = 0; offset < values.Length && ok; offset += ChunkLength)
+                {
+                    var count = Math.Min(ChunkLength, values.Length - offset);
+                    var address = pin.AddrOfPinnedObject() + offset * IntPtr.Size;
+                    ok = XChangeProperty(display, window, atom, XaCardinal, 32, offset == 0 ? PropModeReplace : PropModeAppend, address, count) != 0;
+                }
+
                 XFlush(display);
-                return status != 0;
+                return ok;
             }
             finally
             {
