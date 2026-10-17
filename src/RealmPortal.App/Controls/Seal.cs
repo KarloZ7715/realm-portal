@@ -28,12 +28,8 @@ public class Seal : Control
     {
         AffectsRender<Seal>(StatusProperty);
         AffectsMeasure<Seal>(WidthProperty, HeightProperty);
-    }
-
-    public Seal()
-    {
-        Width = 48;
-        Height = 48;
+        WidthProperty.OverrideDefaultValue<Seal>(48);
+        HeightProperty.OverrideDefaultValue<Seal>(48);
     }
 
     public ServerStatus Status { get => GetValue(StatusProperty); set => SetValue(StatusProperty, value); }
