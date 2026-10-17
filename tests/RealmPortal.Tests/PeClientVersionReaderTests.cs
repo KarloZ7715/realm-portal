@@ -132,7 +132,7 @@ public class PeClientVersionReaderTests
 
     /// <summary>
     /// Optional: set REALM_PORTAL_FIXTURES to a folder with sub-folders such as wow-12340/Wow.exe to run the
-    /// reader against real (or externally generated) clients. Skipped silently when the variable is unset.
+    /// reader against real (or externally generated) clients. Returns immediately when the variable is unset; fails if it is set but a folder is missing.
     /// The files are only read; nothing is copied into the repository.
     /// </summary>
     [Theory]
@@ -142,9 +142,12 @@ public class PeClientVersionReaderTests
     public void Read_OptionalExternalFixtures(string folder, int build)
     {
         var root = Environment.GetEnvironmentVariable("REALM_PORTAL_FIXTURES");
-        var dir = root is null ? null : Path.Combine(root, folder);
-        if (dir is null || !Directory.Exists(dir))
+        if (string.IsNullOrEmpty(root))
             return;
+
+        // The variable is set: a missing folder is a configuration error, not a silent pass.
+        var dir = Path.Combine(root, folder);
+        Assert.True(Directory.Exists(dir), $"REALM_PORTAL_FIXTURES is set but '{dir}' does not exist.");
 
         Assert.Equal(build, _reader.Read(dir).Build);
     }
