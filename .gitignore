@@ -148,6 +148,7 @@ figma-exports/*
 !figma-exports/README.md
 !figma-exports/compact-07-settings-no-cleanup@2x.png
 !figma-exports/compact-07-settings-no-cleanup-scrolled@2x.png
+!figma-exports/07b-confirm-incompatible-switch@2x.png
 !figma-exports/compact-09-backup-conflict@2x.png
 !figma-exports/compact-09b-backup-conflict-restore-anyway@2x.png
 figma-textures/
