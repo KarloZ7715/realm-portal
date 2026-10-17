@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>RealmPortal.Cli</RootNamespace>
+    <AssemblyName>realm-portal</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RealmPortal.Core\RealmPortal.Core.csproj" />
+  </ItemGroup>
+</Project>
