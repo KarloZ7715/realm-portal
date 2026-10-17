@@ -51,7 +51,7 @@ public class Bug9UndoClientFilesUxTests
     }
 
     [Fact]
-    public void Undo_StateOnly_WhenClientAlreadyMatchesActive_PrintsNoClientFilesLine()
+    public void Undo_StateOnly_WhenClientAlreadyMatchesActive_PrintsClientFilesNotChanged()
     {
         using var dir = new TempDirectory();
         var config = dir.Combine("config");
@@ -75,7 +75,9 @@ public class Bug9UndoClientFilesUxTests
         var stdout = new StringWriter();
         var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
-        Assert.DoesNotContain("Client files:", stdout.ToString());
+        var text = stdout.ToString();
+        Assert.Contains("Client files: not changed.", text);
+        Assert.DoesNotContain("Client folder out of sync", text);
     }
 
     private sealed class NeverRunning : IGameProcessProbe

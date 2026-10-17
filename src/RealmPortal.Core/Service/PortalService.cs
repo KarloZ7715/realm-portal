@@ -340,7 +340,7 @@ public sealed class PortalService : IPortalService
 
             _journal.Clear();
             var entry = restored is null ? null : ToServerEntry(restored, restored.Id, journal.ClientId, null);
-            var notice = BuildUndoClientFilesNotice(restored, journal, fileResults, client);
+            var notice = BuildUndoClientFilesNotice(restored, fileResults, client);
             return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults, notice));
         }
         catch (Exception ex)
@@ -650,34 +650,28 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    private string? BuildUndoClientFilesNotice(
+    private string BuildUndoClientFilesNotice(
         Server? restoredActive,
-        LastSwitchEntry journal,
         IReadOnlyList<UndoFileResult> fileResults,
         StoredClient? switchedClient)
     {
         var lines = new List<string>();
-        var restoredLine = fileResults.Count == 0
-            ? null
-            : switchedClient is not null
-                ? $"Client files: restored '{switchedClient.Path}' to its state before the switch."
-                : "Client files: restored to their state before the switch.";
-
-        // Undo back to "no active server" still restored the switched client; say so (there is no active server to drift from).
-        if (restoredActive is null)
-            return restoredLine;
-
-        var drift = ListClientsNotMatchingActive(restoredActive);
-
-        if (restoredLine is not null)
-            lines.Add(restoredLine);
-        else if (journal.BackupId is null && drift.Count > 0)
+        // State-only undo writes nothing. Always say so, including undo back to no active server and when every client already matches.
+        if (fileResults.Count == 0)
             lines.Add("Client files: not changed.");
+        else if (switchedClient is not null)
+            lines.Add($"Client files: restored '{switchedClient.Path}' to its state before the switch.");
+        else
+            lines.Add("Client files: restored to their state before the switch.");
 
-        foreach (var entry in drift)
+        // No active server means there is nothing for registered clients to drift from.
+        if (restoredActive is null)
+            return string.Join(Environment.NewLine, lines);
+
+        foreach (var entry in ListClientsNotMatchingActive(restoredActive))
             lines.Add(ClientSyncMessages.DriftLine(restoredActive, entry.Path));
 
-        return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
+        return string.Join(Environment.NewLine, lines);
     }
 
     private bool ClientFilesMatchFileUndoSnapshot(LastSwitchEntry journal)

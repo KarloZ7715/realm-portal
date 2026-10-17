@@ -39,7 +39,7 @@ public class Bug10UndoWordingTests
     }
 
     [Fact]
-    public void Undo_StateOnly_WhenAllClientsMatchActive_PrintsNoClientFilesLines()
+    public void Undo_StateOnly_WhenAllClientsMatchActive_PrintsClientFilesNotChanged()
     {
         using var dir = new TempDirectory();
         var config = dir.Combine("config");
@@ -63,7 +63,32 @@ public class Bug10UndoWordingTests
         var stdout = new StringWriter();
         var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
-        Assert.DoesNotContain("Client files:", stdout.ToString());
+        var text = stdout.ToString();
+        Assert.Contains("Client files: not changed.", text);
+        Assert.DoesNotContain("Client folder out of sync", text);
+    }
+
+    [Fact]
+    public void Undo_StateOnly_FromNoActiveServer_PrintsNoActiveAndClientFilesNotChanged()
+    {
+        using var dir = new TempDirectory();
+        var config = dir.Combine("config");
+        var projection = dir.Combine("projection");
+        var backups = dir.Combine("backups");
+        Directory.CreateDirectory(config);
+        Directory.CreateDirectory(projection);
+        Directory.CreateDirectory(backups);
+
+        var service = new PortalService(config, projection, new PeClientVersionReader(), new NoLaunch(), new NeverRunning(), _ => backups);
+        var server = service.AddServer(new NewServer("A", "a.example.org")).Value!;
+        Assert.True(service.ActivateWithoutClientFiles(server.Id).Succeeded);
+
+        var stdout = new StringWriter();
+        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
+        Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
+        var text = stdout.ToString();
+        Assert.Contains("Undone: no active server.", text);
+        Assert.Contains("Client files: not changed.", text);
     }
 
     [Fact]
