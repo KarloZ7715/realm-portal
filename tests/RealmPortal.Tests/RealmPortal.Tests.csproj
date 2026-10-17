@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\RealmPortal.Core\RealmPortal.Core.csproj" />
+    <ProjectReference Include="..\..\src\RealmPortal.Cli\RealmPortal.Cli.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
