@@ -54,8 +54,8 @@ already has this configuration) still reports `WriteFiles` Started/Completed wit
 (client files drifted), it applies them as a repair. When the plan is empty, it still reports `WriteFiles` Started/Completed with `BackupId == null`. In both
 cases it does **not** replace the pending single-level undo or the `last-switch.json` journal with a no-op entry: a no-op re-switch must not erase the undo
 from the previous real switch to a different server. `ActiveServerManager.Switch` is still called (projection refresh; undo in `state.json` is unchanged when
-the server was already active). In `SwitchOutcome`, `Previous` equals `Active` (the same server). When the re-switch repairs drifted files, the journal's
-`backup_id` is updated so undo still restores the correct bytes.
+the server was already active). In `SwitchOutcome`, `Previous` equals `Active` (the same server). When the re-switch repairs drifted files, the applier may
+create a new backup, but the journal's `backup_id` is **not** replaced (undo still restores the bytes from the original switch).
 
 **There is no `Account` step.** The applier never writes the account name (`Config.wtf` `accountName` is explicitly left alone, and `ClientFilesRequest` has
 no account). `Server.Account` is only a remembered label. See "Open questions".
@@ -84,19 +84,20 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 ## Consistency between the two undo stacks
 
 Two stacks must move together: the applier's backups (per installation) and `ActiveServerManager`'s one-level undo in `state.json`. The service
-keeps a tiny journal of the **last switch** (`last-switch.json` in the config folder: optional client id and optional backup id)
+keeps a tiny journal of the **last switch** (`last-switch.json` in the config folder: optional `client_id` and optional `backup_id`)
 so undo knows whether **that** switch changed client files. One level only, like the manager. Every successful switch writes the journal, including
-CLI switches without `--client-dir` (`backup_id` omitted, `client_id` omitted unless exactly one client is registered in `clients.json`). A later
-state-only switch **replaces** the journal so undo never replays a backup from an earlier `--client-dir` switch.
+CLI switches without `--client-dir` (`client_id` and `backup_id` both omitted). A later state-only switch **replaces** the journal so undo never
+replays a backup from an earlier `--client-dir` switch. Re-switching the **same** server to repair drifted files creates a new backup in the applier
+store but **does not** replace the journal's `backup_id` (undo still restores the original switch's bytes).
 
 - **Switch:** plan, apply, then activate. If *activate* fails after *apply* succeeded, the service runs `applier.Undo` (the backup it just made) and
   returns the activation error with `RolledBack`; if that rollback fails or reports conflicts the error is `InconsistentState` / `Inconsistent`.
   If plan or apply fails nothing changed (the applier reverts itself): `Unchanged`. The journal is written only after both succeed.
 - **Undo:** pre-flight first, changing nothing: `state.json` has a pending undo, the previous server still exists and its realmlist is valid, the game is not
   running when client files would be touched. Then `applier.Undo` for the journal's `backup_id` only when that id is set (skipped for state-only switches),
-  then `ActiveServerManager.Undo`. When the undone switch had no `backup_id` but a client is known (journal `client_id` or a single registered client),
-  the service **applies the restored server's realmlist** after activate undo so `activo.json` and the game folder stay aligned (state-only switches never
-  wrote files, so there is no applier backup to restore). If the second step fails after file undo succeeded, the service re-applies the active server's
+  then `ActiveServerManager.Undo`. Undo **never** writes client files for state-only switches (`client_id` omitted in the journal): registered clients
+  may still drift from `activo.json` until the user runs `switch <server> --client-dir <folder>`. The CLI prints whether client files were updated.
+  If the second step fails after file undo succeeded, the service re-applies the active server's
   files and reports `RolledBack`; if that fails, `InconsistentState`.
 - **Conflicts:** when `applier.Undo` reports conflicts the app state is **not** touched and the undo stays pending. The call fails with `UndoConflict`,
   `ConflictingFiles` (the files that differ from what the switch wrote, never overwritten) and `Consistency.Pending`. Note the applier restores the files that

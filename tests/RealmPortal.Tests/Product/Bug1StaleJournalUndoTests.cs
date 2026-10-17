@@ -38,7 +38,7 @@ public class Bug1StaleJournalUndoTests
         Assert.True(undo.Succeeded);
         Assert.Equal(b.Id, undo.Value!.Active?.Id);
         var rl = File.ReadAllText(Path.Combine(client, "Data", "enUS", "realmlist.wtf"));
-        Assert.Contains("stale-b.example.org", rl);
+        Assert.Contains("stale-a.example.org", rl);
         Assert.DoesNotContain("orig.example.org", rl);
     }
 

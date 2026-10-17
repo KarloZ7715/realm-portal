@@ -129,21 +129,21 @@ public class PortalServiceTests
     }
 
     [Fact]
-    public void ReswitchSameServer_DriftedFiles_Repairs_AndUpdatesJournalBackup()
+    public void ReswitchSameServer_DriftedFiles_Repairs_AndKeepsOriginalJournalBackup()
     {
         using var env = new Env();
         var clientId = env.ClientId;
         var b = Add("B", "b.example.org", env.Service);
 
         Assert.True(env.Service.SwitchServer(new SwitchRequest(clientId, b.Id)).Succeeded);
-        var firstBackup = env.Service.GetStatus().Value!.BackupFolder;
-        Assert.NotNull(Directory.GetDirectories(Path.Combine(firstBackup, clientId)));
+        var journalAfterFirstSwitch = File.ReadAllText(Path.Combine(env.Config, "last-switch.json"));
 
         env.PutRealmlist("set realmlist tamper.example.org\r\n");
 
         var steps = new List<ServiceProgress>();
         var repair = env.Service.SwitchServer(new SwitchRequest(clientId, b.Id), new Progress<ServiceProgress>(steps.Add));
         Assert.True(repair.Succeeded);
+        Assert.Equal(journalAfterFirstSwitch, File.ReadAllText(Path.Combine(env.Config, "last-switch.json")));
         Assert.NotNull(repair.Value!.BackupId);
         Assert.Contains(b.Host, env.ReadRealmlist());
         Assert.Contains(steps, s => s.Step == ServiceStep.WriteFiles && s.State == StepState.Completed);

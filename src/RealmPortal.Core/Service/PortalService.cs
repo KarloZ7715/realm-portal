@@ -226,7 +226,7 @@ public sealed class PortalService : IPortalService
             var before = _active.GetActive();
             _active.Switch(server);
             if (before?.Id != server.Id)
-                _journal.Save(new LastSwitchEntry(SoleRegisteredClientId(), null));
+                _journal.Save(new LastSwitchEntry(null, null));
             return ServiceResult<ServerEntry>.Ok(ToServerEntry(server, server.Id, null, null));
         }
         catch (Exception ex)
@@ -242,7 +242,7 @@ public sealed class PortalService : IPortalService
             if (!_active.Status().CanUndo)
                 return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
 
-            var journal = _journal.Load() ?? new LastSwitchEntry(SoleRegisteredClientId(), null);
+            var journal = _journal.Load() ?? new LastSwitchEntry(null, null);
 
             StoredClient? client = null;
             if (journal.BackupId is not null)
@@ -280,24 +280,6 @@ public sealed class PortalService : IPortalService
                 catch (InvalidRealmlistException ex)
                 {
                     return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex.ForServer(undoTarget.Name)));
-                }
-            }
-
-            var syncClientId = journal.BackupId is null ? journal.ClientId ?? SoleRegisteredClientId() : null;
-            if (syncClientId is not null && journal.BackupId is null)
-            {
-                var syncClient = _clients.FindById(syncClientId);
-                if (syncClient is not null)
-                {
-                    try
-                    {
-                        if (_probe.IsGameRunning(syncClient.Path))
-                            return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: syncClient.Path));
-                    }
-                    catch (Exception ex)
-                    {
-                        return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: syncClient.Path, Diagnostic: ex.Message));
-                    }
                 }
             }
 
@@ -356,12 +338,10 @@ public sealed class PortalService : IPortalService
             if (journal.BackupId is not null && journal.ClientId is not null)
                 applier.MarkBackupUndone(journal.ClientId, journal.BackupId);
 
-            if (journal.BackupId is null && restored is not null)
-                TrySyncClientToServer(restored, journal.ClientId ?? SoleRegisteredClientId(), applier);
-
             _journal.Clear();
             var entry = restored is null ? null : ToServerEntry(restored, restored.Id, journal.ClientId, null);
-            return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults));
+            var notice = BuildUndoClientFilesNotice(restored, journal, fileResults, _clients.List().Count);
+            return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults, notice));
         }
         catch (Exception ex)
         {
@@ -390,7 +370,11 @@ public sealed class PortalService : IPortalService
             var status = _active.Status();
             var active = status.Active is null ? null : ToServerEntry(status.Active, status.Active.Id, null, null);
             var canUndo = ComputeCanUndo();
-            return ServiceResult<PortalStatus>.Ok(new PortalStatus(active, canUndo, status.ProjectionInSync, _activeBackupRoot));
+            var drifting = status.Active is null
+                ? []
+                : ListClientsNotMatchingActive(status.Active);
+            return ServiceResult<PortalStatus>.Ok(
+                new PortalStatus(active, canUndo, status.ProjectionInSync, _activeBackupRoot, drifting));
         }
         catch (Exception ex)
         {
@@ -539,9 +523,6 @@ public sealed class PortalService : IPortalService
                         }
                     }
 
-                    if (!sameServerActive)
-                        TryRevertActiveServer(active);
-
                     installationLock?.Dispose();
                     return ServiceResult<SwitchOutcome>.Fail(activateError! with
                     {
@@ -558,8 +539,6 @@ public sealed class PortalService : IPortalService
             installationLock?.Dispose();
 
             if (!sameServerActive)
-                _journal.Save(new LastSwitchEntry(request.ClientId, backupId));
-            else if (!plan.IsEmpty)
                 _journal.Save(new LastSwitchEntry(request.ClientId, backupId));
 
             var activeEntry = ToServerEntry(server, server.Id, request.ClientId, version);
@@ -638,6 +617,9 @@ public sealed class PortalService : IPortalService
             if (journal is not { FilesUndone: true } || !_active.Status().CanUndo)
                 return;
 
+            if (!ClientFilesMatchFileUndoSnapshot(journal))
+                return;
+
             _active.Undo();
             if (journal.BackupId is not null && journal.ClientId is not null)
                 CreateApplier().MarkBackupUndone(journal.ClientId, journal.BackupId);
@@ -668,42 +650,84 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    private string? SoleRegisteredClientId()
+    private static string? BuildUndoClientFilesNotice(
+        Server? restored,
+        LastSwitchEntry journal,
+        IReadOnlyList<UndoFileResult> fileResults,
+        int registeredClientCount)
     {
-        var clients = _clients.List();
-        return clients.Count == 1 ? clients[0].Id : null;
+        if (fileResults.Count > 0)
+            return "Client files: updated";
+
+        if (restored is not null && registeredClientCount > 0 && journal.BackupId is null)
+            return $"Client files: not changed ({registeredClientCount} client{(registeredClientCount == 1 ? "" : "s")} registered; run 'switch {restored.Name} --client-dir <folder>')";
+
+        return null;
     }
 
-    private void TrySyncClientToServer(Server server, string? clientId, IClientFilesApplier applier)
+    private bool ClientFilesMatchFileUndoSnapshot(LastSwitchEntry journal)
     {
-        if (clientId is null)
-            return;
+        if (journal.ClientId is null || journal.BackupId is null)
+            return false;
 
-        var client = _clients.FindById(clientId);
+        var client = _clients.FindById(journal.ClientId);
         if (client is null)
-            return;
+            return false;
+
+        var manifestPath = Path.Combine(_activeBackupRoot, journal.ClientId, journal.BackupId, "manifest.json");
+        if (!File.Exists(manifestPath))
+            return false;
 
         try
         {
-            if (_probe.IsGameRunning(client.Path))
-                return;
+            var manifest = BackupManifest.FromJson(File.ReadAllBytes(manifestPath), manifestPath);
+            foreach (var file in manifest.Files)
+            {
+                var relative = file.Path.Replace('\\', '/');
+                var path = Path.Combine(client.Path, relative.Replace('/', Path.DirectorySeparatorChar));
+                if (!file.Existed)
+                {
+                    if (File.Exists(path))
+                        return false;
+                    continue;
+                }
+
+                if (!File.Exists(path) || file.Sha256Before is null)
+                    return false;
+
+                var hash = ClientFilesIo.Sha256Hex(File.ReadAllBytes(path));
+                if (!string.Equals(hash, file.Sha256Before, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            return true;
         }
         catch
         {
-            return;
+            return false;
+        }
+    }
+
+    private List<ClientEntry> ListClientsNotMatchingActive(Server active)
+    {
+        var applier = CreateApplier();
+        var drift = new List<ClientEntry>();
+        foreach (var stored in _clients.List())
+        {
+            try
+            {
+                var version = _versionReader.Read(stored.Path);
+                var plan = applier.Plan(BuildRequest(stored.Id, active, stored.Path, version));
+                if (!plan.IsEmpty)
+                    drift.Add(ToClientEntry(stored));
+            }
+            catch (ClientVersionException)
+            {
+                drift.Add(ToClientEntry(stored));
+            }
         }
 
-        try
-        {
-            var version = _versionReader.Read(client.Path);
-            var plan = applier.Plan(BuildRequest(clientId, server, client.Path, version));
-            if (!plan.IsEmpty)
-                applier.Apply(plan);
-        }
-        catch
-        {
-            // Undo already restored active server; a failed sync leaves client drift for the user to repair.
-        }
+        return drift;
     }
 
     private bool BackupIsPending(string installationId, string backupId)
@@ -721,21 +745,6 @@ public sealed class PortalService : IPortalService
         catch
         {
             return false;
-        }
-    }
-
-    private void TryRevertActiveServer(Server? previous)
-    {
-        if (previous is null)
-            return;
-
-        try
-        {
-            _active.Switch(previous);
-        }
-        catch
-        {
-            // State may already be inconsistent; the caller returns RolledBack or Unchanged for files.
         }
     }
 
