@@ -1,5 +1,4 @@
 using RealmPortal.Core.ClientFiles;
-using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
 
@@ -9,6 +8,16 @@ internal static class ServiceCli
 {
     public static string Describe(ServiceError error, bool verbose = false)
     {
+        if (verbose && !string.IsNullOrEmpty(error.Diagnostic)
+            && error.Code is ServiceErrorCode.StoreCorrupt
+                or ServiceErrorCode.PermissionDenied
+                or ServiceErrorCode.ReadOnlyFs
+                or ServiceErrorCode.Unexpected
+                or ServiceErrorCode.InconsistentState)
+        {
+            return error.Diagnostic;
+        }
+
         return error.Code switch
         {
             ServiceErrorCode.ServerNameTaken => $"A server named '{error.ServerName}' already exists.",
@@ -19,25 +28,63 @@ internal static class ServiceCli
             ServiceErrorCode.NothingToUndo => "Nothing to undo.",
             ServiceErrorCode.UndoTargetMissing => "The previous server no longer exists; cannot undo.",
             ServiceErrorCode.GameRunning => "The game is running; close it before changing client files.",
+            ServiceErrorCode.ProcessCheckFailed => string.IsNullOrEmpty(error.Diagnostic)
+                ? "Could not check whether the game is running."
+                : error.Diagnostic,
             ServiceErrorCode.LaunchFailed => string.IsNullOrEmpty(error.Diagnostic) ? "Launch failed." : error.Diagnostic,
-            ServiceErrorCode.InvalidRealmlist => error.Diagnostic,
-            ServiceErrorCode.StoreCorrupt => verbose && !string.IsNullOrEmpty(error.Diagnostic)
-                ? error.Diagnostic
-                : "A config file is corrupt or unreadable.",
-            ServiceErrorCode.InconsistentState => verbose && !string.IsNullOrEmpty(error.Diagnostic)
-                ? error.Diagnostic
-                : "The app state may be inconsistent; review config and client files.",
+            ServiceErrorCode.InvalidRealmlist => error.Diagnostic ?? "The server's realmlist is invalid.",
+            ServiceErrorCode.StoreCorrupt => FormatStoreCorrupt(error),
+            ServiceErrorCode.InconsistentState => "The app state may be inconsistent; review config and client files.",
             ServiceErrorCode.UndoConflict => "Client files changed since the switch; undo stopped.",
-            ServiceErrorCode.PermissionDenied => verbose && !string.IsNullOrEmpty(error.Diagnostic)
-                ? error.Diagnostic
-                : "Permission denied.",
-            ServiceErrorCode.ReadOnlyFs => verbose && !string.IsNullOrEmpty(error.Diagnostic)
-                ? error.Diagnostic
-                : "The file system or directory is read-only.",
-            ServiceErrorCode.Unexpected => verbose && !string.IsNullOrEmpty(error.Diagnostic)
-                ? error.Diagnostic
-                : "An unexpected error occurred.",
-            _ => verbose && !string.IsNullOrEmpty(error.Diagnostic) ? error.Diagnostic : error.Code.ToString(),
+            ServiceErrorCode.PermissionDenied => "Permission denied.",
+            ServiceErrorCode.ReadOnlyFs => "The file system or directory is read-only.",
+            ServiceErrorCode.DiskFull => "There is not enough disk space to complete the operation.",
+            ServiceErrorCode.FileSharingViolation => "A file is in use by another process.",
+            ServiceErrorCode.PathNotFound => string.IsNullOrEmpty(error.Path)
+                ? "A required path was not found."
+                : $"Path not found: '{error.Path}'.",
+            ServiceErrorCode.HashMismatch => "A client file changed since it was planned or backed up.",
+            ServiceErrorCode.VerifyFailed => "A client file could not be verified after writing.",
+            ServiceErrorCode.UnsupportedClient => string.IsNullOrEmpty(error.ClientVersion)
+                ? "This client version is not supported."
+                : $"This client version is not supported ({error.ClientVersion}).",
+            ServiceErrorCode.ClientExecutableNotFound => string.IsNullOrEmpty(error.Path)
+                ? "Wow.exe was not found in the client folder."
+                : $"Wow.exe was not found in '{error.Path}'.",
+            ServiceErrorCode.ClientNotAPortableExecutable => "Wow.exe is not a valid portable executable.",
+            ServiceErrorCode.ClientNoVersionResource => "Wow.exe has no readable version resource.",
+            ServiceErrorCode.ClientUnreadable => string.IsNullOrEmpty(error.Path)
+                ? "The client folder could not be read."
+                : $"The client folder could not be read: '{error.Path}'.",
+            ServiceErrorCode.InvalidServerInput => FormatInvalidServerInput(error),
+            ServiceErrorCode.InvalidLauncherSettings => string.IsNullOrEmpty(error.Diagnostic)
+                ? "Launcher settings are invalid."
+                : error.Diagnostic,
+            ServiceErrorCode.Unexpected => "An unexpected error occurred.",
+            _ => throw new ArgumentOutOfRangeException(nameof(error), error.Code, "Unhandled ServiceErrorCode in CLI messages."),
+        };
+    }
+
+    private static string FormatStoreCorrupt(ServiceError error)
+    {
+        var name = error.Path is { } p ? Path.GetFileName(p) : null;
+        return name is null or ""
+            ? "A config file is corrupt or unreadable."
+            : $"Config file '{name}' is corrupt or unreadable.";
+    }
+
+    private static string FormatInvalidServerInput(ServiceError error)
+    {
+        if (!string.IsNullOrEmpty(error.Diagnostic))
+            return error.Diagnostic;
+        return error.Field switch
+        {
+            "name" => "Server name is invalid.",
+            "host" => "Server host is invalid.",
+            "realm" => "Realm name is invalid.",
+            "account" => "Account name is invalid.",
+            "build" => "Client build must be a positive number.",
+            _ => "Server input is invalid.",
         };
     }
 
