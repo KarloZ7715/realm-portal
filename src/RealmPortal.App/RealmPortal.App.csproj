@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- Declared so packages.lock.json can include linux-x64 assets for release publish while CI restores without -r. -->
+    <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
     <OutputType>WinExe</OutputType>
     <RootNamespace>RealmPortal.App</RootNamespace>
     <AssemblyName>RealmPortal.App</AssemblyName>
