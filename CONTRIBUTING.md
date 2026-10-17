@@ -2,6 +2,20 @@
 
 Thanks for your interest! This project is MIT-licensed; the app UI is available in Spanish and English.
 
+## Project layout
+
+```text
+src/RealmPortal.Core         core library
+src/RealmPortal.Cli          command-line tool (executable name: realm-portal)
+src/RealmPortal.App          Avalonia desktop app
+tests/RealmPortal.Tests      xunit tests (core and CLI)
+tests/RealmPortal.App.Tests  headless Avalonia tests and screenshots (UI)
+assets/                      textures, frames, icons, fonts (see assets/ASSETS.md)
+docs/                        design notes for the client-file engine and game launch
+```
+
+Built with C# / .NET 9 and Avalonia, in a "Parchment and bronze" visual style.
+
 ## Build and test
 
 Requires the .NET SDK pinned in [`global.json`](global.json) (9.0.x).
@@ -10,9 +24,53 @@ Requires the .NET SDK pinned in [`global.json`](global.json) (9.0.x).
 dotnet restore RealmPortal.sln
 dotnet build RealmPortal.sln -c Release --no-restore
 dotnet test RealmPortal.sln -c Release --no-build
+dotnet run --project src/RealmPortal.App
 ```
 
+On Linux the app needs an X11 server (or XWayland) and `libfontconfig1`, `libfreetype6`, `libx11-6`, `libice6`, `libsm6`.
+
 CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan and a per-file size check.
+
+## Command line
+
+`realm-portal` manages servers without the UI. Exit codes: 0 ok, 1 usage, 2 failure.
+Run it from source with `dotnet run --project src/RealmPortal.Cli -- <command>`.
+
+```bash
+realm-portal add Wotlk wotlk.example.org --build 12340 --line "set patchlist patch.example.org"
+realm-portal list --client-dir /path/to/client     # only servers this client can play on (--all shows every one)
+realm-portal switch Wotlk --client-dir /path/to/client
+realm-portal undo
+realm-portal status --client-dir /path/to/client
+realm-portal launch --client-dir /path/to/client --dry-run
+```
+
+Where files go: `--config-dir` / `REALM_PORTAL_CONFIG_DIR` (default `<app data>/realm-portal`: `servers.json`, `state.json`),
+`--projection-dir` / `REALM_PORTAL_PROJECTION_DIR` (default `~/.config/wow-servidores`: `activo.json`) and
+`--client-dir` / `REALM_PORTAL_CLIENT_DIR`. Always point them at temporary folders when testing.
+
+## Component gallery
+
+Every themed control in every state, rendered with the real theme:
+
+```bash
+dotnet run --project src/RealmPortal.App -- --gallery
+```
+
+Headless screenshots of the gallery at render scales 1.0, 1.5 and 2.0 (plus seam checks at 1.25 and 1.75) come from the UI tests:
+
+```bash
+RP_SCREENSHOT_DIR=/tmp/rp-shots dotnet test tests/RealmPortal.App.Tests -c Release --filter GalleryScreenshotTests
+```
+
+The theme draws the designer's UI kit (`assets/ui`, inventory in the kit's `ASSETS.md`); what is still missing is listed in `assets/ART-GAPS.md`.
+
+## Design notes
+
+- [docs/client-files.md](docs/client-files.md): what is written into the game client.
+- [docs/client-files-backup.md](docs/client-files-backup.md): backup, apply and undo.
+- [docs/launch.md](docs/launch.md): starting the game.
+- [assets/ASSETS.md](assets/ASSETS.md) and [assets/branding/README.md](assets/branding/README.md): assets and the Tésera mark.
 
 ## Secret scanning (gitleaks)
 
