@@ -113,6 +113,25 @@ public class CliServerFlowTests
     }
 
     [Fact]
+    public void Add_WithClientDir_DoesNotRegisterTheClient()
+    {
+        using var box = new Sandbox();
+        var app = new CliApp(new StringWriter(), new StringWriter(), new PeClientVersionReader(), box.Launcher, _ => null);
+
+        var code = app.Run("add",
+        [
+            "Wotlk", "wotlk.example.org",
+            "--config-dir", box.Config,
+            "--projection-dir", box.Projection,
+            "--client-dir", box.Client,
+        ]);
+
+        Assert.Equal(0, code);
+        Assert.NotNull(new ServerStore(box.Config, new RealmPortal.Core.IO.AtomicFileWriter()).Find("Wotlk"));
+        Assert.Empty(new ClientStore(box.Config, new RealmPortal.Core.IO.AtomicFileWriter()).List());
+    }
+
+    [Fact]
     public void Switch_Force_AllowsIncompatibleServer()
     {
         using var box = new Sandbox(clientBuild: 12340);

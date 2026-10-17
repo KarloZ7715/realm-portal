@@ -78,7 +78,7 @@ public sealed class CliApp(
             var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
             var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher), getVariable: getVariable);
             string? clientId = null;
-            if (clientDir is not null)
+            if (clientDir is not null && command is "list" or "switch" or "status" or "launch")
             {
                 var reg = service.AddClient(clientDir);
                 if (!reg.Succeeded)
