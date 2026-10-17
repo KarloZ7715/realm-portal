@@ -2,4 +2,7 @@
   <PropertyGroup>
     <RootNamespace>RealmPortal.Core</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="PeNet" />
+  </ItemGroup>
 </Project>
