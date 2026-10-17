@@ -82,7 +82,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                     $"'{path}' changed since the plan was made; plan again.");
             }
 
-            targets.Add(new Target(edit, path, original));
+            targets.Add(new Target(edit, path, original, SymlinkSnapshot.Capture(path)));
         }
 
         var backupId = NewBackupId(plan.InstallationId);
@@ -154,6 +154,14 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 Guard(() => File.Delete(path), path, "delete");
                 status = UndoFileStatus.Deleted;
             }
+            else if (file.IsSymlink && !string.IsNullOrEmpty(file.SymlinkTarget))
+            {
+                Guard(() => new SymlinkSnapshot(true, file.SymlinkTarget).Restore(path), path, "restore symlink");
+                var restored = Guard(() => File.ReadAllBytes(path), path, "read back");
+                if (ClientFilesIo.Sha256Hex(restored) != file.Sha256Before)
+                    throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
+                status = UndoFileStatus.Restored;
+            }
             else
             {
                 var original = ReadBackupFile(backupDir, file);
@@ -199,7 +207,9 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 t.Original is not null,
                 backupFile,
                 t.Edit.Sha256Before,
-                t.Edit.Sha256After));
+                t.Edit.Sha256After,
+                t.Symlink?.IsSymlink ?? false,
+                t.Symlink?.Target));
         }
 
         var manifest = new BackupManifest(
@@ -263,7 +273,10 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 }
                 else if (!ClientFilesIo.Sha256Hex(ReadIfExists(t.Path) ?? []).Equals(t.Edit.Sha256Before, StringComparison.Ordinal))
                 {
-                    _writer.WriteAllBytes(t.Path, t.Original);
+                    if (t.Symlink?.IsSymlink == true)
+                        t.Symlink.Value.Restore(t.Path);
+                    else
+                        _writer.WriteAllBytes(t.Path, t.Original);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ClientFilesException)
@@ -403,5 +416,5 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
     }
 
-    private sealed record Target(ClientFileEdit Edit, string Path, byte[]? Original);
+    private sealed record Target(ClientFileEdit Edit, string Path, byte[]? Original, SymlinkSnapshot? Symlink);
 }

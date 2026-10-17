@@ -73,7 +73,7 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 | Current state | Result |
 |---|---|
 | equals `sha256_before` (or is missing when the file did not exist) | `AlreadyRestored` (an earlier undo was interrupted) |
-| equals `sha256_after`, file existed | the original bytes are written back and verified: `Restored` |
+| equals `sha256_after`, file existed | the original bytes are written back and verified: `Restored` (symbolic links are recreated when the manifest records `is_symlink`) |
 | equals `sha256_after`, file did not exist | the file is deleted: `Deleted` (folders are never removed) |
 | anything else | `Conflict`: the file is not touched, the UI decides |
 
