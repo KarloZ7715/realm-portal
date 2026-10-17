@@ -27,7 +27,9 @@ The backup root is `$REALM_PORTAL_BACKUP_DIR`, else `realm-portal/backups` under
 3. Every target is read again; if its sha256 is not the plan's `Sha256Before` (or a file to create now exists) the call fails with
    `HashMismatch` and nothing is changed. Plan again to refresh.
 4. A backup is written **first**: the original bytes of each existing file plus `manifest.json` (last, atomically, flushed to disk).
-5. Each file is written with `IAtomicFileWriter` and read back; a different hash is `VerifyFailed`.
+5. Each file is written with `IAtomicFileWriter` and read back; a different hash is `VerifyFailed`. When a target file was
+   read-only, Apply records a warning in `ApplyResult.Warnings` and copies its permission bits onto the new file (and into the
+   backup manifest so Undo can restore them).
 6. On any failure every touched file is put back (created files are deleted) and the backup folder is removed, since nothing changed.
    If the revert itself fails, the backup stays so `Undo` can finish the job.
 
@@ -57,7 +59,7 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
   "undone_at": null,
   "files": [
     { "path": "Data/enUS/realmlist.wtf", "existed": true, "backup_file": "files/0",
-      "sha256_before": "…", "sha256_after": "…" },
+      "sha256_before": "…", "sha256_after": "…", "unix_mode": 292, "windows_read_only": null },
     { "path": "WTF/Config.wtf", "existed": false, "backup_file": null,
       "sha256_before": null, "sha256_after": "…" }
   ]

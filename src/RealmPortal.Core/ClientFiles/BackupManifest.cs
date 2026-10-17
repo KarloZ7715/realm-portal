@@ -9,7 +9,9 @@ internal sealed record ManifestFile(
     bool Existed,
     string? BackupFile,
     string? Sha256Before,
-    string Sha256After);
+    string Sha256After,
+    int? UnixMode = null,
+    bool? WindowsReadOnly = null);
 
 /// <summary>The <c>manifest.json</c> that describes one backup.</summary>
 internal sealed record BackupManifest(

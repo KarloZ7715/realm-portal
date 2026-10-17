@@ -3,7 +3,13 @@ namespace RealmPortal.Core.ClientFiles;
 /// <summary>Outcome of <see cref="IClientFilesApplier.Apply"/>.</summary>
 /// <param name="BackupId">Id of the backup that <see cref="IClientFilesApplier.Undo"/> restores; <c>null</c> when the plan was empty.</param>
 /// <param name="Edits">The edits that were written.</param>
-public sealed record ApplyResult(string? BackupId, IReadOnlyList<ClientFileEdit> Edits);
+public sealed record ApplyResult(string? BackupId, IReadOnlyList<ClientFileEdit> Edits, IReadOnlyList<string> Warnings)
+{
+    public ApplyResult(string? backupId, IReadOnlyList<ClientFileEdit> edits)
+        : this(backupId, edits, [])
+    {
+    }
+}
 
 public enum UndoFileStatus
 {

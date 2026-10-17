@@ -71,6 +71,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
         // Read and verify the current state of every file before touching anything.
         var targets = new List<Target>();
+        var warnings = new List<string>();
         foreach (var edit in plan.Edits)
         {
             var path = ResolveInside(plan.ClientRoot, edit.RelativePath);
@@ -82,7 +83,11 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                     $"'{path}' changed since the plan was made; plan again.");
             }
 
-            targets.Add(new Target(edit, path, original));
+            var permissions = FilePermissionSnapshot.Capture(path);
+            if (permissions is not null && FilePermissionSnapshot.IsReadOnly(path))
+                warnings.Add($"'{edit.RelativePath}' was read-only; its permissions were preserved.");
+
+            targets.Add(new Target(edit, path, original, permissions));
         }
 
         var backupId = NewBackupId(plan.InstallationId);
@@ -104,6 +109,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             {
                 attempted.Add(target);
                 Guard(() => _writer.WriteAllBytes(target.Path, target.Edit.NewBytes), target.Path, "write");
+                target.Permissions?.Apply(target.Path);
                 var written = Guard(() => File.ReadAllBytes(target.Path), target.Path, "read back");
                 if (ClientFilesIo.Sha256Hex(written) != target.Edit.Sha256After)
                     throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, target.Path, $"'{target.Path}' does not hold the expected bytes after writing.");
@@ -118,7 +124,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
 
         Prune(plan.InstallationId);
-        return new ApplyResult(backupId, plan.Edits);
+        return new ApplyResult(backupId, plan.Edits, warnings);
     }
 
     public UndoResult Undo(string installationId)
@@ -161,6 +167,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 var restored = Guard(() => File.ReadAllBytes(path), path, "read back");
                 if (ClientFilesIo.Sha256Hex(restored) != file.Sha256Before)
                     throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
+                new FilePermissionSnapshot(file.UnixMode, file.WindowsReadOnly).Apply(path);
                 status = UndoFileStatus.Restored;
             }
 
@@ -199,7 +206,9 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 t.Original is not null,
                 backupFile,
                 t.Edit.Sha256Before,
-                t.Edit.Sha256After));
+                t.Edit.Sha256After,
+                t.Permissions?.UnixMode,
+                t.Permissions?.WindowsReadOnly));
         }
 
         var manifest = new BackupManifest(
@@ -264,6 +273,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 else if (!ClientFilesIo.Sha256Hex(ReadIfExists(t.Path) ?? []).Equals(t.Edit.Sha256Before, StringComparison.Ordinal))
                 {
                     _writer.WriteAllBytes(t.Path, t.Original);
+                    t.Permissions?.Apply(t.Path);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ClientFilesException)
@@ -403,5 +413,5 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
     }
 
-    private sealed record Target(ClientFileEdit Edit, string Path, byte[]? Original);
+    private sealed record Target(ClientFileEdit Edit, string Path, byte[]? Original, FilePermissionSnapshot? Permissions);
 }
