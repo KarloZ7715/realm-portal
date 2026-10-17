@@ -6,6 +6,7 @@
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\branding\icon\windows\realm-portal.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" />
@@ -16,7 +17,7 @@
     <ProjectReference Include="..\RealmPortal.Core\RealmPortal.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <AvaloniaResource Include="..\..\assets\icons\app\app-icon-256.png" Link="Assets/app-icon.png" />
+    <AvaloniaResource Include="..\..\assets\branding\icon\png\realm-portal-256.png" Link="Assets/app-icon.png" />
   </ItemGroup>
   <ItemGroup Label="Bundled fonts (SIL OFL 1.1). Static instances only; the variable fonts in assets/fonts are not bundled.">
     <AvaloniaResource Include="..\..\assets\fonts\almendra\Almendra-Bold.ttf" Link="Assets/Fonts/Almendra-Bold.ttf" />
