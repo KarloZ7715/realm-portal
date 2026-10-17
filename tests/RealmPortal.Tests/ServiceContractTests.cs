@@ -97,6 +97,21 @@ public class ServiceContractTests
     }
 
     [Fact]
+    public void MissingFileAndDirectoryExceptions_MapToPathNotFound()
+    {
+        var file = ServiceErrors.FromException(new FileNotFoundException("missing file", "/games/wow/Wow.exe"));
+        var fileWithoutPath = ServiceErrors.FromException(new FileNotFoundException("missing file"));
+        var directory = ServiceErrors.FromException(new DirectoryNotFoundException("missing directory"));
+
+        Assert.Equal(ServiceErrorCode.PathNotFound, file.Code);
+        Assert.Equal("/games/wow/Wow.exe", file.Path);
+        Assert.Equal(ServiceErrorCode.PathNotFound, fileWithoutPath.Code);
+        Assert.Null(fileWithoutPath.Path);
+        Assert.Equal(ServiceErrorCode.PathNotFound, directory.Code);
+        Assert.Null(directory.Path);
+    }
+
+    [Fact]
     public void ServiceError_CarriesVersionAndConflictingFiles()
     {
         var conflict = new ServiceError(ServiceErrorCode.UndoConflict, ConflictingFiles: ["Data/enUS/realmlist.wtf"], Consistency: Consistency.Pending);

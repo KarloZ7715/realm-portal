@@ -32,11 +32,14 @@ internal static class ServiceErrors
     private static ServiceError FromIOException(IOException io, Consistency consistency)
     {
         var code = MapIOException(io);
-        return new(code, Consistency: consistency, Diagnostic: io.Message);
+        return new(code, Path: code == ServiceErrorCode.PathNotFound ? MissingPath(io) : null, Consistency: consistency, Diagnostic: io.Message);
     }
 
     private static ServiceErrorCode MapIOException(IOException io)
     {
+        if (io is FileNotFoundException or DirectoryNotFoundException)
+            return ServiceErrorCode.PathNotFound;
+
         var code = io.HResult & 0xFFFF;
         if (code is 112 or 28)
             return ServiceErrorCode.DiskFull;
@@ -46,6 +49,10 @@ internal static class ServiceErrors
             return ServiceErrorCode.ReadOnlyFs;
         return ServiceErrorCode.PermissionDenied;
     }
+
+    // FileNotFoundException.FileName is the only path the BCL exposes; DirectoryNotFoundException has none.
+    private static string? MissingPath(IOException io) =>
+        io is FileNotFoundException { FileName: { Length: > 0 } path } ? path : null;
 
     private static bool IsReadOnlyFileSystem(IOException ex) =>
         ex.HResult == 30 || (ex.HResult & 0xFFFF) == 19 && (ex.HResult & 0x7FFF0000) == 0x70000;
