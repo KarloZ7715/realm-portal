@@ -9,12 +9,10 @@ on:
         type: string
   push:
     tags:
-      - "v*"
+      - "v[0-9]+.[0-9]+.[0-9]+*"
 
-# Read repo; write only workflow artifacts (no GitHub Release, no package registry).
 permissions:
   contents: read
-  actions: write
 
 concurrency:
   group: release-linux-${{ github.workflow }}-${{ github.ref }}
@@ -34,6 +32,10 @@ jobs:
     name: linux-x64 packages
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      REF_NAME: ${{ github.ref_name }}
+      INPUT_VERSION: ${{ inputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,12 +44,14 @@ jobs:
 
       - name: Resolve package version
         id: version
+        env:
+          VALIDATE_VERSION: packaging/linux/validate-version.sh
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "push" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
-            ver="${GITHUB_REF_NAME#v}"
-          elif [ -n "${{ inputs.version }}" ]; then
-            ver="${{ inputs.version }}"
+          if [ "$EVENT_NAME" = "push" ]; then
+            ver="${REF_NAME#v}"
+          elif [ -n "$INPUT_VERSION" ]; then
+            ver="$INPUT_VERSION"
           else
             ver="$(grep -E '<Version>' Directory.Build.props | head -1 | sed -E 's/.*<Version>([^<]+)<\/Version>.*/\1/')"
           fi
@@ -55,7 +59,9 @@ jobs:
             echo "::error::Could not determine package version"
             exit 1
           fi
+          "$VALIDATE_VERSION" "$ver"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "PACKAGE_VERSION=$ver" >> "$GITHUB_ENV"
           echo "Package version: $ver"
 
       - name: Setup .NET
@@ -63,14 +69,7 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
-      - name: Cache NuGet packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', '**/*.csproj', '**/Directory.Packages.props', '**/Directory.Build.props', '**/packages.lock.json') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-
+      # TODO(#51): After NuGet lock files land on main, use `dotnet restore --locked-mode` (and publish --no-restore).
       - name: Publish (linux-x64, self-contained, trimmed, ReadyToRun)
         run: |
           set -euo pipefail
@@ -94,7 +93,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends dpkg-dev zsync libfuse2
+          sudo apt-get install -y --no-install-recommends dpkg-dev
           archive="obsolete-appimagetool-x86_64.AppImage"
           url="https://github.com/AppImage/AppImageKit/releases/download/${APPIMAGETOOL_VERSION}/${archive}"
           curl -sSfL --retry 3 -o "$RUNNER_TEMP/$archive" "$url"
@@ -107,7 +106,7 @@ jobs:
           set -euo pipefail
           out_dir="$RUNNER_TEMP/packages"
           mkdir -p "$out_dir"
-          packaging/linux/build-packages.sh "$PUBLISH_DIR" "${{ steps.version.outputs.version }}" "$out_dir"
+          packaging/linux/build-packages.sh "$PUBLISH_DIR" "$PACKAGE_VERSION" "$out_dir"
           echo "PACKAGE_DIR=$out_dir" >> "$GITHUB_ENV"
 
       - name: Upload Linux packages
@@ -117,5 +116,6 @@ jobs:
           path: |
             ${{ env.PACKAGE_DIR }}/*.deb
             ${{ env.PACKAGE_DIR }}/*.AppImage
+            ${{ env.PACKAGE_DIR }}/SHA256SUMS
           if-no-files-found: error
           retention-days: 14

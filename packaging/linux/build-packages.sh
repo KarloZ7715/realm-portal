@@ -11,7 +11,9 @@ usage() {
 
 PUBLISH_DIR="$(readlink -f "$1")"
 VERSION="$2"
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"${SCRIPT_DIR}/validate-version.sh" "$VERSION"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PACKAGING_DIR="${ROOT_DIR}/packaging/linux"
 OUT_DIR="${3:-"${ROOT_DIR}/artifacts/linux"}"
 APPIMAGETOOL="${APPIMAGETOOL:-}"
@@ -119,5 +121,11 @@ APPIMAGE_FILE="${OUT_DIR}/RealmPortal-${VERSION}-x86_64.AppImage"
 # appimagetool runs under FUSE or extracts itself; --appimage-extract-and-run works in CI without user namespaces.
 APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" --no-appstream "${APPDIR}" "${APPIMAGE_FILE}"
 
+(
+  cd "${OUT_DIR}"
+  sha256sum "$(basename "${DEB_FILE}")" "$(basename "${APPIMAGE_FILE}")" > SHA256SUMS
+)
+
 echo "Wrote ${DEB_FILE}"
 echo "Wrote ${APPIMAGE_FILE}"
+echo "Wrote ${OUT_DIR}/SHA256SUMS"

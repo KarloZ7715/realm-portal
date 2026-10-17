@@ -7,12 +7,13 @@ The [Release (Linux packages)](https://github.com/KarloZ7715/realm-portal/action
 | Trigger | Version used |
 | --- | --- |
 | `workflow_dispatch` | Input `version`, or `Version` from `Directory.Build.props` when empty |
-| Push tag `v*` | Tag without the `v` prefix (e.g. `v0.1.0` → `0.1.0`) |
+| Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix (e.g. `v0.1.0` → `0.1.0`); validated against `^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$` |
 
 It does **not** create a GitHub Release. Outputs are uploaded as a single workflow artifact named `realm-portal-linux-<version>` containing:
 
 - `realm-portal_<version>_amd64.deb`
 - `RealmPortal-<version>-x86_64.AppImage`
+- `SHA256SUMS` (checksums for the `.deb` and AppImage)
 
 ### Build steps (summary)
 
