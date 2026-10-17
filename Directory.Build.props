@@ -1,5 +1,6 @@
 <Project>
   <PropertyGroup>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
@@ -8,5 +9,9 @@
     <Deterministic>true</Deterministic>
     <Authors>Realm Portal contributors</Authors>
     <Version>0.1.0</Version>
+  </PropertyGroup>
+  <!-- Trimmed publish disables JSON reflection by default; the app uses JsonSerializer for config and loc tables. -->
+  <PropertyGroup Condition="'$(PublishTrimmed)' == 'true'">
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 </Project>

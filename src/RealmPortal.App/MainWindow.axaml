@@ -23,6 +23,8 @@
     <DataTemplate DataType="vm:PlaceholderViewModel"><v:PlaceholderView/></DataTemplate>
   </Window.DataTemplates>
   <Grid RowDefinitions="*,Auto">
+    <Panel Grid.RowSpan="2" Name="MainChrome" IsEnabled="{Binding Dialog, Converter={x:Static ObjectConverters.IsNull}}">
+    <Grid RowDefinitions="*,Auto">
     <Grid ColumnDefinitions="Auto,*">
       <!-- Sidebar: icons only below 960 px wide, icons + labels + the non-affiliation note above. -->
       <Panel Name="Sidebar" Width="56" ZIndex="1">
@@ -57,5 +59,14 @@
         </Button>
       </Grid>
     </Border>
+    </Grid>
+    </Panel>
+
+    <!-- Modal question (e.g. discard a conflicting backup) over everything, status bar included. -->
+    <ContentControl Grid.RowSpan="2" Name="DialogHost" Content="{Binding Dialog}" IsVisible="{Binding Dialog, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:ConfirmDialogViewModel"><v:ConfirmDialogView/></DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
   </Grid>
 </Window>
