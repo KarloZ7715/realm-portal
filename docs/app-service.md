@@ -71,6 +71,7 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 | `ClientVersionException.Kind` | `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `ClientUnreadable` (a missing folder: `PathNotFound`), with `Path` |
 | `StoreException` | `StoreCorrupt`, `ServerNameTaken`, `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing` |
 | undo backup made for another client folder (manifest `client_root` differs from the registered client) | `PathEscapesClient`, `Diagnostic` names both folders; nothing is written |
+| managed path outside the allow-list, traversal/absolute/backslash/drive paths, or a managed folder linked outside the client | `PathEscapesClient`; nothing is written or deleted |
 | undo finds changed client files | `UndoConflict` with `ConflictingFiles`, `Consistency.Pending` |
 | backup folder cannot be used | `PathNotFound`, `PermissionDenied`, `ReadOnlyFs` |
 | `ArgumentException` from `Server.Create` | `InvalidServerInput` with `Field` |

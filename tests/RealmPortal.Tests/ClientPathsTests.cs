@@ -151,6 +151,54 @@ public class ClientPathsTests
         Assert.Equal(appliedRealmlist, File.ReadAllText(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf")));
     }
 
+    [Theory]
+    [InlineData("Data/../Wow.exe")]
+    [InlineData("Data/enUS/../../Wow.exe")]
+    [InlineData("./Wow.exe")]
+    [InlineData("/tmp/c/Wow.exe")]
+    [InlineData("Data\\enUS\\..\\..\\Wow.exe")]
+    [InlineData("Interface\\AddOns\\keep.txt")]
+    [InlineData("C:/Wow.exe")]
+    [InlineData("../outside/target.txt")]
+    [InlineData("Data/enUS/realmlist.wtf/../../../Wow.exe")]
+    [InlineData("Data//enUS/realmlist.wtf")]
+    public void ValidateManagedRelativePath_TraversalAbsoluteAndBackslashPaths_ArePathEscapesClient(string relative)
+    {
+        var ex = Assert.Throws<ClientFilesException>(() => ClientPaths.ValidateManagedRelativePath(relative));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+    }
+
+    [Theory]
+    [InlineData("Data/../Wow.exe")]
+    [InlineData("./Wow.exe")]
+    [InlineData("C:/Wow.exe")]
+    [InlineData("Data\\enUS\\..\\..\\Wow.exe")]
+    [InlineData("../outside/target.txt")]
+    [InlineData("Data/enUS/realmlist.wtf/../../../Wow.exe")]
+    public void Undo_WithTraversalManifestPath_IsPathEscapesClient_AndRestoresNothing(string evil)
+    {
+        using var env = new ApplierEnv();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        var wowPath = Path.Combine(env.Client, "Wow.exe");
+        File.WriteAllBytes(wowPath, SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+        var wowBefore = File.ReadAllBytes(wowPath);
+        var result = env.Applier.Apply(env.Plan());
+        var applied = File.ReadAllText(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf"));
+        var manifestPath = Path.Combine(env.Backups, "install-1", result.BackupId!, "manifest.json");
+        var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(manifestPath))!;
+        var files = node["files"]!.AsArray();
+        var extra = files[0]!.DeepClone();
+        extra["path"] = evil;
+        files.Add(extra); // the valid entry comes first: a partial restore would show up
+        File.WriteAllText(manifestPath, node.ToJsonString());
+
+        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
+
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+        Assert.Equal(wowBefore, File.ReadAllBytes(wowPath));
+        Assert.Equal(applied, File.ReadAllText(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf")));
+    }
+
     [Fact]
     public void CanonicalRoot_PreservesUnixFilesystemRoot()
     {

@@ -119,7 +119,7 @@ public static class ClientPaths
     {
         var segments = relative.Split('/');
         if (segments.Any(s => s.Length == 0 || s is "." or ".." || s.Contains('\\') || s.Contains(':')))
-            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, relative,
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, relative,
                 $"'{relative}' is not a relative path inside the client folder.");
 
         if (segments.Length == 1 && string.Equals(segments[0], "realmlist.wtf", StringComparison.OrdinalIgnoreCase))
