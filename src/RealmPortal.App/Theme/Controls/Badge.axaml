@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="using:RealmPortal.App.Controls">
   <!--
-    Status badge: ivory pill with a thin border, a glyph and an upper-case Alegreya Sans Bold 12 label.
+    Status badge: ivory pill with a thin border in the status colour, a glyph and an upper-case Alegreya Sans Bold 12 label.
     Colour and glyph follow Badge.Status; the state is never colour alone (each has its own glyph).
     Text colours are the "text" variants of the tokens, all at 4.5:1 or better on ivory/parchment (DESIGN-TOKENS-B.md).
   -->
@@ -12,7 +12,7 @@
       <Setter Property="Template">
         <ControlTemplate>
           <Border Background="{DynamicResource IvoryBrush}"
-                  BorderBrush="{DynamicResource ParchmentShadowBrush}" BorderThickness="1"
+                  BorderBrush="{TemplateBinding Foreground}" BorderThickness="1"
                   CornerRadius="3" Padding="8,3" HorizontalAlignment="Left">
             <StackPanel Orientation="Horizontal" Spacing="5">
               <c:Icon Name="Glyph" Width="12" Height="12" VerticalAlignment="Center"
