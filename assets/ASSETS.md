@@ -11,7 +11,7 @@ assets/
   preview-composition.png    test composition
   textures/                  3 tileable CC0 JPG textures + tiling check image
   frames/                    frames, panels, buttons, dividers (PNG @1x/@2x + SVG) + nineslice.json
-  icons/app/                 app icon (SVG, PNG 512–16, ICO)
+  branding/                  app icon "Tesera" (SVG, PNG 16–512, ICO) — see Branding section
   icons/seals/               5 status seals (SVG, PNG 64/128)
   icons/ui/, icons/ui-ink/   23 interface icons as SVG (bone color / ink color)
   fonts/                     TTF + OFL.txt per family + FONTS.md
@@ -33,7 +33,7 @@ assets/
 | `textures/tex-bronze.jpg` | 512×512 | 67.3 KB | yes; ratio 1.2–1.3×, no visible seam in a 2×2 tiling | Metal008 (ambientCG) · CC0 1.0 |
 | `textures/preview-tiling-2x2.png` | 1840×600 | 889.2 KB | — | visual check (leather, parchment and bronze in a 2×2 tiling) |
 
-Notes: the three textures were already tileable at the source (ambientCG publishes them that way) and are unmodified relative to the ambientCG originals (only re-encoded as JPEG q90). Verified with a 2×2 tiling (with ×2.2 contrast at the junction) and with the edge-jump metric against the interior gradient. In the mockups they are used with partial opacity over the token base color: parchment 50% over `#D8C7A0` (512 css px tile), leather 34–40% (512 css px tile), bronze 35% in Figma and 45% in the ring of the icon PNGs. The parchment has large recognizable blotches: a 2×2 repetition shows the pattern; in panels up to ~700 px it does not repeat.
+Notes: the three textures were already tileable at the source (ambientCG publishes them that way) and are unmodified relative to the ambientCG originals (only re-encoded as JPEG q90). Verified with a 2×2 tiling (with ×2.2 contrast at the junction) and with the edge-jump metric against the interior gradient. In the mockups they are used with partial opacity over the token base color: parchment 50% over `#D8C7A0` (512 css px tile), leather 34–40% (512 css px tile), bronze 35% in Figma (the app icon no longer uses it). The parchment has large recognizable blotches: a 2×2 repetition shows the pattern; in panels up to ~700 px it does not repeat.
 
 ## 2. frames/
 
@@ -145,24 +145,23 @@ Full listing of `frames/`:
 | `frames/window-frame.svg` | SVG | 0.7 KB |
 | `frames/window-frame@2x.png` | 1920×1200 | 1.43 MB |
 
+## Branding (`assets/branding/`)
+
+| File | Purpose |
+|---|---|
+| `assets/branding/icon/svg/realm-portal.svg` | App icon "Tesera", full colour (≥ 48 px) |
+| `assets/branding/icon/svg/realm-portal-simplified.svg` | 32 px |
+| `assets/branding/icon/svg/realm-portal-micro.svg` | 16, 22, 24 px |
+| `assets/branding/icon/svg/realm-portal-mono.svg`, `-mono-negative.svg`, `-mono-simplified.svg` | one-colour versions |
+| `assets/branding/icon/svg/realm-portal-symbolic.svg` | 16×16 symbolic icon |
+| `assets/branding/icon/png/realm-portal-{16,22,24,32,48,64,128,256,512}.png` | transparent PNGs, rendered natively per size |
+| `assets/branding/icon/windows/realm-portal.ico` | 16, 24, 32, 48, 64, 128, 256 |
+
+Linux icons live in `packaging/linux/icons/hicolor/` with the name `com.karloz7715.RealmPortal`. See `assets/branding/README.md` for the concept, grid, colours and usage rules.
+
+License: own design, original artwork under the repository's MIT license (see `assets/branding/LICENSE-ART.md`); no third-party textures, fonts or artwork.
+
 ## 3. icons/
-
-### icons/app — application icon (wax seal with portal arch)
-
-| File | Pixels | Size | Notes |
-|---|---|---|---|
-| `icons/app/app-icon.svg` | SVG | 4.0 KB | flat 128×128 vector (bronze ring without texture) |
-| `icons/app/app-icon-simplified.svg` | SVG | 3.4 KB | simplified version (thick strokes) for ≤32 px |
-| `icons/app/app-icon-512.png` | 512×512 | 68.5 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
-| `icons/app/app-icon-256.png` | 256×256 | 27.9 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
-| `icons/app/app-icon-128.png` | 128×128 | 11.7 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
-| `icons/app/app-icon-64.png` | 64×64 | 5.0 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
-| `icons/app/app-icon-48.png` | 48×48 | 3.3 KB | bronze ring with Metal008 (CC0) texture at ≥64 px |
-| `icons/app/app-icon-simple-32.png` | 32×32 | 1.3 KB | simplified, flat ring |
-| `icons/app/app-icon-simple-16.png` | 16×16 | 0.7 KB | simplified, flat ring |
-| `icons/app/app-icon.ico` | ICO | 125.7 KB | multi-size ICO: 256, 128, 64, 48, 32 (simplified), 16 (simplified) |
-
-Versions of 48 px or more use the full design; 32 and 16 use the simplified one (seal and arch with thick strokes, no stitching). The SVGs have a flat bronze ring (`#A8743F`); the bronze texture exists only in the PNGs ≥64.
 
 ### icons/seals — status seals (SVG 56×56, PNG 64 and 128)
 
@@ -203,8 +202,7 @@ See `fonts/FONTS.md` (OFL 1.1 license, source URLs, file types and glyph check).
 - The SVGs in `frames/` are flat (no texture, shadows or inner shadow): the effects exist only in the PNGs, because cairosvg/Avalonia.Svg do not guarantee `feGaussianBlur`/`<pattern>`. Either accept "two looks" or use the PNGs.
 - The irregular parchment edge is a fixed shape: when stretched, the waviness stretches too, and the decorated zone requires ≥72 px per side. Panels wider than ~1000 px will show very soft waviness (it cannot be tiled).
 - The dotted stitching of buttons and hardware stretches in the 9-slice center (it does not keep the 6 px period).
-- The bronze ring of the icon with texture exists only as PNG ≥64 px; the SVG and the 32/16 sizes use flat bronze.
-- The seals and the app icon are not pixel-fitted at 16 px (the 16×16 is a reduction of the simplified design; legible as a red seal with an arch, but without detail).
+- The seals are not pixel-fitted at 16 px (the 16×16 is a reduction of the simplified design; legible as a red seal with an arch, but without detail).
 - JetBrains Mono does not include the ✓ glyph (U+2713); do not use it in code UI (use "OK" or an SVG icon).
 - There is no @2x variant of the interface icons or of the seals: they are vector; the seal PNGs are given at 64 and 128.
 - Textures visibly repeat on very large screens if tiled without variation (parchment more than leather).
