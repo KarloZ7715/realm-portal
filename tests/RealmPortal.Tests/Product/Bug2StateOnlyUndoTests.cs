@@ -76,8 +76,78 @@ public class Bug2StateOnlyUndoTests
         Assert.Equal(wotlk.Id, undo.Value!.Active?.Id);
     }
 
+    [Fact]
+    public void StateOnlyUndo_WhenActivoWriteFails_IsUnchangedAndLeavesClientFilesAlone()
+    {
+        using var dir = new TempDirectory();
+        var config = dir.Combine("config");
+        var projection = dir.Combine("projection");
+        var client = dir.Combine("client");
+        Directory.CreateDirectory(config);
+        Directory.CreateDirectory(projection);
+        Directory.CreateDirectory(Path.Combine(client, "Data", "enUS"));
+        File.WriteAllBytes(Path.Combine(client, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+        var realmlist = Path.Combine(client, "Data", "enUS", "realmlist.wtf");
+        var realmlistBytes = "set realmlist keep.example.org\r\n"u8.ToArray();
+        File.WriteAllBytes(realmlist, realmlistBytes);
+
+        var writer = new FailNextActivoWrite(projection);
+        var service = new PortalService(
+            config,
+            projection,
+            new PeClientVersionReader(),
+            new NoLaunch(),
+            getVariable: _ => dir.Combine("backups"),
+            writer: writer);
+        service.AddClient(client);
+        var first = service.AddServer(new NewServer("First", "first.example.org")).Value!;
+        var second = service.AddServer(new NewServer("Second", "second.example.org")).Value!;
+        Assert.True(service.ActivateWithoutClientFiles(first.Id).Succeeded);
+        Assert.True(service.ActivateWithoutClientFiles(second.Id).Succeeded);
+
+        writer.Arm();
+        var failed = service.Undo();
+
+        Assert.False(failed.Succeeded);
+        Assert.NotNull(failed.Error);
+        Assert.Equal(Consistency.Unchanged, failed.Error.Consistency);
+        Assert.Contains("Injected activo.json write failure.", failed.Error.Diagnostic);
+        Assert.Equal(second.Id, service.GetStatus().Value!.Active!.Id);
+        Assert.True(service.GetStatus().Value!.CanUndo);
+        Assert.Contains("second.example.org", File.ReadAllText(ActiveProjection.FilePath(projection)));
+        Assert.Equal(realmlistBytes, File.ReadAllBytes(realmlist));
+
+        var retry = service.Undo();
+        Assert.True(retry.Succeeded);
+        Assert.Equal(first.Id, service.GetStatus().Value!.Active!.Id);
+        Assert.Equal(realmlistBytes, File.ReadAllBytes(realmlist));
+    }
+
     private sealed class NoLaunch : IGameLaunchService
     {
         public void Launch(GameLaunchSpec spec) { }
+    }
+
+    /// <summary>Fails the next <c>activo.json</c> write after <see cref="Arm"/>.</summary>
+    private sealed class FailNextActivoWrite(string projectionDir) : IAtomicFileWriter
+    {
+        private readonly AtomicFileWriter _inner = new();
+        private readonly string _activoPath = ActiveProjection.FilePath(projectionDir);
+        private int _activoWrites;
+        private int _failAt = -1;
+
+        public void Arm() => _failAt = _activoWrites + 1;
+
+        public void WriteAllBytes(string path, byte[] content)
+        {
+            if (path == _activoPath)
+            {
+                _activoWrites++;
+                if (_activoWrites == _failAt)
+                    throw new IOException("Injected activo.json write failure.");
+            }
+
+            _inner.WriteAllBytes(path, content);
+        }
     }
 }

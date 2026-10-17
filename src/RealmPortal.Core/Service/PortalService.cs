@@ -317,11 +317,13 @@ public sealed class PortalService : IPortalService
             }
             catch (Exception ex)
             {
+                // State-only undo (no backup): ActiveServerManager already restored state.json, and no client files
+                // were touched. Report the original failure as Unchanged instead of a synthetic inconsistent state.
+                if (client is null || journal.ClientId is null)
+                    return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex, Consistency.Unchanged));
+
                 try
                 {
-                    if (client is null || journal.ClientId is null)
-                        throw new InvalidOperationException("No client files were undone before the failed state undo.");
-
                     var active = _active.GetActive()
                                  ?? throw new InvalidOperationException("No active server to re-apply after a failed undo.");
                     var version = ReadStoredClientVersion(client.Path);
