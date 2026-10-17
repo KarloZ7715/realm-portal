@@ -48,9 +48,19 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
 
     /// <summary>Adds a server. Ids and names (case-insensitive) must be unique.</summary>
     /// <exception cref="StoreException">The id or the name is already taken.</exception>
+    /// <exception cref="InvalidRealmlistException">The server's realmlist breaks the realmlist contract; nothing is written.</exception>
     public Server Add(Server server)
     {
         ArgumentNullException.ThrowIfNull(server);
+        try
+        {
+            RealmlistText.Validate(server.Realmlist);
+        }
+        catch (InvalidRealmlistException ex)
+        {
+            throw ex.ForServer(server.Name);
+        }
+
         var servers = Load().ToList();
         if (servers.Any(s => s.Id == server.Id))
             throw new StoreException($"A server with id '{server.Id}' already exists.");

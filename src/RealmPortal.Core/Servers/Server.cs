@@ -21,7 +21,8 @@ public sealed record Server(
 
     /// <summary>Creates a validated server with a freshly generated id (or <paramref name="id"/> when given).</summary>
     /// <param name="extraRealmlistLines">Extra realmlist lines after <c>set realmlist</c>, such as <c>set patchlist patch.example.org</c>.</param>
-    /// <exception cref="ArgumentException">A value is empty, too long or contains forbidden characters.</exception>
+    /// <exception cref="ArgumentException">The name, realm, account or id is empty, too long or contains forbidden characters.</exception>
+    /// <exception cref="InvalidRealmlistException">The host or an extra line breaks the realmlist contract (see <see cref="RealmlistText"/>); no server is created.</exception>
     public static Server Create(
         string name,
         string host,
@@ -36,8 +37,8 @@ public sealed record Server(
             throw new ArgumentException($"Name must be 1-{MaxNameLength} characters without control characters.", nameof(name));
 
         host = host?.Trim() ?? "";
-        if (host.Length == 0 || host.Any(c => char.IsWhiteSpace(c) || char.IsControl(c)))
-            throw new ArgumentException("Host must be non-empty and contain no whitespace or control characters.", nameof(host));
+        if (host.Length == 0)
+            throw new ArgumentException("Host must not be empty.", nameof(host));
 
         realm = realm?.Trim() ?? "";
         if (HasControlCharacters(realm))

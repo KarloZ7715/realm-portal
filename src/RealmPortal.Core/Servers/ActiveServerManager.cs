@@ -57,6 +57,7 @@ public sealed class ActiveServerManager(
     /// already active rewrites the projection but keeps the undo information unchanged.
     /// </summary>
     /// <exception cref="StoreException">The server is not in the store.</exception>
+    /// <exception cref="InvalidRealmlistException">The stored realmlist breaks the realmlist contract; nothing is written.</exception>
     public void Switch(Server server)
     {
         ArgumentNullException.ThrowIfNull(server);
@@ -78,6 +79,7 @@ public sealed class ActiveServerManager(
     /// </summary>
     /// <returns>The restored server, or <c>null</c> when the result is "no active server".</returns>
     /// <exception cref="StoreException">There is nothing to undo, or the server to restore no longer exists.</exception>
+    /// <exception cref="InvalidRealmlistException">The realmlist of the server to restore is invalid; nothing is changed.</exception>
     public Server? Undo()
     {
         var state = LoadState();
@@ -133,8 +135,9 @@ public sealed class ActiveServerManager(
             return File.Exists(_projectionPath)
                    && File.ReadAllBytes(_projectionPath).AsSpan().SequenceEqual(ActiveProjection.Serialize(active));
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or InvalidRealmlistException)
         {
+            // An unreadable file, or a server whose realmlist is invalid, can never be "in sync".
             return false;
         }
     }

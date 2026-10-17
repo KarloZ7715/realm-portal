@@ -35,6 +35,23 @@ public class ServerStoreTests
         Assert.Equal([b], store.List());
     }
 
+    [Theory]
+    [InlineData("SET REALMLIST h\r\n", InvalidRealmlistKind.WrongFirstLine)]
+    [InlineData("set realmlist h\r\nset portal x\r\n", InvalidRealmlistKind.ForbiddenKey)]
+    [InlineData("set realmlist h\u00f3\r\n", InvalidRealmlistKind.NotAscii)]
+    public void Add_RejectsServerWithInvalidRealmlist_AndWritesNothing(string realmlist, InvalidRealmlistKind kind)
+    {
+        using var dir = new TempDirectory();
+        var store = NewStore(dir.Combine("cfg"));
+        var bad = new Server(new string('a', 32), "Bad", "h", "", realmlist, null, null);
+
+        var ex = Assert.Throws<InvalidRealmlistException>(() => store.Add(bad));
+
+        Assert.Equal(kind, ex.Kind);
+        Assert.Equal("Bad", ex.ServerName);
+        Assert.False(Directory.Exists(dir.Combine("cfg")));
+    }
+
     [Fact]
     public void Add_RejectsDuplicateNameIgnoringCase()
     {
