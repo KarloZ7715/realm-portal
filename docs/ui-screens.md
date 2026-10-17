@@ -54,7 +54,7 @@ On parchment surfaces, buttons use border `#5A3D22` and focus color `#0F5561`.
 ## Errors and dialogs (F4)
 
 - `ErrorText` turns the stable error codes of the core (`ClientFilesErrorCode`, plus `ProcessCheckFailed`, announced for 0.1) into a localized title and body; the core never supplies UI text. A code without strings shows a generic message; a test fails when a code lacks ES or EN text.
-- `ConfirmDialogViewModel` / `MainViewModel.ConfirmAsync` show a modal question over the window. "Discard backup" (conflicting backup: nothing is restored or deleted, the backup is only marked as discarded and can no longer be undone from the app) uses it with Cancel as the default button and the first focus. The dialog layout is provisional until the designer delivers it; it is not wired to any action yet (the service does not expose Discard).
+- `ConfirmDialogViewModel` / `MainViewModel.ConfirmAsync` show a modal question over the window. "Discard backup" (conflicting backup: nothing is restored or deleted, the backup is only marked as discarded and can no longer be undone from the app) uses it with Cancel as the default button and the first focus. On the parchment sheet, buttons use `ButtonSurface.Surface = Parchment` (compact-09 / 09b): bronze/dark (`#5A3D22`) 1.5 px inner borders and the teal focus ring (`focus/parchment`, `#0F5561`) plus leather/950 outer ring for WCAG 1.4.11 non-text contrast. The dialog layout is provisional until the designer delivers it; it is not wired to any action yet (the service does not expose Discard).
 
 ## Art used without a Figma reference
 

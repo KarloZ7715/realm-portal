@@ -72,6 +72,10 @@
       <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
       <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
       <Style Selector="^.secondary /template/ c|SplitPlate#Plate"><Setter Property="Variant" Value="secondary"/></Style>
+      <!-- Surface=Parchment (Figma 18:1727): #5A3D22 inner border, focus-ring-parchment; both segments share the plate -->
+      <Style Selector="^.surface-parchment:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.surface-parchment /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-parchment"/></Style>
+      <Style Selector="^.surface-parchment:not(.secondary) /template/ c|SplitPlate#Plate"><Setter Property="Variant" Value="primary-parchment"/></Style>
     </ControlTheme>
   </Styles.Resources>
   <Style Selector="SplitButton"><Setter Property="Theme" Value="{StaticResource RpSplitButton}"/></Style>
