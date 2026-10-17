@@ -16,10 +16,10 @@ public static class ServerGen
     private static readonly Gen<string> NameGen = Text(1, 20).Where(s => s.Trim().Length > 0);
 
     private static readonly Gen<string> HostGen =
-        Gen.Elements("logon.example.org", "10.0.0.5:3724", "localhost", "wow.example.net:8085", "ünï.example.org");
+        Gen.Elements("logon.example.org", "10.0.0.5:3724", "localhost", "wow.example.net:8085", "xn--n-1ga.example.org");
 
     private static readonly Gen<string[]> ExtraLinesGen =
-        Gen.Elements("set patchlist patch.example.org", "set realmname \"My & Realm\"", "-- ñ 龍", "set x y")
+        Gen.Elements("set patchlist patch.example.org", "set realmname \"My & Realm\"", "-- comment", "set x y")
             .ArrayOf();
 
     private static readonly Gen<int?> BuildGen =

@@ -36,8 +36,10 @@ public sealed record Server(
             throw new ArgumentException($"Name must be 1-{MaxNameLength} characters without control characters.", nameof(name));
 
         host = host?.Trim() ?? "";
-        if (host.Length == 0 || host.Any(c => char.IsWhiteSpace(c) || char.IsControl(c)))
-            throw new ArgumentException("Host must be non-empty and contain no whitespace or control characters.", nameof(host));
+        if (host.Length == 0 || host.Any(c => !RealmlistText.IsPrintableAscii(c) || c == ' '))
+            throw new ArgumentException(
+                "Host must be non-empty ASCII without spaces or control characters (use the punycode form for international names).",
+                nameof(host));
 
         realm = realm?.Trim() ?? "";
         if (HasControlCharacters(realm))

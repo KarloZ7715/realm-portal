@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Realm Portal
+GenericName=Game Server Launcher
+GenericName[es]=Lanzador de servidores de juego
+Comment=Switch between game realms with one click
+Comment[es]=Cambia de reino con un clic
+Exec=realm-portal
+Icon=com.karloz7715.RealmPortal
+Terminal=false
+Categories=Game;Utility;
+Keywords=launcher;server;realm;private server;game;
+Keywords[es]=lanzador;servidor;reino;servidor privado;juego;
+StartupNotify=true
