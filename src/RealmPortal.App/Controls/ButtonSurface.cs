@@ -11,23 +11,26 @@ public enum ButtonSurfaceKind
 }
 
 /// <summary>
-/// Attached <see cref="Surface"/> on <see cref="Button"/>: leather (default) or parchment.
+/// Attached <see cref="Surface"/> on <see cref="Button"/> and <see cref="SplitButton"/>: leather (default) or parchment.
 /// Combines with the type style classes primary (default), <c>secondary</c>, and <c>ghost</c> (text).
 /// </summary>
 public static class ButtonSurface
 {
     public static readonly AttachedProperty<ButtonSurfaceKind> SurfaceProperty =
-        AvaloniaProperty.RegisterAttached<Button, ButtonSurfaceKind>("Surface", typeof(ButtonSurface), ButtonSurfaceKind.Leather);
+        AvaloniaProperty.RegisterAttached<Control, ButtonSurfaceKind>("Surface", typeof(ButtonSurface), ButtonSurfaceKind.Leather);
 
     static ButtonSurface()
     {
-        SurfaceProperty.Changed.AddClassHandler<Button>((button, args) =>
-        {
-            button.Classes.Set("surface-parchment", (ButtonSurfaceKind)args.NewValue! == ButtonSurfaceKind.Parchment);
-        });
+        SurfaceProperty.Changed.AddClassHandler<Button>(OnSurfaceChanged);
+        SurfaceProperty.Changed.AddClassHandler<SplitButton>(OnSurfaceChanged);
     }
 
-    public static ButtonSurfaceKind GetSurface(Button button) => button.GetValue(SurfaceProperty);
+    public static ButtonSurfaceKind GetSurface(Control control) => control.GetValue(SurfaceProperty);
 
-    public static void SetSurface(Button button, ButtonSurfaceKind value) => button.SetValue(SurfaceProperty, value);
+    public static void SetSurface(Control control, ButtonSurfaceKind value) => control.SetValue(SurfaceProperty, value);
+
+    private static void OnSurfaceChanged(Control control, AvaloniaPropertyChangedEventArgs args)
+    {
+        control.Classes.Set("surface-parchment", (ButtonSurfaceKind)args.NewValue! == ButtonSurfaceKind.Parchment);
+    }
 }

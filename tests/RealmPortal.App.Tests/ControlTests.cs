@@ -219,6 +219,26 @@ public class ControlTests
     }
 
     [AvaloniaFact]
+    public void ParchmentSplitButtonUsesParchmentPlateAndFocusRing()
+    {
+        var split = Host(new SplitButton { Content = "Play", Width = 200 });
+        ButtonSurface.SetSurface(split, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
+        Assert.Equal("primary-parchment", split.GetVisualDescendants().OfType<SplitPlate>().Single().Variant);
+        Assert.Equal("focus-ring-parchment", Source(split, "Ring"));
+    }
+
+    [AvaloniaFact]
+    public void SecondaryButtonInsideCardGetsParchmentSurface()
+    {
+        var button = new Button { Content = "Test", Classes = { "secondary" } };
+        var card = Host(new ContentControl { Classes = { "card" }, Content = button, Width = 300, Height = 80 });
+        Screenshots.Settle();
+        Assert.Equal(ButtonSurfaceKind.Parchment, ButtonSurface.GetSurface(button));
+        Assert.Equal("button-secondary-parchment-normal", Source(button, "Plate"));
+    }
+
+    [AvaloniaFact]
     public void ToggleArtFollowsTheControlState()
     {
         var box = Host(new CheckBox { Content = "x", IsChecked = true });
