@@ -79,7 +79,12 @@ rp switch Wotlk >/dev/null; rp undo >/dev/null
 [ ! -e "$PROJ_DIR/activo.json" ]; check QA-07a6 "undo of first-ever switch removes activo.json" $? "rc=$RC out=[$OUT] err=[$ERR]"
 
 # QA-07a7: a switch with --client-dir leaves a client-files journal; later switches without --client-dir must not let a
-# plain 'undo' replay that old journal. After undo the active server, the client's realmlist.wtf and activo.json must all be B.
+# plain 'undo' replay that old journal. Undo rule (docs/app-service.md, PR #58, AC changed 2026-10-17 after Seguridad's review):
+# every successful switch replaces last-switch.json, a switch without --client-dir journals no client_id and no backup_id, and
+# undo restores client files only for the journal's backup_id. So for 'switch A --client-dir C; switch B; switch A; undo' the
+# journal is empty at undo time: the active server and activo.json go back to B, and the client is NOT written at all. Its
+# realmlist.wtf keeps exactly what the first switch wrote (A's realmlist): neither B's realmlist nor the original file.
+# Anti-masking: if undo replayed the stale journal, realmlist.wtf would revert to orig.example.org; that must fail.
 # QA-07a7c (the realmlist.wtf check) REQUIRES THE CLIENT-FILES PATH from PR #58, where 'switch --client-dir' writes the
 # client files and journals them. A CLI without that path (e.g. main, where --client-dir only checks compatibility) never
 # touches the client, so there is nothing to replay: QA-07a7c is then recorded as KNOWN, not PASS and not FAIL.
@@ -94,6 +99,7 @@ CF_SIGNALS=""
 [ "$(sha "$C7/Data/enUS/realmlist.wtf")" != "$WTF7_0" ] && CF_SIGNALS="$CF_SIGNALS realmlist.wtf-written"
 [ -n "$(find "$WORK/backups" -name manifest.json -print -quit 2>/dev/null)" ] && CF_SIGNALS="$CF_SIGNALS backup-manifest"
 [ -e "$CONFIG_DIR/last-switch.json" ] && CF_SIGNALS="$CF_SIGNALS last-switch.json"
+WTF7_A="$(sha "$C7/Data/enUS/realmlist.wtf")"   # bytes written by 'switch A --client-dir'; undo must leave them untouched
 echo "INFO  QA-07a7 client-files path after 'switch --client-dir': ${CF_SIGNALS:- none (CLI did not write or journal client files)}"
 rp switch StaleB; SETUP="$SETUP; switch B rc=$RC"
 rp switch StaleA; SETUP="$SETUP; switch A rc=$RC"
@@ -103,11 +109,14 @@ RL_B="$(jq -r '.servers[] | select(.name == "StaleB") | .realmlist' "$CONFIG_DIR
 rp status; echo "$OUT" | grep -q '^Active server: StaleB '
 check QA-07a7b "stale journal: active server after undo is B" $? "$SETUP; undo=[$UNDO_OUT] status=[$OUT]"
 WTF7="$(tr -d '\r' < "$C7/Data/enUS/realmlist.wtf")"
-[ -n "$RL_B" ] && [ "$WTF7" = "$RL_B" ] && ! grep -q 'orig.example.org' "$C7/Data/enUS/realmlist.wtf"; ok=$?
+RL_A="$(jq -r '.servers[] | select(.name == "StaleA") | .realmlist' "$CONFIG_DIR/servers.json" | tr -d '\r')"
+[ -n "$RL_A" ] && [ "$WTF7" = "$RL_A" ] && [ "$(sha "$C7/Data/enUS/realmlist.wtf")" = "$WTF7_A" ] \
+  && ! grep -q 'orig.example.org' "$C7/Data/enUS/realmlist.wtf"; ok=$?
 if [ -n "$CF_SIGNALS" ]; then
-  check QA-07a7c "stale journal: client realmlist.wtf matches B's realmlist (not the original)" $ok "expected=[$RL_B] actual=[$WTF7] client-files signals:$CF_SIGNALS"
+  check QA-07a7c "stale journal: client realmlist.wtf untouched by undo (still A's realmlist, not the original, not B)" $ok \
+    "expected=[$RL_A] (bytes unchanged since 'switch A --client-dir') actual=[$WTF7] client-files signals:$CF_SIGNALS"
 else
-  known QA-07a7c "requires client-files path (PR #58)" "stale journal: client realmlist.wtf matches B's realmlist (not the original)" 1 \
+  known QA-07a7c "requires client-files path (PR #58)" "stale journal: client realmlist.wtf untouched by undo (still A's realmlist, not the original, not B)" 1 \
     "not run: 'switch --client-dir' wrote no client file, backup or last-switch.json in this run; realmlist.wtf=[$WTF7]"
 fi
 [ "$(jq -r '.name' "$PROJ_DIR/activo.json" 2>/dev/null)" = StaleB ] && [ "$(jq -r '.realmlist' "$PROJ_DIR/activo.json" | tr -d '\r')" = "$RL_B" ]

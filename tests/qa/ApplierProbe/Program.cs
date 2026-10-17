@@ -24,8 +24,9 @@ try
 {
     // Directory-boundary check. Path.GetFullPath alone does not resolve symlinks, so "<temp>/link/client" with link -> /elsewhere
     // would pass. Both sides are therefore resolved component by component: every existing symlink (absolute or relative target,
-    // chained links included) is followed, ".." is applied after resolution like the OS does, and the part of a path that does not
-    // exist yet (e.g. a new backup dir) is appended unresolved to its resolved existing ancestor. The temp root is resolved the same
+    // chained links included) is followed, ".." is applied after resolution like the OS does, and a component that does not exist yet
+    // (e.g. a new backup dir) is appended as-is while the walk goes on, so a later ".." that climbs back into an existing
+    // directory is followed by normal symlink resolution again. The temp root is resolved the same
     // way (on macOS /tmp -> /private/tmp). Then the temp root itself or "<root>/" must be a prefix, so sibling paths such as
     // /tmp-work or /tmp/work-evil (for TMPDIR=/tmp/work) are rejected too. Any resolution error fails closed (exit 1).
     string tmp, client, backup;
@@ -87,7 +88,8 @@ catch (Exception ex) when (ex is ArgumentException or ClientVersionException)
 }
 
 // Returns the absolute, symlink-free form of `path`. Existing components are resolved through their link targets
-// (relative targets are taken relative to the link's directory); components that do not exist are appended as-is.
+// (relative targets are taken relative to the link's directory); a component that does not exist is appended as-is
+// and the walk continues with the next one (a later ".." can lead back to existing directories and their symlinks).
 // Throws IOException on a symlink loop (more than 40 links followed).
 static string ResolveSymlinks(string path)
 {
@@ -125,11 +127,9 @@ static string ResolveSymlinks(string path)
             }
             else
             {
-                // First missing component: nothing below it can be a symlink yet, so keep the rest unresolved.
-                foreach (var rest in parts[i..])
-                    current = rest == ".." ? Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(current)) ?? root
-                            : rest == "." ? current : Path.Combine(current, rest);
-                break;
+                // Missing component: append only it and keep walking. A later ".." can climb back into an existing
+                // directory, and the components after that must still be resolved through their symlinks.
+                current = candidate;
             }
         }
         return current;
