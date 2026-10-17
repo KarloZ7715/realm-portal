@@ -113,6 +113,22 @@ public class CliServerFlowTests
     }
 
     [Fact]
+    public void Status_MarksBuildMismatch_Incompatible_LikeCompatibilityFilter()
+    {
+        using var box = new Sandbox(clientBuild: 8606);
+        Assert.Equal(0, box.Run("add", "Wotlk", "wotlk.example.org", "--build", "12340").Code);
+        Assert.Equal(0, box.Run("switch", "Wotlk", "--force").Code);
+
+        var client = new PeClientVersionReader().Read(box.Client);
+        var server = new ServerStore(box.Config, new RealmPortal.Core.IO.AtomicFileWriter()).Find("Wotlk")!;
+        Assert.False(CompatibilityFilter.IsCompatible(server, client));
+
+        var status = box.Run("status");
+        Assert.Equal(0, status.Code);
+        Assert.Contains($"Client: {client} (INCOMPATIBLE)", status.Out);
+    }
+
+    [Fact]
     public void Add_WithClientDir_DoesNotRegisterTheClient()
     {
         using var box = new Sandbox();

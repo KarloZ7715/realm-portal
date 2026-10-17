@@ -306,7 +306,7 @@ public sealed class CliApp(
             try
             {
                 var client = versionReader.Read(clientDir);
-                var compat = status.Active is null ? "" : status.Active.IsCompatible ? " (compatible)" : " (INCOMPATIBLE)";
+                var compat = status.Active is null ? "" : CompatibilityFilter.IsCompatible(status.Active, client) ? " (compatible)" : " (INCOMPATIBLE)";
                 output.WriteLine($"Client: {client}{compat}");
             }
             catch (ClientVersionException ex)
