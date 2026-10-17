@@ -8,8 +8,11 @@
   <StyleInclude Source="avares://RealmPortal.App/Theme/Typography.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Window.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Button.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/SplitButton.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Card.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/NavTab.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Badge.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Inputs.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/ScrollBar.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/ProgressBar.axaml"/>
 </Styles>

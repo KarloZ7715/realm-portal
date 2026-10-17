@@ -4,10 +4,11 @@
   <!--
     Button. Default = primary (wax leather plate). Style classes:
       secondary        dark leather plate with bronze edge
-      ghost            text only, on leather (hover/pressed tint)
-      ghost parchment  text only, on parchment (class "parchment" switches ink colours and the teal focus ring)
+      ghost            no plate; the kit's optional wood-brown plate appears on hover and pressed (on leather)
+      ghost parchment  outline plate on parchment (class "parchment" also switches ink colours and the teal focus ring)
       compact          36 px high instead of 40
-    Plates are the designer's 160x40 9-slice PNGs (inset 14); stretching beyond about 240 px wide smears the stitching (see ART-GAPS.md).
+    Plates are the kit's 160x40 leather pieces (insets 17,14,17,14), tiled on x so the stitching never stretches. For a
+    perfect stitch make the width 160 + 6k; other widths can shorten one stitch dash near the right cap.
     States: normal, :pointerover, :pressed, :disabled, :focus-visible (outer ring art, margin 8).
   -->
   <Styles.Resources>
@@ -27,13 +28,7 @@
           <Panel>
             <c:NineSlice Name="Ring" Source="focus-ring-leather" Insets="14" ShadowMargin="8"
                          Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
-            <Border Name="Tint" CornerRadius="{DynamicResource RadiusControl}" Opacity="0"
-                    Background="{DynamicResource Wood700Brush}">
-              <Border.Transitions>
-                <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12"/></Transitions>
-              </Border.Transitions>
-            </Border>
-            <c:NineSlice Name="Plate" Source="button-primary-normal" Insets="14"/>
+            <c:NineSlice Name="Plate" Source="button-primary-normal" Insets="17,14,17,14" TileX="True"/>
             <ContentPresenter Name="PART_ContentPresenter"
                               Padding="{TemplateBinding Padding}"
                               Content="{TemplateBinding Content}"
@@ -63,15 +58,19 @@
       <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
       <Style Selector="^.compact"><Setter Property="MinHeight" Value="36"/></Style>
 
-      <!-- ghost: no plate art exists yet (see ART-GAPS.md), so a flat tint layer stands in for hover and pressed -->
-      <Style Selector="^.ghost /template/ c|NineSlice#Plate"><Setter Property="IsVisible" Value="False"/></Style>
+      <!-- ghost: plate art only on hover/pressed (leather) or always (parchment) -->
+      <Style Selector="^.ghost /template/ c|NineSlice#Plate">
+        <Setter Property="Insets" Value="14"/><Setter Property="TileX" Value="False"/><Setter Property="IsVisible" Value="False"/>
+      </Style>
       <Style Selector="^.ghost:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource BoneBrush}"/></Style>
-      <Style Selector="^.ghost:pointerover /template/ Border#Tint"><Setter Property="Opacity" Value="1"/></Style>
-      <Style Selector="^.ghost:pressed /template/ Border#Tint"><Setter Property="Background" Value="{DynamicResource Wood600Brush}"/><Setter Property="Opacity" Value="1"/></Style>
-      <Style Selector="^.ghost:disabled /template/ Border#Tint"><Setter Property="Opacity" Value="0"/></Style>
+      <Style Selector="^.ghost:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-leather-hover"/><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^.ghost:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-leather-pressed"/><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^.ghost:disabled /template/ c|NineSlice#Plate"><Setter Property="IsVisible" Value="False"/></Style>
       <Style Selector="^.ghost.parchment:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
-      <Style Selector="^.ghost.parchment /template/ Border#Tint"><Setter Property="Background" Value="#33000000"/></Style>
-      <Style Selector="^.ghost.parchment:pressed /template/ Border#Tint"><Setter Property="Background" Value="#55000000"/></Style>
+      <Style Selector="^.ghost.parchment /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-parchment-normal"/><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^.ghost.parchment:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-parchment-hover"/></Style>
+      <Style Selector="^.ghost.parchment:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-parchment-pressed"/></Style>
+      <Style Selector="^.ghost.parchment:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="ghost-parchment-disabled"/></Style>
       <Style Selector="^.ghost.parchment /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-parchment"/></Style>
     </ControlTheme>
   </Styles.Resources>
