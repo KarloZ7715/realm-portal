@@ -1,0 +1,98 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Design tokens of direction B "Parchment and bronze" (DESIGN-TOKENS-B.md).
+    The design docs are in Spanish; this file uses English names. Mapping: cuero = Leather, madera = Wood,
+    costura = Stitch, bronce = Bronze, hueso = Bone, marfil = Ivory, pergamino = Parchment, tinta = Ink,
+    lacre = Wax (sealing wax), bosque = Forest, ambar = Amber, apagado = Muted, foco = Focus.
+    Every colour exists as a Color ("<Name>Color") and a SolidColorBrush ("<Name>Brush").
+    Hex values must stay in sync with the design file; the unit tests check a few of them.
+  -->
+  <Color x:Key="Leather950Color">#120C08</Color> <!-- leather/950 -->
+  <Color x:Key="Leather900Color">#1A110C</Color> <!-- leather/900 -->
+  <Color x:Key="Leather800Color">#25190F</Color> <!-- leather/800 -->
+  <Color x:Key="Wood700Color">#33241A</Color> <!-- wood/700 -->
+  <Color x:Key="Wood600Color">#42301F</Color> <!-- wood/600 -->
+  <Color x:Key="StitchColor">#8A6C4A</Color> <!-- stitch (costura) -->
+  <Color x:Key="BronzeDarkColor">#5A3D22</Color> <!-- bronze/dark -->
+  <Color x:Key="BronzeColor">#A8743F</Color> <!-- bronze -->
+  <Color x:Key="BronzeLightColor">#D2A268</Color> <!-- bronze/light -->
+  <Color x:Key="BoneColor">#EFE5CD</Color> <!-- bone (hueso) -->
+  <Color x:Key="BoneSoftColor">#C4B494</Color> <!-- bone/soft -->
+  <Color x:Key="IvoryColor">#F6EBD2</Color> <!-- ivory (marfil) -->
+  <Color x:Key="ParchmentPaperColor">#D8C7A0</Color> <!-- parchment/paper -->
+  <Color x:Key="ParchmentLightColor">#E9DDBF</Color> <!-- parchment/light -->
+  <Color x:Key="ParchmentShadowColor">#C2AE84</Color> <!-- parchment/shadow -->
+  <Color x:Key="InkColor">#2B2118</Color> <!-- ink (tinta) -->
+  <Color x:Key="InkSoftColor">#54442F</Color> <!-- ink/soft -->
+  <Color x:Key="WaxColor">#7A2723</Color> <!-- wax (lacre) -->
+  <Color x:Key="WaxHoverColor">#923530</Color> <!-- wax/hover -->
+  <Color x:Key="WaxPressedColor">#5A1C19</Color> <!-- wax/pressed -->
+  <Color x:Key="WaxTextColor">#8A2A25</Color> <!-- wax/text -->
+  <Color x:Key="WaxLightColor">#E58A7C</Color> <!-- wax/light -->
+  <Color x:Key="WaxShadowColor">#6E201D</Color> <!-- wax/shadow -->
+  <Color x:Key="ForestColor">#46704C</Color> <!-- forest (bosque) -->
+  <Color x:Key="ForestTextColor">#2D5B38</Color> <!-- forest/text -->
+  <Color x:Key="ForestLightColor">#8CC596</Color> <!-- forest/light -->
+  <Color x:Key="AmberColor">#8F5C0E</Color> <!-- amber (ambar) -->
+  <Color x:Key="AmberTextColor">#6E4509</Color> <!-- amber/text -->
+  <Color x:Key="AmberLightColor">#E8B04A</Color> <!-- amber/light -->
+  <Color x:Key="MutedColor">#6B5842</Color> <!-- muted (apagado) -->
+  <Color x:Key="FocusLeatherColor">#F0BC82</Color> <!-- focus/leather -->
+  <Color x:Key="FocusParchmentColor">#0F5561</Color> <!-- focus/parchment -->
+  <Color x:Key="BlackColor">#000000</Color> <!-- base/black -->
+  <Color x:Key="WhiteColor">#FFFFFF</Color> <!-- base/white -->
+
+  <SolidColorBrush x:Key="Leather950Brush" Color="{StaticResource Leather950Color}"/>
+  <SolidColorBrush x:Key="Leather900Brush" Color="{StaticResource Leather900Color}"/>
+  <SolidColorBrush x:Key="Leather800Brush" Color="{StaticResource Leather800Color}"/>
+  <SolidColorBrush x:Key="Wood700Brush" Color="{StaticResource Wood700Color}"/>
+  <SolidColorBrush x:Key="Wood600Brush" Color="{StaticResource Wood600Color}"/>
+  <SolidColorBrush x:Key="StitchBrush" Color="{StaticResource StitchColor}"/>
+  <SolidColorBrush x:Key="BronzeDarkBrush" Color="{StaticResource BronzeDarkColor}"/>
+  <SolidColorBrush x:Key="BronzeBrush" Color="{StaticResource BronzeColor}"/>
+  <SolidColorBrush x:Key="BronzeLightBrush" Color="{StaticResource BronzeLightColor}"/>
+  <SolidColorBrush x:Key="BoneBrush" Color="{StaticResource BoneColor}"/>
+  <SolidColorBrush x:Key="BoneSoftBrush" Color="{StaticResource BoneSoftColor}"/>
+  <SolidColorBrush x:Key="IvoryBrush" Color="{StaticResource IvoryColor}"/>
+  <SolidColorBrush x:Key="ParchmentPaperBrush" Color="{StaticResource ParchmentPaperColor}"/>
+  <SolidColorBrush x:Key="ParchmentLightBrush" Color="{StaticResource ParchmentLightColor}"/>
+  <SolidColorBrush x:Key="ParchmentShadowBrush" Color="{StaticResource ParchmentShadowColor}"/>
+  <SolidColorBrush x:Key="InkBrush" Color="{StaticResource InkColor}"/>
+  <SolidColorBrush x:Key="InkSoftBrush" Color="{StaticResource InkSoftColor}"/>
+  <SolidColorBrush x:Key="WaxBrush" Color="{StaticResource WaxColor}"/>
+  <SolidColorBrush x:Key="WaxHoverBrush" Color="{StaticResource WaxHoverColor}"/>
+  <SolidColorBrush x:Key="WaxPressedBrush" Color="{StaticResource WaxPressedColor}"/>
+  <SolidColorBrush x:Key="WaxTextBrush" Color="{StaticResource WaxTextColor}"/>
+  <SolidColorBrush x:Key="WaxLightBrush" Color="{StaticResource WaxLightColor}"/>
+  <SolidColorBrush x:Key="WaxShadowBrush" Color="{StaticResource WaxShadowColor}"/>
+  <SolidColorBrush x:Key="ForestBrush" Color="{StaticResource ForestColor}"/>
+  <SolidColorBrush x:Key="ForestTextBrush" Color="{StaticResource ForestTextColor}"/>
+  <SolidColorBrush x:Key="ForestLightBrush" Color="{StaticResource ForestLightColor}"/>
+  <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}"/>
+  <SolidColorBrush x:Key="AmberTextBrush" Color="{StaticResource AmberTextColor}"/>
+  <SolidColorBrush x:Key="AmberLightBrush" Color="{StaticResource AmberLightColor}"/>
+  <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedColor}"/>
+  <SolidColorBrush x:Key="FocusLeatherBrush" Color="{StaticResource FocusLeatherColor}"/>
+  <SolidColorBrush x:Key="FocusParchmentBrush" Color="{StaticResource FocusParchmentColor}"/>
+  <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource BlackColor}"/>
+  <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource WhiteColor}"/>
+
+  <!-- Spacing scale (px) -->
+  <x:Double x:Key="Space2">2</x:Double><x:Double x:Key="Space4">4</x:Double><x:Double x:Key="Space8">8</x:Double>
+  <x:Double x:Key="Space12">12</x:Double><x:Double x:Key="Space16">16</x:Double><x:Double x:Key="Space20">20</x:Double>
+  <x:Double x:Key="Space24">24</x:Double><x:Double x:Key="Space32">32</x:Double><x:Double x:Key="Space48">48</x:Double>
+
+  <!-- Shape -->
+  <CornerRadius x:Key="RadiusControl">4</CornerRadius>
+  <CornerRadius x:Key="RadiusPanel">6</CornerRadius>
+  <CornerRadius x:Key="RadiusWindow">8</CornerRadius>
+  <x:Double x:Key="BorderThin">1</x:Double>
+  <x:Double x:Key="BorderMedium">1.5</x:Double>
+  <x:Double x:Key="BorderFrame">2</x:Double>
+  <x:Double x:Key="FocusRingThickness">2</x:Double>
+  <x:Double x:Key="FocusRingGap">3</x:Double>
+  <x:Double x:Key="RivetSize">5</x:Double>
+  <!-- Touch target minimum (UX-DESIGN.md) -->
+  <x:Double x:Key="MinTarget">36</x:Double>
+</ResourceDictionary>

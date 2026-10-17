@@ -6,7 +6,7 @@ Desktop launcher for World of Warcraft private servers. You add your own servers
 
 ## Status
 
-Phase 1: project skeleton (empty window).
+Phase 3a (in progress): visual layer "Parchment and bronze" (tokens, fonts, themed controls, component gallery).
 
 ## Layout
 
@@ -14,7 +14,8 @@ Phase 1: project skeleton (empty window).
 src/RealmPortal.Core     core library
 src/RealmPortal.Cli      command-line tool
 src/RealmPortal.App      Avalonia desktop app
-tests/RealmPortal.Tests  xunit tests
+tests/RealmPortal.Tests  xunit tests (core)
+tests/RealmPortal.App.Tests  headless Avalonia tests and screenshots (UI)
 assets/                  textures, frames, icons, fonts (see assets/ASSETS.md)
 ```
 

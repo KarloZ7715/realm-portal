@@ -11,6 +11,7 @@ Checked against the restored packages' `.nuspec` files (Phase 1, 2026-10-17).
 | Package | Version | License | Use |
 |---|---|---|---|
 | Avalonia, Avalonia.Desktop, Avalonia.Themes.Fluent | 11.3.22 | MIT (© The AvaloniaUI Project) | cross-platform UI (`RealmPortal.App`) |
+| Avalonia.Headless, Avalonia.Headless.XUnit, Avalonia.Skia | 11.3.22 | MIT (© The AvaloniaUI Project) | headless UI tests and screenshots (development only) |
 | Microsoft.NET.Test.Sdk | 17.12.0 | MIT | tests (development only) |
 | xunit | 2.9.3 | Apache-2.0 | tests (development only) |
 | xunit.runner.visualstudio | 2.8.2 | Apache-2.0 | tests (development only) |
@@ -58,6 +59,8 @@ Downloaded on 2026-10-17 from the official google/fonts repository (`ofl/` folde
 | Alegreya | `alegreya/Alegreya[wght].ttf` (original variable font), `Alegreya-Regular/Medium/Bold.ttf` (static instances derived with fontTools), `OFL.txt` | © 2011 The Alegreya Project Authors | none | https://github.com/google/fonts/tree/main/ofl/alegreya |
 | Alegreya Sans | `alegreyasans/AlegreyaSans-Regular/Medium/Bold.ttf` (unmodified), `OFL.txt` | © 2013 The Alegreya Sans Project Authors | none | https://github.com/google/fonts/tree/main/ofl/alegreyasans |
 | JetBrains Mono | `jetbrainsmono/JetBrainsMono[wght].ttf` (original variable font), `JetBrainsMono-Regular.ttf` (static instance derived with fontTools), `OFL.txt` | © 2020 The JetBrains Mono Project Authors | none | https://github.com/google/fonts/tree/main/ofl/jetbrainsmono |
+
+Bundled in the app as resources (`src/RealmPortal.App/RealmPortal.App.csproj`, linked from `assets/fonts/`): the static TTFs only (Almendra Bold, Marcellus SC, Alegreya Regular/Medium/Bold, Alegreya Sans Regular/Medium/Bold, JetBrains Mono Regular) plus each family's `OFL.txt` under `Assets/Fonts/licenses/`. The variable fonts are not bundled. The Medium weights are registered under their own family names ("Alegreya Medium", "Alegreya Sans Medium").
 
 The static instances of Alegreya and JetBrains Mono are derivative works permitted by the OFL (no RFN); they are distributed with the same `OFL.txt`.
 

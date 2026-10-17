@@ -18,4 +18,20 @@
   <ItemGroup>
     <AvaloniaResource Include="..\..\assets\icons\app\app-icon-256.png" Link="Assets/app-icon.png" />
   </ItemGroup>
+  <ItemGroup Label="Bundled fonts (SIL OFL 1.1). Static instances only; the variable fonts in assets/fonts are not bundled.">
+    <AvaloniaResource Include="..\..\assets\fonts\almendra\Almendra-Bold.ttf" Link="Assets/Fonts/Almendra-Bold.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\marcellussc\MarcellusSC-Regular.ttf" Link="Assets/Fonts/MarcellusSC-Regular.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\alegreya\Alegreya-Regular.ttf" Link="Assets/Fonts/Alegreya-Regular.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\alegreya\Alegreya-Medium.ttf" Link="Assets/Fonts/Alegreya-Medium.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\alegreya\Alegreya-Bold.ttf" Link="Assets/Fonts/Alegreya-Bold.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\alegreyasans\AlegreyaSans-Regular.ttf" Link="Assets/Fonts/AlegreyaSans-Regular.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\alegreyasans\AlegreyaSans-Medium.ttf" Link="Assets/Fonts/AlegreyaSans-Medium.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\alegreyasans\AlegreyaSans-Bold.ttf" Link="Assets/Fonts/AlegreyaSans-Bold.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\jetbrainsmono\JetBrainsMono-Regular.ttf" Link="Assets/Fonts/JetBrainsMono-Regular.ttf" />
+    <AvaloniaResource Include="..\..\assets\fonts\almendra\OFL.txt" Link="Assets/Fonts/licenses/OFL-Almendra.txt" />
+    <AvaloniaResource Include="..\..\assets\fonts\marcellussc\OFL.txt" Link="Assets/Fonts/licenses/OFL-MarcellusSC.txt" />
+    <AvaloniaResource Include="..\..\assets\fonts\alegreya\OFL.txt" Link="Assets/Fonts/licenses/OFL-Alegreya.txt" />
+    <AvaloniaResource Include="..\..\assets\fonts\alegreyasans\OFL.txt" Link="Assets/Fonts/licenses/OFL-AlegreyaSans.txt" />
+    <AvaloniaResource Include="..\..\assets\fonts\jetbrainsmono\OFL.txt" Link="Assets/Fonts/licenses/OFL-JetBrainsMono.txt" />
+  </ItemGroup>
 </Project>
