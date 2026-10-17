@@ -16,13 +16,26 @@ public static class ClientPathSecurity
         return (attributes & FileAttributes.ReparsePoint) != 0;
     }
 
+    /// <summary>Rejects paths with a symlink or reparse point on any path prefix (including parents).</summary>
+    public static void EnsureTrustedDirectoryPath(string directoryPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directoryPath);
+        var full = Path.GetFullPath(directoryPath);
+        for (var current = full; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
+        {
+            if (Directory.Exists(current) && IsReparsePointOrSymlink(current))
+                throw new StoreException($"Path '{full}' cannot be used because '{current}' is a symbolic link or reparse point.");
+        }
+    }
+
     /// <summary>Canonical folder path that must match <see cref="ClientIds.FromFolderPath"/> for the stored id.</summary>
     public static string CanonicalizeTrustedFolder(string folderPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
         var full = Path.GetFullPath(folderPath);
-        if (IsReparsePointOrSymlink(full))
-            throw new StoreException($"Client folder '{full}' is a symbolic link or reparse point and cannot be registered.");
+        EnsureTrustedDirectoryPath(full);
+        if (!Directory.Exists(full))
+            throw new StoreException($"Client folder '{full}' does not exist.");
         return full;
     }
 }
