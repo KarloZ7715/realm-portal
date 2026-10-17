@@ -2,7 +2,7 @@
 
 `RealmPortal.Core.ClientFiles` changes the game client's own files so that it connects to the selected server.
 This page describes **what is written** (the planner). Backup, apply and undo are described in
-[client-files-backup.md](client-files-backup.md) once that part lands.
+a separate page once that part lands.
 
 ## Source of truth
 
