@@ -7,7 +7,7 @@ namespace RealmPortal.Cli;
 
 internal static class ServiceCli
 {
-    public static string Describe(ServiceError error)
+    public static string Describe(ServiceError error, bool verbose = false)
     {
         return error.Code switch
         {
@@ -21,10 +21,23 @@ internal static class ServiceCli
             ServiceErrorCode.GameRunning => "The game is running; close it before changing client files.",
             ServiceErrorCode.LaunchFailed => string.IsNullOrEmpty(error.Diagnostic) ? "Launch failed." : error.Diagnostic,
             ServiceErrorCode.InvalidRealmlist => error.Diagnostic,
-            ServiceErrorCode.StoreCorrupt => error.Diagnostic,
-            ServiceErrorCode.InconsistentState => error.Diagnostic,
+            ServiceErrorCode.StoreCorrupt => verbose && !string.IsNullOrEmpty(error.Diagnostic)
+                ? error.Diagnostic
+                : "A config file is corrupt or unreadable.",
+            ServiceErrorCode.InconsistentState => verbose && !string.IsNullOrEmpty(error.Diagnostic)
+                ? error.Diagnostic
+                : "The app state may be inconsistent; review config and client files.",
             ServiceErrorCode.UndoConflict => "Client files changed since the switch; undo stopped.",
-            _ => string.IsNullOrEmpty(error.Diagnostic) ? error.Code.ToString() : error.Diagnostic,
+            ServiceErrorCode.PermissionDenied => verbose && !string.IsNullOrEmpty(error.Diagnostic)
+                ? error.Diagnostic
+                : "Permission denied.",
+            ServiceErrorCode.ReadOnlyFs => verbose && !string.IsNullOrEmpty(error.Diagnostic)
+                ? error.Diagnostic
+                : "The file system or directory is read-only.",
+            ServiceErrorCode.Unexpected => verbose && !string.IsNullOrEmpty(error.Diagnostic)
+                ? error.Diagnostic
+                : "An unexpected error occurred.",
+            _ => verbose && !string.IsNullOrEmpty(error.Diagnostic) ? error.Diagnostic : error.Code.ToString(),
         };
     }
 

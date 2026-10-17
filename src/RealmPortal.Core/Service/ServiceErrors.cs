@@ -20,7 +20,15 @@ internal static class ServiceErrors
             ClientVersionException cve => FromClientVersion(cve, consistency),
             StoreException se => FromStore(se, consistency),
             ArgumentException ae => FromArgument(ae, consistency),
-            _ => new(ServiceErrorCode.Unexpected, Consistency: consistency, Diagnostic: ex.ToString()),
+            UnauthorizedAccessException uae => new(
+                ServiceErrorCode.PermissionDenied,
+                Consistency: consistency,
+                Diagnostic: uae.Message),
+            IOException io => new(
+                ServiceErrorCode.ReadOnlyFs,
+                Consistency: consistency,
+                Diagnostic: io.Message),
+            _ => new(ServiceErrorCode.Unexpected, Consistency: consistency, Diagnostic: ex.Message),
         };
 
     public static ServiceError FromClientFiles(ClientFilesException ex, Consistency consistency = Consistency.Unchanged)
