@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using RealmPortal.Cli;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
@@ -12,7 +11,8 @@ public class Bug4ReadOnlyProjectionCliTests
     [Fact]
     public void Switch_WithReadOnlyProjectionDir_PrintsShortError_NotStackTrace()
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        // A privileged process (root) ignores directory mode bits, so clearing write bits does not make the projection unwritable.
+        if (SkipsReadOnlyDirectoryAssertion(OperatingSystem.IsLinux(), Environment.IsPrivilegedProcess))
             return;
 
         using var dir = new TempDirectory();
@@ -43,6 +43,19 @@ public class Bug4ReadOnlyProjectionCliTests
             File.SetUnixFileMode(projection, mode);
         }
     }
+
+    [Fact]
+    public void ReadOnlyProjectionAssertion_SkipsWhenPrivilegedProcessIgnoresModeBits()
+    {
+        Assert.True(SkipsReadOnlyDirectoryAssertion(isLinux: true, isPrivilegedProcess: true));
+        Assert.False(SkipsReadOnlyDirectoryAssertion(isLinux: true, isPrivilegedProcess: false));
+        Assert.True(SkipsReadOnlyDirectoryAssertion(isLinux: false, isPrivilegedProcess: false));
+        Assert.True(SkipsReadOnlyDirectoryAssertion(isLinux: false, isPrivilegedProcess: true));
+    }
+
+    // Same guard as ActiveServerManagerTests: directory mode bits are not enforced for a privileged process.
+    internal static bool SkipsReadOnlyDirectoryAssertion(bool isLinux, bool isPrivilegedProcess) =>
+        !isLinux || isPrivilegedProcess;
 
     private sealed class FakeLauncher : IGameLauncher
     {
