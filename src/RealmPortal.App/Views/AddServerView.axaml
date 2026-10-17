@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.AddServerView"
+             x:DataType="vm:AddServerViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
+    <StackPanel Margin="20,10,20,0">
+      <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Height="44" VerticalAlignment="Center" Text="{loc:T add.title}"/>
+      <ContentControl Classes="card" Padding="22,12,22,16" Margin="0,2,0,0">
+        <StackPanel>
+          <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,8">
+            <TextBlock Classes="sheet-title" VerticalAlignment="Center" Text="{loc:T add.sheet}"/>
+            <c:Badge Grid.Column="1" Name="ResultBadge" IsVisible="{Binding HasResult}" Status="{Binding ResultStatus}" Text="{Binding ResultText}"/>
+          </Grid>
+          <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,0,0,14"/>
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="20" RowSpacing="12">
+          <StackPanel Spacing="6" Grid.Column="0" Grid.Row="0">
+            <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.name}"/>
+            <TextBox Name="NameBox" Classes="parchment" Classes.error="{Binding HasNameError}" Text="{Binding Name, Mode=TwoWay}" MaxLength="64"/>
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !HasNameError}">
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.name.help}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasNameError}">
+              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+              <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding NameError}"/>
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Spacing="6" Grid.Column="1" Grid.Row="0">
+            <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.address}"/>
+            <TextBox Name="AddressBox" Classes="parchment" Classes.error="{Binding HasAddressError}" Text="{Binding Address, Mode=TwoWay}" Watermark="logon.ejemplo.com:3724"/>
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !HasAddressError}">
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.address.help}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasAddressError}">
+              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+              <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding AddressError}"/>
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Spacing="6" Grid.Column="0" Grid.Row="1">
+            <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.client}"/>
+            <ComboBox Name="ClientBox" Classes="parchment" Classes.error="{Binding HasClientError}" HorizontalAlignment="Stretch" ItemsSource="{Binding Clients.Items}" SelectedItem="{Binding SelectedClient, Mode=TwoWay}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ClientItemViewModel"><TextBlock Text="{Binding Label}"/></DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !HasClientError}">
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.client.help}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasClientError}">
+              <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+              <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding ClientError}"/>
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Spacing="6" Grid.Column="1" Grid.Row="1">
+            <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.account}"/>
+            <TextBox Name="AccountBox" Classes="parchment" Text="{Binding Account, Mode=TwoWay}" MaxLength="32"/>
+            <StackPanel Orientation="Horizontal" Spacing="6" >
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.account.help}"/>
+            </StackPanel>
+          </StackPanel>
+          </Grid>
+        </StackPanel>
+      </ContentControl>
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,16,0,0">
+        <Button Name="TestButton" Classes="secondary" Width="210" Command="{Binding TestCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <c:Icon Data="{DynamicResource IconRefresh}" Width="14" Height="14" StrokeThickness="2.2"/>
+            <TextBlock Text="{loc:T add.test}"/>
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="2" Name="CancelButton" Classes="link caps" Margin="0,0,22,0" VerticalAlignment="Center" Command="{Binding CancelCommand}">
+          <TextBlock Text="{loc:T add.cancel}"/>
+        </Button>
+        <Button Grid.Column="3" Name="SaveButton" Width="172" Command="{Binding SaveCommand}">
+          <TextBlock Text="{loc:T add.save}"/>
+        </Button>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -18,6 +18,8 @@
   </Window.Styles>
   <Window.DataTemplates>
     <DataTemplate DataType="vm:ServersViewModel"><v:ServersView/></DataTemplate>
+    <DataTemplate DataType="vm:ClientsViewModel"><v:ClientsView/></DataTemplate>
+    <DataTemplate DataType="vm:AddServerViewModel"><v:AddServerView/></DataTemplate>
     <DataTemplate DataType="vm:PlaceholderViewModel"><v:PlaceholderView/></DataTemplate>
   </Window.DataTemplates>
   <Grid RowDefinitions="*,Auto">
