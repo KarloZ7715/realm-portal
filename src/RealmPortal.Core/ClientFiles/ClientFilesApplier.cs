@@ -17,13 +17,15 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     private readonly IGameProcessProbe _probe;
     private readonly string _backupRoot;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly TimeSpan _lockTimeout;
 
     public ClientFilesApplier(
         IClientFilesPlanner planner,
         IAtomicFileWriter writer,
         IGameProcessProbe probe,
         string backupRoot,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        TimeSpan? lockTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(planner);
         ArgumentNullException.ThrowIfNull(writer);
@@ -34,6 +36,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         _probe = probe;
         _backupRoot = Path.GetFullPath(backupRoot);
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _lockTimeout = lockTimeout ?? TimeSpan.FromSeconds(10);
     }
 
     /// <summary>Where backups live by default: <c>$REALM_PORTAL_BACKUP_DIR</c>, else <c>realm-portal/backups</c> under the platform local app-data folder.</summary>
@@ -56,6 +59,8 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
         if (_probe.IsGameRunning(plan.ClientRoot))
             throw new ClientFilesException(ClientFilesErrorCode.GameRunning, plan.ClientRoot, "The game is running; close it before changing its files.");
+
+        using var installationLock = AcquireLock(plan.InstallationId);
 
         // Read and verify the current state of every file before touching anything.
         var targets = new List<Target>();
@@ -111,6 +116,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     public UndoResult Undo(string installationId)
     {
         RequireValidIds(installationId, "-");
+        using var installationLock = AcquireLock(installationId);
         var (manifestPath, manifest) = FindPending(installationId)
             ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
                 $"There is no applied change to undo for '{installationId}'.");
@@ -252,13 +258,41 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                     _writer.WriteAllBytes(t.Path, t.Original);
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ClientFilesException)
             {
-                ok = false;
+                ok = false; // keep reverting the other files; the caller sees the original failure
             }
         }
 
         return ok;
+    }
+
+    /// <summary>
+    /// Serializes Apply and Undo per installation, across threads and processes, with an exclusive lock file
+    /// (<c>&lt;backupRoot&gt;/&lt;installationId&gt;/.lock</c>) held for the whole check-and-write sequence.
+    /// </summary>
+    private FileStream AcquireLock(string installationId)
+    {
+        var dir = Path.Combine(_backupRoot, installationId);
+        var path = Path.Combine(dir, ".lock");
+        Guard(() => Directory.CreateDirectory(dir), dir, "create backup folder");
+        var deadline = DateTime.UtcNow + _lockTimeout;
+        while (true)
+        {
+            try
+            {
+                return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(50);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new ClientFilesException(ClientFilesErrorCode.PermissionDenied, path,
+                    $"Another operation is already running for installation '{installationId}' (or '{path}' is not accessible): {ex.Message}", ex);
+            }
+        }
     }
 
     private static void TryDeleteDirectory(string path)
