@@ -10,4 +10,8 @@
     <Authors>Realm Portal contributors</Authors>
     <Version>0.1.0</Version>
   </PropertyGroup>
+  <!-- Trimmed publish disables JSON reflection by default; the app uses JsonSerializer for config and loc tables. -->
+  <PropertyGroup Condition="'$(PublishTrimmed)' == 'true'">
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
 </Project>
