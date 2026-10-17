@@ -157,6 +157,8 @@
     </ControlTheme>
   </Styles.Resources>
   <Style Selector="TextBox"><Setter Property="Theme" Value="{StaticResource RpTextBox}"/></Style>
+  <!-- Commands, paths and variables are typed in mono. -->
+  <Style Selector="TextBox.mono"><Setter Property="FontFamily" Value="{DynamicResource FontMono}"/><Setter Property="FontSize" Value="14"/></Style>
   <Style Selector="CheckBox"><Setter Property="Theme" Value="{StaticResource RpCheckBox}"/></Style>
   <Style Selector="RadioButton"><Setter Property="Theme" Value="{StaticResource RpRadioButton}"/></Style>
   <Style Selector="ToggleButton.switch"><Setter Property="Theme" Value="{StaticResource RpSwitch}"/></Style>
