@@ -12,12 +12,16 @@
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Simple" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="RealmPortal.App.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RealmPortal.Core\RealmPortal.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup Label="UI strings (Spanish and English), loaded by Localization/Loc.cs">
+    <AvaloniaResource Include="Localization\Strings\*.json" />
   </ItemGroup>
   <ItemGroup>
     <AvaloniaResource Include="..\..\assets\branding\icon\png\realm-portal-256.png" Link="Assets/app-icon.png" />
