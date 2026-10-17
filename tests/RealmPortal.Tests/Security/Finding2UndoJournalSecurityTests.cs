@@ -50,9 +50,10 @@ public class Finding2UndoJournalSecurityTests
         File.WriteAllBytes(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf"), Encoding.Latin1.GetBytes(tampered));
 
         var recovered = new PortalService(env.Config, env.Projection, new PeClientVersionReader(), new NoLaunch(), new NeverRunning(), _ => env.Backups);
-        Assert.Equal(env.ServerA.Id, recovered.GetStatus().Value!.Active!.Id);
-        Assert.False(recovered.GetStatus().Value!.CanUndo);
+        Assert.Equal(env.ServerB.Id, recovered.GetStatus().Value!.Active!.Id);
+        Assert.True(recovered.GetStatus().Value!.CanUndo);
         Assert.Contains("tampered.example.org", File.ReadAllText(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf")));
+        Assert.True(File.Exists(journalPath));
     }
 
     private sealed class UndoEnv : IDisposable
