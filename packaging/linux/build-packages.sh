@@ -32,13 +32,23 @@ install_tree() {
   cp -a "${PUBLISH_DIR}/." "${dest_lib}/"
 }
 
-write_launcher() {
+write_deb_launcher() {
   local launcher_path="$1"
-  local install_lib="$2"
-  cat >"${launcher_path}" <<EOF
+  cat >"${launcher_path}" <<'EOF'
 #!/bin/sh
 set -eu
-exec "${install_lib}/RealmPortal.App" "\$@"
+exec /opt/realm-portal/RealmPortal.App "$@"
+EOF
+  chmod 755 "${launcher_path}"
+}
+
+write_appimage_launcher() {
+  local launcher_path="$1"
+  cat >"${launcher_path}" <<'EOF'
+#!/bin/sh
+set -eu
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "${HERE}/../lib/realm-portal/RealmPortal.App" "$@"
 EOF
   chmod 755 "${launcher_path}"
 }
@@ -55,7 +65,7 @@ mkdir -p "${DEB_STAGING}/DEBIAN" \
   "${DEB_STAGING}/usr/share/icons"
 
 install_tree "${DEB_STAGING}${DEB_INSTALL_LIB}"
-write_launcher "${DEB_STAGING}/usr/bin/realm-portal" "${DEB_INSTALL_LIB}"
+write_deb_launcher "${DEB_STAGING}/usr/bin/realm-portal"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${DEB_STAGING}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
@@ -88,7 +98,7 @@ mkdir -p "${APPIMAGE_INSTALL_LIB}" \
   "${APPDIR}/usr/share/icons"
 
 install_tree "${APPIMAGE_INSTALL_LIB}"
-write_launcher "${APPDIR}/usr/bin/realm-portal" "${APPIMAGE_INSTALL_LIB}"
+write_appimage_launcher "${APPDIR}/usr/bin/realm-portal"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${APPDIR}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
