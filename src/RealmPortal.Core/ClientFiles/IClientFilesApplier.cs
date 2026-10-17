@@ -61,14 +61,13 @@ public interface IClientFilesApplier
     /// Undoes the most recent applied change of the installation that has not been undone yet. Files whose current
     /// content is not what the apply wrote are reported as conflicts and never overwritten.
     /// </summary>
-    /// <exception cref="ClientFilesException"><see cref="ClientFilesErrorCode.NothingToUndo"/> when no change is pending.</exception>
-    UndoResult Undo(string installationId);
-
     /// <summary>
     /// Undoes a specific pending backup (or the newest pending one when <paramref name="backupId"/> is null).
-    /// <paramref name="clientRoot"/> is the trusted client folder from <see cref="Clients.ClientStore"/> (never the manifest path).
+    /// <paramref name="clientRoot"/> is the trusted client folder from <see cref="Clients.ClientStore"/> (must match the backup manifest).
     /// When <paramref name="markUndone"/> is false, restored files stay pending in the manifest until <see cref="MarkBackupUndone"/>.
     /// </summary>
+    /// <param name="clientRoot">The installation's trusted client directory (must match the backup manifest).</param>
+    /// <exception cref="ClientFilesException"><see cref="ClientFilesErrorCode.NothingToUndo"/> when no change is pending.</exception>
     UndoResult Undo(string installationId, string clientRoot, string? backupId = null, bool markUndone = true, InstallationLock? installationLock = null);
 
     /// <summary>Marks a backup as fully undone after the application state undo has been committed.</summary>

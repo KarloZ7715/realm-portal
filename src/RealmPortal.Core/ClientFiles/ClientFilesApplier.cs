@@ -80,14 +80,15 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         if (plan.IsEmpty)
             return new ApplyResult(null, []);
 
-        if (_probe.IsGameRunning(plan.ClientRoot))
-            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, plan.ClientRoot, "The game is running; close it before changing its files.");
+        var clientRoot = ClientPaths.CanonicalRoot(plan.ClientRoot);
+        if (_probe.IsGameRunning(clientRoot))
+            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, clientRoot, "The game is running; close it before changing its files.");
 
         // Read and verify the current state of every file before touching anything.
         var targets = new List<Target>();
         foreach (var edit in plan.Edits)
         {
-            var path = ResolveInside(plan.ClientRoot, edit.RelativePath);
+            var path = ClientPaths.ResolveManagedPath(clientRoot, edit.RelativePath);
             var original = ReadIfExists(path);
             var currentHash = original is null ? null : ClientFilesIo.Sha256Hex(original);
             if (!string.Equals(currentHash, edit.Sha256Before, StringComparison.Ordinal))
@@ -103,7 +104,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         var backupDir = Path.Combine(_backupRoot, plan.InstallationId, backupId);
         try
         {
-            WriteBackup(plan, backupId, backupDir, targets);
+            WriteBackup(plan, clientRoot, backupId, backupDir, targets);
         }
         catch
         {
@@ -135,19 +136,11 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         return new ApplyResult(backupId, plan.Edits);
     }
 
-    public UndoResult Undo(string installationId)
-    {
-        RequireValidIds(installationId, "-");
-        var pending = FindPending(installationId)
-                      ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
-                          $"There is no applied change to undo for '{installationId}'.");
-        return Undo(installationId, pending.Manifest.ClientRoot);
-    }
-
     public UndoResult Undo(string installationId, string clientRoot, string? backupId = null, bool markUndone = true, InstallationLock? installationLock = null)
     {
         RequireValidIds(installationId, "-");
         ArgumentException.ThrowIfNullOrWhiteSpace(clientRoot);
+        var trustedRoot = ClientPaths.CanonicalRoot(clientRoot);
         if (backupId is not null && !BackupIdFormat.IsValid(backupId))
             throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, clientRoot, $"Backup id '{backupId}' is not valid.");
 
@@ -166,43 +159,50 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             if (backupId is not null && !string.Equals(manifest.BackupId, backupId, StringComparison.Ordinal))
                 throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, clientRoot, "The pending backup id does not match the requested rollback.");
 
-            if (_probe.IsGameRunning(clientRoot))
-                throw new ClientFilesException(ClientFilesErrorCode.GameRunning, clientRoot, "The game is running; close it before restoring its files.");
+            ClientPaths.RequireMatchingRoots(trustedRoot, manifest.ClientRoot, manifestPath);
+
+            if (_probe.IsGameRunning(trustedRoot))
+                throw new ClientFilesException(ClientFilesErrorCode.GameRunning, trustedRoot, "The game is running; close it before restoring its files.");
 
             var backupDir = Path.GetDirectoryName(manifestPath)!;
+
+            // Resolve every manifest path before restoring anything so a bad entry cannot leave a partial undo.
+            var resolved = manifest.Files
+                .Select(file => (file, path: ClientPaths.ResolveManagedPath(trustedRoot, file.Path)))
+                .ToList();
+
             var results = new List<UndoFileResult>();
-            foreach (var file in manifest.Files)
+            foreach (var (file, path) in resolved)
             {
-                var path = ResolveInside(clientRoot, file.Path);
-            var current = ReadIfExists(path);
-            var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
+                var current = ReadIfExists(path);
+                var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
 
-            UndoFileStatus status;
-            if (string.Equals(currentHash, file.Sha256Before, StringComparison.Ordinal))
-            {
-                status = UndoFileStatus.AlreadyRestored;
-            }
-            else if (!string.Equals(currentHash, file.Sha256After, StringComparison.Ordinal))
-            {
-                status = UndoFileStatus.Conflict;
-            }
-            else if (!file.Existed)
-            {
-                Guard(() => File.Delete(path), path, "delete");
-                status = UndoFileStatus.Deleted;
-            }
-            else
-            {
-                var original = ReadBackupFile(backupDir, file);
-                Guard(() => _writer.WriteAllBytes(path, original), path, "restore");
-                var restored = Guard(() => File.ReadAllBytes(path), path, "read back");
-                if (ClientFilesIo.Sha256Hex(restored) != file.Sha256Before)
-                    throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
-                status = UndoFileStatus.Restored;
-            }
+                UndoFileStatus status;
+                if (string.Equals(currentHash, file.Sha256Before, StringComparison.Ordinal))
+                {
+                    status = UndoFileStatus.AlreadyRestored;
+                }
+                else if (!string.Equals(currentHash, file.Sha256After, StringComparison.Ordinal))
+                {
+                    status = UndoFileStatus.Conflict;
+                }
+                else if (!file.Existed)
+                {
+                    Guard(() => File.Delete(path), path, "delete");
+                    status = UndoFileStatus.Deleted;
+                }
+                else
+                {
+                    var original = ReadBackupFile(backupDir, file);
+                    Guard(() => _writer.WriteAllBytes(path, original), path, "restore");
+                    var restored = Guard(() => File.ReadAllBytes(path), path, "read back");
+                    if (ClientFilesIo.Sha256Hex(restored) != file.Sha256Before)
+                        throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
+                    status = UndoFileStatus.Restored;
+                }
 
-            results.Add(new UndoFileResult(file.Path, status));
-        }
+                results.Add(new UndoFileResult(file.Path, status));
+            }
 
             var result = new UndoResult(manifest.BackupId, results);
             if (!result.HasConflicts && markUndone)
@@ -252,7 +252,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     // ---- backup ----
 
-    private void WriteBackup(ClientFilesPlan plan, string backupId, string backupDir, List<Target> targets)
+    private void WriteBackup(ClientFilesPlan plan, string clientRoot, string backupId, string backupDir, List<Target> targets)
     {
         var files = new List<ManifestFile>();
         for (var i = 0; i < targets.Count; i++)
@@ -279,7 +279,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             backupId,
             plan.InstallationId,
             plan.ProfileId,
-            plan.ClientRoot,
+            clientRoot,
             plan.Version.ToString(),
             _clock(),
             null,
@@ -438,15 +438,6 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             throw new ArgumentException("InstallationId must be 1-64 characters of letters, digits, '.', '_' or '-'.", nameof(installationId));
         if (profileId != "-" && !ClientFilesRequest.IsValidId(profileId))
             throw new ArgumentException("ProfileId must be 1-64 characters of letters, digits, '.', '_' or '-'.", nameof(profileId));
-    }
-
-    /// <summary>Joins a '/'-separated relative path below the client root, refusing anything that could leave it.</summary>
-    private static string ResolveInside(string root, string relative)
-    {
-        var segments = relative.Split('/');
-        if (segments.Any(s => s.Length == 0 || s is "." or ".." || s.Contains('\\') || s.Contains(':')))
-            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, relative, $"'{relative}' is not a relative path inside the client folder.");
-        return Path.Combine([root, .. segments]);
     }
 
     private static byte[]? ReadIfExists(string path)

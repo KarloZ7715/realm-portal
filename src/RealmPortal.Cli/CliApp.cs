@@ -165,7 +165,7 @@ public sealed class CliApp(
         int? build = null;
         if (parsed.Get("--build") is { } text)
         {
-            if (!int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n))
+            if (!int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) || n <= 0)
                 throw new UsageException($"--build must be a positive integer, got '{text}'");
             build = n;
         }

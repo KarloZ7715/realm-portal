@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Settings;
 using RealmPortal.Core;
 
 namespace RealmPortal.App.ViewModels;
@@ -13,12 +14,13 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ViewModelBase[] _sections;
     private AddServerViewModel? _adding;
 
-    public MainViewModel(DemoBackend? backend = null, bool autoTick = true)
+    public MainViewModel(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null)
     {
         Backend = backend ?? new DemoBackend();
         Servers = new ServersViewModel(Backend, autoTick: autoTick);
         Clients = new ClientsViewModel(Backend);
-        Settings = new PlaceholderViewModel("nav.settings");
+        Settings = new SettingsViewModel(settings ?? new DemoSettingsStore(), () => "/home/demo/.local/share/RealmPortal/backups-2");
+        Settings.BackRequested += () => SectionIndex = 0;
         _sections = [Servers, Clients, Settings];
         foreach (var section in _sections)
         {
@@ -35,7 +37,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ClientsViewModel Clients { get; }
 
-    public ViewModelBase Settings { get; }
+    public SettingsViewModel Settings { get; }
 
     /// <summary>Index in the sidebar: 0 servers, 1 clients, 2 settings.</summary>
     [ObservableProperty]
@@ -56,6 +58,38 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>The non-affiliation note shown at the foot of the wide sidebar.</summary>
     public string Disclaimer => Loc.Instance.Current == Language.Es ? AppInfo.DisclaimerEs : AppInfo.DisclaimerEn;
+
+    /// <summary>The modal question being shown, or null.</summary>
+    [ObservableProperty]
+    private ConfirmDialogViewModel? _dialog;
+
+    /// <summary>Raised before <see cref="Dialog"/> is set so the window can capture keyboard focus.</summary>
+    public event Action? DialogOpening;
+
+    /// <summary>Raised after <see cref="Dialog"/> is cleared so the window can restore keyboard focus.</summary>
+    public event Action? DialogClosed;
+
+    /// <summary>Shows <paramref name="dialog"/> over the window and returns the user's answer; a second dialog while one is open answers false.</summary>
+    public async Task<bool> ConfirmAsync(ConfirmDialogViewModel dialog)
+    {
+        if (Dialog is not null)
+        {
+            dialog.Reject();
+            return false;
+        }
+
+        DialogOpening?.Invoke();
+        Dialog = dialog;
+        try
+        {
+            return await dialog.Result;
+        }
+        finally
+        {
+            Dialog = null;
+            DialogClosed?.Invoke();
+        }
+    }
 
     [RelayCommand]
     private void ToggleLanguage() => Loc.Instance.Toggle();
