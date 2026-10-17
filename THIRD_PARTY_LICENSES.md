@@ -45,7 +45,7 @@ All ambientCG textures are published under CC0 1.0 (https://docs.ambientcg.com/l
 |---|---|---|---|---|---|---|
 | Leather (window background, sidebar, buttons) | Leather 037 | https://ambientcg.com/a/Leather037 | https://ambientcg.com/get?file=Leather037_1K-JPG.zip | CC0 1.0 | `Displacement` (the color map is flat), converted to grayscale and tinted dark brown | `assets/textures/tex-leather.jpg` |
 | Paper (parchment of panels and cards) | Paper 003 | https://ambientcg.com/a/Paper003 | https://ambientcg.com/get?file=Paper003_1K-JPG.zip | CC0 1.0 | `Color` in grays, contrast reduced to 50% and tinted parchment | `assets/textures/tex-parchment.jpg` |
-| Bronze (ring of the app icon) | Metal 008 | https://ambientcg.com/a/Metal008 | https://ambientcg.com/get?file=Metal008_1K-JPG.zip | CC0 1.0 | `Color`, grayscale tinted muted bronze, reduced to 512² | `assets/textures/tex-bronze.jpg` |
+| Bronze (texture asset; not used by the app icon) | Metal 008 | https://ambientcg.com/a/Metal008 | https://ambientcg.com/get?file=Metal008_1K-JPG.zip | CC0 1.0 | `Color`, grayscale tinted muted bronze, reduced to 512² | `assets/textures/tex-bronze.jpg` |
 
 Processed with Python/Pillow (autocontrast, colorize, blend). Only the derivatives in `assets/textures/` are included in the repository.
 
@@ -70,7 +70,7 @@ The static instances of Alegreya and JetBrains Mono are derivative works permitt
 |---|---|---|
 | `assets/textures/` | `tex-parchment.jpg` (Paper003), `tex-leather.jpg` (Leather037), `tex-bronze.jpg` (Metal008) | Derived from the ambientCG textures in the table above, **CC0 1.0**. Re-encoded as JPEG q90, no other changes (already tileable; verified in a 2×2 tiling). |
 | `assets/frames/` (PNG/SVG) | parchment panels, bronze corners, buttons, rivet hardware, focus rings, window frame, divider, stitching, tab | Drawn from scratch for this project with Python (Pillow + cairosvg), using the geometry and tokens of the project's own mockups. The PNGs have the CC0 textures above baked in (parchment, leather), so those parts remain **CC0 1.0** (ambientCG, no attribution required). The SVGs are flat, with no third-party material. |
-| `assets/icons/app/` | `app-icon*.svg`, `app-icon-{512,256,128,64,48}.png`, `app-icon-simple-{32,16}.png`, `app-icon.ico` | Own design (wax seal with portal arch). PNGs ≥64 px carry the ring with the Metal008 texture (**CC0 1.0**). |
+| `assets/branding/` and `packaging/linux/icons/` | Realm Portal app icon ("Tesera"): SVG, PNG 16–512, `.ico`, Linux hicolor and symbolic | Original design for this project, drawn as geometric vectors (no textures, fonts or third-party artwork). **MIT**, see `assets/branding/LICENSE-ART.md`. Trademark clearance pending. Not affiliated with or endorsed by Blizzard Entertainment. |
 | `assets/icons/seals/` | 5 status seals, SVG and PNG 64/128 | Own design; no third parties. |
 | `assets/icons/ui/`, `assets/icons/ui-ink/` | 23 interface icons as SVG | Hand-drawn for this project with a project script (not included). They do **not** come from the Figma connector or from Lucide (ISC), Feather, Heroicons or any other library; therefore there is no third-party attribution. |
 | `assets/fonts/` | TTF + OFL.txt | See the typefaces section (OFL 1.1). |
@@ -79,4 +79,4 @@ The static instances of Alegreya and JetBrains Mono are derivative works permitt
 The project's own drawings (frames, icons, seals, app icon) are published under the repository's MIT license (see `LICENSE`).
 
 ## No Blizzard assets
-No Blizzard logo, trademark, screenshot or typeface is used. The icon (wax seal with portal arch), the status seals and the ornaments are own vectors drawn for this project.
+No Blizzard logo, trademark, screenshot or typeface is used. The app icon (split-coin "Tesera" with a butterfly key), the status seals and the ornaments are own vectors drawn for this project.

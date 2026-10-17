@@ -6,6 +6,7 @@
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\branding\icon\windows\realm-portal.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" />
@@ -19,7 +20,7 @@
     <ProjectReference Include="..\RealmPortal.Core\RealmPortal.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <AvaloniaResource Include="..\..\assets\icons\app\app-icon-256.png" Link="Assets/app-icon.png" />
+    <AvaloniaResource Include="..\..\assets\branding\icon\png\realm-portal-256.png" Link="Assets/app-icon.png" />
   </ItemGroup>
   <ItemGroup Label="9-slice art, seals and textures (designer pack in assets/). window-frame is not bundled: the app keeps the system title bar.">
     <AvaloniaResource Include="..\..\assets\frames\button-*.png;..\..\assets\frames\focus-ring-*.png;..\..\assets\frames\panel-*.png;..\..\assets\frames\tab-*.png" Link="Assets/Frames/%(Filename)%(Extension)" />
