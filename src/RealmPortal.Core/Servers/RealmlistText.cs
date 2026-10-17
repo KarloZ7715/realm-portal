@@ -10,9 +10,13 @@ public static class RealmlistText
     /// Returns <c>set realmlist {host}</c> followed by the extra lines, each line terminated by <c>\r\n</c>
     /// (the last one too). Extra lines are trimmed; blank ones are dropped.
     /// </summary>
-    /// <exception cref="ArgumentException">An extra line contains an embedded line break.</exception>
+    /// <exception cref="ArgumentException">The host or an extra line contains an embedded line break.</exception>
     public static string Build(string host, IEnumerable<string>? extraLines = null)
     {
+        ArgumentNullException.ThrowIfNull(host);
+        if (host.Contains('\r') || host.Contains('\n'))
+            throw new ArgumentException("The host must not contain line breaks.", nameof(host));
+
         var text = new System.Text.StringBuilder();
         text.Append("set realmlist ").Append(host).Append(LineEnding);
 
