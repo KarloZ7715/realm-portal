@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: the workflow only needs to read the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  build-test:
+    name: build-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', '**/*.csproj', '**/Directory.Packages.props', '**/Directory.Build.props', '**/packages.lock.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Detect solution
+        id: sln
+        run: |
+          shopt -s nullglob
+          files=(./*.sln ./*.slnx)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::warning::No .sln/.slnx found in the repository root; build and test are skipped."
+            echo "solution=" >> "$GITHUB_OUTPUT"
+          elif [ "${#files[@]}" -gt 1 ]; then
+            echo "::error::Multiple solution files in the root: ${files[*]}"
+            exit 1
+          else
+            echo "Using solution ${files[0]}"
+            echo "solution=${files[0]}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Show .NET info
+        if: steps.sln.outputs.solution != ''
+        run: dotnet --info
+
+      - name: Restore
+        if: steps.sln.outputs.solution != ''
+        env:
+          SOLUTION: ${{ steps.sln.outputs.solution }}
+        run: dotnet restore "$SOLUTION"
+
+      - name: Build
+        if: steps.sln.outputs.solution != ''
+        env:
+          SOLUTION: ${{ steps.sln.outputs.solution }}
+        run: dotnet build "$SOLUTION" --no-restore -c Release
+
+      - name: Test
+        if: steps.sln.outputs.solution != ''
+        env:
+          SOLUTION: ${{ steps.sln.outputs.solution }}
+        run: dotnet test "$SOLUTION" --no-build -c Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+  gitleaks:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      # SHA256 of gitleaks_8.30.1_linux_x64.tar.gz (pinned here and cross-checked
+      # against the official gitleaks_8.30.1_checksums.txt of the release).
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks (pinned release, checksum verified)
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
+          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
+
+      - name: Scan git history for secrets
+        run: |
+          gitleaks version
+          gitleaks git --redact --no-banner --verbose .
