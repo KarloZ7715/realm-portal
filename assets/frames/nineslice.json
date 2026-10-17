@@ -1,0 +1,276 @@
+{
+ "esquina-bronce-*": {
+  "size": [
+   18,
+   18
+  ],
+  "nota": "sin 9-slice; colocar en cada esquina del panel a 0,0 (sin margen)"
+ },
+ "panel-hoja-ancho": {
+  "png": [
+   724,
+   134
+  ],
+  "insets": [
+   36,
+   36,
+   36,
+   36
+  ],
+  "margen_sombra": 12,
+  "cuerpo": [
+   700,
+   110
+  ],
+  "nota": "sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura"
+ },
+ "panel-activa-ancho": {
+  "png": [
+   724,
+   134
+  ],
+  "insets": [
+   36,
+   36,
+   36,
+   36
+  ],
+  "margen_sombra": 12,
+  "cuerpo": [
+   700,
+   110
+  ],
+  "nota": "sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura"
+ },
+ "panel-hoja-medio": {
+  "png": [
+   384,
+   284
+  ],
+  "insets": [
+   36,
+   36,
+   36,
+   36
+  ],
+  "margen_sombra": 12,
+  "cuerpo": [
+   360,
+   260
+  ],
+  "nota": "sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura"
+ },
+ "panel-activa-medio": {
+  "png": [
+   384,
+   284
+  ],
+  "insets": [
+   36,
+   36,
+   36,
+   36
+  ],
+  "margen_sombra": 12,
+  "cuerpo": [
+   360,
+   260
+  ],
+  "nota": "sombra incluida en el PNG (12 px de margen); el SVG es plano, sin sombra ni textura"
+ },
+ "boton-primario-normal": {
+  "png": [
+   160,
+   40
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+ },
+ "boton-primario-hover": {
+  "png": [
+   160,
+   40
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+ },
+ "boton-primario-pulsado": {
+  "png": [
+   160,
+   40
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+ },
+ "boton-primario-desactivado": {
+  "png": [
+   160,
+   40
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+ },
+ "boton-secundario-normal": {
+  "png": [
+   160,
+   40
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+ },
+ "boton-secundario-hover": {
+  "png": [
+   160,
+   40
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+ },
+ "boton-secundario-pulsado": {
+  "png": [
+   160,
+   40
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+ },
+ "boton-secundario-desactivado": {
+  "png": [
+   160,
+   40
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "fondo de cuero con textura horneada, borde de bronce 1.5 px, costura punteada y 2 remaches; el centro se estira (la costura se estira ~1.3x a 200 px de ancho)"
+ },
+ "herraje-bronce-remaches": {
+  "png": [
+   160,
+   64
+  ],
+  "insets": [
+   16,
+   16,
+   16,
+   16
+  ],
+  "nota": "centro transparente; usar como borde de tarjeta/botón sobre cualquier fondo; remaches en las 4 esquinas"
+ },
+ "anillo-foco-cuero": {
+  "png": [
+   176,
+   56
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "anillo de foco (doble en cuero: contorno oscuro + foco claro; simple en pergamino); elemento de 160x40 centrado con 8 px de margen"
+ },
+ "anillo-foco-pergamino": {
+  "png": [
+   176,
+   56
+  ],
+  "insets": [
+   14,
+   14,
+   14,
+   14
+  ],
+  "nota": "anillo de foco (doble en cuero: contorno oscuro + foco claro; simple en pergamino); elemento de 160x40 centrado con 8 px de margen"
+ },
+ "ventana-marco": {
+  "png": [
+   960,
+   600
+  ],
+  "insets": [
+   14,
+   40,
+   14,
+   28
+  ],
+  "nota": "cuero opaco con barra de título (40 px) y barra de estado (28 px) horneadas, filete de bronce y 4 remaches; el centro es cuero teselado (no se ven costuras al estirar)"
+ },
+ "divisor-hilo-medallon": {
+  "png": [
+   712,
+   14
+  ],
+  "nota": "3-slice horizontal: hilo izquierdo (estirable, x 0-326), medallón fijo (44 px centrales), hilo derecho (estirable); en Avalonia, mejor 2 hilos con tile + divisor-medallon.png centrado"
+ },
+ "costura-h-tile": {
+  "png": [
+   10,
+   4
+  ],
+  "nota": "tile repetible (periodo 10 px: 6 de hilo + 4 de hueco), color #8A6C4A"
+ },
+ "costura-v-tile": {
+  "png": [
+   4,
+   10
+  ],
+  "nota": "tile repetible (periodo 10 px: 6 de hilo + 4 de hueco), color #8A6C4A"
+ },
+ "pestana-pergamino": {
+  "png": [
+   228,
+   64
+  ],
+  "insets": [
+   18,
+   18,
+   18,
+   18
+  ],
+  "margen_sombra": 10,
+  "cuerpo": [
+   208,
+   44
+  ],
+  "nota": "pestaña activa de la barra lateral: pega al borde izquierdo (x=10 del PNG = borde de la ventana); marca de lacre de 5 px a la izquierda"
+ }
+}
