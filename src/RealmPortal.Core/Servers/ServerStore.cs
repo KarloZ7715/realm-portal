@@ -15,10 +15,11 @@ namespace RealmPortal.Core.Servers;
 /// A missing file is an empty store; an unreadable or unsupported file raises <see cref="StoreException"/>
 /// and is never overwritten.
 /// </remarks>
-public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer)
+public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer, ConfigDirectoryLock? directoryLock = null)
 {
     public const string FileName = "servers.json";
     private const int FormatVersion = 1;
+    private readonly ConfigDirectoryLock _directoryLock = directoryLock ?? new ConfigDirectoryLock(configDirectory);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -30,6 +31,9 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
     };
 
     public string FilePath { get; } = Path.Combine(configDirectory, FileName);
+
+    /// <summary>Lock shared with <see cref="ActiveServerManager"/> for cross-process serialization.</summary>
+    public ConfigDirectoryLock DirectoryLock => _directoryLock;
 
     public IReadOnlyList<Server> List() => Load();
 
@@ -61,19 +65,29 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
             throw ex.ForServer(server.Name);
         }
 
-        var servers = Load().ToList();
-        if (servers.Any(s => s.Id == server.Id))
-            throw new StoreException($"A server with id '{server.Id}' already exists.");
-        if (servers.Any(s => string.Equals(s.Name, server.Name, StringComparison.OrdinalIgnoreCase)))
-            throw new StoreException($"A server named '{server.Name}' already exists.");
+        using (_directoryLock.Acquire())
+        {
+            var servers = Load().ToList();
+            if (servers.Any(s => s.Id == server.Id))
+                throw new StoreException($"A server with id '{server.Id}' already exists.");
+            if (servers.Any(s => string.Equals(s.Name, server.Name, StringComparison.OrdinalIgnoreCase)))
+                throw new StoreException($"A server named '{server.Name}' already exists.");
 
-        servers.Add(server);
-        Save(servers);
-        return server;
+            servers.Add(server);
+            Save(servers);
+            return server;
+        }
     }
 
     /// <summary>Removes a server by id. Returns false when no such server exists.</summary>
     public bool Remove(string id)
+    {
+        using (_directoryLock.Acquire())
+            return RemoveCore(id);
+    }
+
+    /// <summary>Like <see cref="Remove"/> but assumes the config lock is already held.</summary>
+    internal bool RemoveCore(string id)
     {
         var servers = Load().ToList();
         if (servers.RemoveAll(s => s.Id == id) == 0)

@@ -61,16 +61,19 @@ public sealed class ActiveServerManager(
     public void Switch(Server server)
     {
         ArgumentNullException.ThrowIfNull(server);
-        var stored = store.List().FirstOrDefault(s => s.Id == server.Id)
-                     ?? throw new StoreException($"Server '{server.Name}' is not in the store.");
+        using (store.DirectoryLock.Acquire())
+        {
+            var stored = store.List().FirstOrDefault(s => s.Id == server.Id)
+                         ?? throw new StoreException($"Server '{server.Name}' is not in the store.");
 
-        var state = LoadState();
-        var previous = Resolve(state);
+            var state = LoadState();
+            var previous = Resolve(state);
 
-        writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
-        SaveState(previous?.Id == stored.Id
-            ? state with { ActiveId = stored.Id }
-            : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } });
+            writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
+            SaveState(previous?.Id == stored.Id
+                ? state with { ActiveId = stored.Id }
+                : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } });
+        }
     }
 
     /// <summary>
@@ -82,45 +85,51 @@ public sealed class ActiveServerManager(
     /// <exception cref="InvalidRealmlistException">The realmlist of the server to restore is invalid; nothing is changed.</exception>
     public Server? Undo()
     {
-        var state = LoadState();
-        if (state.Undo is null)
-            throw new StoreException("Nothing to undo.");
-
-        Server? target = null;
-        if (state.Undo.ServerId is { } id)
+        using (store.DirectoryLock.Acquire())
         {
-            target = store.List().FirstOrDefault(s => s.Id == id)
-                     ?? throw new StoreException("The previous server no longer exists; cannot undo.");
+            var state = LoadState();
+            if (state.Undo is null)
+                throw new StoreException("Nothing to undo.");
+
+            Server? target = null;
+            if (state.Undo.ServerId is { } id)
+            {
+                target = store.List().FirstOrDefault(s => s.Id == id)
+                         ?? throw new StoreException("The previous server no longer exists; cannot undo.");
+            }
+
+            if (target is null)
+                DeleteProjection();
+            else
+                writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
+
+            SaveState(new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null });
+            return target;
         }
-
-        if (target is null)
-            DeleteProjection();
-        else
-            writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
-
-        SaveState(new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null });
-        return target;
     }
 
     /// <summary>Removes a server from the store; when it was the active one, deactivates it and deletes <c>activo.json</c>.</summary>
     /// <returns>False when the server does not exist.</returns>
     public bool Remove(string id)
     {
-        if (!store.Remove(id))
-            return false;
-
-        var state = LoadState();
-        if (state.ActiveId == id)
+        using (store.DirectoryLock.Acquire())
         {
-            DeleteProjection();
-            SaveState(new State { Version = FormatVersion, ActiveId = null, Undo = null });
-        }
-        else if (state.Undo?.ServerId == id)
-        {
-            SaveState(state with { Undo = null });
-        }
+            if (!store.RemoveCore(id))
+                return false;
 
-        return true;
+            var state = LoadState();
+            if (state.ActiveId == id)
+            {
+                DeleteProjection();
+                SaveState(new State { Version = FormatVersion, ActiveId = null, Undo = null });
+            }
+            else if (state.Undo?.ServerId == id)
+            {
+                SaveState(state with { Undo = null });
+            }
+
+            return true;
+        }
     }
 
     private Server? Resolve(State state) =>
