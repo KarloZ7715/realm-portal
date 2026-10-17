@@ -40,6 +40,9 @@ public sealed class CliApp(
           realm-portal status
           realm-portal launch [<server>] [--force] [--dry-run] [--wrapper <command>]
 
+        Global options (before or after the command):
+          --verbose               print detailed error messages (paths, parse errors)
+
         Common options (they override the environment variables):
           --config-dir <dir>      app config (env REALM_PORTAL_CONFIG_DIR)
           --projection-dir <dir>  where activo.json is written (env REALM_PORTAL_PROJECTION_DIR)
@@ -60,12 +63,12 @@ public sealed class CliApp(
 
     public bool IsCommand(string name) => Commands.Contains(name);
 
-    public int Run(string command, string[] args)
+    public int Run(string command, string[] args, bool globalVerbose = false)
     {
         try
         {
             var parsed = Parse(args);
-            _verbose = parsed.Flags.Contains("--verbose");
+            _verbose = globalVerbose || parsed.Flags.Contains("--verbose");
             var configDir = parsed.Get("--config-dir") ?? PortalPaths.ConfigDirectory(getVariable);
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
             var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
@@ -122,6 +125,8 @@ public sealed class CliApp(
             {
                 if (i + 1 >= args.Length)
                     throw new UsageException($"option {arg} needs a value");
+                if (args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                    throw new UsageException($"option {arg} needs a value");
                 if (!parsed.Options.TryGetValue(arg, out var values))
                     parsed.Options[arg] = values = [];
                 values.Add(args[++i]);
@@ -143,11 +148,13 @@ public sealed class CliApp(
         return parsed;
     }
 
+    private static readonly HashSet<string> GlobalCommandFlags = ["--verbose"];
+
     private static void Expect(Parsed parsed, int min, int max, string what, params string[] allowedFlags)
     {
         if (parsed.Positionals.Count < min || parsed.Positionals.Count > max)
             throw new UsageException($"wrong number of arguments (expected {what})");
-        var extra = parsed.Flags.Except(allowedFlags).FirstOrDefault();
+        var extra = parsed.Flags.Except(allowedFlags).Except(GlobalCommandFlags).FirstOrDefault();
         if (extra is not null)
             throw new UsageException($"option {extra} does not apply to this command");
     }
@@ -257,6 +264,8 @@ public sealed class CliApp(
             return Fail(result.Error!);
         var restored = result.Value!.Active;
         output.WriteLine(restored is null ? "Undone: no active server." : $"Undone: restored '{restored.Name}'.");
+        if (result.Value!.ClientFilesNotice is { } notice)
+            output.WriteLine(notice);
         return 0;
     }
 
@@ -281,6 +290,13 @@ public sealed class CliApp(
         }
 
         output.WriteLine($"activo.json: {(status.ProjectionInSync ? "in sync" : "OUT OF SYNC (run switch to repair)")}");
+        if (status.ClientsNotMatchingActive.Count > 0 && status.Active is not null)
+        {
+            foreach (var client in status.ClientsNotMatchingActive)
+                output.WriteLine(
+                    $"Client folder out of sync: {client.Path} (run 'switch {status.Active.Name} --client-dir <folder>')");
+        }
+
         output.WriteLine($"Can undo: {(status.CanUndo ? "yes" : "no")}");
         if (clientDir is not null)
         {
