@@ -452,6 +452,60 @@ public class ClientFilesApplierTests
         Assert.Equal(ClientFilesErrorCode.VerifyFailed, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1")).Code);
     }
 
+    private static string[] BackupIds(Env env) =>
+        Directory.GetDirectories(Path.Combine(env.Backups, "install-1")).Select(d => Path.GetFileName(d)!).Order(StringComparer.Ordinal).ToArray();
+
+    [Fact]
+    public void Apply_KeepsOnlyTheNewestTenBackups_ByDefault()
+    {
+        using var env = new Env();
+        var ids = new List<string>();
+        for (var i = 0; i < 13; i++)
+            ids.Add(env.Applier.Apply(env.Plan(i % 2 == 0 ? BlobA : BlobB)).BackupId!);
+
+        Assert.Equal(ids.Skip(3).Order(StringComparer.Ordinal), BackupIds(env));
+        Assert.Equal(ClientFilesApplier.DefaultKeepBackups, 10);
+    }
+
+    [Fact]
+    public void Retention_IsConfigurable_AndUndoStillWorksOnTheNewestBackup()
+    {
+        using var env = new Env();
+        var applier = new ClientFilesApplier(new ClientFilesPlanner(), env.Writer, env.Probe, env.Backups, keepBackups: 2);
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        for (var i = 0; i < 4; i++)
+            applier.Apply(env.Plan(i % 2 == 0 ? BlobA : BlobB));
+        var afterThree = env.Files();
+
+        Assert.Equal(2, BackupIds(env).Length);
+        var undo = applier.Undo("install-1");
+
+        Assert.All(undo.Files, f => Assert.Equal(UndoFileStatus.Restored, f.Status));
+        Assert.NotEqual(afterThree, env.Files());
+    }
+
+    [Fact]
+    public void Retention_NeverDeletesThePendingBackup_AndIgnoresForeignFolders()
+    {
+        using var env = new Env();
+        var applier = new ClientFilesApplier(new ClientFilesPlanner(), env.Writer, env.Probe, env.Backups, keepBackups: 1);
+        applier.Apply(env.Plan(BlobA));
+        var newest = applier.Apply(env.Plan(BlobB)).BackupId!;
+        var foreign = Path.Combine(env.Backups, "install-1", "0000-not-a-backup");
+        Directory.CreateDirectory(foreign);
+
+        applier.Apply(env.Plan(BlobA));
+        var ids = BackupIds(env);
+
+        Assert.Contains("0000-not-a-backup", ids);
+        Assert.DoesNotContain(newest, ids); // older and not pending: removed
+        Assert.Equal(2, ids.Length); // the foreign folder and the newest backup
+    }
+
+    [Fact]
+    public void Retention_ValueBelowOne_IsRejected() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new FakeProbe(), "/x", keepBackups: 0));
+
     [Fact]
     public void DefaultBackupRoot_HonorsTheOverride()
     {

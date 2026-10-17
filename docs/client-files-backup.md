@@ -78,9 +78,15 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 
 A backup copy whose hash no longer matches `sha256_before` is never restored (`HashMismatch`). The backup is marked undone only when
 no file had a conflict; otherwise it stays pending and the next `Undo` reports the same conflicts instead of undoing something older.
-Successive applies are undone one by one, newest first. No backup pending: `NothingToUndo`. Undo also refuses while the game runs.
+Successive applies are undone one by one, newest first, as long as their backups are kept. No backup pending: `NothingToUndo`. Undo also refuses while the game runs.
 
 ## Game process probe
 
 `GameProcessProbe` looks for a process named `Wow`, `Wow-64`, `WowB`, `WowT` or `WowClassic` (`.exe` ignored, so Wine works). It does not
 compare folders, so a game running from another folder also blocks, which errs on the safe side.
+
+## Retention
+
+After a successful apply the newest `keepBackups` backups of the installation are kept (default 10, constructor parameter) and older
+ones are deleted. The newest backup that is still pending undo is never deleted, and folders without a `manifest.json` are left alone.
+Pruning is best effort and never fails an apply.
