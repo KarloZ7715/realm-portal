@@ -129,6 +129,7 @@ public class PortalViewModelTests
         var settings = (SettingsViewModel)env.Main.Settings;
         var other = Path.Combine(env.Backups, "other");
         Directory.CreateDirectory(other);
+        settings.Template = "wine {exe}";
         settings.BackupFolder = other;
         settings.SaveCommand.Execute(null);
         Assert.Equal(settings.BackupFolder, env.Session.Service.GetStorageSettings().Value!.BackupFolder);

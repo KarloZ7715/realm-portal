@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
+using RealmPortal.App.Settings;
 using RealmPortal.Core;
 
 namespace RealmPortal.App.ViewModels;
@@ -23,7 +24,10 @@ public sealed partial class MainViewModel : ObservableObject
         Backend = backend;
         Servers = new ServersViewModel(backend, autoTick);
         Clients = new ClientsViewModel(backend);
-        Settings = new PlaceholderViewModel("nav.settings");
+        var settings = new SettingsViewModel(new DemoSettingsStore());
+        settings.ApplySavedLanguage();
+        settings.BackRequested += () => SectionIndex = 0;
+        Settings = settings;
         _sections = [Servers, Clients, Settings];
         WireSections();
     }
@@ -31,10 +35,14 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true)
     {
         _session = session;
-        Loc.Instance.SetLanguage(session.UiPreferences.ResolveLanguage());
         Servers = new ServersViewModel(session, autoTick);
         Clients = new ClientsViewModel(session, pickFolder);
-        Settings = new SettingsViewModel(session);
+        var settings = new SettingsViewModel(
+            new PortalSettingsStore(session),
+            pickFolder is null ? null : () => pickFolder().GetAwaiter().GetResult());
+        settings.ApplySavedLanguage();
+        settings.BackRequested += () => SectionIndex = 0;
+        Settings = settings;
         _sections = [Servers, Clients, Settings];
         WireSections();
         Clients.ClientsChanged += () => Servers.ReloadFromService();
