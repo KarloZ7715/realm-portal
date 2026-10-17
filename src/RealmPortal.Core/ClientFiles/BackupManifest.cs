@@ -10,8 +10,8 @@ internal sealed record ManifestFile(
     string? BackupFile,
     string? Sha256Before,
     string Sha256After,
-    bool IsSymlink = false,
-    string? SymlinkTarget = null);
+    int? UnixMode = null,
+    bool? WindowsReadOnly = null);
 
 /// <summary>The <c>manifest.json</c> that describes one backup.</summary>
 internal sealed record BackupManifest(

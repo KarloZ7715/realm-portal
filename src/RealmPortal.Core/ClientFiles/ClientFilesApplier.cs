@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using RealmPortal.Core.IO;
 
 namespace RealmPortal.Core.ClientFiles;
@@ -64,16 +65,18 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         if (plan.IsEmpty)
             return new ApplyResult(null, []);
 
-        if (_probe.IsGameRunning(plan.ClientRoot))
-            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, plan.ClientRoot, "The game is running; close it before changing its files.");
+        var clientRoot = ClientPaths.CanonicalRoot(plan.ClientRoot);
+        if (_probe.IsGameRunning(clientRoot))
+            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, clientRoot, "The game is running; close it before changing its files.");
 
         using var installationLock = AcquireLock(plan.InstallationId);
 
         // Read and verify the current state of every file before touching anything.
         var targets = new List<Target>();
+        var warnings = new List<string>();
         foreach (var edit in plan.Edits)
         {
-            var path = ResolveInside(plan.ClientRoot, edit.RelativePath);
+            var path = ClientPaths.ResolveManagedPath(clientRoot, edit.RelativePath);
             var original = ReadIfExists(path);
             var currentHash = original is null ? null : ClientFilesIo.Sha256Hex(original);
             if (!string.Equals(currentHash, edit.Sha256Before, StringComparison.Ordinal))
@@ -82,14 +85,18 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                     $"'{path}' changed since the plan was made; plan again.");
             }
 
-            targets.Add(new Target(edit, path, original, SymlinkSnapshot.Capture(path)));
+            var permissions = FilePermissionSnapshot.Capture(path);
+            if (permissions is not null && FilePermissionSnapshot.IsReadOnly(path))
+                warnings.Add($"'{edit.RelativePath}' was read-only; its permissions were preserved.");
+
+            targets.Add(new Target(edit, path, original, permissions, SymlinkSnapshot.Capture(path)));
         }
 
         var backupId = NewBackupId(plan.InstallationId);
         var backupDir = Path.Combine(_backupRoot, plan.InstallationId, backupId);
         try
         {
-            WriteBackup(plan, backupId, backupDir, targets);
+            WriteBackup(plan, clientRoot, backupId, backupDir, targets);
         }
         catch
         {
@@ -103,7 +110,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             foreach (var target in targets)
             {
                 attempted.Add(target);
-                Guard(() => _writer.WriteAllBytes(target.Path, target.Edit.NewBytes), target.Path, "write");
+                Guard(() => _writer.WriteAllBytes(target.Path, target.Edit.NewBytes, target.Permissions?.ToReplacementPermissions()), target.Path, "write");
                 var written = Guard(() => File.ReadAllBytes(target.Path), target.Path, "read back");
                 if (ClientFilesIo.Sha256Hex(written) != target.Edit.Sha256After)
                     throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, target.Path, $"'{target.Path}' does not hold the expected bytes after writing.");
@@ -118,25 +125,34 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
 
         Prune(plan.InstallationId);
-        return new ApplyResult(backupId, plan.Edits);
+        return new ApplyResult(backupId, plan.Edits, warnings);
     }
 
-    public UndoResult Undo(string installationId)
+    public UndoResult Undo(string installationId, string clientRoot)
     {
         RequireValidIds(installationId, "-");
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientRoot);
+        var trustedRoot = ClientPaths.CanonicalRoot(clientRoot);
         using var installationLock = AcquireLock(installationId);
         var (manifestPath, manifest) = FindPending(installationId)
             ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
                 $"There is no applied change to undo for '{installationId}'.");
 
-        if (_probe.IsGameRunning(manifest.ClientRoot))
-            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, manifest.ClientRoot, "The game is running; close it before restoring its files.");
+        ClientPaths.RequireMatchingRoots(trustedRoot, manifest.ClientRoot, manifestPath);
+
+        if (_probe.IsGameRunning(trustedRoot))
+            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, trustedRoot, "The game is running; close it before restoring its files.");
 
         var backupDir = Path.GetDirectoryName(manifestPath)!;
+
+        // Resolve every manifest path before restoring anything so a bad entry cannot leave a partial undo.
+        var resolved = manifest.Files
+            .Select(file => (file, path: ClientPaths.ResolveManagedPath(trustedRoot, file.Path)))
+            .ToList();
+
         var results = new List<UndoFileResult>();
-        foreach (var file in manifest.Files)
+        foreach (var (file, path) in resolved)
         {
-            var path = ResolveInside(manifest.ClientRoot, file.Path);
             var current = ReadIfExists(path);
             var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
 
@@ -154,22 +170,11 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 Guard(() => File.Delete(path), path, "delete");
                 status = UndoFileStatus.Deleted;
             }
-            else if (file.IsSymlink && !string.IsNullOrEmpty(file.SymlinkTarget))
-            {
-                Guard(() => new SymlinkSnapshot(true, file.SymlinkTarget).Restore(path), path, "restore symlink");
-                var restored = Guard(() => File.ReadAllBytes(path), path, "read back");
-                if (ClientFilesIo.Sha256Hex(restored) != file.Sha256Before)
-                    throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
-                status = UndoFileStatus.Restored;
-            }
             else
             {
                 var original = ReadBackupFile(backupDir, file);
-                Guard(() => _writer.WriteAllBytes(path, original), path, "restore");
-                var restored = Guard(() => File.ReadAllBytes(path), path, "read back");
-                if (ClientFilesIo.Sha256Hex(restored) != file.Sha256Before)
-                    throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
-                status = UndoFileStatus.Restored;
+                var permissions = FileReplacementPermissions.FromUnixAndWindows(file.UnixMode, file.WindowsReadOnly);
+                status = RestoreOriginalBytes(trustedRoot, backupDir, file, path, original, permissions);
             }
 
             results.Add(new UndoFileResult(file.Path, status));
@@ -188,7 +193,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     // ---- backup ----
 
-    private void WriteBackup(ClientFilesPlan plan, string backupId, string backupDir, List<Target> targets)
+    private void WriteBackup(ClientFilesPlan plan, string clientRoot, string backupId, string backupDir, List<Target> targets)
     {
         var files = new List<ManifestFile>();
         for (var i = 0; i < targets.Count; i++)
@@ -200,6 +205,12 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 backupFile = $"files/{i}";
                 var dest = Path.Combine(backupDir, "files", i.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 Guard(() => _writer.WriteAllBytes(dest, t.Original), dest, "write backup file");
+                if (t.Symlink?.IsSymlink == true && !string.IsNullOrEmpty(t.Symlink.Value.Target))
+                {
+                    var sidecar = dest + ".symlink";
+                    var bytes = Encoding.UTF8.GetBytes(t.Symlink.Value.Target);
+                    Guard(() => _writer.WriteAllBytes(sidecar, bytes), sidecar, "write symlink sidecar");
+                }
             }
 
             files.Add(new ManifestFile(
@@ -208,8 +219,8 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 backupFile,
                 t.Edit.Sha256Before,
                 t.Edit.Sha256After,
-                t.Symlink?.IsSymlink ?? false,
-                t.Symlink?.Target));
+                t.Permissions?.UnixMode,
+                t.Permissions?.WindowsReadOnly));
         }
 
         var manifest = new BackupManifest(
@@ -217,7 +228,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             backupId,
             plan.InstallationId,
             plan.ProfileId,
-            plan.ClientRoot,
+            clientRoot,
             plan.Version.ToString(),
             _clock(),
             null,
@@ -256,6 +267,57 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         return bytes;
     }
 
+    private UndoFileStatus RestoreOriginalBytes(
+        string clientRoot,
+        string backupDir,
+        ManifestFile file,
+        string path,
+        byte[] original,
+        FileReplacementPermissions? permissions)
+    {
+        var sidecar = SymlinkSidecarPath(backupDir, file);
+        if (sidecar is not null)
+        {
+            var linkText = SymlinkSnapshot.ReadValidatedSidecar(
+                clientRoot, path, Guard(() => File.ReadAllBytes(sidecar), sidecar, "read symlink sidecar"));
+            Guard(() => new SymlinkSnapshot(true, linkText).Restore(path), path, "restore symlink");
+            var symlinkBytes = Guard(() => File.ReadAllBytes(path), path, "read back");
+            if (ClientFilesIo.Sha256Hex(symlinkBytes) == file.Sha256Before)
+                return UndoFileStatus.Restored;
+
+            TryRemovePath(path);
+        }
+
+        Guard(() => _writer.WriteAllBytes(path, original, permissions), path, "restore");
+        var bytes = Guard(() => File.ReadAllBytes(path), path, "read back");
+        if (ClientFilesIo.Sha256Hex(bytes) != file.Sha256Before)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"'{path}' does not hold its original bytes after restoring.");
+        return UndoFileStatus.Restored;
+    }
+
+    private static string? SymlinkSidecarPath(string backupDir, ManifestFile file)
+    {
+        if (file.BackupFile is null)
+            return null;
+        var path = Path.Combine(backupDir, file.BackupFile + ".symlink");
+        return File.Exists(path) ? path : null;
+    }
+
+    private static void TryRemovePath(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
     // ---- helpers ----
 
     /// <summary>Puts every attempted file back as it was; returns false when some file could not be reverted.</summary>
@@ -276,7 +338,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                     if (t.Symlink?.IsSymlink == true)
                         t.Symlink.Value.Restore(t.Path);
                     else
-                        _writer.WriteAllBytes(t.Path, t.Original);
+                        _writer.WriteAllBytes(t.Path, t.Original, t.Permissions?.ToReplacementPermissions());
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ClientFilesException)
@@ -381,15 +443,6 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             throw new ArgumentException("ProfileId must be 1-64 characters of letters, digits, '.', '_' or '-'.", nameof(profileId));
     }
 
-    /// <summary>Joins a '/'-separated relative path below the client root, refusing anything that could leave it.</summary>
-    private static string ResolveInside(string root, string relative)
-    {
-        var segments = relative.Split('/');
-        if (segments.Any(s => s.Length == 0 || s is "." or ".." || s.Contains('\\') || s.Contains(':')))
-            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, relative, $"'{relative}' is not a relative path inside the client folder.");
-        return Path.Combine([root, .. segments]);
-    }
-
     private static byte[]? ReadIfExists(string path)
     {
         try
@@ -416,5 +469,10 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
     }
 
-    private sealed record Target(ClientFileEdit Edit, string Path, byte[]? Original, SymlinkSnapshot? Symlink);
+    private sealed record Target(
+        ClientFileEdit Edit,
+        string Path,
+        byte[]? Original,
+        FilePermissionSnapshot? Permissions,
+        SymlinkSnapshot? Symlink);
 }

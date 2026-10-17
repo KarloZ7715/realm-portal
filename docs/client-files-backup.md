@@ -27,7 +27,9 @@ The backup root is `$REALM_PORTAL_BACKUP_DIR`, else `realm-portal/backups` under
 3. Every target is read again; if its sha256 is not the plan's `Sha256Before` (or a file to create now exists) the call fails with
    `HashMismatch` and nothing is changed. Plan again to refresh.
 4. A backup is written **first**: the original bytes of each existing file plus `manifest.json` (last, atomically, flushed to disk).
-5. Each file is written with `IAtomicFileWriter` and read back; a different hash is `VerifyFailed`.
+5. Each file is written with `IAtomicFileWriter` and read back; a different hash is `VerifyFailed`. When a target file was
+   read-only, Apply records a warning in `ApplyResult.Warnings` and copies its permission bits onto the new file (and into the
+   backup manifest so Undo can restore them).
 6. On any failure every touched file is put back (created files are deleted) and the backup folder is removed, since nothing changed.
    If the revert itself fails, the backup stays so `Undo` can finish the job.
 
@@ -40,6 +42,7 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 ```
 <backupRoot>/<installationId>/<backupId>/manifest.json
 <backupRoot>/<installationId>/<backupId>/files/<n>      original bytes of the n-th file of the manifest
+<backupRoot>/<installationId>/<backupId>/files/<n>.symlink   optional UTF-8 link text when file <n> was a symlink at apply time
 ```
 
 `backupId` is `yyyyMMddTHHmmssfffZ-NNNNNN` (UTC time plus a sequence number). It is always greater than the newest existing id of the installation
@@ -57,7 +60,7 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
   "undone_at": null,
   "files": [
     { "path": "Data/enUS/realmlist.wtf", "existed": true, "backup_file": "files/0",
-      "sha256_before": "…", "sha256_after": "…" },
+      "sha256_before": "…", "sha256_after": "…", "unix_mode": 292, "windows_read_only": null },
     { "path": "WTF/Config.wtf", "existed": false, "backup_file": null,
       "sha256_before": null, "sha256_after": "…" }
   ]
@@ -73,7 +76,7 @@ An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
 | Current state | Result |
 |---|---|
 | equals `sha256_before` (or is missing when the file did not exist) | `AlreadyRestored` (an earlier undo was interrupted) |
-| equals `sha256_after`, file existed | the original bytes are written back and verified: `Restored` (symbolic links are recreated when the manifest records `is_symlink`) |
+| equals `sha256_after`, file existed | the original bytes are written back and verified: `Restored` (when a trusted `files/<n>.symlink` sidecar exists and validates inside the client root, the symlink is recreated from that text; otherwise a regular file is restored) |
 | equals `sha256_after`, file did not exist | the file is deleted: `Deleted` (folders are never removed) |
 | anything else | `Conflict`: the file is not touched, the UI decides |
 

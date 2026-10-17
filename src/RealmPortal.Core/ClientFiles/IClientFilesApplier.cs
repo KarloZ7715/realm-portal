@@ -3,7 +3,13 @@ namespace RealmPortal.Core.ClientFiles;
 /// <summary>Outcome of <see cref="IClientFilesApplier.Apply"/>.</summary>
 /// <param name="BackupId">Id of the backup that <see cref="IClientFilesApplier.Undo"/> restores; <c>null</c> when the plan was empty.</param>
 /// <param name="Edits">The edits that were written.</param>
-public sealed record ApplyResult(string? BackupId, IReadOnlyList<ClientFileEdit> Edits);
+public sealed record ApplyResult(string? BackupId, IReadOnlyList<ClientFileEdit> Edits, IReadOnlyList<string> Warnings)
+{
+    public ApplyResult(string? backupId, IReadOnlyList<ClientFileEdit> edits)
+        : this(backupId, edits, [])
+    {
+    }
+}
 
 public enum UndoFileStatus
 {
@@ -52,6 +58,7 @@ public interface IClientFilesApplier
     /// Undoes the most recent applied change of the installation that has not been undone yet. Files whose current
     /// content is not what the apply wrote are reported as conflicts and never overwritten.
     /// </summary>
+    /// <param name="clientRoot">The installation's trusted client directory (must match the backup manifest).</param>
     /// <exception cref="ClientFilesException"><see cref="ClientFilesErrorCode.NothingToUndo"/> when no change is pending.</exception>
-    UndoResult Undo(string installationId);
+    UndoResult Undo(string installationId, string clientRoot);
 }
