@@ -802,7 +802,7 @@
    ],
    "mode": "stretch",
    "svg": true,
-   "note": "outline only (Figma \"Texto pergamino/Normal\"). Label #2B2118, Marcellus SC 14."
+   "note": "outline only (Figma \"Parchment text/Normal\"). Label #2B2118, Marcellus SC 14."
   },
   "ghost-parchment-hover": {
    "group": "buttons",
