@@ -6,6 +6,22 @@ namespace RealmPortal.Tests;
 public class ClientPathsCaseTests
 {
     [Fact]
+    public void ResolveManagedPath_RejectsAmbiguousCaseVariants()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        using var temp = new TempDirectory();
+        var client = temp.Combine("client");
+        Directory.CreateDirectory(Path.Combine(client, "WTF"));
+        Directory.CreateDirectory(Path.Combine(client, "wtf"));
+
+        var ex = Assert.Throws<ClientFilesException>(() =>
+            ClientPaths.ResolveManagedPath(ClientPaths.CanonicalRoot(client), "WTF/Config.wtf"));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+    }
+
+    [Fact]
     public void ResolveManagedPath_UsesExistingDirectoryCasing_OnLinux()
     {
         if (!OperatingSystem.IsLinux())

@@ -17,6 +17,23 @@ public class FileReplacementPermissionsTests
     }
 
     [Fact]
+    public void TryNormalizeUnixMode_RejectsNegativeAndHugeValues()
+    {
+        Assert.False(FileReplacementPermissions.TryNormalizeUnixMode(-1, out _));
+        Assert.False(FileReplacementPermissions.TryNormalizeUnixMode(int.MaxValue, out _));
+        Assert.Null(FileReplacementPermissions.FromUnixAndWindows(-1, null));
+        Assert.Null(FileReplacementPermissions.FromUnixAndWindows(int.MaxValue, null));
+    }
+
+    [Fact]
+    public void TryNormalizeUnixMode_StripsHighBitsWithinStModeRange()
+    {
+        const int mode4755 = 2541;
+        Assert.True(FileReplacementPermissions.TryNormalizeUnixMode(mode4755, out var normalized));
+        Assert.Equal(493, normalized);
+    }
+
+    [Fact]
     public void AtomicWriter_OnLinux_AppliesUnixModeToTempBeforeReplace()
     {
         if (!OperatingSystem.IsLinux())

@@ -118,7 +118,7 @@ public sealed class ClientFilesPlanner : IClientFilesPlanner
         if (layout.Config == ConfigMode.None)
             return;
 
-        var (segments, exists) = CaseInsensitivePath.Resolve(root, "WTF", "Config.wtf");
+        var (segments, exists) = CaseInsensitivePath.Resolve(root, ["WTF", "Config.wtf"]);
         if (!exists && layout.Config == ConfigMode.RealmNameOnly)
             return; // Old clients: never create Config.wtf.
 

@@ -72,14 +72,23 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
         if (permissions is null)
             return;
 
-        if (permissions.UnixMode is int unix && (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS()))
-            File.SetUnixFileMode(tempPath, (UnixFileMode)unix);
-
-        if (OperatingSystem.IsWindows() && permissions.WindowsReadOnly is true && File.Exists(destinationPath))
+        if (permissions.UnixMode is int unix && (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            && FileReplacementPermissions.TryNormalizeUnixMode(unix, out var normalized))
         {
-            var attrs = File.GetAttributes(destinationPath);
-            if (attrs.HasFlag(FileAttributes.ReadOnly))
-                File.SetAttributes(destinationPath, attrs & ~FileAttributes.ReadOnly);
+            File.SetUnixFileMode(tempPath, (UnixFileMode)(normalized & FileReplacementPermissions.UnixPermissionMask));
+        }
+
+        if (OperatingSystem.IsWindows() && permissions.WindowsReadOnly is true)
+        {
+            if (File.Exists(destinationPath))
+            {
+                var destAttrs = File.GetAttributes(destinationPath);
+                if (destAttrs.HasFlag(FileAttributes.ReadOnly))
+                    File.SetAttributes(destinationPath, destAttrs & ~FileAttributes.ReadOnly);
+            }
+
+            var tempAttrs = File.GetAttributes(tempPath);
+            File.SetAttributes(tempPath, tempAttrs | FileAttributes.ReadOnly);
         }
     }
 
