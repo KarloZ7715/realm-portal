@@ -28,8 +28,13 @@ public sealed class ErrorsAndDialogTests
     [MemberData(nameof(AllCodes))]
     public void EveryErrorCodeHasTitleAndBodyInBothLanguages(string code)
     {
+        var titleKey = $"error.{code.ToLowerInvariant()}.title";
+        var bodyKey = $"error.{code.ToLowerInvariant()}.body";
         foreach (var language in new[] { Language.Es, Language.En })
         {
+            var table = Loc.Load(language);
+            Assert.True(table.ContainsKey(titleKey), $"Missing {titleKey} in {language}");
+            Assert.True(table.ContainsKey(bodyKey), $"Missing {bodyKey} in {language}");
             Loc.Instance.SetLanguage(language);
             Assert.DoesNotContain("!error.", ErrorText.Title(code));
             Assert.DoesNotContain("!error.", ErrorText.Body(code, "/some/path"));
@@ -100,9 +105,46 @@ public sealed class ErrorsAndDialogTests
     {
         var shell = new Shell();
         var first = shell.Model.ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
-        Assert.False(await shell.Model.ConfirmAsync(ConfirmDialogViewModel.DiscardBackup()));
+        var rejected = ConfirmDialogViewModel.DiscardBackup();
+        Assert.False(await shell.Model.ConfirmAsync(rejected));
+        Assert.True(rejected.Result.IsCompletedSuccessfully);
         shell.Model.Dialog!.CancelCommand.Execute(null);
         Assert.False(await first);
+    }
+
+    [AvaloniaFact]
+    public async Task DiscardDialogTrapsFocusAndRestoresIt()
+    {
+        var shell = new Shell();
+        var language = shell.Window.FindControl<Button>("LanguageButton")!;
+        language.Focus();
+        Screenshots.Settle();
+        Assert.True(language.IsFocused);
+
+        var answer = shell.Model.ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
+        Screenshots.Settle();
+
+        var mainChrome = shell.Window.FindControl<Panel>("MainChrome")!;
+        Assert.False(mainChrome.IsEnabled);
+
+        var host = shell.Window.FindControl<ContentControl>("DialogHost")!;
+        var cancel = host.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CancelButton");
+        var confirm = host.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ConfirmButton");
+        Assert.True(cancel.IsFocused);
+
+        confirm.Focus();
+        Screenshots.Settle();
+        Assert.True(confirm.IsFocused);
+        cancel.Focus();
+        Assert.True(cancel.IsFocused);
+
+        cancel.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
+        Assert.False(await answer);
+        Screenshots.Settle();
+        Assert.Null(shell.Model.Dialog);
+        Assert.True(mainChrome.IsEnabled);
+        Screenshots.Settle();
+        Assert.True(language.IsFocused);
     }
 
     [AvaloniaFact]
@@ -115,13 +157,16 @@ public sealed class ErrorsAndDialogTests
         combo.IsDropDownOpen = true;
         Screenshots.Settle();
         var popup = combo.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Popup>().First();
-        var item = popup.Child!.GetVisualDescendants().OfType<ComboBoxItem>().First();
-        var bar = item.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "Bar");
-        Assert.Equal(3, bar.Width);
-        Assert.Equal(0, bar.Opacity); // selected: fill only
-        ((Avalonia.Controls.IPseudoClasses)item.Classes).Set(":pointerover", true);
+        var items = popup.Child!.GetVisualDescendants().OfType<ComboBoxItem>().ToList();
+        var selected = items[0];
+        var hovered = items[1];
+        var selectedBar = selected.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "Bar");
+        Assert.Equal(3, selectedBar.Width);
+        Assert.Equal(0, selectedBar.Opacity); // selected: fill only, no bar
+        var bar = hovered.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "Bar");
+        ((Avalonia.Controls.IPseudoClasses)hovered.Classes).Set(":pointerover", true);
         Screenshots.Settle();
-        Assert.Equal(1, bar.Opacity); // hovered: fill + bar
+        Assert.Equal(1, bar.Opacity); // unselected + hovered: fill + bar
         combo.IsDropDownOpen = false;
     }
 }

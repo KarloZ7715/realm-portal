@@ -46,5 +46,17 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
     [RelayCommand]
     private void Cancel() => _result.TrySetResult(false);
 
+    /// <summary>Completes with false and unsubscribes when the dialog cannot be shown (e.g. another is already open).</summary>
+    public void Reject()
+    {
+        if (_result.Task.IsCompleted)
+        {
+            return;
+        }
+
+        Loc.Instance.Changed -= Refresh;
+        _result.TrySetResult(false);
+    }
+
     private void Refresh() => OnPropertyChanged(string.Empty);
 }

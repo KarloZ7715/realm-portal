@@ -61,14 +61,22 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private ConfirmDialogViewModel? _dialog;
 
+    /// <summary>Raised before <see cref="Dialog"/> is set so the window can capture keyboard focus.</summary>
+    public event Action? DialogOpening;
+
+    /// <summary>Raised after <see cref="Dialog"/> is cleared so the window can restore keyboard focus.</summary>
+    public event Action? DialogClosed;
+
     /// <summary>Shows <paramref name="dialog"/> over the window and returns the user's answer; a second dialog while one is open answers false.</summary>
     public async Task<bool> ConfirmAsync(ConfirmDialogViewModel dialog)
     {
         if (Dialog is not null)
         {
+            dialog.Reject();
             return false;
         }
 
+        DialogOpening?.Invoke();
         Dialog = dialog;
         try
         {
@@ -77,6 +85,7 @@ public sealed partial class MainViewModel : ObservableObject
         finally
         {
             Dialog = null;
+            DialogClosed?.Invoke();
         }
     }
 
