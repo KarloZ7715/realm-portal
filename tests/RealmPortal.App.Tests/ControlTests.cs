@@ -1,6 +1,7 @@
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Dev;
@@ -69,6 +70,27 @@ public class ControlTests
     {
         var button = Host(new Button { Content = "Label", Classes = { "ghost", "parchment" } });
         Assert.Equal("focus-ring-parchment", Source(button, "Ring"));
+    }
+
+    [AvaloniaFact]
+    public void ParchmentPrimaryAndSecondaryButtonsUseDarkBronzePlatesAndTealFocusRing()
+    {
+        var primary = Host(new Button { Content = "Discard", Classes = { "parchment" } });
+        Assert.Equal("button-primary-parchment-normal", Source(primary, "Plate"));
+        Assert.Equal("focus-ring-parchment", Source(primary, "Ring"));
+        var secondary = Host(new Button { Content = "Cancel", Classes = { "secondary", "parchment" } });
+        Assert.Equal("button-secondary-parchment-normal", Source(secondary, "Plate"));
+        Assert.Equal("focus-ring-parchment", Source(secondary, "Ring"));
+    }
+
+    [AvaloniaFact]
+    public void ThreadStitchDividerMatchesTheDesignerSpec()
+    {
+        var line = Host(new Avalonia.Controls.Shapes.Line { Classes = { "stitch" }, StartPoint = new(0, 0), EndPoint = new(200, 0) });
+        Assert.Equal(1.5, line.StrokeThickness);
+        Assert.Equal(new[] { 6d, 4d }, line.StrokeDashArray);
+        var stroke = Assert.IsType<SolidColorBrush>(line.Stroke);
+        Assert.Equal(Color.Parse("#8A6C4A"), stroke.Color);
     }
 
     [AvaloniaFact]

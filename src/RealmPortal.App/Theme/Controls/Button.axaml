@@ -4,6 +4,7 @@
   <!--
     Button. Default = primary (wax leather plate). Style classes:
       secondary        dark leather plate with bronze edge
+      parchment        on primary or secondary (not ghost): bronze/dark border plates and focus/parchment ring (dialogs)
       ghost            no plate; the kit's optional wood-brown plate appears on hover and pressed (on leather)
       ghost parchment  outline plate on parchment (class "parchment" also switches ink colours and the teal focus ring)
       compact          36 px high instead of 40
@@ -52,6 +53,16 @@
       <Style Selector="^.secondary:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-hover"/></Style>
       <Style Selector="^.secondary:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-pressed"/></Style>
       <Style Selector="^.secondary:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-disabled"/></Style>
+      <!-- primary + secondary on parchment (WCAG 1.4.11 non-text contrast on parchment sheets) -->
+      <Style Selector="^.parchment:not(.ghost) /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-parchment"/></Style>
+      <Style Selector="^.parchment:not(.ghost):not(.secondary) /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-parchment-normal"/></Style>
+      <Style Selector="^.parchment:not(.ghost):not(.secondary):pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-parchment-hover"/></Style>
+      <Style Selector="^.parchment:not(.ghost):not(.secondary):pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-parchment-pressed"/></Style>
+      <Style Selector="^.parchment:not(.ghost):not(.secondary):disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-primary-parchment-disabled"/></Style>
+      <Style Selector="^.parchment.secondary /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-parchment-normal"/></Style>
+      <Style Selector="^.parchment.secondary:pointerover /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-parchment-hover"/></Style>
+      <Style Selector="^.parchment.secondary:pressed /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-parchment-pressed"/></Style>
+      <Style Selector="^.parchment.secondary:disabled /template/ c|NineSlice#Plate"><Setter Property="Source" Value="button-secondary-parchment-disabled"/></Style>
       <!-- shared -->
       <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="RenderTransform" Value="translate(0px,1px)"/></Style>
       <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>

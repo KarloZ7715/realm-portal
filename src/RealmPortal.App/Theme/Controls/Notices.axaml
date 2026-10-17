@@ -87,11 +87,10 @@
   <Style Selector="c|StepIndicator"><Setter Property="Theme" Value="{StaticResource RpStepIndicator}"/></Style>
   <Style Selector="ContentControl.toast"><Setter Property="Theme" Value="{StaticResource RpToast}"/></Style>
   <Style Selector="Line.stitch">
-    <Setter Property="Stroke" Value="{DynamicResource BronzeDarkBrush}"/>
-    <Setter Property="StrokeThickness" Value="1"/>
-    <Setter Property="StrokeDashArray" Value="4,3"/>
+    <Setter Property="Stroke" Value="{DynamicResource StitchBrush}"/>
+    <Setter Property="StrokeThickness" Value="1.5"/>
+    <Setter Property="StrokeDashArray" Value="6,4"/>
   </Style>
-  <Style Selector="Line.stitch.parchment"><Setter Property="Stroke" Value="{DynamicResource BronzeDarkBrush}"/></Style>
   <!-- Small caps heading of a sheet (CLIENTES GUARDADOS, DATOS DEL SERVIDOR); give it upper-case text. -->
   <Style Selector="TextBlock.sheet-title">
     <Setter Property="FontFamily" Value="{DynamicResource FontCaps}"/>

@@ -11,10 +11,10 @@
         <TextBlock Classes="sheet-title" Name="DialogTitle" TextWrapping="Wrap" Text="{Binding Title}"/>
         <TextBlock Classes="body" Name="DialogBody" TextWrapping="Wrap" Foreground="{DynamicResource InkBrush}" Text="{Binding Body}"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,10,0,0">
-          <Button Name="CancelButton" Classes="secondary" MinWidth="130" IsCancel="True" Command="{Binding CancelCommand}">
+          <Button Name="CancelButton" Classes="secondary parchment" MinWidth="130" IsCancel="True" Command="{Binding CancelCommand}">
             <TextBlock Text="{Binding CancelText}"/>
           </Button>
-          <Button Name="ConfirmButton" MinWidth="130" Command="{Binding ConfirmCommand}">
+          <Button Name="ConfirmButton" Classes="parchment" MinWidth="130" Command="{Binding ConfirmCommand}">
             <TextBlock Text="{Binding ConfirmText}"/>
           </Button>
         </StackPanel>
