@@ -16,6 +16,7 @@ public class ClientFilesContractTests
     [InlineData("a/b", false)]
     [InlineData("a b", false)]
     [InlineData("é", false)]
+    [InlineData("abc\n", false)]
     public void IsValidId_AcceptsOnlySafeFolderNames(string id, bool expected) =>
         Assert.Equal(expected, ClientFilesRequest.IsValidId(id));
 

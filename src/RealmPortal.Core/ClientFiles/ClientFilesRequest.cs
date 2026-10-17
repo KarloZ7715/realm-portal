@@ -23,7 +23,7 @@ public sealed record ClientFilesRequest(
     string Realmlist,
     string Realm)
 {
-    private static readonly Regex SafeId = new("^[A-Za-z0-9._-]{1,64}$", RegexOptions.CultureInvariant);
+    private static readonly Regex SafeId = new("^[A-Za-z0-9._-]{1,64}\z", RegexOptions.CultureInvariant);
 
     /// <summary>True when the id can be used as a folder name and manifest value.</summary>
     public static bool IsValidId(string? id) => id is not null && id != "." && id != ".." && SafeId.IsMatch(id);
