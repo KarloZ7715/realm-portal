@@ -1,0 +1,10 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Tiled texture brushes (ambientCG, CC0 1.0; see THIRD_PARTY_LICENSES.md). The texture is drawn at partial opacity
+    over a flat token colour (DESIGN.md section 7); the tile is 512 DIP so the 1024 px JPEG is 1:1 at 200 %.
+  -->
+  <ImageBrush x:Key="LeatherTextureBrush"
+              Source="avares://RealmPortal.App/Assets/Textures/tex-leather.jpg"
+              TileMode="Tile" Stretch="None" DestinationRect="0,0,512,512"/>
+</ResourceDictionary>

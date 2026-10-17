@@ -10,13 +10,21 @@
   <ItemGroup>
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />
-    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Themes.Simple" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="RealmPortal.App.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RealmPortal.Core\RealmPortal.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AvaloniaResource Include="..\..\assets\icons\app\app-icon-256.png" Link="Assets/app-icon.png" />
+  </ItemGroup>
+  <ItemGroup Label="9-slice art, seals and textures (designer pack in assets/). window-frame is not bundled: the app keeps the system title bar.">
+    <AvaloniaResource Include="..\..\assets\frames\button-*.png;..\..\assets\frames\focus-ring-*.png;..\..\assets\frames\panel-*.png;..\..\assets\frames\tab-*.png" Link="Assets/Frames/%(Filename)%(Extension)" />
+    <AvaloniaResource Include="..\..\assets\icons\seals\*-64.png;..\..\assets\icons\seals\*-128.png" Link="Assets/Seals/%(Filename)%(Extension)" />
+    <AvaloniaResource Include="..\..\assets\textures\tex-leather.jpg" Link="Assets/Textures/tex-leather.jpg" />
   </ItemGroup>
   <ItemGroup Label="Bundled fonts (SIL OFL 1.1). Static instances only; the variable fonts in assets/fonts are not bundled.">
     <AvaloniaResource Include="..\..\assets\fonts\almendra\Almendra-Bold.ttf" Link="Assets/Fonts/Almendra-Bold.ttf" />
