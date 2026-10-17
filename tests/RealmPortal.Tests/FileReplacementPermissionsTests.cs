@@ -1,4 +1,5 @@
 using RealmPortal.Core.IO;
+using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
 
@@ -7,9 +8,12 @@ public class FileReplacementPermissionsTests
     [Fact]
     public void FromUnixAndWindows_MasksSetuidBits()
     {
-        var permissions = FileReplacementPermissions.FromUnixAndWindows(0o104755, true);
+        var withSetUid = (int)(UnixFileMode.SetUser | UnixFileMode.UserRead | UnixFileMode.UserWrite
+            | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        var permissions = FileReplacementPermissions.FromUnixAndWindows(withSetUid, true);
         Assert.NotNull(permissions);
-        Assert.Equal(0o755, permissions!.UnixMode);
+        Assert.Equal(withSetUid & 0x1FF, permissions!.UnixMode);
     }
 
     [Fact]

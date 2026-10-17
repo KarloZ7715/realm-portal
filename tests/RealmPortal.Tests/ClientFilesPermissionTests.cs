@@ -31,7 +31,7 @@ public class ClientFilesPermissionTests
         Assert.Contains(result.Warnings, w => w.Contains("read-only", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.GroupRead | UnixFileMode.OtherRead, File.GetUnixFileMode(path));
 
-        applier.Undo("install-1");
+        applier.Undo("install-1", client);
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.GroupRead | UnixFileMode.OtherRead, File.GetUnixFileMode(path));
     }
 
