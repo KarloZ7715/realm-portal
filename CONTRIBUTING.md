@@ -47,10 +47,11 @@ realm-portal launch Wotlk --client-dir /path/to/client --wrapper wine   # switch
 ```
 
 Options: `--force` (on `switch` and `launch`) skips the compatibility check; `--wrapper <command>` (on `launch`) runs the game
-through a command such as `wine` or `gamemoderun` (it becomes the prefix of the launch command); `--dry-run` only prints what would start.
+through a command such as `wine` or `gamemoderun` (it becomes the prefix of the launch command); `--dry-run` (on `launch`) prints the
+launch command and does not start the client, but if you pass a server name it still switches to that server first.
 `--build` must be a positive integer (anything else is a usage error, exit 1).
 
-What the commands write: `add`, `remove`, `switch` and `undo` only change Realm Portal's own files (`servers.json`, `state.json`,
+What the commands write: `add`, `remove`, `switch`, `undo`, and `launch <server>` (including with `--dry-run`) only change Realm Portal's own files (`servers.json`, `state.json`,
 `activo.json`). **They do not edit the game client yet**: `ClientFilesApplier` (backup, write `realmlist.wtf`/`Config.wtf`, byte-identical undo,
 see [docs/client-files-backup.md](docs/client-files-backup.md)) exists in `RealmPortal.Core` but the CLI does not call it, so `launch` starts
 the client with whatever realm configuration it already has. Connecting both is planned in the application service for the desktop app.
