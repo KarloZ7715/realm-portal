@@ -27,7 +27,32 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
 
     public string DefaultBackupFolder => ClientFilesApplier.DefaultBackupRoot(getVariable);
 
-    public string ActiveBackupFolder => LoadStorage()?.BackupFolder ?? DefaultBackupFolder;
+    /// <summary>
+    /// Folder backups use for this process. A missing file yields <see cref="DefaultBackupFolder"/>.
+    /// A corrupt file, or a folder that is missing or not writable, also yields the default and sets
+    /// <paramref name="error"/> so the host can still start and report the problem.
+    /// </summary>
+    public string ResolveActiveBackupFolder(out Exception? error)
+    {
+        try
+        {
+            var configured = LoadStorage()?.BackupFolder;
+            if (configured is null)
+            {
+                error = null;
+                return DefaultBackupFolder;
+            }
+
+            var full = ValidateBackupFolder(configured);
+            error = null;
+            return full;
+        }
+        catch (Exception ex) when (ex is StoreException or ClientFilesException)
+        {
+            error = ex;
+            return DefaultBackupFolder;
+        }
+    }
 
     public StorageSettings GetStorageSettings() => new(LoadStorage()?.BackupFolder ?? DefaultBackupFolder);
 
@@ -144,7 +169,10 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
                     throw new StoreException($"'{_storagePath}' has unsupported format version {file.Version}.");
                 if (string.IsNullOrWhiteSpace(file.BackupFolder))
                     throw new StoreException($"'{_storagePath}' is missing backup_folder.");
-                file.BackupFolder = ValidateBackupFolder(file.BackupFolder);
+                // Parse only. Writability is checked when the folder is saved and once at startup.
+                if (!Path.IsPathRooted(file.BackupFolder))
+                    throw new StoreException($"'{_storagePath}' backup_folder must be an absolute path.");
+                file.BackupFolder = Path.GetFullPath(file.BackupFolder);
                 return file;
             }
             catch (JsonException ex)

@@ -22,6 +22,7 @@ public sealed class PortalService : IPortalService
     private readonly LastSwitchJournal _journal;
     private readonly PortalSettingsStore _settings;
     private readonly string _activeBackupRoot;
+    private Exception? _storageSettingsError;
 
     public PortalService(
         string configDirectory,
@@ -48,7 +49,7 @@ public sealed class PortalService : IPortalService
         _active = new ActiveServerManager(_servers, configDirectory, projectionDirectory, _writer);
         _journal = new LastSwitchJournal(configDirectory, _writer);
         _settings = new PortalSettingsStore(configDirectory, _writer, _getVariable);
-        _activeBackupRoot = _settings.ActiveBackupFolder;
+        _activeBackupRoot = _settings.ResolveActiveBackupFolder(out _storageSettingsError);
         TryRecoverPendingStateUndo();
     }
 
@@ -404,6 +405,9 @@ public sealed class PortalService : IPortalService
 
     public ServiceResult<StorageSettings> GetStorageSettings()
     {
+        if (_storageSettingsError is not null)
+            return ServiceResult<StorageSettings>.Fail(ServiceErrors.FromException(_storageSettingsError));
+
         try
         {
             return ServiceResult<StorageSettings>.Ok(_settings.GetStorageSettings());
@@ -422,6 +426,7 @@ public sealed class PortalService : IPortalService
         try
         {
             _settings.SetStorageSettings(settings);
+            _storageSettingsError = null;
             return ServiceResult<Unit>.Ok(default);
         }
         catch (Exception ex)
