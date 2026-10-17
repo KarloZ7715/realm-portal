@@ -1,0 +1,78 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!--
+    SplitButton: one joined leather plate (kit piece split-{variant}-{state}, 200x44 native) with the action on the left
+    and the 43.5 px menu segment (chevron) on the right. Class "secondary" selects the dark plate. A hovered or pressed
+    segment is drawn from the matching state plate, clipped to that segment (see SplitPlate). The focus ring goes around
+    the whole plate. For a perfect stitch make the width 200 + 6k.
+  -->
+  <Styles.Resources>
+    <ControlTheme x:Key="RpSplitSegment" TargetType="Button">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ContentPresenter Name="PART_ContentPresenter" Background="Transparent"
+                            Padding="{TemplateBinding Padding}"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                            RecognizesAccessKey="True"/>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:disabled"><Setter Property="Cursor" Value="Arrow"/></Style>
+      <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="RenderTransform" Value="translate(0px,1px)"/></Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RpSplitButton" TargetType="SplitButton">
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="FontFamily" Value="{DynamicResource FontCaps}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Foreground" Value="{DynamicResource IvoryBrush}"/>
+      <Setter Property="MinHeight" Value="44"/>
+      <Setter Property="Padding" Value="20,0"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Focusable" Value="True"/>
+      <Setter Property="KeyboardNavigation.IsTabStop" Value="True"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <c:NineSlice Name="Ring" Source="focus-ring-leather" Insets="14" ShadowMargin="8"
+                         Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
+            <c:SplitPlate Name="Plate" ActionSegment="{Binding #PART_PrimaryButton}" MenuSegment="{Binding #PART_SecondaryButton}"/>
+            <Grid ColumnDefinitions="*,43.5">
+              <Button Name="PART_PrimaryButton" Theme="{StaticResource RpSplitSegment}"
+                      Content="{TemplateBinding Content}"
+                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                      Command="{TemplateBinding Command}"
+                      CommandParameter="{TemplateBinding CommandParameter}"
+                      FontFamily="{TemplateBinding FontFamily}"
+                      FontSize="{TemplateBinding FontSize}"
+                      Foreground="{TemplateBinding Foreground}"
+                      Padding="{TemplateBinding Padding}"
+                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                      KeyboardNavigation.IsTabStop="False"/>
+              <Button Name="PART_SecondaryButton" Grid.Column="1" Theme="{StaticResource RpSplitSegment}"
+                      Foreground="{TemplateBinding Foreground}" Padding="0"
+                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                      KeyboardNavigation.IsTabStop="False">
+                <c:Icon Data="{DynamicResource IconChevronDown}" StrokeThickness="2.2" Width="16" Height="16"/>
+              </Button>
+            </Grid>
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
+      <Style Selector="^.secondary /template/ c|SplitPlate#Plate"><Setter Property="Variant" Value="secondary"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="SplitButton"><Setter Property="Theme" Value="{StaticResource RpSplitButton}"/></Style>
+</Styles>

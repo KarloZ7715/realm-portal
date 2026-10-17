@@ -2,8 +2,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="using:RealmPortal.App.Controls">
   <!--
-    Sidebar navigation: ListBox.nav ListBoxItem. The selected item is a parchment tab (designer art, inset 18,
-    baked shadow 10 px) in ink-coloured Alegreya Medium; other items are bone text on leather with a soft hover wash.
+    Sidebar navigation: ListBox.nav ListBoxItem. The selected item is a parchment tab (kit piece tab-parchment-flat, inset 18, flush with
+    the window edge) over a shadow-soft layer in ink-coloured Alegreya Medium; other items are bone text on leather with a wood-coloured hover wash.
+    Content is usually an icon + label (StackPanel, 12 px apart); add class "compact" to the ListBox for icon-only items.
   -->
   <Styles.Resources>
     <!-- The focus ring layer has ZIndex 3: without it the ring is not drawn above the 9-slice art. -->
@@ -19,19 +20,22 @@
       <Setter Property="Template">
         <ControlTemplate>
           <Panel>
-            <Border Name="Hover" CornerRadius="0,6,6,0" Background="#22EFE5CD" Opacity="0"/>
-            <c:NineSlice Name="Tab" Source="tab-parchment" Insets="18" ShadowMargin="10" IsVisible="False" IsHitTestVisible="False"/>
+            <Border Name="Hover" CornerRadius="{DynamicResource RadiusControl}" Background="{DynamicResource Wood700Brush}" Opacity="0"/>
+            <c:NineSlice Name="Shadow" Source="shadow-soft" Insets="18" ShadowMargin="12" IsVisible="False" IsHitTestVisible="False"/>
+            <c:NineSlice Name="Tab" Source="tab-parchment-flat" Insets="18" IsVisible="False" IsHitTestVisible="False"/>
             <c:NineSlice Name="Ring" Source="focus-ring-leather" Insets="14" ShadowMargin="8" Opacity="0" IsHitTestVisible="False" ZIndex="3"/>
             <ContentPresenter Name="PART_ContentPresenter"
                               Padding="{TemplateBinding Padding}"
                               Content="{TemplateBinding Content}"
                               ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
                               VerticalContentAlignment="Center"/>
           </Panel>
         </ControlTemplate>
       </Setter>
       <Style Selector="^:pointerover /template/ Border#Hover"><Setter Property="Opacity" Value="1"/></Style>
       <Style Selector="^:selected /template/ c|NineSlice#Tab"><Setter Property="IsVisible" Value="True"/></Style>
+      <Style Selector="^:selected /template/ c|NineSlice#Shadow"><Setter Property="IsVisible" Value="True"/></Style>
       <Style Selector="^:selected /template/ Border#Hover"><Setter Property="Opacity" Value="0"/></Style>
       <Style Selector="^:selected">
         <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
@@ -42,10 +46,15 @@
     </ControlTheme>
   </Styles.Resources>
   <Style Selector="ListBox.nav ListBoxItem"><Setter Property="Theme" Value="{StaticResource RpNavTab}"/></Style>
+  <!-- Compact sidebar (720x480): icon-only items, about 56 px wide; put an Icon as the content. -->
+  <Style Selector="ListBox.nav.compact ListBoxItem">
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+  </Style>
   <Style Selector="ListBox.nav">
     <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-    <!-- Room for the 10 px baked shadow of the tab; the negative margin hands it back to the layout. -->
-    <Setter Property="Padding" Value="0,10,10,10"/>
-    <Setter Property="Margin" Value="0,-10,-10,-10"/>
+    <!-- Room for the 12 px shadow layer of the tab; the negative margin hands it back to the layout. -->
+    <Setter Property="Padding" Value="0,12,12,12"/>
+    <Setter Property="Margin" Value="0,-12,-12,-12"/>
   </Style>
 </Styles>

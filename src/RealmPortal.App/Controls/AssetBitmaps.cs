@@ -5,7 +5,7 @@ using Avalonia.Platform;
 namespace RealmPortal.App.Controls;
 
 /// <summary>
-/// Loads the designer's PNG art. Frames come as <c>name.png</c> (@1x) and <c>name@2x.png</c> (exactly twice the pixels);
+/// Loads the designer's UI kit PNGs (assets/ui). Pieces come as <c>name.png</c> (@1x) and <c>name@2x.png</c> (exactly twice the pixels);
 /// the @2x file is used from a render scale of 1.5 up, so the art is never upscaled.
 /// </summary>
 internal static class AssetBitmaps
@@ -22,7 +22,7 @@ internal static class AssetBitmaps
     {
         var factor = scale >= HiDpiThreshold ? 2 : 1;
         var file = factor == 2 ? $"{name}@2x.png" : $"{name}.png";
-        return (Load($"avares://RealmPortal.App/Assets/Frames/{file}"), factor);
+        return (Load($"avares://RealmPortal.App/Assets/Ui/{file}"), factor);
     }
 
     public static Bitmap Seal(string name, bool hiRes) =>
