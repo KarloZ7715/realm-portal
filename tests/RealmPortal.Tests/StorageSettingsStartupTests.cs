@@ -111,7 +111,8 @@ public class StorageSettingsStartupTests
     [Fact]
     public void UnwritableBackupFolder_ServiceStillStarts()
     {
-        if (OperatingSystem.IsWindows())
+        // A privileged process ignores directory mode bits, so clearing write bits does not make the folder unwritable.
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
             return;
 
         using var dir = new TempDirectory();
