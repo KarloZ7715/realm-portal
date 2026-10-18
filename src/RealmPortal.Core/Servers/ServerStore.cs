@@ -79,6 +79,53 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
         }
     }
 
+    /// <summary>Replaces an existing server while preserving its id.</summary>
+    /// <exception cref="StoreException">The server is missing or another server uses the same name.</exception>
+    public Server Update(Server server)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        try
+        {
+            ServerValidator.Validate(server);
+        }
+        catch (InvalidRealmlistException ex)
+        {
+            throw ex.ForServer(server.Name);
+        }
+
+        using (_directoryLock.Acquire())
+            return UpdateCore(server);
+    }
+
+    internal Server UpdateCore(Server server)
+    {
+        var servers = Load().ToList();
+        var index = servers.FindIndex(s => s.Id == server.Id);
+        if (index < 0)
+            throw new StoreException($"No server matches '{server.Id}'.");
+        if (servers.Where((_, i) => i != index)
+            .Any(s => string.Equals(s.Name, server.Name, StringComparison.OrdinalIgnoreCase)))
+            throw new StoreException($"A server named '{server.Name}' already exists.");
+        servers[index] = server;
+        Save(servers);
+        return server;
+    }
+
+    internal void RewriteClientIdReferencesCore(string oldClientId, string? newClientId)
+    {
+        var servers = Load().ToList();
+        var changed = false;
+        for (var i = 0; i < servers.Count; i++)
+        {
+            if (servers[i].ClientId != oldClientId)
+                continue;
+            servers[i] = servers[i] with { ClientId = newClientId };
+            changed = true;
+        }
+        if (changed)
+            Save(servers);
+    }
+
     /// <summary>Removes a server by id. Returns false when no such server exists.</summary>
     public bool Remove(string id)
     {

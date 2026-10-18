@@ -21,7 +21,10 @@ public interface IPortalService
     ServiceResult<IReadOnlyList<ClientEntry>> ListClients();
 
     /// <summary>Registers a client folder (the one with <c>Wow.exe</c>). Fails with the version-reading codes when it is not a readable client; adding the same folder twice returns the existing entry.</summary>
-    ServiceResult<ClientEntry> AddClient(string folder);
+    ServiceResult<ClientEntry> AddClient(string folder, string? name = null);
+
+    /// <summary>Updates the name and/or path of a registered client.</summary>
+    ServiceResult<ClientEntry> UpdateClient(UpdateClientRequest request);
 
     /// <summary>Forgets a client folder (nothing on disk is touched). Backups of its installation are kept.</summary>
     ServiceResult<Unit> RemoveClient(string clientId);
@@ -39,6 +42,9 @@ public interface IPortalService
 
     /// <summary>Adds a server by hand. There is no bundled list.</summary>
     ServiceResult<ServerEntry> AddServer(NewServer server);
+
+    /// <summary>Updates a stored server without changing its id.</summary>
+    ServiceResult<ServerEntry> UpdateServer(UpdateServerRequest request);
 
     /// <summary>Removes a server; when it was active it is deactivated and <c>activo.json</c> is deleted.</summary>
     ServiceResult<Unit> RemoveServer(string serverId);

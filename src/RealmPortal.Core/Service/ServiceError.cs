@@ -67,6 +67,12 @@ public enum ServiceErrorCode
     /// <summary>No registered client with that id.</summary>
     ClientNotFound,
 
+    /// <summary>A client with the requested canonical folder path is already registered.</summary>
+    ClientAlreadyExists,
+
+    /// <summary>A client name is invalid.</summary>
+    InvalidClientInput,
+
     /// <summary>Another server already has that name (case-insensitive); <see cref="ServiceError.ServerName"/> is set.</summary>
     ServerNameTaken,
 
