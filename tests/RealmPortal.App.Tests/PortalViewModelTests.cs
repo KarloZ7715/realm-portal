@@ -91,13 +91,15 @@ public class PortalViewModelTests
         }
     }
 
-    private sealed class FailAfterFirstProbe : IGameProcessProbe
+    private sealed class FailAfterLaunchProbe : IGameProcessProbe
     {
         private int _calls;
 
         public bool IsGameRunning(string clientRoot)
         {
-            if (Interlocked.Increment(ref _calls) > 1)
+            // The initial service-backed reload now derives already-running clients from the probe.
+            // Let those reads and Play's file guard pass, then fail the watcher read.
+            if (Interlocked.Increment(ref _calls) > 3)
             {
                 throw new InvalidOperationException("Injected process check failure.");
             }
@@ -110,6 +112,15 @@ public class PortalViewModelTests
     private sealed class GameRunningProbe : IGameProcessProbe
     {
         public bool IsGameRunning(string clientRoot) => true;
+    }
+
+    private sealed class DelayedGameProbe : IGameProcessProbe
+    {
+        private int _calls;
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        public bool IsGameRunning(string clientRoot) => Interlocked.Increment(ref _calls) >= 8;
     }
 
     private sealed class Env : IDisposable
@@ -694,7 +705,7 @@ public class PortalViewModelTests
     [AvaloniaFact]
     public async Task Play_ProcessCheckFailure_ReturnsToIdleWithError()
     {
-        using var env = new Env(probe: new FailAfterFirstProbe());
+        using var env = new Env(probe: new FailAfterLaunchProbe());
         var server = env.AddServer("Play", "play.example.org");
         env.Main.Servers.ReloadFromService();
         var card = env.Main.Servers.All.First(x => x.ServerId == server.Id);
@@ -715,6 +726,28 @@ public class PortalViewModelTests
         Assert.Equal(ServerOverlay.None, visible.Overlay);
         Assert.True(visible.CanAct);
         Assert.True(visible.PlayCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public async Task Play_ProbeFalseThenTrue_DoesNotShowClosedBanner()
+    {
+        var probe = new DelayedGameProbe();
+        using var env = new Env(probe: probe);
+        var server = env.AddServer("Play", "play.example.org");
+        env.Main.Servers.ReloadFromService();
+        var card = env.Main.Servers.All.Single(x => x.ServerId == server.Id);
+
+        await env.Main.Servers.PlayAsync(card);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (probe.Calls < 8 && DateTime.UtcNow < deadline)
+            await Task.Delay(50);
+        await Task.Delay(50);
+
+        Assert.False(env.Main.Servers.GameClosed);
+        Assert.Equal(ServersPhase.Running, env.Main.Servers.Phase);
+        Assert.Equal("Play", env.Main.Servers.Target?.Name);
+        Assert.Equal(ServerOverlay.Running, env.Main.Servers.Target?.Overlay);
+        Assert.False(env.Main.Servers.Target!.PlayCommand.CanExecute(null));
     }
 
     [AvaloniaFact]
