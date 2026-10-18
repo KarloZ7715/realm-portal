@@ -95,7 +95,7 @@ public sealed class ErrorsAndDialogTests
         Assert.Equal(
             "Realm Portal could not put everything back. Review the client files.",
             ErrorText.Body(inconsistent));
-        Assert.Equal("The switch succeeded but the game did not start.", ErrorText.Body(launch));
+        Assert.Equal("The game could not be started. Check the launcher settings and try again.", ErrorText.Body(launch));
         Assert.Equal(
             "The server was applied and is now active, but the game didn't start. Check the launcher settings and try again.",
             ErrorText.Body(applied));
@@ -105,7 +105,7 @@ public sealed class ErrorsAndDialogTests
         Assert.Equal(
             "Realm Portal no pudo dejar todo como estaba. Revisa los archivos del cliente.",
             ErrorText.Body(inconsistent));
-        Assert.Equal("El cambio de servidor se hizo, pero el juego no arrancó.", ErrorText.Body(launch));
+        Assert.Equal("No se pudo iniciar el juego. Revisa los ajustes del lanzador e inténtalo de nuevo.", ErrorText.Body(launch));
         Assert.Equal(
             "El servidor quedó aplicado y activo, pero el juego no se abrió. Revisa los ajustes del lanzador e inténtalo de nuevo.",
             ErrorText.Body(applied));

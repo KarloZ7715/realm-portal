@@ -164,7 +164,7 @@
   "error.invalidlaunchersettings.title": "Ajustes del lanzador no válidos",
   "error.invalidlaunchersettings.body": "Corrige los ajustes del lanzador antes de jugar.",
   "error.launchfailed.title": "No se pudo iniciar el juego",
-  "error.launchfailed.body": "El cambio de servidor se hizo, pero el juego no arrancó.",
+  "error.launchfailed.body": "No se pudo iniciar el juego. Revisa los ajustes del lanzador e inténtalo de nuevo.",
   "error.launchfailed.applied.title": "El juego no se abrió",
   "error.launchfailed.applied.body": "El servidor quedó aplicado y activo, pero el juego no se abrió. Revisa los ajustes del lanzador e inténtalo de nuevo.",
   "error.inconsistentstate.title": "Estado inconsistente",
