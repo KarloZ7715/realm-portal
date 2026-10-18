@@ -229,6 +229,53 @@ public class ControlTests
     }
 
     [AvaloniaFact]
+    public void PrimaryRedLabelUsesWhiteAndClearsContrast()
+    {
+        var split = new SplitButton { Content = "Play", Width = 200 };
+        Host(new ListBox { Classes = { "cards" }, Width = 420, Height = 140, Items = { split } });
+        AssertLabelContrast(split, "WaxColor");
+
+        split.IsEnabled = false;
+        Screenshots.Settle();
+        AssertLabelContrast(split, "Leather800Color");
+
+        var button = Host(new Button { Content = "Play" });
+        ButtonSurface.SetSurface(button, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
+        AssertLabelContrast(button, "WaxColor");
+        button.IsEnabled = false;
+        Screenshots.Settle();
+        AssertLabelContrast(button, "Leather800Color");
+    }
+
+    private static void AssertLabelContrast(Control control, string backgroundToken)
+    {
+        var label = control.GetVisualDescendants().OfType<TextBlock>().First(block => block.Text == "Play");
+        var foreground = Assert.IsType<SolidColorBrush>(label.Foreground).Color;
+        Assert.Equal(Res.Get<Color>("WhiteColor"), foreground);
+        var ratio = Contrast(foreground, Res.Get<Color>(backgroundToken));
+        Assert.True(ratio >= 4.5, $"{backgroundToken} contrast {ratio:0.00} is below 4.5:1");
+    }
+
+    private static double Contrast(Color foreground, Color background)
+    {
+        var lighter = Math.Max(Luminance(foreground), Luminance(background));
+        var darker = Math.Min(Luminance(foreground), Luminance(background));
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static double Luminance(Color color)
+    {
+        static double Channel(byte component)
+        {
+            var value = component / 255d;
+            return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * Channel(color.R) + 0.7152 * Channel(color.G) + 0.0722 * Channel(color.B);
+    }
+
+    [AvaloniaFact]
     public void SecondaryButtonInsideCardGetsParchmentSurface()
     {
         var button = new Button { Content = "Test", Classes = { "secondary" } };
