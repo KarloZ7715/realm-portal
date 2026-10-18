@@ -5,4 +5,7 @@
   <ItemGroup>
     <PackageReference Include="PeNet" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="RealmPortal.Tests" />
+  </ItemGroup>
 </Project>

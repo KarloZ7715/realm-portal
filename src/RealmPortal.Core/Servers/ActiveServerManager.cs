@@ -19,7 +19,7 @@ public sealed record ActiveStatus(Server? Active, bool ProjectionInSync, bool Ca
 /// <c>state.json</c> (same byte conventions as <c>servers.json</c>):
 /// <c>{ "version": 1, "active_id": string|null, "undo": null | { "server_id": string|null } }</c>.
 /// <c>undo.server_id</c> is the server that was active before the last switch (<c>null</c> = none was active).
-/// Order of writes: <c>activo.json</c> first, then <c>state.json</c>, so a failed projection changes nothing.
+/// Order of writes: <c>state.json</c> first, then <c>activo.json</c>, so a failed projection leaves state ahead of the projection.
 /// </remarks>
 public sealed class ActiveServerManager(
     ServerStore store,
@@ -52,6 +52,29 @@ public sealed class ActiveServerManager(
         return new ActiveStatus(active, IsProjectionInSync(active), state.Undo is not null);
     }
 
+    /// <summary>The <c>server_id</c> recorded for undo, or <c>null</c> when undo would deactivate; unset when there is nothing to undo.</summary>
+    public string? PendingUndoServerId => LoadState().Undo?.ServerId;
+
+    /// <summary>The server that <see cref="Undo"/> would restore, or <c>null</c> when undo would deactivate; <c>null</c> when there is nothing to undo.</summary>
+    public Server? GetUndoTarget()
+    {
+        var state = LoadState();
+        if (state.Undo is null)
+            return null;
+        return state.Undo.ServerId is { } id
+            ? store.List().FirstOrDefault(s => s.Id == id)
+            : null;
+    }
+
+    /// <summary>Clears the one-level undo record without changing the active server or projection.</summary>
+    public void DiscardPendingUndo()
+    {
+        var state = LoadState();
+        if (state.Undo is null)
+            return;
+        SaveState(state with { Undo = null });
+    }
+
     /// <summary>
     /// Makes <paramref name="server"/> the active one and writes <c>activo.json</c>. Switching to the server that is
     /// already active rewrites the projection but keeps the undo information unchanged.
@@ -67,10 +90,28 @@ public sealed class ActiveServerManager(
         var state = LoadState();
         var previous = Resolve(state);
 
-        writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
-        SaveState(previous?.Id == stored.Id
+        try
+        {
+            RealmlistText.Validate(stored.Realmlist);
+        }
+        catch (InvalidRealmlistException ex)
+        {
+            throw ex.ForServer(stored.Name);
+        }
+
+        var next = previous?.Id == stored.Id
             ? state with { ActiveId = stored.Id }
-            : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } });
+            : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } };
+        SaveState(next);
+        try
+        {
+            writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SaveState(state);
+            throw;
+        }
     }
 
     /// <summary>
@@ -93,12 +134,36 @@ public sealed class ActiveServerManager(
                      ?? throw new StoreException("The previous server no longer exists; cannot undo.");
         }
 
-        if (target is null)
-            DeleteProjection();
-        else
-            writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
+        if (target is not null)
+        {
+            try
+            {
+                RealmlistText.Validate(target.Realmlist);
+            }
+            catch (InvalidRealmlistException ex)
+            {
+                throw ex.ForServer(target.Name);
+            }
+        }
 
-        SaveState(new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null });
+        var stateBeforeUndo = state;
+        var nextState = new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null };
+        SaveState(nextState);
+        try
+        {
+            if (target is null)
+                DeleteProjection();
+            else
+                writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or StoreException)
+        {
+            // DeleteProjection wraps I/O failures in StoreException. Roll state back so a failed
+            // delete of activo.json does not commit ActiveId=null and drop the undo record.
+            SaveState(stateBeforeUndo);
+            throw;
+        }
+
         return target;
     }
 
@@ -112,8 +177,8 @@ public sealed class ActiveServerManager(
         var state = LoadState();
         if (state.ActiveId == id)
         {
-            DeleteProjection();
             SaveState(new State { Version = FormatVersion, ActiveId = null, Undo = null });
+            DeleteProjection();
         }
         else if (state.Undo?.ServerId == id)
         {
