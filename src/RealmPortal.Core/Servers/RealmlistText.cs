@@ -44,6 +44,8 @@ public static class RealmlistText
                 text.Append(line).Append(LineEnding);
         }
 
+        RealmlistAddress.ValidateRealmlistHost(host, 1);
+
         var result = text.ToString();
         Validate(result);
         return result;
@@ -55,6 +57,9 @@ public static class RealmlistText
     {
         if (string.IsNullOrEmpty(text))
             throw new InvalidRealmlistException(InvalidRealmlistKind.Empty, "the realmlist is empty");
+
+        if (System.Text.Encoding.UTF8.GetByteCount(text) > RealmlistAddress.MaxRealmlistBytes)
+            throw new InvalidRealmlistException(InvalidRealmlistKind.InvalidValue, $"the realmlist must be at most {RealmlistAddress.MaxRealmlistBytes} bytes");
 
         var bad = text.FirstOrDefault(c => c > '\u007F');
         if (bad != '\0')
@@ -112,6 +117,11 @@ public static class RealmlistText
             if (parts[2].Any(c => c is '"' or '\'' || char.IsControl(c)))
                 throw new InvalidRealmlistException(
                     InvalidRealmlistKind.InvalidValue, "the value must not contain quotes or control characters", number);
+
+            if (key == "realmlist")
+                RealmlistAddress.ValidateRealmlistHost(parts[2], number);
+            else
+                RealmlistAddress.ValidatePatchlistValue(parts[2], number);
         }
     }
 

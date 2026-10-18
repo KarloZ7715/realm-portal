@@ -12,7 +12,7 @@ public class Bug4ReadOnlyProjectionCliTests
     public void Switch_WithReadOnlyProjectionDir_PrintsShortError_NotStackTrace()
     {
         // A privileged process (root) ignores directory mode bits, so clearing write bits does not make the projection unwritable.
-        if (SkipsReadOnlyDirectoryAssertion(OperatingSystem.IsLinux(), Environment.IsPrivilegedProcess))
+        if (!OperatingSystem.IsLinux() || SkipsReadOnlyDirectoryAssertion(OperatingSystem.IsLinux(), Environment.IsPrivilegedProcess))
             return;
 
         using var dir = new TempDirectory();
