@@ -267,7 +267,8 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 #### 4.3 3-Button Backup Restore Conflict Dialog (`compact-09` & `compact-09b`)
 - **Figma reference:** `compact-09-backup-conflict@2x.png` (`55:5645`) and `compact-09b-backup-conflict-restore-anyway@2x.png` (`56:5887`).
-- **Trigger:** The user clicks **`Restore`** on an older backup while `PendingUndo != null` for that client (and the target backup is not the `PendingUndo` backup itself), causing `RestoreBackup(clientId, backupId, force: false)` to return `ServiceErrorCode.BackupConflict`.
+- **Trigger:** The user clicks **`Restore`** on a backup (or **`Undo`**) when the client's managed files on disk differ from the snapshot (`PendingUndo != null` or manual edits), causing `RestoreBackup(clientId, backupId, force: false)` to return `ServiceErrorCode.UndoConflict` (with `ConflictingFiles` and `Consistency.Pending`).
+- **Service error mapping:** The canonical enum member in `RealmPortal.Core.Service.ServiceErrorCode` is `ServiceErrorCode.UndoConflict` (used by both `Undo()` and non-forced `RestoreBackup(clientId, backupId, force: false)`); there is no separate `BackupConflict` enum value, and `UndoConflict` maps directly to the `confirm.backupconflict.*` dialog strings below.
 - **3-Button Parchment Modal Layout (`ConfirmDialogView.axaml` extended with optional `SecondaryActionText` / `SecondaryActionCommand`):**
   - **Title:** `IconWarning` (`#8C5214`) + `A recent change hasn't been confirmed` (`Hay un cambio reciente sin confirmar`, `confirm.backupconflict.title`).
   - **Body (`confirm.backupconflict.body`):**
