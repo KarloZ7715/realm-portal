@@ -1,27 +1,48 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.ViewModels;
 
 /// <summary>One detected (or hand-picked) game client row.</summary>
-public sealed partial class ClientItemViewModel(ClientSeed seed) : ObservableObject
+public sealed partial class ClientItemViewModel : ObservableObject
 {
-    public string Version { get; } = seed.Version;
+    private ClientItemViewModel(string? id, string version, string path, ClientOrigin origin, bool inUse)
+    {
+        Id = id;
+        Version = version;
+        Path = path;
+        Origin = origin;
+        _isInUse = inUse;
+    }
 
-    public string Path { get; } = seed.Path;
+    public ClientItemViewModel(ClientSeed seed)
+        : this(null, seed.Version, seed.Path, seed.Origin, seed.InUse)
+    {
+    }
 
-    public ClientOrigin Origin { get; } = seed.Origin;
+    public static ClientItemViewModel FromEntry(ClientEntry entry, bool inUse)
+    {
+        var version = entry.Version?.ToString() ?? entry.Error?.Code.ToString() ?? "?";
+        return new ClientItemViewModel(entry.Id, version, entry.Path, ClientOrigin.Manual, inUse);
+    }
+
+    public string? Id { get; }
+
+    public string Version { get; }
+
+    public string Path { get; }
+
+    public ClientOrigin Origin { get; }
 
     [ObservableProperty]
-    private bool _isInUse = seed.InUse;
+    private bool _isInUse;
 
-    /// <summary>"Cliente 3.3.5a (12340)".</summary>
     public string Title => Loc.Format("clients.client", Version);
 
     public string OriginText => Loc.Get($"clients.origin.{Origin.ToString().ToLowerInvariant()}");
 
-    /// <summary>"Cliente 3.3.5a (12340) · Lutris": how the add-server form lists it.</summary>
     public string Label => $"{Title} · {OriginText}";
 
     public void RefreshText()

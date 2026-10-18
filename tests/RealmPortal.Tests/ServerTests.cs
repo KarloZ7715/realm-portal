@@ -46,6 +46,16 @@ public class ServerTests
         Assert.Throws<ArgumentException>(() => Server.Create(name, host));
 
     [Theory]
+    [InlineData("Tag\U000E0001Name")] // U+E0001 LANGUAGE TAG: a Format character outside the BMP (a surrogate pair)
+    [InlineData("Zero\u200BWidth")]    // U+200B ZERO WIDTH SPACE: a Format character inside the BMP
+    public void Create_RejectsFormatCharactersInMetadata(string value)
+    {
+        Assert.Throws<ArgumentException>(() => Server.Create(value, "h"));
+        Assert.Throws<ArgumentException>(() => Server.Create("n", "h", realm: value));
+        Assert.Throws<ArgumentException>(() => Server.Create("n", "h", account: value));
+    }
+
+    [Theory]
     [InlineData("ho st", InvalidRealmlistKind.InvalidValue)]
     [InlineData("ho\tst", InvalidRealmlistKind.InvalidValue)]
     [InlineData("ho\"st", InvalidRealmlistKind.InvalidValue)]

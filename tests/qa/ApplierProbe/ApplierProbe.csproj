@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- QA helper: drives the real ClientFilesApplier from bash on SYNTHETIC client folders. Not part of RealmPortal.sln. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>applier-probe</AssemblyName>
+    <RootNamespace>RealmPortal.Qa</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\RealmPortal.Core\RealmPortal.Core.csproj" />
+  </ItemGroup>
+</Project>

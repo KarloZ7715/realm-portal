@@ -39,7 +39,7 @@ internal sealed class Shell
         // The expected texts are Spanish: tests do not depend on the machine's language.
         Loc.Instance.SetLanguage(Language.Es);
         Backend = new DemoBackend { TimeScale = 0 };
-        Model = new MainViewModel(Backend, autoTick: false);
+        Model = MainViewModel.ForDemo(Backend, autoTick: false);
         Window = new MainWindow(Model) { Width = width, Height = height };
         Window.Show();
         Screenshots.Settle();

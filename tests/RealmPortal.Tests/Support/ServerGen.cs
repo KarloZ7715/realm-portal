@@ -13,7 +13,8 @@ public static class ServerGen
             .Where(chars => chars.Length >= min && chars.Length <= max)
             .Select(chars => string.Concat(chars));
 
-    private static readonly Gen<string> NameGen = Text(1, 20).Where(s => s.Trim().Length > 0);
+    private static readonly Gen<string> NameGen = Text(1, 20)
+        .Where(s => s.Trim().Length > 0 && s.Length <= Core.Servers.Server.MaxNameLength && IsValidMetadata(s));
 
     private static readonly Gen<string> HostGen =
         Gen.Elements("logon.example.org", "10.0.0.5:3724", "localhost", "wow.example.net:8085", "xn--n-1ga.example.org");
@@ -29,18 +30,21 @@ public static class ServerGen
         Gen.OneOf(Gen.Constant<int?>(null), Gen.Elements<int?>(5875, 8606, 12340, 15595));
 
     private static readonly Gen<string?> AccountGen =
-        Gen.OneOf(Gen.Constant<string?>(null), Gen.Elements<string?>("carlos", "Ünï", "a b"));
+        Gen.OneOf(Gen.Constant<string?>(null), Gen.Elements<string?>("carlos", "Ünï", "a b").Where(a => a is null || (a.Length <= Core.Servers.Server.MaxAccountLength && IsValidMetadata(a))));
 
     public static Gen<Server> Server() =>
         from name in NameGen
         from host in HostGen
-        from realm in Text(0, 12).Where(s => !s.Any(char.IsControl))
+        from realm in Text(0, 12).Where(s => IsValidMetadata(s) && s.Length <= Core.Servers.Server.MaxRealmLength)
         from extra in ExtraLinesGen
         from build in BuildGen
         from account in AccountGen
         select Core.Servers.Server.Create(name, host, realm, extra, build, account);
 
     /// <summary>A list of servers with distinct (case-insensitive) names.</summary>
+    private static bool IsValidMetadata(string value) =>
+        !value.Any(c => c is '"' or '\\' || char.IsControl(c));
+
     public static Gen<IReadOnlyList<Server>> DistinctServers() =>
         Server().ListOf().Select(list =>
         {

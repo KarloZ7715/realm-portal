@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
+using RealmPortal.App.Portal;
 using RealmPortal.App.ViewModels;
 
 namespace RealmPortal.App;
@@ -13,7 +14,10 @@ public partial class MainWindow : Window
 
     private IInputElement? _focusBeforeDialog;
 
-    public MainWindow() : this(new MainViewModel())
+    /// <summary>
+    /// The previewer calls this constructor. Design mode uses the demo backend so it does not open the developer's portal config.
+    /// </summary>
+    public MainWindow() : this(Design.IsDesignMode ? new MainViewModel() : new MainViewModel(PortalSession.Create()))
     {
     }
 

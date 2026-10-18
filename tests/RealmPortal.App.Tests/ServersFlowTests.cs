@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
@@ -278,6 +279,7 @@ public class ServersMenuTests
         Assert.Equal(["MenuPlay", "MenuSwitchOnly"], items.Select(i => i.Name));
         var item = items[1];
         Assert.Equal("Solo cambiar", HeaderTexts(item)[0]);
+        Assert.Equal("Solo cambiar", AutomationProperties.GetName(item));
         Assert.Equal("Cambia el realmlist sin abrir el juego.", HeaderTexts(item)[1]);
         Assert.True(item.Command!.CanExecute(null));
         item.Command.Execute(null);
@@ -290,6 +292,26 @@ public class ServersMenuTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(ServersPhase.Idle, shell.Servers.Phase);
         Assert.False(shell.Backend.GameRunning);
+    }
+
+    [AvaloniaFact]
+    public async Task SwitchOnlyMenuItem_UsesTheRepairTitleWhenTheCardNeedsRepair()
+    {
+        var shell = new Shell();
+        var cardVm = shell.Servers.All.First(s => !s.IsActive);
+        cardVm.SetNeedsRepair(true);
+        var card = shell.Window.GetVisualDescendants().OfType<SplitButton>().First(b => ReferenceEquals(b.DataContext, cardVm));
+
+        card.Flyout!.ShowAt(card);
+        for (var i = 0; i < 5; i++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            await Task.Yield();
+        }
+
+        var item = ((MenuFlyout)card.Flyout).Items.OfType<MenuItem>().First(i => i.Name == "MenuSwitchOnly");
+        Assert.Equal("Reparar", cardVm.SwitchMenuText);
+        Assert.Equal(cardVm.SwitchMenuText, AutomationProperties.GetName(item));
     }
 
     [AvaloniaFact]
