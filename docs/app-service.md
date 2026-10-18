@@ -73,7 +73,7 @@ public enum ClientOrigin
     Manual     = 0, // Added or path-edited by the user
     Discovered = 1, // Found in a standard candidate folder (~/Games, C:\Games, etc.)
     Lutris     = 2, // Found via Lutris game YAML / runners config
-    Wine       = 3, // Found inside a Wine / Bottles prefix ( alias: WinePrefix )
+    Wine       = 3, // Found inside a Wine / Bottles prefix (alias: WinePrefix)
     Steam      = 4, // Found via Steam libraryfolders.vdf / compatdata
     WinePrefix = Wine,
 }
