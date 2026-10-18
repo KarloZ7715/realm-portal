@@ -139,6 +139,51 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
+    public void Reload_UsesEachServersEffectiveClientForVersionAndCompatibility()
+    {
+        using var env = new Env();
+        var fallbackId = env.Session.ResolveClientId()!;
+        var classicRoot = Path.Combine(Path.GetDirectoryName(env.Client)!, "classic");
+        Directory.CreateDirectory(classicRoot);
+        File.WriteAllBytes(Path.Combine(classicRoot, "Wow.exe"), SyntheticPe.WithVersion(new Version(1, 12, 1, 5875)));
+        var classicId = env.Session.Service.AddClient(classicRoot).Value!.Id;
+
+        var classic = env.Session.Service.AddServer(new NewServer(
+            "Classic",
+            "classic.example.org",
+            RequiredClientBuild: 5875,
+            ClientId: classicId)).Value!;
+        var wotlk = env.Session.Service.AddServer(new NewServer(
+            "Wotlk",
+            "wotlk.example.org",
+            RequiredClientBuild: 12340,
+            ClientId: fallbackId)).Value!;
+        var unpinned = env.Session.Service.AddServer(new NewServer(
+            "Unpinned",
+            "unpinned.example.org",
+            RequiredClientBuild: 5875)).Value!;
+
+        env.Main.Servers.ReloadFromService();
+        var classicCard = env.Main.Servers.All.Single(s => s.ServerId == classic.Id);
+        var wotlkCard = env.Main.Servers.All.Single(s => s.ServerId == wotlk.Id);
+        var unpinnedCard = env.Main.Servers.All.Single(s => s.ServerId == unpinned.Id);
+
+        Assert.Equal(classicId, classicCard.PreferredClientId);
+        Assert.True(classicCard.IsCompatible);
+        Assert.Contains("5875", classicCard.ClientVersion);
+        Assert.DoesNotContain("12340", classicCard.ClientVersion);
+
+        Assert.Equal(fallbackId, wotlkCard.PreferredClientId);
+        Assert.True(wotlkCard.IsCompatible);
+        Assert.Contains("12340", wotlkCard.ClientVersion);
+
+        Assert.Null(unpinnedCard.PreferredClientId);
+        Assert.False(unpinnedCard.IsCompatible);
+        Assert.Contains("12340", unpinnedCard.ClientVersion);
+        Assert.Equal(fallbackId, env.Session.ResolveClientId(unpinnedCard.PreferredClientId));
+    }
+
+    [AvaloniaFact]
     public void ManualAdd_AppearsInList()
     {
         using var env = new Env();

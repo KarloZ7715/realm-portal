@@ -4,6 +4,7 @@ using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.Core.Clients;
+using RealmPortal.Core.Servers;
 using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.ViewModels;
@@ -78,6 +79,9 @@ public sealed partial class ServerItemViewModel : ObservableObject
     {
         var versionLabel = clientVersion?.ToString() ?? "?";
         var needsRepair = entry.IsActive && !projectionInSync;
+        // An unreadable or missing client matches the service: every server stays compatible.
+        // A known version uses the same build rule as the client RunPortalAsync will switch with.
+        var compatible = clientVersion is null || CompatibilityFilter.IsCompatible(entry, clientVersion);
         return new(
             entry.Id,
             entry.ClientId,
@@ -86,7 +90,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
             entry.Host,
             versionLabel,
             entry.Account,
-            entry.IsCompatible,
+            compatible,
             entry.IsActive,
             needsRepair,
             play,

@@ -320,8 +320,15 @@ public sealed partial class ServersViewModel : ViewModelBase
             return;
         }
 
-        var clientId = _session.ResolveClientId();
-        var list = _session.Service.ListServers(clientId, compatibleOnly: false);
+        var clientsResult = _session.Service.ListClients();
+        var clients = clientsResult.Succeeded ? clientsResult.Value! : [];
+        var clientsById = new Dictionary<string, ClientEntry>(clients.Count, StringComparer.Ordinal);
+        foreach (var client in clients)
+        {
+            clientsById.TryAdd(client.Id, client);
+        }
+
+        var list = _session.Service.ListServers(compatibleOnly: false);
         if (!list.Succeeded)
         {
             SetError(list.Error);
@@ -330,14 +337,15 @@ public sealed partial class ServersViewModel : ViewModelBase
 
         var status = _session.StatusOrNull();
         var projectionInSync = status?.ProjectionInSync ?? true;
-        var clientVersion = clientId is null
-            ? null
-            : _session.Service.ListClients().Value?.FirstOrDefault(c => c.Id == clientId)?.Version;
 
         _all.Clear();
         var order = 0;
         foreach (var entry in list.Value!)
         {
+            var clientId = _session.ResolveClientId(clients, entry.ClientId);
+            var clientVersion = clientId is not null && clientsById.TryGetValue(clientId, out var client)
+                ? client.Version
+                : null;
             var card = ServerItemViewModel.FromEntry(
                 entry,
                 clientVersion,

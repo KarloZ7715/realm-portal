@@ -51,31 +51,38 @@ public sealed class PortalSession
     /// <summary>The client used for server list compatibility and switch/play when none is pinned on the server.</summary>
     public string? ResolveClientId(string? preferredServerClientId = null)
     {
-        if (preferredServerClientId is not null)
+        var list = Service.ListClients();
+        var clients = list.Succeeded ? list.Value! : [];
+        return ResolveClientId(clients, preferredServerClientId);
+    }
+
+    /// <summary>
+    /// Same choice as <see cref="ResolveClientId(string?)"/> against an already loaded client list,
+    /// so a screen can resolve every card without calling <c>ListClients</c> again.
+    /// </summary>
+    public string? ResolveClientId(IReadOnlyList<ClientEntry> clients, string? preferredServerClientId)
+    {
+        ArgumentNullException.ThrowIfNull(clients);
+        if (preferredServerClientId is not null && clients.Any(c => c.Id == preferredServerClientId))
         {
-            var list = Service.ListClients();
-            if (list.Succeeded && list.Value!.Any(c => c.Id == preferredServerClientId))
-            {
-                return preferredServerClientId;
-            }
+            return preferredServerClientId;
         }
 
-        var prefs = UiPreferences.Load();
-        var clients = Service.ListClients();
-        if (!clients.Succeeded || clients.Value!.Count == 0)
+        if (clients.Count == 0)
         {
             return null;
         }
 
+        var prefs = UiPreferences.Load();
         foreach (var id in prefs.InUseSet)
         {
-            if (clients.Value.Any(c => c.Id == id))
+            if (clients.Any(c => c.Id == id))
             {
                 return id;
             }
         }
 
-        return clients.Value[0].Id;
+        return clients[0].Id;
     }
 
     public PortalStatus? StatusOrNull()
