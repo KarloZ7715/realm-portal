@@ -28,8 +28,11 @@ public static class ClientPaths
     public static string ResolveManagedPath(string canonicalRoot, string relativePath)
     {
         ValidateManagedRelativePath(relativePath);
-        var combined = ResolveInside(canonicalRoot, relativePath);
-        RequireParentInsideThroughLinks(canonicalRoot, relativePath, combined);
+        var segments = relativePath.Split('/');
+        var (realSegments, _) = CaseInsensitivePath.Resolve(canonicalRoot, segments, rejectAmbiguousMatches: true);
+        var normalized = string.Join('/', realSegments);
+        var combined = ResolveInside(canonicalRoot, normalized);
+        RequireParentInsideThroughLinks(canonicalRoot, normalized, combined);
         return combined;
     }
 

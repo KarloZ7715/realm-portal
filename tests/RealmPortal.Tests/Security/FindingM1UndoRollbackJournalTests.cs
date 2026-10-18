@@ -104,7 +104,9 @@ public class FindingM1UndoRollbackJournalTests
 
         public void FailNextActivoWrite() => _failAt = _activoWrites + 1;
 
-        public void WriteAllBytes(string path, byte[] content)
+        public void WriteAllBytes(string path, byte[] content) => WriteAllBytes(path, content, null);
+
+        public void WriteAllBytes(string path, byte[] content, FileReplacementPermissions? permissions)
         {
             if (path == _activoPath)
             {
@@ -113,7 +115,7 @@ public class FindingM1UndoRollbackJournalTests
                     throw new IOException("Injected activo.json write failure.");
             }
 
-            _inner.WriteAllBytes(path, content);
+            _inner.WriteAllBytes(path, content, permissions);
         }
     }
 }

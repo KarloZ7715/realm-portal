@@ -119,17 +119,22 @@ public sealed class CliApp(
 
     /// <summary>
     /// Same failure as <see cref="Fail"/>. When launch failed after the switch was applied
-    /// (<see cref="ServiceErrorCode.LaunchFailed"/> and <see cref="Consistency.AppliedLaunchFailed"/>),
-    /// also say the server is still applied and that <c>undo</c> can restore the previous one.
+    /// (<see cref="ServiceErrorCode.LaunchFailed"/> and <see cref="Consistency.AppliedLaunchFailed"/>)
+    /// and <see cref="PortalStatus.CanUndo"/> is true, also say the server is still applied and that
+    /// <c>undo</c> can restore the previous one.
     /// </summary>
-    private int FailLaunch(ServiceError serviceError, string serverName)
+    private int FailLaunch(ServiceError serviceError, string serverName, PortalService service)
     {
         var code = Fail(serviceError);
         if (serviceError.Code == ServiceErrorCode.LaunchFailed
             && serviceError.Consistency == Consistency.AppliedLaunchFailed)
         {
-            error.WriteLine(
-                $"The game did not start, but '{serverName}' is still applied to this client. Run 'undo' to restore the previous server.");
+            var status = service.GetStatus();
+            if (status.Succeeded && status.Value!.CanUndo)
+            {
+                error.WriteLine(
+                    $"The game did not start, but '{serverName}' is still applied to this client. Run 'undo' to restore the previous server.");
+            }
         }
 
         return code;
@@ -371,7 +376,7 @@ public sealed class CliApp(
 
             var play = service.Play(new SwitchRequest(clientId, server.Id, force));
             if (!play.Succeeded)
-                return FailLaunch(play.Error!, server.Name);
+                return FailLaunch(play.Error!, server.Name, service);
             output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
             return 0;
         }
@@ -396,7 +401,7 @@ public sealed class CliApp(
 
         var launch = service.Play(new SwitchRequest(clientId, server.Id, force));
         if (!launch.Succeeded)
-            return FailLaunch(launch.Error!, server.Name);
+            return FailLaunch(launch.Error!, server.Name, service);
         output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
         return 0;
     }

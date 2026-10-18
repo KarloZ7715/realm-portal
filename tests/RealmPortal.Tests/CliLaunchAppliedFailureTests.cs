@@ -3,6 +3,7 @@ using RealmPortal.Cli;
 using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
+using RealmPortal.Core.Service;
 using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
@@ -68,10 +69,77 @@ public class CliLaunchAppliedFailureTests
         Assert.DoesNotContain("Run 'undo'", refused.Err);
     }
 
+    [Fact]
+    public void Launch_WhenStartFailsAfterApplyButUndoWasDiscarded_OmitsUndoHint()
+    {
+        using var dir = new TempDirectory();
+        var config = dir.Combine("config");
+        var projection = dir.Combine("projection");
+        var client = dir.Combine("client");
+        var backups = dir.Combine("backups");
+        Directory.CreateDirectory(client);
+        File.WriteAllBytes(Path.Combine(client, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+
+        string? GetVariable(string name) =>
+            name == ClientFilesApplier.BackupDirectoryVariable ? backups : null;
+
+        (int Code, string Out, string Err) Run(string[] args)
+        {
+            var stdout = new StringWriter();
+            var stderr = new StringWriter();
+            var code = Program.Run(
+                args,
+                stdout,
+                stderr,
+                new PeClientVersionReader(),
+                new ThrowingLauncher(),
+                GetVariable);
+            return (code, stdout.ToString(), stderr.ToString());
+        }
+
+        string[] common = ["--config-dir", config, "--projection-dir", projection, "--client-dir", client];
+        Assert.Equal(0, Run(["add", "Frost", "frost.example.org", .. common]).Code);
+        Assert.Equal(0, Run(["switch", "Frost", .. common]).Code);
+
+        // The switch is already applied. Drop the journal so a later launch of the same server
+        // fails after apply without creating a new undo.
+        var service = new PortalService(
+            config,
+            projection,
+            new PeClientVersionReader(),
+            new NoLaunch(),
+            getVariable: GetVariable);
+        Assert.True(service.DiscardUndo().Succeeded);
+        Assert.False(service.GetStatus().Value!.CanUndo);
+
+        var failed = Run(["launch", "Frost", .. common]);
+        Assert.Equal(2, failed.Code);
+        Assert.Contains("error: Injected process start failure.", failed.Err);
+        Assert.DoesNotContain("still applied", failed.Err);
+        Assert.DoesNotContain("Run 'undo'", failed.Err);
+        Assert.DoesNotContain("still applied", failed.Out);
+
+        var after = new PortalService(
+            config,
+            projection,
+            new PeClientVersionReader(),
+            new NoLaunch(),
+            getVariable: GetVariable);
+        var status = after.GetStatus();
+        Assert.True(status.Succeeded);
+        Assert.Equal("Frost", status.Value!.Active!.Name);
+        Assert.False(status.Value.CanUndo);
+    }
+
     /// <summary>Same shape as the service test: the adapter wraps this in <see cref="InvalidOperationException"/>.</summary>
     private sealed class ThrowingLauncher : IGameLauncher
     {
         public void Launch(string executablePath, string workingDirectory, string? wrapper) =>
             throw new Win32Exception("Injected process start failure.");
+    }
+
+    private sealed class NoLaunch : IGameLaunchService
+    {
+        public void Launch(GameLaunchSpec spec) => throw new InvalidOperationException("not used");
     }
 }

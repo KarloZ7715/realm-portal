@@ -3,6 +3,9 @@
     <RootNamespace>RealmPortal.Core</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="RealmPortal.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="PeNet" />
   </ItemGroup>
   <ItemGroup>
