@@ -19,8 +19,8 @@ public interface IConnectionProbe
 
 /// <summary>
 /// Resolves <paramref name="host"/> and connects to each address until one accepts a TCP connection, then closes it.
-/// DNS and the connects share one timeout. A resolver that ignores cancellation still ends as <see cref="ProbeResult.TimedOut"/>.
-/// A DNS failure or a refused connection is <see cref="ProbeResult.Failed"/>.
+/// DNS and the connects share one timeout. A resolver that ignores cancellation still ends as <see cref="ProbeResult.TimedOut"/>
+/// and does not open a socket after that. A DNS failure or a refused connection is <see cref="ProbeResult.Failed"/>.
 /// </summary>
 public sealed class TcpConnectionProbe : IConnectionProbe
 {
@@ -34,32 +34,48 @@ public sealed class TcpConnectionProbe : IConnectionProbe
     public async Task<ProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeout);
-        var operation = ConnectAnyAsync(host, port, timeoutCts.Token);
-        ObserveAbandonedFaults(operation);
         try
         {
-            return await operation.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+            timeoutCts.CancelAfter(timeout);
+            var operation = ConnectAnyAsync(host, port, timeoutCts.Token);
+            ObserveAbandonedFaults(operation);
+            try
+            {
+                return await operation.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                return ProbeResult.TimedOut;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                return ProbeResult.TimedOut;
+            }
+            catch (SocketException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                return ProbeResult.TimedOut;
+            }
+            catch (SocketException)
+            {
+                return ProbeResult.Failed;
+            }
         }
-        catch (TimeoutException)
+        finally
         {
-            return ProbeResult.TimedOut;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (OperationCanceledException)
-        {
-            return ProbeResult.TimedOut;
-        }
-        catch (SocketException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-        {
-            return ProbeResult.TimedOut;
-        }
-        catch (SocketException)
-        {
-            return ProbeResult.Failed;
+            // WaitAsync can time out before CancelAfter runs. Disposing the source then stops that timer
+            // without signaling the token, so a resolver that ignores cancellation could still connect.
+            try
+            {
+                timeoutCts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed; the token can no longer be signaled.
+            }
         }
     }
 
@@ -78,6 +94,9 @@ public sealed class TcpConnectionProbe : IConnectionProbe
         {
             return ProbeResult.Failed;
         }
+
+        // The resolver may ignore the token and return after the probe has already timed out.
+        token.ThrowIfCancellationRequested();
 
         if (addresses is null || addresses.Length == 0)
         {

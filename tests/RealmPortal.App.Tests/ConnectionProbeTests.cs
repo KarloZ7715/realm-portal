@@ -101,4 +101,44 @@ public class ConnectionProbeTests
             listener.Stop();
         }
     }
+
+    [Fact]
+    public async Task LateResolverAfterTimeout_DoesNotConnect()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationToken? resolverToken = null;
+            var probe = new TcpConnectionProbe(async (_, token) =>
+            {
+                resolverToken = token;
+                await release.Task.ConfigureAwait(false);
+                return new[] { IPAddress.Loopback };
+            });
+
+            var result = await probe.ProbeAsync("late.invalid", port, TimeSpan.FromMilliseconds(200), CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(2));
+
+            Assert.Equal(ProbeResult.TimedOut, result);
+            Assert.True(resolverToken?.IsCancellationRequested);
+
+            release.TrySetResult();
+            var watch = Stopwatch.StartNew();
+            while (watch.Elapsed < TimeSpan.FromMilliseconds(500))
+            {
+                Assert.False(listener.Pending());
+                await Task.Delay(25);
+            }
+
+            Assert.False(listener.Pending());
+            Assert.True(resolverToken?.IsCancellationRequested);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
 }
