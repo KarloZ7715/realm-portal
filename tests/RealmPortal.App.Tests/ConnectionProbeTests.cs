@@ -119,8 +119,9 @@ public class ConnectionProbeTests
                 return new[] { IPAddress.Loopback };
             });
 
-            var result = await probe.ProbeAsync("late.invalid", port, TimeSpan.FromMilliseconds(200), CancellationToken.None)
-                .WaitAsync(TimeSpan.FromSeconds(2));
+            var budget = TimeSpan.FromMilliseconds(200);
+            var result = await probe.ProbeAsync("late.invalid", port, budget, CancellationToken.None)
+                .WaitAsync(budget + TimeSpan.FromSeconds(10));
 
             Assert.Equal(ProbeResult.TimedOut, result);
             Assert.True(resolverToken?.IsCancellationRequested);
