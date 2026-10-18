@@ -63,12 +63,14 @@ public sealed record Server(
         return new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account, clientId);
     }
 
+    // Checks whole code points (Runes), so a supplementary Format character such as U+E0001 is seen as one Format
+    // character instead of two surrogates.
     private static bool HasForbiddenMetadataCharacters(string value) =>
-        value.Any(c => c is '"' or '\\' || char.IsControl(c) || IsFormatOrLineSeparator(c));
+        value.EnumerateRunes().Any(r => r.Value is '"' or '\\' || System.Text.Rune.IsControl(r) || IsFormatOrLineSeparator(r));
 
-    private static bool IsFormatOrLineSeparator(char c)
+    private static bool IsFormatOrLineSeparator(System.Text.Rune r)
     {
-        var category = char.GetUnicodeCategory(c);
+        var category = System.Text.Rune.GetUnicodeCategory(r);
         return category is System.Globalization.UnicodeCategory.Format
             or System.Globalization.UnicodeCategory.LineSeparator
             or System.Globalization.UnicodeCategory.ParagraphSeparator;
