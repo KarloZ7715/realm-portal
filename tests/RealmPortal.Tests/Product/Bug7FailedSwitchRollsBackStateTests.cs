@@ -22,7 +22,7 @@ public class Bug7FailedSwitchRollsBackStateTests
         Directory.CreateDirectory(config);
         Directory.CreateDirectory(projection);
 
-        var app = new CliApp(new StringWriter(), new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
+        var app = new CliApp(new StringWriter(), new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
         Assert.Equal(0, app.Run("add", ["Wotlk", "wotlk.example.org", "--config-dir", config, "--projection-dir", projection]));
         Assert.Equal(0, app.Run("add", ["Second", "second.example.org", "--config-dir", config, "--projection-dir", projection]));
         Assert.Equal(0, app.Run("switch", ["Wotlk", "--config-dir", config, "--projection-dir", projection]));
