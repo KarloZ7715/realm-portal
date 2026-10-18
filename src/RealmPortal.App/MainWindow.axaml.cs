@@ -14,7 +14,10 @@ public partial class MainWindow : Window
 
     private IInputElement? _focusBeforeDialog;
 
-    public MainWindow() : this(new MainViewModel(PortalSession.Create()))
+    /// <summary>
+    /// The previewer calls this constructor. Design mode uses the demo backend so it does not open the developer's portal config.
+    /// </summary>
+    public MainWindow() : this(Design.IsDesignMode ? new MainViewModel() : new MainViewModel(PortalSession.Create()))
     {
     }
 
