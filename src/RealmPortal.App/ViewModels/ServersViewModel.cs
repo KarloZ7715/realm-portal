@@ -43,8 +43,8 @@ public sealed partial class ServersViewModel : ViewModelBase
     private bool _repairRun;
     private bool _undoConflict;
     private bool _canUndoPending;
-    private string? _errorBanner;
     private ServiceError? _bannerError;
+    private string? _bannerMessageKey;
 
     public ServersViewModel(DemoBackend backend, bool autoTick = true)
     {
@@ -119,7 +119,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public bool IsRunning => Phase == ServersPhase.Running;
 
-    public bool ShowBanner => Phase != ServersPhase.Idle || _errorBanner is not null;
+    public bool ShowBanner => Phase != ServersPhase.Idle || HasErrorBanner;
 
     public bool ShowSteps => IsBusy;
 
@@ -143,7 +143,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public string EmptyTitle => Loc.Format("servers.empty.title", SearchText.Trim());
 
-    public BannerSeverity BannerSeverity => _errorBanner is not null
+    public BannerSeverity BannerSeverity => HasErrorBanner
         ? BannerSeverity.Warning
         : Phase switch
         {
@@ -151,7 +151,7 @@ public sealed partial class ServersViewModel : ViewModelBase
             _ => BannerSeverity.Info,
         };
 
-    public string BannerHeader => _errorBanner is not null
+    public string BannerHeader => HasErrorBanner
         ? _bannerError is { } error && PlayServiceResults.SwitchWasApplied(error)
             ? ErrorText.Title(error)
             : Loc.Get("error.banner.title")
@@ -164,7 +164,7 @@ public sealed partial class ServersViewModel : ViewModelBase
             _ => string.Empty,
         };
 
-    public string BannerBody => _errorBanner ?? Phase switch
+    public string BannerBody => ErrorBannerText ?? Phase switch
     {
         ServersPhase.Switching when _repairRun => Loc.Get("repair.body"),
         ServersPhase.Switching => Loc.Get("switch.body"),
@@ -177,8 +177,8 @@ public sealed partial class ServersViewModel : ViewModelBase
         ? Loc.Get("toast.undoconflict")
         : _undoTo is null ? string.Empty : Loc.Format("toast.switched", _undoTo.Name);
 
-    public override string StatusText => _errorBanner is not null
-        ? _errorBanner
+    public override string StatusText => ErrorBannerText is not null
+        ? ErrorBannerText
         : Phase switch
         {
             ServersPhase.Switching when _repairRun => Loc.Format("status.repairing", _target?.Name),
@@ -222,8 +222,8 @@ public sealed partial class ServersViewModel : ViewModelBase
                     if (result.Error!.Code == ServiceErrorCode.UndoConflict)
                     {
                         _undoConflict = true;
-                        _bannerError = null;
-                        _errorBanner = ErrorText.Body(result.Error);
+                        _bannerError = result.Error;
+                        _bannerMessageKey = null;
                         ShowToast();
                         Refresh();
                     }
@@ -235,8 +235,7 @@ public sealed partial class ServersViewModel : ViewModelBase
                 else
                 {
                     _undoConflict = false;
-                    _bannerError = null;
-                    _errorBanner = null;
+                    ClearErrorBanner();
                     HideToast();
                     ReloadFromService();
                 }
@@ -282,8 +281,7 @@ public sealed partial class ServersViewModel : ViewModelBase
             else
             {
                 _undoConflict = false;
-                _bannerError = null;
-                _errorBanner = null;
+                ClearErrorBanner();
                 HideToast();
                 ReloadFromService();
             }
@@ -428,13 +426,12 @@ public sealed partial class ServersViewModel : ViewModelBase
         var clientId = _session.ResolveClientId(target.PreferredClientId);
         if (clientId is null)
         {
-            SetError(null, Loc.Get("error.noclient.body"));
+            SetError(null, "error.noclient.body");
             return;
         }
 
         HideToast();
-        _bannerError = null;
-        _errorBanner = null;
+        ClearErrorBanner();
         _repairRun = target.NeedsRepair;
         _target = target;
         SearchText = string.Empty;
@@ -636,15 +633,37 @@ public sealed partial class ServersViewModel : ViewModelBase
         Refresh();
     }
 
-    private void SetError(ServiceError? error, string? message = null)
+    /// <summary>True when an error banner is showing. The copy itself is <see cref="ErrorBannerText"/>.</summary>
+    private bool HasErrorBanner => _bannerError is not null || _bannerMessageKey is not null;
+
+    /// <summary>
+    /// Error banner copy resolved at read time, so a language change updates <see cref="BannerBody"/> and <see cref="StatusText"/>.
+    /// Service failures, including undo conflict, keep <see cref="_bannerError"/>. Message-only failures keep a localization key
+    /// (<c>error.unknown.body</c> when the failure has neither).
+    /// </summary>
+    private string? ErrorBannerText => _bannerError is { } error
+        ? ErrorText.Body(error)
+        : _bannerMessageKey is null ? null : Loc.Get(_bannerMessageKey);
+
+    /// <summary>
+    /// Shows the error banner from <paramref name="error"/>, or from <paramref name="messageKey"/> when there is no error.
+    /// Both null uses <c>error.unknown.body</c>. Text is formatted when the banner is read.
+    /// </summary>
+    private void SetError(ServiceError? error, string? messageKey = null)
     {
-        _bannerError = message is null ? error : null;
-        _errorBanner = message ?? (error is null ? Loc.Get("error.state.unknown") : ErrorText.Body(error));
+        _bannerError = messageKey is null ? error : null;
+        _bannerMessageKey = messageKey ?? (error is null ? "error.unknown.body" : null);
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(BannerSeverity));
         OnPropertyChanged(nameof(ShowBanner));
         OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void ClearErrorBanner()
+    {
+        _bannerError = null;
+        _bannerMessageKey = null;
     }
 
     private void ShowToast()

@@ -106,6 +106,12 @@ public class PortalViewModelTests
         }
     }
 
+    /// <summary>The client looks like the game is open, so a switch fails before it writes files.</summary>
+    private sealed class GameRunningProbe : IGameProcessProbe
+    {
+        public bool IsGameRunning(string clientRoot) => true;
+    }
+
     private sealed class Env : IDisposable
     {
         private readonly TempDirectory _temp = new();
@@ -583,6 +589,107 @@ public class PortalViewModelTests
         Assert.Equal(ServerOverlay.Running, card.Overlay);
         Assert.Equal(1, env.Launch.Launches);
     }
+
+    [AvaloniaFact]
+    public async Task ErrorBanner_SwitchFailureAndMissingClient_FollowLanguage()
+    {
+        var original = Loc.Instance.Current;
+        try
+        {
+            using (var env = new Env(probe: new GameRunningProbe()))
+            {
+                var server = env.AddServer("Blocked", "blocked.example.org");
+                env.Main.Servers.ReloadFromService();
+                var card = env.Main.Servers.All.First(s => s.ServerId == server.Id);
+                await env.Main.Servers.SwitchOnlyAsync(card);
+
+                var english = ServiceErrorBody("error.gamerunning.body", "error.state.unchanged");
+                Assert.Equal(english, env.Main.Servers.BannerBody);
+                Assert.Equal(english, env.Main.Servers.StatusText);
+
+                var notified = new List<string?>();
+                env.Main.Servers.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+                Loc.Instance.SetLanguage(Language.Es);
+
+                var spanish = ServiceErrorBody("error.gamerunning.body", "error.state.unchanged");
+                Assert.Equal(spanish, env.Main.Servers.BannerBody);
+                Assert.Equal(spanish, env.Main.Servers.StatusText);
+                Assert.NotEqual(english, spanish);
+                Assert.Contains(nameof(ServersViewModel.BannerBody), notified);
+                Assert.Contains(nameof(ServersViewModel.StatusText), notified);
+                Assert.Contains(nameof(ServersViewModel.BannerHeader), notified);
+            }
+
+            Loc.Instance.SetLanguage(Language.En);
+            using (var env = new Env())
+            {
+                var server = env.AddServer("NoClient", "noclient.example.org");
+                var clientId = env.Session.ResolveClientId();
+                Assert.True(env.Session.Service.RemoveClient(clientId!).Succeeded);
+                env.Main.Servers.ReloadFromService();
+                var card = env.Main.Servers.All.First(s => s.ServerId == server.Id);
+                await env.Main.Servers.SwitchOnlyAsync(card);
+
+                Assert.Equal(Loc.Get("error.noclient.body"), env.Main.Servers.BannerBody);
+                Assert.Equal(env.Main.Servers.BannerBody, env.Main.Servers.StatusText);
+                Loc.Instance.SetLanguage(Language.Es);
+                Assert.Equal("Añade un cliente en Clientes antes de cambiar de servidor.", env.Main.Servers.BannerBody);
+                Assert.Equal(env.Main.Servers.BannerBody, env.Main.Servers.StatusText);
+            }
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(original);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ErrorBanner_UndoConflict_FollowsLanguage()
+    {
+        var original = Loc.Instance.Current;
+        try
+        {
+            using var env = new Env();
+            var a = env.AddServer("A", "a.example.org");
+            var b = env.AddServer("B", "b.example.org");
+            env.PutRealmlist("set realmlist seed.example.org\r\n");
+            var clientId = env.Session.ResolveClientId()!;
+            Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(clientId, a.Id)).Succeeded);
+            Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(clientId, b.Id)).Succeeded);
+            env.PutRealmlist("set realmlist tamper.example.org\r\n");
+            env.Main.Servers.ReloadFromService();
+
+            await ((IAsyncRelayCommand)env.Main.Servers.UndoCommand).ExecuteAsync(null);
+
+            const string files = "Data/enUS/realmlist.wtf";
+            var english = UndoConflictBody(files);
+            Assert.Equal(english, env.Main.Servers.BannerBody);
+            Assert.Equal(english, env.Main.Servers.StatusText);
+
+            var notified = new List<string?>();
+            env.Main.Servers.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+            Loc.Instance.SetLanguage(Language.Es);
+
+            var spanish = UndoConflictBody(files);
+            Assert.Equal(spanish, env.Main.Servers.BannerBody);
+            Assert.Equal(spanish, env.Main.Servers.StatusText);
+            Assert.NotEqual(english, spanish);
+            Assert.Contains(nameof(ServersViewModel.BannerBody), notified);
+            Assert.Contains(nameof(ServersViewModel.StatusText), notified);
+            Assert.Contains(nameof(ServersViewModel.BannerHeader), notified);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(original);
+        }
+    }
+
+    private static string ServiceErrorBody(string codeKey, string stateKey) =>
+        $"{Loc.Get(codeKey)} {Loc.Get(stateKey)}";
+
+    private static string UndoConflictBody(string files) =>
+        string.Format(System.Globalization.CultureInfo.CurrentCulture, Loc.Get("error.undoconflict.body"), files)
+        + " " + Loc.Get("error.state.unknown");
 
     [AvaloniaFact]
     public async Task Play_ProcessCheckFailure_ReturnsToIdleWithError()
