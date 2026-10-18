@@ -128,7 +128,7 @@
   "error.gamerunning.title": "El juego está abierto",
   "error.gamerunning.body": "Ciérralo y vuelve a intentarlo. No se ha modificado nada.",
   "error.processcheckfailed.title": "No pudimos comprobar si el juego está abierto",
-  "error.processcheckfailed.body": "No se pudo leer la lista de procesos ({0}). No se ha modificado nada.",
+  "error.processcheckfailed.body": "No se pudo leer la lista de procesos. No se ha modificado nada.",
   "error.permissiondenied.title": "Sin permiso para escribir",
   "error.permissiondenied.body": "El sistema no nos deja escribir en {0}. No se ha modificado nada.",
   "error.readonlyfs.title": "Carpeta de solo lectura",

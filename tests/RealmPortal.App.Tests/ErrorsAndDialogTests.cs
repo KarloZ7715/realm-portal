@@ -5,6 +5,7 @@ using Avalonia.VisualTree;
 using RealmPortal.App.Localization;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.ClientFiles;
+using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.Tests;
 
@@ -52,6 +53,29 @@ public sealed class ErrorsAndDialogTests
         Loc.Instance.SetLanguage(Language.Es);
         Assert.Contains("/games/wow", ErrorText.Body(ClientFilesErrorCode.PermissionDenied, "/games/wow"));
         Assert.Equal("El juego está abierto", ErrorText.Title(ClientFilesErrorCode.GameRunning));
+    }
+
+    [AvaloniaFact]
+    public void ProcessCheckFailedBodyOmitsTheClientPathAndDiagnostic()
+    {
+        var error = new ServiceError(
+            ServiceErrorCode.ProcessCheckFailed,
+            Path: "/games/wow-secret",
+            Diagnostic: "probe boom");
+
+        Loc.Instance.SetLanguage(Language.En);
+        var english = ErrorText.Body(error);
+        Assert.Equal("The process list could not be read. Nothing was changed.", english);
+        Assert.DoesNotContain("/games/wow-secret", english);
+        Assert.DoesNotContain("probe boom", english);
+        Assert.DoesNotContain("{0}", english);
+
+        Loc.Instance.SetLanguage(Language.Es);
+        var spanish = ErrorText.Body(error);
+        Assert.Equal("No se pudo leer la lista de procesos. No se ha modificado nada.", spanish);
+        Assert.DoesNotContain("/games/wow-secret", spanish);
+        Assert.DoesNotContain("probe boom", spanish);
+        Assert.DoesNotContain("{0}", spanish);
     }
 
     [AvaloniaFact]

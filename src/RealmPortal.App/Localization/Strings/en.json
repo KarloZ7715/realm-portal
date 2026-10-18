@@ -128,7 +128,7 @@
   "error.gamerunning.title": "The game is open",
   "error.gamerunning.body": "Close it and try again. Nothing was changed.",
   "error.processcheckfailed.title": "We could not check whether the game is open",
-  "error.processcheckfailed.body": "The process list could not be read ({0}). Nothing was changed.",
+  "error.processcheckfailed.body": "The process list could not be read. Nothing was changed.",
   "error.permissiondenied.title": "No permission to write",
   "error.permissiondenied.body": "The system does not let us write to {0}. Nothing was changed.",
   "error.readonlyfs.title": "Read-only folder",

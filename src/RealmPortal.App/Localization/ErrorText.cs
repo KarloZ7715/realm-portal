@@ -34,9 +34,10 @@ public static class ErrorText
             ServiceErrorCode.PermissionDenied or ServiceErrorCode.ReadOnlyFs or ServiceErrorCode.PathNotFound
                 or ServiceErrorCode.PathEscapesClient or ServiceErrorCode.DiskFull or ServiceErrorCode.FileSharingViolation
                 or ServiceErrorCode.ClientExecutableNotFound or ServiceErrorCode.ClientUnreadable
-                or ServiceErrorCode.ClientNotAPortableExecutable or ServiceErrorCode.ClientNoVersionResource
-                or ServiceErrorCode.ProcessCheckFailed =>
+                or ServiceErrorCode.ClientNotAPortableExecutable or ServiceErrorCode.ClientNoVersionResource =>
                 Body(error.Code.ToString(), error.Path ?? string.Empty),
+            ServiceErrorCode.ProcessCheckFailed =>
+                Body(error.Code.ToString()),
             ServiceErrorCode.ServerNameTaken =>
                 Body(error.Code.ToString(), error.ServerName ?? string.Empty),
             ServiceErrorCode.IncompatibleClient =>
