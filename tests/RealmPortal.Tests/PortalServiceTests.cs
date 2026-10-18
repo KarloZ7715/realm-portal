@@ -192,4 +192,80 @@ public class PortalServiceTests
         Assert.StartsWith("c", id1);
         Assert.Equal(17, id1.Length);
     }
+
+    /// <summary>Holds the config lock file the way another Realm Portal process would.</summary>
+    private static FileStream HoldConfigLock(string config)
+    {
+        Directory.CreateDirectory(config);
+        return new FileStream(
+            Path.Combine(config, ConfigDirectoryLock.LockFileName),
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None);
+    }
+
+    [Fact]
+    public void ActivateWithoutClientFiles_ReadsTheActiveStateUnderTheConfigLock()
+    {
+        using var env = new Env();
+        var a = env.AddServer("Alpha", "a.example.org");
+        Assert.True(env.Service.ActivateWithoutClientFiles(a.Id).Succeeded);
+        var statePath = Path.Combine(env.Config, "state.json");
+        var journalPath = Path.Combine(env.Config, "last-switch.json");
+        Assert.True(File.Exists(statePath));
+
+        File.Delete(journalPath);
+        using var foreign = HoldConfigLock(env.Config);
+
+        var call = Task.Run(() => env.Service.ActivateWithoutClientFiles(a.Id));
+
+        Assert.False(call.Wait(TimeSpan.FromMilliseconds(400)), "the workflow must take the config lock before it reads the active state");
+
+        // Another process clears the active state while this call is in flight, then lets go of the lock.
+        File.Delete(statePath);
+        foreign.Dispose();
+        Assert.True(call.Wait(TimeSpan.FromSeconds(15)));
+        Assert.True(call.Result.Succeeded, call.Result.Error?.Diagnostic ?? call.Result.Error?.Code.ToString());
+
+        // The snapshot was taken under the lock, so it saw the cleared state and the journal was written.
+        Assert.True(File.Exists(journalPath), "the active-state snapshot must be read under the config lock");
+        Assert.True(File.Exists(statePath));
+    }
+
+    [Fact]
+    public void SwitchServer_WhileTheConfigLockIsHeldElsewhere_WaitsBeforeChangingFiles()
+    {
+        using var env = new Env();
+        var clientId = env.ClientId;
+        var a = env.AddServer("Alpha", "a.example.org");
+        env.PutRealmlist("set realmlist keep.example.org\r\n");
+        using var foreign = HoldConfigLock(env.Config);
+
+        var call = Task.Run(() => env.Service.SwitchServer(new SwitchRequest(clientId, a.Id)));
+
+        Assert.False(call.Wait(TimeSpan.FromMilliseconds(400)), "the workflow must take the config lock before it plans, writes files or saves the journal");
+        Assert.Contains("keep.example.org", env.ReadRealmlist());
+        Assert.False(File.Exists(Path.Combine(env.Config, "state.json")));
+
+        foreign.Dispose();
+        Assert.True(call.Wait(TimeSpan.FromSeconds(15)));
+        Assert.True(call.Result.Succeeded, call.Result.Error?.Diagnostic ?? call.Result.Error?.Code.ToString());
+        Assert.Contains("a.example.org", env.ReadRealmlist());
+        Assert.True(File.Exists(Path.Combine(env.Config, "last-switch.json")));
+    }
+
+    [Fact]
+    public void Undo_WhileTheConfigLockIsHeldElsewhere_WaitsBeforeCheckingState()
+    {
+        using var env = new Env();
+        using var foreign = HoldConfigLock(env.Config);
+
+        var call = Task.Run(() => env.Service.Undo());
+
+        Assert.False(call.Wait(TimeSpan.FromMilliseconds(400)), "Undo must take the config lock before it reads or writes any config file");
+
+        foreign.Dispose();
+        Assert.True(call.Wait(TimeSpan.FromSeconds(15)));
+        Assert.Equal(ServiceErrorCode.NothingToUndo, call.Result.Error!.Code);
+    }
 }

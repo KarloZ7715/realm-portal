@@ -83,21 +83,43 @@ public sealed class ConfigDirectoryLock
             {
                 return new FileStream(_path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             }
-            catch (IOException) when (DateTime.UtcNow < deadline)
+            catch (IOException ex) when (IsLockContention(ex) && DateTime.UtcNow < deadline)
             {
                 Thread.Sleep(50);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (IOException ex) when (IsLockContention(ex))
             {
                 throw Locked(ex);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Not contention: a denied path, a full disk, a vanished directory. The operation must fail
+                // plainly instead of telling the user to wait for another process.
+                throw new StoreException($"'{_path}' cannot be opened: {ex.Message}", ex);
             }
         }
     }
 
+    /// <summary>
+    /// True only for a real lock conflict: the Windows sharing/lock violations, or the Unix advisory-lock
+    /// errno that .NET reports as an <see cref="IOException"/> (EAGAIN/EWOULDBLOCK: 11 on Linux, 35 on macOS
+    /// and the BSDs). Permission and other I/O failures are not contention.
+    /// </summary>
+    private static bool IsLockContention(IOException ex)
+    {
+        const int SharingViolation = unchecked((int)0x80070020); // ERROR_SHARING_VIOLATION
+        const int LockViolation = unchecked((int)0x80070021);    // ERROR_LOCK_VIOLATION
+        if (ex.HResult is SharingViolation or LockViolation)
+            return true;
+
+        return !OperatingSystem.IsWindows() && ex.HResult is 11 or 35;
+    }
+
     private StoreException Locked(Exception? inner) =>
         new(
-            $"Another Realm Portal process is using the config directory (or '{_path}' is not accessible"
-            + $"{(inner is null ? string.Empty : ": " + inner.Message)}).",
+            inner is null
+                ? $"Another Realm Portal process is using the config directory ('{_path}')."
+                : $"Another Realm Portal process is using '{_path}': {inner.Message}",
             inner,
             locked: true);
 

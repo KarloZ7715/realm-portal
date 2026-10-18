@@ -115,6 +115,21 @@ public class ConfigDirectoryLockTests
     }
 
     [Fact]
+    public void Acquire_WhenOpeningFailsForAReasonOtherThanContention_ReportsNotLocked()
+    {
+        using var dir = new TempDirectory();
+        var config = dir.Combine("config");
+        // The lock path exists as a directory: opening it fails without any other process being involved.
+        Directory.CreateDirectory(Path.Combine(config, ConfigDirectoryLock.LockFileName));
+
+        var ex = Assert.Throws<StoreException>(() => new ConfigDirectoryLock(config).Acquire().Dispose());
+
+        Assert.False(ex.Locked);
+        Assert.IsType<UnauthorizedAccessException>(ex.InnerException);
+        Assert.NotEqual(ServiceErrorCode.StoreLocked, ServiceErrors.FromException(ex).Code);
+    }
+
+    [Fact]
     public void Add_WhileTheLockFileIsHeldElsewhere_ChangesNothing()
     {
         using var dir = new TempDirectory();

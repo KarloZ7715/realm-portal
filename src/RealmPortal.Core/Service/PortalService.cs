@@ -224,13 +224,18 @@ public sealed class PortalService : IPortalService
 
         try
         {
-            var server = _servers.List().FirstOrDefault(s => s.Id == serverId)
-                         ?? throw new StoreException($"No server matches '{serverId}'.");
-            var before = _active.GetActive();
-            _active.Switch(server);
-            if (before?.Id != server.Id)
-                _journal.Save(new LastSwitchEntry(null, null));
-            return ServiceResult<ServerEntry>.Ok(ToServerEntry(server, server.Id, null, null));
+            // One critical section: the snapshot of the active server, the activation and the journal
+            // save must describe the same switch.
+            using (_servers.DirectoryLock.Acquire())
+            {
+                var server = _servers.List().FirstOrDefault(s => s.Id == serverId)
+                             ?? throw new StoreException($"No server matches '{serverId}'.");
+                var before = _active.GetActive();
+                _active.Switch(server);
+                if (before?.Id != server.Id)
+                    _journal.Save(new LastSwitchEntry(null, null));
+                return ServiceResult<ServerEntry>.Ok(ToServerEntry(server, server.Id, null, null));
+            }
         }
         catch (Exception ex)
         {
@@ -242,119 +247,124 @@ public sealed class PortalService : IPortalService
     {
         try
         {
-            if (!_active.Status().CanUndo)
-                return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
-
-            var journal = _journal.Load() ?? new LastSwitchEntry(null, null);
-
-            StoredClient? client = null;
-            if (journal.BackupId is not null)
+            // One critical section from the CanUndo check through _journal.Clear(): the client-file
+            // undo, the journal flag and the active-state restore must all describe the same switch.
+            using (_servers.DirectoryLock.Acquire())
             {
-                if (journal.ClientId is null)
+                if (!_active.Status().CanUndo)
                     return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
 
-                client = _clients.FindById(journal.ClientId)
-                         ?? throw new StoreException("The client of the last switch is no longer registered.");
+                var journal = _journal.Load() ?? new LastSwitchEntry(null, null);
 
+                StoredClient? client = null;
+                if (journal.BackupId is not null)
+                {
+                    if (journal.ClientId is null)
+                        return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
+
+                    client = _clients.FindById(journal.ClientId)
+                             ?? throw new StoreException("The client of the last switch is no longer registered.");
+
+                    try
+                    {
+                        if (_probe.IsGameRunning(client.Path))
+                            return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: client.Path));
+                    }
+                    catch (Exception ex)
+                    {
+                        return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: client.Path, Diagnostic: ex.Message));
+                    }
+                }
+
+                if (_active.PendingUndoServerId is { } missingId
+                    && _servers.List().All(s => s.Id != missingId))
+                {
+                    return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.UndoTargetMissing));
+                }
+
+                var undoTarget = _active.GetUndoTarget();
+                if (undoTarget is not null)
+                {
+                    try
+                    {
+                        RealmlistText.Validate(undoTarget.Realmlist);
+                    }
+                    catch (InvalidRealmlistException ex)
+                    {
+                        return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex.ForServer(undoTarget.Name)));
+                    }
+                }
+
+                var applier = CreateApplier();
+                IReadOnlyList<UndoFileResult> fileResults = [];
+                if (!journal.FilesUndone && journal.BackupId is not null && client is not null)
+                {
+                    try
+                    {
+                        ClientPathSecurity.EnsureTrustedDirectoryPath(client.Path);
+                        var undoFiles = applier.Undo(journal.ClientId!, client.Path, journal.BackupId, markUndone: false);
+                        fileResults = undoFiles.Files;
+                        if (undoFiles.HasConflicts || !string.Equals(undoFiles.BackupId, journal.BackupId, StringComparison.Ordinal))
+                        {
+                            var conflicts = undoFiles.Files
+                                .Where(f => f.Status == UndoFileStatus.Conflict)
+                                .Select(f => f.RelativePath.Replace('\\', '/'))
+                                .ToList();
+                            return ServiceResult<UndoOutcome>.Fail(ServiceErrors.UndoConflict(conflicts));
+                        }
+
+                        _journal.MarkFilesUndone();
+                    }
+                    catch (ClientFilesException ex)
+                    {
+                        return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromClientFiles(ex));
+                    }
+                }
+
+                Server? restored;
                 try
                 {
-                    if (_probe.IsGameRunning(client.Path))
-                        return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: client.Path));
+                    restored = _active.Undo();
                 }
                 catch (Exception ex)
                 {
-                    return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: client.Path, Diagnostic: ex.Message));
-                }
-            }
+                    // State-only undo (no backup): ActiveServerManager already restored state.json, and no client files
+                    // were touched. Report the original failure as Unchanged instead of a synthetic inconsistent state.
+                    if (client is null || journal.ClientId is null)
+                        return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex, Consistency.Unchanged));
 
-            if (_active.PendingUndoServerId is { } missingId
-                && _servers.List().All(s => s.Id != missingId))
-            {
-                return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.UndoTargetMissing));
-            }
-
-            var undoTarget = _active.GetUndoTarget();
-            if (undoTarget is not null)
-            {
-                try
-                {
-                    RealmlistText.Validate(undoTarget.Realmlist);
-                }
-                catch (InvalidRealmlistException ex)
-                {
-                    return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex.ForServer(undoTarget.Name)));
-                }
-            }
-
-            var applier = CreateApplier();
-            IReadOnlyList<UndoFileResult> fileResults = [];
-            if (!journal.FilesUndone && journal.BackupId is not null && client is not null)
-            {
-                try
-                {
-                    ClientPathSecurity.EnsureTrustedDirectoryPath(client.Path);
-                    var undoFiles = applier.Undo(journal.ClientId!, client.Path, journal.BackupId, markUndone: false);
-                    fileResults = undoFiles.Files;
-                    if (undoFiles.HasConflicts || !string.Equals(undoFiles.BackupId, journal.BackupId, StringComparison.Ordinal))
+                    try
                     {
-                        var conflicts = undoFiles.Files
-                            .Where(f => f.Status == UndoFileStatus.Conflict)
-                            .Select(f => f.RelativePath.Replace('\\', '/'))
-                            .ToList();
-                        return ServiceResult<UndoOutcome>.Fail(ServiceErrors.UndoConflict(conflicts));
+                        var active = _active.GetActive()
+                                     ?? throw new InvalidOperationException("No active server to re-apply after a failed undo.");
+                        var version = ReadStoredClientVersion(client.Path);
+                        var plan = applier.Plan(BuildRequest(journal.ClientId, active, client.Path, version));
+                        if (!plan.IsEmpty)
+                        {
+                            var applied = applier.Apply(plan);
+                            if (applied.BackupId is { } rollbackBackupId)
+                                applier.MarkBackupUndone(journal.ClientId, rollbackBackupId);
+                        }
+
+                        // Original backup stays pending; the client again holds its sha256_after bytes.
+                        _journal.MarkFilesNotUndone();
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        return ServiceResult<UndoOutcome>.Fail(ServiceErrors.Inconsistent(ServiceErrors.FromException(rollbackEx, Consistency.Inconsistent)));
                     }
 
-                    _journal.MarkFilesUndone();
+                    return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex, Consistency.RolledBack));
                 }
-                catch (ClientFilesException ex)
-                {
-                    return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromClientFiles(ex));
-                }
+
+                if (journal.BackupId is not null && journal.ClientId is not null)
+                    applier.MarkBackupUndone(journal.ClientId, journal.BackupId);
+
+                _journal.Clear();
+                var entry = restored is null ? null : ToServerEntry(restored, restored.Id, journal.ClientId, null);
+                var notice = BuildUndoClientFilesNotice(restored, fileResults, client);
+                return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults, notice));
             }
-
-            Server? restored;
-            try
-            {
-                restored = _active.Undo();
-            }
-            catch (Exception ex)
-            {
-                // State-only undo (no backup): ActiveServerManager already restored state.json, and no client files
-                // were touched. Report the original failure as Unchanged instead of a synthetic inconsistent state.
-                if (client is null || journal.ClientId is null)
-                    return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex, Consistency.Unchanged));
-
-                try
-                {
-                    var active = _active.GetActive()
-                                 ?? throw new InvalidOperationException("No active server to re-apply after a failed undo.");
-                    var version = ReadStoredClientVersion(client.Path);
-                    var plan = applier.Plan(BuildRequest(journal.ClientId, active, client.Path, version));
-                    if (!plan.IsEmpty)
-                    {
-                        var applied = applier.Apply(plan);
-                        if (applied.BackupId is { } rollbackBackupId)
-                            applier.MarkBackupUndone(journal.ClientId, rollbackBackupId);
-                    }
-
-                    // Original backup stays pending; the client again holds its sha256_after bytes.
-                    _journal.MarkFilesNotUndone();
-                }
-                catch (Exception rollbackEx)
-                {
-                    return ServiceResult<UndoOutcome>.Fail(ServiceErrors.Inconsistent(ServiceErrors.FromException(rollbackEx, Consistency.Inconsistent)));
-                }
-
-                return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex, Consistency.RolledBack));
-            }
-
-            if (journal.BackupId is not null && journal.ClientId is not null)
-                applier.MarkBackupUndone(journal.ClientId, journal.BackupId);
-
-            _journal.Clear();
-            var entry = restored is null ? null : ToServerEntry(restored, restored.Id, journal.ClientId, null);
-            var notice = BuildUndoClientFilesNotice(restored, fileResults, client);
-            return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults, notice));
         }
         catch (Exception ex)
         {
@@ -493,73 +503,81 @@ public sealed class PortalService : IPortalService
                 return ServiceResult<SwitchOutcome>.Fail(ServiceErrors.FromException(ex.ForServer(server.Name)));
             }
 
-            var applier = CreateApplier();
-            var active = _active.GetActive();
-            var sameServerActive = active?.Id == server.Id;
-            var previousEntry = active is null ? null : ToServerEntry(active, active.Id, request.ClientId, version);
-
-            ClientFilesPlan plan = null!;
-            if (!RunStep(progress, ServiceStep.Plan, () => plan = applier.Plan(BuildRequest(request.ClientId, server, client.Path, version)), out var planError))
-                return ServiceResult<SwitchOutcome>.Fail(planError!);
-
-            string? backupId = null;
-            IReadOnlyList<string> changedFiles = [];
-            InstallationLock? installationLock = null;
-            progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Started));
-            try
+            SwitchOutcome outcome;
+            // One critical section: the active-state snapshot, the plan, the file writes, the
+            // activation and the journal save must all describe the same switch, so no other
+            // process can change the active server in between. Launch stays outside the lock.
+            using (_servers.DirectoryLock.Acquire())
             {
-                if (!plan.IsEmpty)
+                var applier = CreateApplier();
+                var active = _active.GetActive();
+                var sameServerActive = active?.Id == server.Id;
+                var previousEntry = active is null ? null : ToServerEntry(active, active.Id, request.ClientId, version);
+
+                ClientFilesPlan plan = null!;
+                if (!RunStep(progress, ServiceStep.Plan, () => plan = applier.Plan(BuildRequest(request.ClientId, server, client.Path, version)), out var planError))
+                    return ServiceResult<SwitchOutcome>.Fail(planError!);
+
+                string? backupId = null;
+                IReadOnlyList<string> changedFiles = [];
+                InstallationLock? installationLock = null;
+                progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Started));
+                try
                 {
-                    installationLock = applier.AcquireInstallationLock(request.ClientId);
-                    var applied = applier.Apply(plan, installationLock);
-                    backupId = applied.BackupId;
-                    changedFiles = applied.Edits.Select(e => e.RelativePath.Replace('\\', '/')).ToList();
-                }
-
-                progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Completed));
-            }
-            catch (Exception ex)
-            {
-                installationLock?.Dispose();
-                var error = ServiceErrors.FromException(ex, Consistency.Unchanged);
-                progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Failed, error));
-                return ServiceResult<SwitchOutcome>.Fail(error);
-            }
-
-            try
-            {
-                if (!RunStep(progress, ServiceStep.Activate, () => _active.Switch(server), out var activateError))
-                {
-                    if (backupId is not null)
+                    if (!plan.IsEmpty)
                     {
-                        var rollback = RollbackSwitchApply(applier, request.ClientId, client.Path, backupId, installationLock);
-                        if (!rollback.Succeeded)
-                        {
-                            installationLock?.Dispose();
-                            return ServiceResult<SwitchOutcome>.Fail(rollback.Error!);
-                        }
+                        installationLock = applier.AcquireInstallationLock(request.ClientId);
+                        var applied = applier.Apply(plan, installationLock);
+                        backupId = applied.BackupId;
+                        changedFiles = applied.Edits.Select(e => e.RelativePath.Replace('\\', '/')).ToList();
                     }
 
-                    installationLock?.Dispose();
-                    return ServiceResult<SwitchOutcome>.Fail(activateError! with
-                    {
-                        Consistency = backupId is not null ? Consistency.RolledBack : Consistency.Unchanged,
-                    });
+                    progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Completed));
                 }
-            }
-            catch
-            {
+                catch (Exception ex)
+                {
+                    installationLock?.Dispose();
+                    var error = ServiceErrors.FromException(ex, Consistency.Unchanged);
+                    progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Failed, error));
+                    return ServiceResult<SwitchOutcome>.Fail(error);
+                }
+
+                try
+                {
+                    if (!RunStep(progress, ServiceStep.Activate, () => _active.Switch(server), out var activateError))
+                    {
+                        if (backupId is not null)
+                        {
+                            var rollback = RollbackSwitchApply(applier, request.ClientId, client.Path, backupId, installationLock);
+                            if (!rollback.Succeeded)
+                            {
+                                installationLock?.Dispose();
+                                return ServiceResult<SwitchOutcome>.Fail(rollback.Error!);
+                            }
+                        }
+
+                        installationLock?.Dispose();
+                        return ServiceResult<SwitchOutcome>.Fail(activateError! with
+                        {
+                            Consistency = backupId is not null ? Consistency.RolledBack : Consistency.Unchanged,
+                        });
+                    }
+                }
+                catch
+                {
+                    installationLock?.Dispose();
+                    throw;
+                }
+
                 installationLock?.Dispose();
-                throw;
+
+                if (!sameServerActive)
+                    _journal.Save(new LastSwitchEntry(request.ClientId, backupId));
+
+                var activeEntry = ToServerEntry(server, server.Id, request.ClientId, version);
+                var previous = sameServerActive ? activeEntry : previousEntry;
+                outcome = new SwitchOutcome(activeEntry, previous, backupId, changedFiles);
             }
-
-            installationLock?.Dispose();
-
-            if (!sameServerActive)
-                _journal.Save(new LastSwitchEntry(request.ClientId, backupId));
-
-            var activeEntry = ToServerEntry(server, server.Id, request.ClientId, version);
-            var previous = sameServerActive ? activeEntry : previousEntry;
 
             if (launch)
             {
@@ -573,7 +591,7 @@ public sealed class PortalService : IPortalService
                 }
             }
 
-            return ServiceResult<SwitchOutcome>.Ok(new SwitchOutcome(activeEntry, previous, backupId, changedFiles));
+            return ServiceResult<SwitchOutcome>.Ok(outcome);
         }
         catch (Exception ex)
         {
