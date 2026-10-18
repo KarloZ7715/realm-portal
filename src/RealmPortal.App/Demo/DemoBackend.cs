@@ -10,7 +10,7 @@ public enum StepKind
 }
 
 /// <summary>
-/// Simulated backend for the F3b screens: every step is a delay and nothing touches the disk, a client or the network.
+/// Simulated backend for F3b screenshots, gallery and headless UI tests (<c>--demo</c>): every step is a delay and nothing touches the disk, a client or the network.
 /// <see cref="TimeScale"/> 0 makes the steps instant (tests); <see cref="StepGate"/> lets a test or a screenshot hold a step.
 /// </summary>
 public sealed class DemoBackend

@@ -3,6 +3,9 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.Core.Clients;
+using RealmPortal.Core.Servers;
+using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.ViewModels;
 
@@ -21,24 +24,88 @@ public sealed partial class ServerItemViewModel : ObservableObject
     private readonly Action<ServerItemViewModel> _play;
     private readonly Action<ServerItemViewModel> _switchOnly;
 
-    public ServerItemViewModel(ServerSeed seed, Action<ServerItemViewModel> play, Action<ServerItemViewModel> switchOnly)
+    private ServerItemViewModel(
+        string? serverId,
+        string? preferredClientId,
+        string name,
+        string host,
+        string address,
+        string clientVersion,
+        string? account,
+        bool isCompatible,
+        bool isActive,
+        bool needsRepair,
+        Action<ServerItemViewModel> play,
+        Action<ServerItemViewModel> switchOnly)
     {
-        Name = seed.Name;
-        Host = seed.Host;
-        Address = $"{seed.Host}:{seed.Port}";
-        ClientVersion = seed.ClientVersion;
-        Account = seed.Account;
-        IsCompatible = seed.IsCompatible;
-        IsActive = seed.IsActive;
+        ServerId = serverId;
+        PreferredClientId = preferredClientId;
+        Name = name;
+        Host = host;
+        Address = address;
+        ClientVersion = clientVersion;
+        Account = account;
+        IsCompatible = isCompatible;
+        IsActive = isActive;
+        NeedsRepair = needsRepair;
         _play = play;
         _switchOnly = switchOnly;
     }
+
+    public static ServerItemViewModel FromSeed(
+        ServerSeed seed,
+        Action<ServerItemViewModel> play,
+        Action<ServerItemViewModel> switchOnly) =>
+        new(
+            null,
+            null,
+            seed.Name,
+            seed.Host,
+            $"{seed.Host}:{seed.Port}",
+            seed.ClientVersion,
+            seed.Account,
+            seed.IsCompatible,
+            seed.IsActive,
+            false,
+            play,
+            switchOnly);
+
+    public static ServerItemViewModel FromEntry(
+        ServerEntry entry,
+        ClientVersion? clientVersion,
+        bool projectionInSync,
+        Action<ServerItemViewModel> play,
+        Action<ServerItemViewModel> switchOnly)
+    {
+        var versionLabel = clientVersion?.ToString() ?? "?";
+        var needsRepair = entry.IsActive && !projectionInSync;
+        // An unreadable or missing client matches the service: every server stays compatible.
+        // A known version uses the same build rule as the client RunPortalAsync will switch with.
+        var compatible = clientVersion is null || CompatibilityFilter.IsCompatible(entry, clientVersion);
+        return new(
+            entry.Id,
+            entry.ClientId,
+            entry.Name,
+            entry.Host,
+            entry.Host,
+            versionLabel,
+            entry.Account,
+            compatible,
+            entry.IsActive,
+            needsRepair,
+            play,
+            switchOnly);
+    }
+
+    public string? ServerId { get; }
+
+    public string? PreferredClientId { get; }
 
     public string Name { get; }
 
     public string Host { get; }
 
-    /// <summary>host:port.</summary>
+    /// <summary>host:port or host from the service.</summary>
     public string Address { get; }
 
     public string ClientVersion { get; }
@@ -47,9 +114,19 @@ public sealed partial class ServerItemViewModel : ObservableObject
 
     public bool IsCompatible { get; }
 
+    /// <summary>Active server whose client files or projection are out of sync; re-switch runs a repair.</summary>
+    public bool NeedsRepair { get; private set; }
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SealStatus), nameof(BadgeStatus), nameof(BadgeText))]
+    [NotifyPropertyChangedFor(nameof(SealStatus), nameof(BadgeStatus), nameof(BadgeText), nameof(ShowSwitchMenu), nameof(SwitchMenuText))]
     private bool _isActive;
+
+    partial void OnIsActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanSwitchOnly));
+        OnPropertyChanged(nameof(SwitchOnlyHint));
+        SwitchOnlyCommand.NotifyCanExecuteChanged();
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BadgeStatus), nameof(BadgeText))]
@@ -59,7 +136,11 @@ public sealed partial class ServerItemViewModel : ObservableObject
     private bool _canAct = true;
 
     /// <summary>Position in the unfiltered list: keeps the order of the idle servers stable.</summary>
-    public int Order { get; init; }
+    public int Order { get; set; }
+
+    public bool ShowSwitchMenu => !IsActive || NeedsRepair;
+
+    public string SwitchMenuText => NeedsRepair ? Loc.Get("card.repair") : Loc.Get("card.switchonly");
 
     public ServerStatus SealStatus => IsActive ? ServerStatus.Active : IsCompatible ? ServerStatus.Ready : ServerStatus.Incompatible;
 
@@ -72,11 +153,12 @@ public sealed partial class ServerItemViewModel : ObservableObject
 
     public string BadgeText => Overlay switch
     {
-        ServerOverlay.Switching => Loc.Get("badge.switching"),
+        ServerOverlay.Switching => Loc.Get(NeedsRepair ? "badge.repairing" : "badge.switching"),
         ServerOverlay.Opening => Loc.Get("badge.opening"),
         ServerOverlay.Running => Loc.Get("badge.running"),
         _ => SealStatus switch
         {
+            ServerStatus.Active when NeedsRepair => Loc.Get("badge.needsrepair"),
             ServerStatus.Active => Loc.Get("badge.active"),
             ServerStatus.Incompatible => Loc.Get("badge.incompatible"),
             _ => Loc.Get("badge.ready"),
@@ -96,12 +178,31 @@ public sealed partial class ServerItemViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanPlay))]
     private void Play() => _play(this);
 
-    [RelayCommand(CanExecute = nameof(CanPlay))]
+    /// <summary>"Switch only" is disabled for the active server, unless its projection is out of sync and a repair can run.</summary>
+    public bool CanSwitchOnly => CanPlay && (!IsActive || NeedsRepair);
+
+    /// <summary>The line under "Switch only" in the play menu: what it does, or why it is unavailable.</summary>
+    public string SwitchOnlyHint => Loc.Get(IsActive && !NeedsRepair ? "menu.switchonly.active" : "menu.switchonly.hint");
+
+    [RelayCommand(CanExecute = nameof(CanSwitchOnly))]
     private void SwitchOnly() => _switchOnly(this);
+
+    public void SetNeedsRepair(bool needsRepair)
+    {
+        NeedsRepair = needsRepair;
+        OnPropertyChanged(nameof(NeedsRepair));
+        OnPropertyChanged(nameof(ShowSwitchMenu));
+        OnPropertyChanged(nameof(SwitchMenuText));
+        OnPropertyChanged(nameof(SwitchOnlyHint));
+        OnPropertyChanged(nameof(CanSwitchOnly));
+        OnPropertyChanged(nameof(BadgeText));
+        SwitchOnlyCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnCanActChanged(bool value)
     {
         OnPropertyChanged(nameof(CanPlay));
+        OnPropertyChanged(nameof(CanSwitchOnly));
         PlayCommand.NotifyCanExecuteChanged();
         SwitchOnlyCommand.NotifyCanExecuteChanged();
     }
@@ -111,5 +212,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(BadgeText));
         OnPropertyChanged(nameof(DetailText));
+        OnPropertyChanged(nameof(SwitchMenuText));
+        OnPropertyChanged(nameof(SwitchOnlyHint));
     }
 }

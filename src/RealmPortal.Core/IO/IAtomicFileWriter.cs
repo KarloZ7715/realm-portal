@@ -8,4 +8,10 @@ public interface IAtomicFileWriter
     /// On failure the previous content of <paramref name="path"/> (if any) is left untouched.
     /// </summary>
     void WriteAllBytes(string path, byte[] content);
+
+    /// <summary>
+    /// Like <see cref="WriteAllBytes(string, byte[])"/> but copies permission bits onto the temp file (Unix) and clears read-only
+    /// on the destination (Windows) before the atomic rename.
+    /// </summary>
+    void WriteAllBytes(string path, byte[] content, FileReplacementPermissions? permissions);
 }

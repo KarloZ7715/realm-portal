@@ -17,6 +17,7 @@ Conventions for new files (same as the kit): PNG @1x + `@2x` (exactly double the
 | Joined split-button plate | `split-{primary,secondary}-*` | `SplitPlate` draws the plate and re-draws the hovered/pressed segment from the state plate, clipped to it (`Theme/Controls/SplitButton.axaml`, on Avalonia's `SplitButton`). |
 | Card hover | `panel-thin-hover`, `panel-tile-hover` (+ `-selected-hover`) | Replaces the 1 px lift. |
 | Ghost button plate | `ghost-parchment-*`, `ghost-leather-{hover,pressed}` | `Button.ghost` / `.ghost.parchment`. |
+| Parchment button surface (WCAG 1.4.11) | `button-{primary,secondary}-parchment-*`, `ghost-parchment-*`, `focus-ring-parchment` (teal + leather/950 outer) | `ButtonSurface.Surface="Parchment"` on primary, secondary or ghost (text); default `Leather`. Confirm dialogs set Surface on all buttons. Leather Save in settings stays default. |
 | Compact (56 px) tab | `tab-parchment-flat` (inset 18) | `ListBox.nav.compact`; renders cleanly at 56 px wide. |
 | Fields, checkbox, radio, switch, scroll bar, progress | `fields/*`, `controls/*` | `Inputs.axaml`, `ScrollBar.axaml`, `ProgressBar.axaml`; checkbox/radio/switch via `StateArt`. |
 
@@ -26,7 +27,7 @@ Priority: **P1** = visible in the F3b screens, **P2** = nice to have, **P3** = o
 
 | # | Gap | Priority | Stand-in today | Notes |
 |---|---|---|---|---|
-| 1 | **Menu / dropdown / tooltip art** | P1 | Themed with the closest kit pieces (F3b M1): `popup-leather` / `popup-parchment` plates, flat wood hover rows, no shadow layer. | Real art needed for menu item hover, separators, ComboBox list and tooltip, plus a popup shadow. See "Pieces to validate" below. |
+| 1 | **Menu / dropdown / tooltip art** | P1 | Themed with the closest kit pieces (F3b M1): `popup-leather` / `popup-parchment` plates, FLAT hover per the designer's F4 decision (14 % solid token fill, bronze over leather and wax red over parchment, plus a 3 px wax-red bar on the left; the selected ComboBox item gets a stronger fill and no bar), no shadow layer. | Real art needed for menu item hover, separators, ComboBox list and tooltip, plus a popup shadow. See "Pieces to validate" below. |
 | 2 | **Design sign-off for kit pieces that are not in Figma** | P1 | Used as delivered. | Card hover, `ghost-leather-{hover,pressed}` (Figma shows a leather ghost with no plate, only a lighter label), scroll bar, progress stripes, checkbox/radio/switch hover and disabled, popup plates. |
 | 3 | **Pressed art for checkbox, radio and switch** | P3 | The hover art is used while pressed. | |
 | 4 | **Parchment progress bar** | P3 | Not provided; the theme has the leather bar only. | Only if a progress bar appears on parchment. |
@@ -61,8 +62,8 @@ when checking the build; screenshots at 1.0, 1.5 and 2.0 come from the UI tests 
 | 3 | **Scroll bar** | server list and client list when they overflow | Kit scroll bar. The mockups never show one (they crop the list). | Position and width OK next to the cards? |
 | 4 | **Progress bar** with running stripes | switching and opening banners | Kit track and fill; the stripes are on while busy (the mockups show a plain fill). | Keep the stripes? |
 | 5 | **Hover / disabled** of buttons, cards, split button, checkbox | all screens | Kit states. The disabled split button on cards while busy is the dark disabled plate as in mockups 04 and 06. | Disabled "Reintentar" is dimmer than in mockup 06b. |
-| 6 | **Menu** (split button "Solo cambiar") | card menu | `popup-leather` plate, flat wood hover row, no shadow layer. | Needs real menu art: plate, item hover, separator, shadow. |
-| 7 | **ComboBox** (client choice) | add server | Input plate with chevron; list in `popup-parchment`, flat tint for hover and selected item. | Needs real dropdown art. |
+| 6 | **Menu** (split button "Solo cambiar") | card menu | `popup-leather` plate, flat hover (fill + 3 px wax bar), no shadow layer. | Needs real menu art: plate, item hover, separator, shadow. |
+| 7 | **ComboBox** (client choice) | add server | Input plate with chevron; list in `popup-parchment`, flat hover (fill + 3 px wax bar) and a stronger fill for the selected item. | Needs real dropdown art. |
 | 8 | **Tooltip** | sidebar items, language toggle, search clear | `popup-leather` plate, bone text. | Needs real tooltip art. |
 | 9 | **Banner, steps, toast** | switching, opening, running, undo | Drawn in code from the mockups (dashed outline, 4 px bar, round markers, countdown line); only the toast uses kit art (`popup-leather` + `shadow-soft`). | Dash pattern and sizes against the mockups. |
 | 10 | **Status bar, sidebar edge, sheet titles** | all screens | Drawn in code (bronze-dark rules, dashed edge). | Colours of the rules. |

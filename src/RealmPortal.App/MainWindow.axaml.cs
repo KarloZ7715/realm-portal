@@ -1,5 +1,8 @@
-using Avalonia.LogicalTree;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.LogicalTree;
+using Avalonia.Threading;
+using RealmPortal.App.Portal;
 using RealmPortal.App.ViewModels;
 
 namespace RealmPortal.App;
@@ -9,7 +12,12 @@ public partial class MainWindow : Window
     /// <summary>Width from which the sidebar shows labels and the non-affiliation note.</summary>
     public const double WideFrom = 960;
 
-    public MainWindow() : this(new MainViewModel())
+    private IInputElement? _focusBeforeDialog;
+
+    /// <summary>
+    /// The previewer calls this constructor. Design mode uses the demo backend so it does not open the developer's portal config.
+    /// </summary>
+    public MainWindow() : this(Design.IsDesignMode ? new MainViewModel() : new MainViewModel(PortalSession.Create()))
     {
     }
 
@@ -17,8 +25,25 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+        viewModel.DialogOpening += CaptureFocusBeforeDialog;
+        viewModel.DialogClosed += RestoreFocusAfterDialog;
         Opened += (_, _) => Platform.X11WindowIcon.TrySet(this);
         SizeChanged += (_, e) => UpdateSidebar(e.NewSize.Width);
+    }
+
+    private void CaptureFocusBeforeDialog() =>
+        _focusBeforeDialog = FocusManager?.GetFocusedElement();
+
+    private void RestoreFocusAfterDialog()
+    {
+        if (_focusBeforeDialog is not { Focusable: true } restore)
+        {
+            _focusBeforeDialog = null;
+            return;
+        }
+
+        _focusBeforeDialog = null;
+        Dispatcher.UIThread.Post(() => restore.Focus(), DispatcherPriority.Loaded);
     }
 
     private void UpdateSidebar(double width)

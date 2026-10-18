@@ -32,7 +32,9 @@ public class ClientFilesApplierTests
         public Func<int, bool> Fail { get; set; } = _ => false;
         public Func<int, bool> Corrupt { get; set; } = _ => false;
 
-        public void WriteAllBytes(string path, byte[] content)
+        public void WriteAllBytes(string path, byte[] content) => WriteAllBytes(path, content, null);
+
+        public void WriteAllBytes(string path, byte[] content, RealmPortal.Core.IO.FileReplacementPermissions? permissions)
         {
             if (Path.GetFullPath(path).StartsWith(Path.GetFullPath(clientRoot), StringComparison.Ordinal))
             {
@@ -43,7 +45,7 @@ public class ClientFilesApplierTests
                     content = [.. content, (byte)'!'];
             }
 
-            _inner.WriteAllBytes(path, content);
+            _inner.WriteAllBytes(path, content, permissions);
         }
     }
 
@@ -106,7 +108,7 @@ public class ClientFilesApplierTests
         Assert.NotEqual(before, env.Files());
         Assert.Contains("logon-a.example.org", File.ReadAllText(env.Path_("Data/enUS/realmlist.wtf")));
 
-        var undo = env.Applier.Undo("install-1");
+        var undo = env.Applier.Undo("install-1", env.Client);
 
         Assert.Equal(result.BackupId, undo.BackupId);
         Assert.All(undo.Files, f => Assert.Equal(UndoFileStatus.Restored, f.Status));
@@ -122,7 +124,7 @@ public class ClientFilesApplierTests
         var result = env.Applier.Apply(env.Plan());
         Assert.True(File.Exists(env.Path_("WTF/Config.wtf")));
 
-        var undo = env.Applier.Undo("install-1");
+        var undo = env.Applier.Undo("install-1", env.Client);
 
         Assert.All(undo.Files, f => Assert.Equal(UndoFileStatus.Deleted, f.Status));
         Assert.Equal(before, env.Files());
@@ -176,7 +178,7 @@ public class ClientFilesApplierTests
         env.Probe.Running = false;
         env.Applier.Apply(plan);
         env.Probe.Running = true;
-        var undo = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1"));
+        var undo = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
         Assert.Equal(ClientFilesErrorCode.GameRunning, undo.Code);
     }
 
@@ -225,7 +227,7 @@ public class ClientFilesApplierTests
         Assert.Equal(ClientFilesErrorCode.PermissionDenied, ex.Code);
         Assert.Equal(before, env.Files()); // old content everywhere, no temp files left
         Assert.Empty(Directory.GetDirectories(Path.Combine(env.Backups, "install-1")));
-        Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1")).Code);
+        Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client)).Code);
     }
 
     [Fact]
@@ -269,7 +271,7 @@ public class ClientFilesApplierTests
         Assert.NotEqual(before, env.Files());
 
         env.Writer.Fail = _ => false;
-        var undo = env.Applier.Undo("install-1");
+        var undo = env.Applier.Undo("install-1", env.Client);
 
         Assert.Equal(before, env.Files());
         Assert.Contains(undo.Files, f => f.Status == UndoFileStatus.Restored);
@@ -285,7 +287,7 @@ public class ClientFilesApplierTests
         env.Applier.Apply(env.Plan());
         env.Put("WTF/Config.wtf", "SET realmList \"edited by the game\"\r\n");
 
-        var undo = env.Applier.Undo("install-1");
+        var undo = env.Applier.Undo("install-1", env.Client);
 
         Assert.True(undo.HasConflicts);
         Assert.Equal(UndoFileStatus.Conflict, undo.Files.Single(f => f.RelativePath == "WTF/Config.wtf").Status);
@@ -294,7 +296,7 @@ public class ClientFilesApplierTests
         Assert.Equal("set realmlist old.example.org\r\n", File.ReadAllText(env.Path_("Data/enUS/realmlist.wtf")));
 
         // Still pending: asking again reports the same conflict instead of undoing something older.
-        var again = env.Applier.Undo("install-1");
+        var again = env.Applier.Undo("install-1", env.Client);
         Assert.True(again.HasConflicts);
         Assert.Equal(undo.BackupId, again.BackupId);
     }
@@ -303,12 +305,12 @@ public class ClientFilesApplierTests
     public void Undo_WithNothingApplied_ThrowsNothingToUndo_AndAlsoAfterTheLastUndo()
     {
         using var env = new Env();
-        Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1")).Code);
+        Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client)).Code);
 
         env.Applier.Apply(env.Plan());
-        env.Applier.Undo("install-1");
+        env.Applier.Undo("install-1", env.Client);
 
-        Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1")).Code);
+        Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client)).Code);
     }
 
     [Fact]
@@ -322,10 +324,10 @@ public class ClientFilesApplierTests
         env.Applier.Apply(env.Plan(BlobB));
         Assert.NotEqual(afterA, env.Files());
 
-        env.Applier.Undo("install-1");
+        env.Applier.Undo("install-1", env.Client);
         Assert.Equal(afterA, env.Files());
 
-        env.Applier.Undo("install-1");
+        env.Applier.Undo("install-1", env.Client);
         Assert.Equal(original, env.Files());
     }
 
@@ -339,7 +341,7 @@ public class ClientFilesApplierTests
         env.Applier.Apply(env.Plan());
         env.Put("WTF/Config.wtf", "SET realmList \"old\"\r\n"); // as if a previous undo had already restored this one
 
-        var undo = env.Applier.Undo("install-1");
+        var undo = env.Applier.Undo("install-1", env.Client);
 
         Assert.Equal(UndoFileStatus.AlreadyRestored, undo.Files.Single(f => f.RelativePath == "WTF/Config.wtf").Status);
         Assert.Equal(before, env.Files());
@@ -355,7 +357,7 @@ public class ClientFilesApplierTests
         File.WriteAllText(Path.Combine(backup, "files", "0"), "tampered");
         var current = env.Files();
 
-        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1"));
+        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
 
         Assert.Equal(ClientFilesErrorCode.HashMismatch, ex.Code);
         Assert.Equal(current, env.Files());
@@ -396,7 +398,7 @@ public class ClientFilesApplierTests
         Assert.True(file.GetProperty("existed").GetBoolean());
         Assert.Equal(plan.Edits.First(e => e.RelativePath == "Data/enUS/realmlist.wtf").Sha256Before, file.GetProperty("sha256_before").GetString());
 
-        env.Applier.Undo("install-1");
+        env.Applier.Undo("install-1", env.Client);
         using var undone = JsonDocument.Parse(File.ReadAllText(Path.Combine(env.Backups, "install-1", result.BackupId!, "manifest.json")));
         Assert.NotEqual(JsonValueKind.Null, undone.RootElement.GetProperty("undone_at").ValueKind);
     }
@@ -408,9 +410,9 @@ public class ClientFilesApplierTests
         var plan = env.Plan();
         var evil = plan with { Edits = [plan.Edits[0] with { RelativePath = "../outside.txt" }] };
 
-        Assert.Equal(ClientFilesErrorCode.PathNotFound, Assert.Throws<ClientFilesException>(() => env.Applier.Apply(evil)).Code);
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, Assert.Throws<ClientFilesException>(() => env.Applier.Apply(evil)).Code);
         Assert.Throws<ArgumentException>(() => env.Applier.Apply(plan with { InstallationId = "../x" }));
-        Assert.Throws<ArgumentException>(() => env.Applier.Undo(".."));
+        Assert.Throws<ArgumentException>(() => env.Applier.Undo("..", env.Client));
     }
 
     [Fact]
@@ -419,7 +421,7 @@ public class ClientFilesApplierTests
         using var env = new Env();
         env.Applier.Apply(env.Plan());
 
-        Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-2")).Code);
+        Assert.Equal(ClientFilesErrorCode.NothingToUndo, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-2", env.Client)).Code);
     }
 
     [Fact]
@@ -434,11 +436,28 @@ public class ClientFilesApplierTests
         using (new FileStream(Path.Combine(env.Backups, "install-1", ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
         {
             Assert.Throws<ClientFilesException>(() => env.Applier.Apply(plan));
-            Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1"));
+            Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
         }
 
         Assert.Equal(before, env.Files());
         Assert.NotNull(env.Applier.Apply(plan).BackupId); // the lock is released afterwards
+    }
+
+    [Fact]
+    public void Undo_WithALockForAnotherInstallation_ThrowsAndLeavesClientFilesUnchanged()
+    {
+        using var env = new Env();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        var plan = env.Plan();
+        var applied = env.Applier.Apply(plan);
+        var before = env.Files();
+
+        using var other = env.Applier.AcquireInstallationLock("install-2");
+        var ex = Assert.Throws<ArgumentException>(() => env.Applier.Undo("install-1", env.Client, applied.BackupId, installationLock: other));
+
+        Assert.Equal("installationLock", ex.ParamName);
+        Assert.StartsWith("The installation lock does not match the installation.", ex.Message);
+        Assert.Equal(before, env.Files());
     }
 
     [Fact]
@@ -449,7 +468,7 @@ public class ClientFilesApplierTests
         var manifest = Directory.GetFiles(Path.Combine(env.Backups, "install-1"), "manifest.json", SearchOption.AllDirectories).Single();
         File.WriteAllText(manifest, File.ReadAllText(manifest).Replace("\"sha256_after\"", "\"sha256_afterx\""));
 
-        Assert.Equal(ClientFilesErrorCode.VerifyFailed, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1")).Code);
+        Assert.Equal(ClientFilesErrorCode.VerifyFailed, Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client)).Code);
     }
 
     private static string[] BackupIds(Env env) =>
@@ -478,7 +497,7 @@ public class ClientFilesApplierTests
         var afterThree = env.Files();
 
         Assert.Equal(2, BackupIds(env).Length);
-        var undo = applier.Undo("install-1");
+        var undo = applier.Undo("install-1", env.Client);
 
         Assert.All(undo.Files, f => Assert.Equal(UndoFileStatus.Restored, f.Status));
         Assert.NotEqual(afterThree, env.Files());
@@ -516,7 +535,7 @@ public class ClientFilesApplierTests
             last = applier.Apply(env.Plan(i % 2 == 0 ? BlobA : BlobB)).BackupId;
 
         Assert.Equal([last!], BackupIds(env));
-        Assert.All(applier.Undo("install-1").Files, f => Assert.Equal(UndoFileStatus.Restored, f.Status));
+        Assert.All(applier.Undo("install-1", env.Client).Files, f => Assert.Equal(UndoFileStatus.Restored, f.Status));
     }
 
     [Fact]
@@ -552,7 +571,7 @@ public class ClientFilesApplierTests
             var before = env.Files();
 
             env.Applier.Apply(env.Plan(blob, "Realm"));
-            env.Applier.Undo("install-1");
+            env.Applier.Undo("install-1", env.Client);
 
             return before.OrderBy(p => p.Key).SequenceEqual(env.Files().OrderBy(p => p.Key));
         });

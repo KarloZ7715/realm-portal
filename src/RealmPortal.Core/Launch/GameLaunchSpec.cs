@@ -23,6 +23,9 @@ public sealed record GameLaunchSpec(
     IReadOnlyDictionary<string, string?>? Environment = null,
     IReadOnlyList<string>? Prefix = null)
 {
+    /// <summary><see cref="ArgumentException.ParamName"/> when a launcher cannot apply one of these settings.</summary>
+    public const string UnsupportedSettingParameter = "launcherSetting";
+
     /// <summary>Builds the process to start: <c>Prefix + (Template | executable) + Arguments</c>.</summary>
     /// <exception cref="ArgumentException">Empty path, invalid environment variable name, or a template without <c>{exe}</c> or with an unclosed quote.</exception>
     public ProcessLaunch Resolve()

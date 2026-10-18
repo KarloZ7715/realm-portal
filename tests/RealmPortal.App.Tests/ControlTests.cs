@@ -1,6 +1,7 @@
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Dev;
@@ -65,10 +66,48 @@ public class ControlTests
     }
 
     [AvaloniaFact]
-    public void ParchmentGhostButtonUsesTheTealRing()
+    public void LeatherSurfaceKeepsLeatherPlatesAndFocusRing()
     {
-        var button = Host(new Button { Content = "Label", Classes = { "ghost", "parchment" } });
-        Assert.Equal("focus-ring-parchment", Source(button, "Ring"));
+        var primary = Host(new Button { Content = "Save" });
+        Assert.Equal("button-primary-normal", Source(primary, "Plate"));
+        Assert.Equal("focus-ring-leather", Source(primary, "Ring"));
+        ButtonSurface.SetSurface(primary, ButtonSurfaceKind.Leather);
+        Screenshots.Settle();
+        Assert.Equal("button-primary-normal", Source(primary, "Plate"));
+        var secondary = Host(new Button { Content = "Cancel", Classes = { "secondary" } });
+        Assert.Equal("button-secondary-normal", Source(secondary, "Plate"));
+        var text = Host(new Button { Content = "Label", Classes = { "ghost" } });
+        Assert.False(text.GetVisualDescendants().OfType<NineSlice>().First(n => n.Name == "Plate").IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void ParchmentSurfaceUsesDarkBronzePlatesAndParchmentFocusRing()
+    {
+        var primary = Host(new Button { Content = "Discard" });
+        ButtonSurface.SetSurface(primary, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
+        Assert.Equal("button-primary-parchment-normal", Source(primary, "Plate"));
+        Assert.Equal("focus-ring-parchment", Source(primary, "Ring"));
+        var secondary = Host(new Button { Content = "Cancel", Classes = { "secondary" } });
+        ButtonSurface.SetSurface(secondary, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
+        Assert.Equal("button-secondary-parchment-normal", Source(secondary, "Plate"));
+        Assert.Equal("focus-ring-parchment", Source(secondary, "Ring"));
+        var text = Host(new Button { Content = "Label", Classes = { "ghost" } });
+        ButtonSurface.SetSurface(text, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
+        Assert.Equal("ghost-parchment-normal", Source(text, "Plate"));
+        Assert.Equal("focus-ring-parchment", Source(text, "Ring"));
+    }
+
+    [AvaloniaFact]
+    public void ThreadStitchDividerMatchesTheDesignerSpec()
+    {
+        var line = Host(new Avalonia.Controls.Shapes.Line { Classes = { "stitch" }, StartPoint = new(0, 0), EndPoint = new(200, 0) });
+        Assert.Equal(1.5, line.StrokeThickness);
+        Assert.Equal(new[] { 6d, 4d }, line.StrokeDashArray);
+        var stroke = Assert.IsType<SolidColorBrush>(line.Stroke);
+        Assert.Equal(Color.Parse("#8A6C4A"), stroke.Color);
     }
 
     [AvaloniaFact]
@@ -143,7 +182,9 @@ public class ControlTests
     [InlineData(":pointerover :pressed", "ghost-parchment-pressed")]
     public void ParchmentGhostAlwaysHasItsOutlinePlate(string states, string expected)
     {
-        var button = Host(new Button { Content = "Label", Classes = { "ghost", "parchment" } });
+        var button = Host(new Button { Content = "Label", Classes = { "ghost" } });
+        ButtonSurface.SetSurface(button, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
         ForceState.SetStates(button, states);
         Screenshots.Settle();
         Assert.Equal(expected, Source(button, "Plate"));
@@ -175,6 +216,86 @@ public class ControlTests
     {
         var split = Host(new SplitButton { Content = "Play", Width = 200, Classes = { "secondary" } });
         Assert.Equal("secondary", split.GetVisualDescendants().OfType<SplitPlate>().Single().Variant);
+    }
+
+    [AvaloniaFact]
+    public void ParchmentSplitButtonUsesParchmentPlateAndFocusRing()
+    {
+        var split = Host(new SplitButton { Content = "Play", Width = 200 });
+        ButtonSurface.SetSurface(split, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
+        Assert.Equal("primary-parchment", split.GetVisualDescendants().OfType<SplitPlate>().Single().Variant);
+        Assert.Equal("focus-ring-parchment", Source(split, "Ring"));
+    }
+
+    [AvaloniaFact]
+    public void PrimaryRedLabelUsesWhiteAndClearsContrast()
+    {
+        var split = new SplitButton { Content = "Play", Width = 200 };
+        Host(new ListBox { Classes = { "cards" }, Width = 420, Height = 140, Items = { split } });
+        AssertLabelContrast(split, "WaxColor");
+
+        split.IsEnabled = false;
+        Screenshots.Settle();
+        AssertLabelContrast(split, "Leather800Color");
+
+        var button = Host(new Button { Content = "Play" });
+        ButtonSurface.SetSurface(button, ButtonSurfaceKind.Parchment);
+        Screenshots.Settle();
+        AssertLabelContrast(button, "WaxColor");
+        button.IsEnabled = false;
+        Screenshots.Settle();
+        AssertLabelContrast(button, "Leather800Color");
+    }
+
+    private static void AssertLabelContrast(Control control, string backgroundToken)
+    {
+        var label = control.GetVisualDescendants().OfType<TextBlock>().First(block => block.Text == "Play");
+        var foreground = Assert.IsType<SolidColorBrush>(label.Foreground).Color;
+        Assert.Equal(Res.Get<Color>("WhiteColor"), foreground);
+        var ratio = Contrast(foreground, Res.Get<Color>(backgroundToken));
+        Assert.True(ratio >= 4.5, $"{backgroundToken} contrast {ratio:0.00} is below 4.5:1");
+    }
+
+    private static double Contrast(Color foreground, Color background)
+    {
+        var lighter = Math.Max(Luminance(foreground), Luminance(background));
+        var darker = Math.Min(Luminance(foreground), Luminance(background));
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static double Luminance(Color color)
+    {
+        static double Channel(byte component)
+        {
+            var value = component / 255d;
+            return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * Channel(color.R) + 0.7152 * Channel(color.G) + 0.0722 * Channel(color.B);
+    }
+
+    [AvaloniaFact]
+    public void SecondaryButtonInsideCardGetsParchmentSurface()
+    {
+        var button = new Button { Content = "Test", Classes = { "secondary" } };
+        var card = Host(new ContentControl { Classes = { "card" }, Content = button, Width = 300, Height = 80 });
+        Screenshots.Settle();
+        Assert.Equal(ButtonSurfaceKind.Parchment, ButtonSurface.GetSurface(button));
+        Assert.Equal("button-secondary-parchment-normal", Source(button, "Plate"));
+    }
+
+    [AvaloniaFact]
+    public void ParchmentSurfaceInheritsFromParentToDescendantButtons()
+    {
+        var button = new Button { Content = "Test", Classes = { "secondary" } };
+        var card = new ContentControl { Classes = { "card" }, Content = button, Width = 300, Height = 80 };
+        ButtonSurface.SetSurface(card, ButtonSurfaceKind.Parchment);
+        Host(card);
+        Screenshots.Settle();
+        Assert.Equal(ButtonSurfaceKind.Parchment, ButtonSurface.GetSurface(button));
+        Assert.Contains("surface-parchment", button.Classes);
+        Assert.Equal("button-secondary-parchment-normal", Source(button, "Plate"));
     }
 
     [AvaloniaFact]
