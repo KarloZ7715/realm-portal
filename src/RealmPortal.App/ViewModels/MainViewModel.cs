@@ -17,7 +17,7 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null)
     {
         Backend = backend ?? new DemoBackend();
-        Servers = new ServersViewModel(Backend, autoTick);
+        Servers = new ServersViewModel(Backend, autoTick: autoTick);
         Clients = new ClientsViewModel(Backend);
         Settings = new SettingsViewModel(settings ?? new DemoSettingsStore(), () => "/home/demo/.local/share/RealmPortal/backups-2");
         Settings.BackRequested += () => SectionIndex = 0;

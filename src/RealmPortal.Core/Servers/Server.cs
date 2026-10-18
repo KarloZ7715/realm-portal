@@ -8,6 +8,7 @@ namespace RealmPortal.Core.Servers;
 /// <param name="Realmlist">Full realmlist text: lines separated and terminated by <c>\r\n</c>, including extra lines such as <c>set patchlist</c>.</param>
 /// <param name="RequiredClientBuild">Client build number the server needs (for example <c>12340</c>), or <c>null</c> when any client works. Compared with <c>ClientVersion.Build</c>.</param>
 /// <param name="Account">Remembered account name (never a password), or <c>null</c>.</param>
+/// <param name="ClientId">Preferred client id when the server was added; <c>null</c> when none.</param>
 public sealed record Server(
     string Id,
     string Name,
@@ -15,7 +16,8 @@ public sealed record Server(
     string Realm,
     string Realmlist,
     int? RequiredClientBuild,
-    string? Account)
+    string? Account,
+    string? ClientId = null)
 {
     public const int MaxNameLength = 64;
     public const int MaxRealmLength = 64;
@@ -32,7 +34,8 @@ public sealed record Server(
         IEnumerable<string>? extraRealmlistLines = null,
         int? requiredClientBuild = null,
         string? account = null,
-        string? id = null)
+        string? id = null,
+        string? clientId = null)
     {
         name = name?.Trim() ?? "";
         if (name.Length == 0 || name.Length > MaxNameLength || HasForbiddenMetadataCharacters(name))
@@ -57,7 +60,7 @@ public sealed record Server(
         if (id.Length != 32 || id.Any(c => !(c is >= '0' and <= '9' or >= 'a' and <= 'f')))
             throw new ArgumentException("Id must be exactly 32 lowercase hexadecimal characters.", nameof(id));
 
-        return new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account);
+        return new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account, clientId);
     }
 
     private static bool HasForbiddenMetadataCharacters(string value) =>

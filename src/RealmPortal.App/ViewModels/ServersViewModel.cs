@@ -5,6 +5,8 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.Core.Service;
+using StepState = RealmPortal.App.Controls.StepState;
 
 namespace RealmPortal.App.ViewModels;
 
@@ -29,6 +31,8 @@ public sealed partial class ServersViewModel : ViewModelBase
     private static readonly int[] OpenProgress = [25, 60, 100];
 
     private readonly DemoBackend _backend;
+    private readonly IPortalService? _portal;
+    private readonly string? _portalClientId;
     private readonly List<ServerItemViewModel> _all = [];
     private readonly DispatcherTimer? _toastTimer;
     private ServerItemViewModel? _target;
@@ -36,9 +40,11 @@ public sealed partial class ServersViewModel : ViewModelBase
     private ServerItemViewModel? _undoFrom;
     private TimeSpan _toastElapsed;
 
-    public ServersViewModel(DemoBackend backend, bool autoTick = true)
+    public ServersViewModel(DemoBackend backend, IPortalService? portal = null, string? portalClientId = null, bool autoTick = true)
     {
         _backend = backend;
+        _portal = portal;
+        _portalClientId = portalClientId;
         var order = 0;
         foreach (var seed in DemoData.Servers)
         {
@@ -171,8 +177,21 @@ public sealed partial class ServersViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void Undo()
+    private async Task UndoAsync()
     {
+        if (_portal is not null && _portalClientId is not null)
+        {
+            var result = await Task.Run(() => _portal.Undo()).ConfigureAwait(true);
+            if (!result.Succeeded)
+            {
+                return;
+            }
+
+            HideToast();
+            Refresh();
+            return;
+        }
+
         if (_undoFrom is null || _undoTo is null)
         {
             return;

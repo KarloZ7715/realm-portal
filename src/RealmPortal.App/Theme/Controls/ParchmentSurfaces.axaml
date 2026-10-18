@@ -1,0 +1,12 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls">
+  <!-- Secondary actions on parchment sheets (card panels): WCAG 1.4.11 bronze border + parchment focus ring. -->
+  <Style Selector="ContentControl.card Button.secondary">
+    <Setter Property="c:ButtonSurface.Surface" Value="Parchment"/>
+  </Style>
+  <!-- Server card Play ▾ (Figma 18:1727); applies when stacked on play-menu / servers list. -->
+  <Style Selector="ListBox.cards SplitButton">
+    <Setter Property="c:ButtonSurface.Surface" Value="Parchment"/>
+  </Style>
+</Styles>
