@@ -143,6 +143,9 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     public UndoResult Undo(string installationId, string clientRoot, string? backupId = null, bool markUndone = true, InstallationLock? installationLock = null)
     {
+        if (installationLock is not null && !string.Equals(installationId, installationLock.InstallationId, StringComparison.Ordinal))
+            throw new ArgumentException("The installation lock does not match the installation.", nameof(installationLock));
+
         RequireValidIds(installationId, "-");
         ArgumentException.ThrowIfNullOrWhiteSpace(clientRoot);
         var trustedRoot = ClientPaths.CanonicalRoot(clientRoot);
