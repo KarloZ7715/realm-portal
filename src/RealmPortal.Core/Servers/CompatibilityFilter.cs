@@ -1,4 +1,5 @@
 using RealmPortal.Core.Clients;
+using RealmPortal.Core.Service;
 
 namespace RealmPortal.Core.Servers;
 
@@ -11,6 +12,16 @@ public static class CompatibilityFilter
     /// (an unknown client version cannot be verified, so it is not compatible).
     /// </summary>
     public static bool IsCompatible(Server server, ClientVersion? client)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        return server.RequiredClientBuild is not { } required || client?.Build == required;
+    }
+
+    /// <summary>
+    /// Same rule as <see cref="IsCompatible(Server, ClientVersion?)"/> for a <see cref="ServerEntry"/>,
+    /// which carries <see cref="ServerEntry.RequiredClientBuild"/> but is not a <see cref="Server"/>.
+    /// </summary>
+    public static bool IsCompatible(ServerEntry server, ClientVersion? client)
     {
         ArgumentNullException.ThrowIfNull(server);
         return server.RequiredClientBuild is not { } required || client?.Build == required;

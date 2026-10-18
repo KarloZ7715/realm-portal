@@ -2211,6 +2211,214 @@
    "mode": "stretch",
    "svg": true,
    "note": "thumb, 16 px circle. Disabled: 50 % opacity."
+  },
+  "button-primary-parchment-normal": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-parchment-hover": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-parchment-pressed": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-parchment-disabled": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-parchment-normal": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-parchment-hover": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-parchment-pressed": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-parchment-disabled": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
   }
  }
 }

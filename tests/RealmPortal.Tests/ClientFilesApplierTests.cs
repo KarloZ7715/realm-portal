@@ -410,7 +410,7 @@ public class ClientFilesApplierTests
         var plan = env.Plan();
         var evil = plan with { Edits = [plan.Edits[0] with { RelativePath = "../outside.txt" }] };
 
-        Assert.Equal(ClientFilesErrorCode.PathNotFound, Assert.Throws<ClientFilesException>(() => env.Applier.Apply(evil)).Code);
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, Assert.Throws<ClientFilesException>(() => env.Applier.Apply(evil)).Code);
         Assert.Throws<ArgumentException>(() => env.Applier.Apply(plan with { InstallationId = "../x" }));
         Assert.Throws<ArgumentException>(() => env.Applier.Undo("..", env.Client));
     }
