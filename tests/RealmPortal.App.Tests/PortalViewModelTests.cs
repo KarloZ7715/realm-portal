@@ -270,6 +270,28 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task PortalTest_AddressChangedWhileProbeIsInFlight_DropsTheOldResult()
+    {
+        using var env = new Env();
+        var probe = new FakeProbe(ProbeResult.Ok, wait: true);
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { }, probe);
+        add.Address = "old.example.org";
+        var run = add.TestCommand.ExecuteAsync(null);
+        Assert.Equal(ConnectionTest.Testing, add.TestState);
+        Assert.Equal(1, probe.Calls);
+        Assert.Equal("old.example.org", probe.Host);
+
+        add.Address = "new.example.org";
+        probe.Release();
+        await run;
+
+        Assert.Equal("new.example.org", add.Address);
+        Assert.Equal(ConnectionTest.None, add.TestState);
+        Assert.False(add.HasResult);
+        Assert.Equal(string.Empty, add.ResultText);
+    }
+
+    [AvaloniaFact]
     public void PortalSave_FailureShowsSaveErrorWithoutAFailedConnectionTest()
     {
         using var env = new Env();

@@ -178,7 +178,15 @@ public sealed partial class AddServerViewModel : ViewModelBase
         if (_session is not null)
         {
             TestState = ConnectionTest.Testing;
+            var testedAddress = Address;
             var result = await _probe!.ProbeAsync(host, port, ConnectionProbeTimeout, CancellationToken.None).ConfigureAwait(true);
+            // The field may have moved on while the probe was in flight. Do not paint the old host's result on the new address.
+            if (Address != testedAddress)
+            {
+                TestState = ConnectionTest.None;
+                return;
+            }
+
             TestState = result switch
             {
                 ProbeResult.Ok => ConnectionTest.Ok,
