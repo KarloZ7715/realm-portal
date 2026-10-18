@@ -20,13 +20,13 @@ public sealed class CliApp(
     public const string ClientDirVariable = "REALM_PORTAL_CLIENT_DIR";
 
     private static readonly HashSet<string> ValueOptions =
-        ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper"];
+        ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper", "--name", "--path", "--host", "--client"];
 
     private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose"];
 
     private bool _verbose;
 
-    public static readonly string[] Commands = ["add", "remove", "list", "switch", "undo", "status", "launch"];
+    public static readonly string[] Commands = ["add", "remove", "list", "switch", "undo", "status", "launch", "client", "edit"];
 
     public const string Usage = """
         Usage:
@@ -39,6 +39,11 @@ public sealed class CliApp(
           realm-portal undo
           realm-portal status
           realm-portal launch [<server>] [--force] [--dry-run] [--wrapper <command>]
+          realm-portal client list
+          realm-portal client add <path> [--name <name>]
+          realm-portal client edit <client> [--name <name>] [--path <path>]
+          realm-portal client remove <client>
+          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n>] [--account <name>] [--client <client|none>]
 
         Global options (before or after the command):
           --verbose               print detailed error messages (paths, parse errors)
@@ -95,6 +100,8 @@ public sealed class CliApp(
                 "undo" => Undo(parsed, service),
                 "status" => Status(parsed, service, clientId, clientDir),
                 "launch" => Launch(parsed, service, clientId, clientDir, parsed.Flags.Contains("--dry-run")),
+                "client" => ClientCommand(parsed, service),
+                "edit" => EditServer(parsed, service),
                 _ => throw new UsageException($"unknown command '{command}'"),
             };
         }
@@ -222,6 +229,122 @@ public sealed class CliApp(
         if (!result.Succeeded)
             return Fail(result.Error!);
         SafeWriteLine(output, $"Removed '{server.Name}'");
+        return 0;
+    }
+
+    private int EditServer(Parsed parsed, PortalService service)
+    {
+        Expect(parsed, 1, 1, "<server>");
+        if (FindServer(service, parsed.Positionals[0], out var server) != 0)
+            return 2;
+
+        int? build = server.RequiredClientBuild;
+        if (parsed.Get("--build") is { } text)
+        {
+            if (!int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsedBuild) || parsedBuild <= 0)
+                throw new UsageException($"--build must be a positive integer, got '{text}'");
+            build = parsedBuild;
+        }
+
+        var clientId = server.ClientId;
+        if (parsed.Get("--client") is { } clientSelector)
+        {
+            if (clientSelector.Equals("none", StringComparison.OrdinalIgnoreCase))
+                clientId = null;
+            else if (FindClient(service, clientSelector, out var selected) != 0)
+                return 2;
+            else
+                clientId = selected.Id;
+        }
+
+        var extraLines = server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+        var result = service.UpdateServer(new UpdateServerRequest(
+            server.Id,
+            parsed.Get("--name") ?? server.Name,
+            parsed.Get("--host") ?? server.Host,
+            parsed.Get("--realm") ?? server.Realm,
+            RequiredClientBuild: build,
+            Account: parsed.Options.ContainsKey("--account") ? parsed.Get("--account") : server.Account,
+            ClientId: clientId,
+            ExtraRealmlistLines: extraLines));
+        if (!result.Succeeded)
+            return Fail(result.Error!);
+        SafeWriteLine(output, $"Updated '{server.Name}' to '{result.Value!.Name}' ({result.Value.Id})");
+        return 0;
+    }
+
+    private int ClientCommand(Parsed parsed, PortalService service)
+    {
+        if (parsed.Positionals.Count == 0)
+            throw new UsageException("client requires list, add, edit, or remove");
+        var action = parsed.Positionals[0];
+        var selectorArgs = parsed.Positionals.Skip(1).ToList();
+        switch (action)
+        {
+            case "list":
+                Expect(parsed, 1, 1, "list");
+                var listed = service.ListClients();
+                if (!listed.Succeeded)
+                    return Fail(listed.Error!);
+                if (listed.Value!.Count == 0)
+                    SafeWriteLine(output, "No clients.");
+                foreach (var entry in listed.Value)
+                    SafeWriteLine(output, $"{entry.Id}  {entry.Name}  {entry.Path}  origin={entry.Origin.ToString().ToLowerInvariant()}");
+                return 0;
+            case "add":
+                Expect(parsed, 2, 2, "add <path>");
+                var added = service.AddClient(selectorArgs[0], parsed.Get("--name"));
+                if (!added.Succeeded)
+                    return Fail(added.Error!);
+                SafeWriteLine(output, $"Added client '{added.Value!.Name}' ({added.Value.Id})");
+                return 0;
+            case "edit":
+                Expect(parsed, 2, 2, "edit <client>");
+                if (FindClient(service, selectorArgs[0], out var existing) != 0)
+                    return 2;
+                var update = service.UpdateClient(new UpdateClientRequest(
+                    existing.Id,
+                    parsed.Options.ContainsKey("--name") ? parsed.Get("--name") : existing.Name,
+                    parsed.Get("--path")));
+                if (!update.Succeeded)
+                    return Fail(update.Error!);
+                SafeWriteLine(output, $"Updated client '{update.Value!.Name}' ({update.Value.Id})");
+                return 0;
+            case "remove":
+                Expect(parsed, 2, 2, "remove <client>");
+                if (FindClient(service, selectorArgs[0], out var client) != 0)
+                    return 2;
+                var removed = service.RemoveClient(client.Id);
+                if (!removed.Succeeded)
+                    return Fail(removed.Error!);
+                SafeWriteLine(output, $"Removed client '{client.Name}'");
+                return 0;
+            default:
+                throw new UsageException($"unknown client command '{action}'");
+        }
+    }
+
+    private int FindClient(PortalService service, string selector, out ClientEntry client)
+    {
+        client = null!;
+        var listed = service.ListClients();
+        if (!listed.Succeeded)
+            return Fail(listed.Error!);
+        var clients = listed.Value!;
+        client = clients.FirstOrDefault(c => c.Id == selector
+            || string.Equals(c.Name, selector, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(c.Path, selector, StringComparison.OrdinalIgnoreCase))!;
+        if (client is null && selector.Length > 0)
+        {
+            var matches = clients.Where(c => c.Id.StartsWith(selector, StringComparison.Ordinal)).Take(2).ToList();
+            if (matches.Count == 1)
+                client = matches[0];
+        }
+        if (client is null)
+        {
+            SafeWriteLine(error, $"error: no client matches '{selector}'.");
+            return 2;
+        }
         return 0;
     }
 

@@ -125,6 +125,7 @@ internal static class ServiceErrors
 
         var field = ex.ParamName switch
         {
+            "name" when ex.Message.Contains("Client name", StringComparison.Ordinal) => "name",
             nameof(NewServer.Name) or "name" => "name",
             nameof(NewServer.Host) or "host" => "host",
             nameof(NewServer.Realm) or "realm" => "realm",
@@ -133,7 +134,8 @@ internal static class ServiceErrors
             _ => null,
         };
         if (field is not null)
-            return new(ServiceErrorCode.InvalidServerInput, Field: field, Consistency: consistency, Diagnostic: UserFacingMessages.Sanitize(ex.Message));
+            return new(ex.Message.Contains("Client name", StringComparison.Ordinal) ? ServiceErrorCode.InvalidClientInput : ServiceErrorCode.InvalidServerInput,
+                Field: field, Consistency: consistency, Diagnostic: UserFacingMessages.Sanitize(ex.Message));
 
         return new(ServiceErrorCode.Unexpected, Consistency: consistency, Diagnostic: UserFacingMessages.Sanitize(ex.Message));
     }
