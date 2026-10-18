@@ -1,3 +1,4 @@
+using RealmPortal.App.Service;
 using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Service;
 
@@ -14,11 +15,21 @@ public static class ErrorText
 
     public static string Body(ClientFilesErrorCode code, string? path = null) => Body(code.ToString(), path);
 
-    public static string Title(ServiceError error) => Title(error.Code.ToString());
+    public static string Title(ServiceError error) =>
+        PlayServiceResults.SwitchWasApplied(error)
+            ? Loc.Get("error.launchfailed.applied.title")
+            : Title(error.Code.ToString());
 
     /// <summary>The body for a service failure, filling the placeholders of that code from <paramref name="error"/>.</summary>
-    public static string Body(ServiceError error) =>
-        error.Code switch
+    public static string Body(ServiceError error)
+    {
+        if (PlayServiceResults.SwitchWasApplied(error))
+        {
+            // Diagnostic is English text for logs only, so it is not shown here.
+            return Loc.Get("error.launchfailed.applied.body");
+        }
+
+        return error.Code switch
         {
             ServiceErrorCode.PermissionDenied or ServiceErrorCode.ReadOnlyFs or ServiceErrorCode.PathNotFound
                 or ServiceErrorCode.PathEscapesClient or ServiceErrorCode.DiskFull or ServiceErrorCode.FileSharingViolation
@@ -39,6 +50,7 @@ public static class ErrorText
                 Body("unexpected", error.Diagnostic),
             _ => Body(error.Code.ToString()),
         };
+    }
 
     public static string Title(string code) => Lookup(code, "title");
 

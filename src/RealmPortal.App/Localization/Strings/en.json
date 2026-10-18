@@ -165,6 +165,8 @@
   "error.invalidlaunchersettings.body": "Fix the launcher settings before playing.",
   "error.launchfailed.title": "Could not start the game",
   "error.launchfailed.body": "The switch succeeded but the game did not start.",
+  "error.launchfailed.applied.title": "The game didn't start",
+  "error.launchfailed.applied.body": "The server was applied and is now active, but the game didn't start. Check the launcher settings and try again.",
   "error.inconsistentstate.title": "Inconsistent state",
   "error.inconsistentstate.body": "Realm Portal could not put everything back. Review the client files.",
   "error.unexpected.title": "Something went wrong",

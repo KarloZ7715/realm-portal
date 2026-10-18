@@ -165,6 +165,8 @@
   "error.invalidlaunchersettings.body": "Corrige los ajustes del lanzador antes de jugar.",
   "error.launchfailed.title": "No se pudo iniciar el juego",
   "error.launchfailed.body": "El cambio de servidor se hizo, pero el juego no arrancó.",
+  "error.launchfailed.applied.title": "El juego no se abrió",
+  "error.launchfailed.applied.body": "El servidor quedó aplicado y activo, pero el juego no se abrió. Revisa los ajustes del lanzador e inténtalo de nuevo.",
   "error.inconsistentstate.title": "Estado inconsistente",
   "error.inconsistentstate.body": "Realm Portal no pudo dejar todo como estaba. Revisa los archivos del cliente.",
   "error.unexpected.title": "Algo salió mal",

@@ -43,6 +43,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     private bool _repairRun;
     private bool _undoConflict;
     private string? _errorBanner;
+    private ServiceError? _bannerError;
 
     public ServersViewModel(DemoBackend backend, bool autoTick = true)
     {
@@ -143,7 +144,9 @@ public sealed partial class ServersViewModel : ViewModelBase
         };
 
     public string BannerHeader => _errorBanner is not null
-        ? Loc.Get("error.banner.title")
+        ? _bannerError is { } error && PlayServiceResults.SwitchWasApplied(error)
+            ? ErrorText.Title(error)
+            : Loc.Get("error.banner.title")
         : Phase switch
         {
             ServersPhase.Switching when _repairRun => Loc.Format("repair.title", _target?.Name),
@@ -211,6 +214,7 @@ public sealed partial class ServersViewModel : ViewModelBase
                     if (result.Error!.Code == ServiceErrorCode.UndoConflict)
                     {
                         _undoConflict = true;
+                        _bannerError = null;
                         _errorBanner = ErrorText.Body(result.Error);
                         ShowToast();
                         Refresh();
@@ -224,6 +228,7 @@ public sealed partial class ServersViewModel : ViewModelBase
                 }
 
                 _undoConflict = false;
+                _bannerError = null;
                 _errorBanner = null;
                 HideToast();
                 ReloadFromService();
@@ -267,6 +272,7 @@ public sealed partial class ServersViewModel : ViewModelBase
             }
 
             _undoConflict = false;
+            _bannerError = null;
             _errorBanner = null;
             HideToast();
             ReloadFromService();
@@ -386,6 +392,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         }
 
         HideToast();
+        _bannerError = null;
         _errorBanner = null;
         _repairRun = target.NeedsRepair;
         _target = target;
@@ -402,6 +409,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         Phase = play ? ServersPhase.Opening : ServersPhase.Switching;
         Refresh();
 
+        // Progress<T> is created on the UI thread before Task.Run, so callbacks are posted to its SynchronizationContext.
         var progress = new Progress<ServiceProgress>(p =>
         {
             Dispatcher.UIThread.Post(() =>
@@ -584,6 +592,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     private void SetError(ServiceError? error, string? message = null)
     {
+        _bannerError = message is null ? error : null;
         _errorBanner = message ?? (error is null ? Loc.Get("error.unknown.body") : ErrorText.Body(error));
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
