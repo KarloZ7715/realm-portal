@@ -238,6 +238,21 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task Play_Success_ShowsRunningOverlayOnReloadedCard()
+    {
+        using var env = new Env();
+        var server = env.AddServer("Play", "play.example.org");
+        env.Main.Servers.ReloadFromService();
+        var stale = env.Main.Servers.All.First(x => x.ServerId == server.Id);
+        await env.Main.Servers.PlayAsync(stale);
+
+        var card = env.Main.Servers.All.Single(x => x.ServerId == server.Id);
+        Assert.NotSame(stale, card);
+        Assert.Equal(ServerOverlay.Running, card.Overlay);
+        Assert.Equal(1, env.Launch.Launches);
+    }
+
+    [AvaloniaFact]
     public void Settings_PersistsLanguageOnlyAfterLauncherAndStorageSucceed()
     {
         using var env = new Env();

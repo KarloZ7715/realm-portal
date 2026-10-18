@@ -476,10 +476,13 @@ public sealed partial class ServersViewModel : ViewModelBase
             return;
         }
 
-        target.Overlay = ServerOverlay.Running;
         GameClosed = false;
         Phase = ServersPhase.Running;
+        // Reload replaces every card. The running badge has to land on the new instance.
         ReloadFromService();
+        target = ResolveCard(target);
+        _target = target;
+        target.Overlay = ServerOverlay.Running;
         _ = WatchGamePortalAsync(clientId);
     }
 
