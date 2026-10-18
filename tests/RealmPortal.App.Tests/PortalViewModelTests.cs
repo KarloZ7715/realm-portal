@@ -33,6 +33,29 @@ public class PortalViewModelTests
 
     /// <summary>Play's file apply checks the probe once. Later checks (the running watch) fail.</summary>
     /// <summary>Returns a fixed probe result and never opens a socket.</summary>
+    private sealed class LateProbe : IConnectionProbe
+    {
+        private readonly TaskCompletionSource<ProbeResult> _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int Calls { get; private set; }
+
+        public CancellationToken Token { get; private set; }
+
+        public bool SawCancellation { get; private set; }
+
+        public async Task<ProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            Calls++;
+            Token = cancellationToken;
+            cancellationToken.Register(() => SawCancellation = true);
+            var result = await _gate.Task.ConfigureAwait(false);
+            SawCancellation = cancellationToken.IsCancellationRequested;
+            return result;
+        }
+
+        public void Release(ProbeResult result = ProbeResult.Ok) => _gate.TrySetResult(result);
+    }
+
     private sealed class FakeProbe : IConnectionProbe
     {
         private readonly ProbeResult _result;
@@ -336,6 +359,70 @@ public class PortalViewModelTests
         {
             Loc.Instance.SetLanguage(Language.En);
         }
+    }
+
+    [AvaloniaFact]
+    public async Task PortalTest_ClosingTheForm_IgnoresALateProbeResultAndCancelsIt()
+    {
+        using var env = new Env();
+        var probe = new LateProbe();
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { }, probe);
+        add.Address = "logon.example.org";
+        var run = add.TestCommand.ExecuteAsync(null);
+        Assert.Equal(ConnectionTest.Testing, add.TestState);
+        Assert.Equal(1, probe.Calls);
+
+        add.CancelCommand.Execute(null);
+        Assert.True(probe.SawCancellation);
+        var stateWhenClosed = add.TestState;
+
+        probe.Release(ProbeResult.Ok);
+        await run;
+        Assert.Equal(stateWhenClosed, add.TestState);
+        Assert.Equal(ConnectionTest.Testing, add.TestState);
+    }
+
+    [AvaloniaFact]
+    public async Task PortalTest_LeavingTheSection_CancelsTheProbeAndDropsTheLateResult()
+    {
+        using var env = new Env();
+        var probe = new LateProbe();
+        var main = new MainViewModel(env.Session, () => Task.FromResult<string?>(env.Client), autoTick: false, probe);
+        main.Servers.RequestAddServerCommand.Execute(null);
+        var add = main.Adding!;
+        add.Address = "logon.example.org";
+        var run = add.TestCommand.ExecuteAsync(null);
+        Assert.Equal(ConnectionTest.Testing, add.TestState);
+
+        main.SectionIndex = 1;
+        Assert.Null(main.Adding);
+        Assert.True(probe.SawCancellation);
+
+        probe.Release(ProbeResult.Ok);
+        await run;
+        Assert.Equal(ConnectionTest.Testing, add.TestState);
+    }
+
+    [AvaloniaFact]
+    public async Task PortalTest_SuccessfulSave_CancelsTheProbeAndDropsTheLateResult()
+    {
+        using var env = new Env();
+        var probe = new LateProbe();
+        var saved = false;
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => saved = true, () => { }, probe);
+        add.Name = "Fresh Realm";
+        add.Address = "fresh.example.org";
+        add.SelectedClient = env.Main.Clients.Items[0];
+        var run = add.TestCommand.ExecuteAsync(null);
+        Assert.Equal(ConnectionTest.Testing, add.TestState);
+
+        add.SaveCommand.Execute(null);
+        Assert.True(saved);
+        Assert.True(probe.SawCancellation);
+
+        probe.Release(ProbeResult.Failed);
+        await run;
+        Assert.Equal(ConnectionTest.Testing, add.TestState);
     }
 
     [AvaloniaFact]

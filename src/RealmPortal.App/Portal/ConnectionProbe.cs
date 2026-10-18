@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Sockets;
 
 namespace RealmPortal.App.Portal;
@@ -17,22 +18,32 @@ public interface IConnectionProbe
 }
 
 /// <summary>
-/// Connects with <see cref="TcpClient.ConnectAsync(string, int, CancellationToken)"/> and closes the socket.
-/// A DNS failure or a refused connection is <see cref="ProbeResult.Failed"/>. The timeout is a cancelled token.
+/// Resolves <paramref name="host"/> and connects to each address until one accepts a TCP connection, then closes it.
+/// DNS and the connects share one timeout. A resolver that ignores cancellation still ends as <see cref="ProbeResult.TimedOut"/>.
+/// A DNS failure or a refused connection is <see cref="ProbeResult.Failed"/>.
 /// </summary>
 public sealed class TcpConnectionProbe : IConnectionProbe
 {
+    private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolve;
+
+    public TcpConnectionProbe(Func<string, CancellationToken, Task<IPAddress[]>>? resolve = null)
+    {
+        _resolve = resolve ?? ((host, token) => Dns.GetHostAddressesAsync(host, token));
+    }
+
     public async Task<ProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
     {
-        using var client = new TcpClient();
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
+        var operation = ConnectAnyAsync(host, port, timeoutCts.Token);
+        ObserveAbandonedFaults(operation);
         try
         {
-            await client.ConnectAsync(host, port, timeoutCts.Token).ConfigureAwait(false);
-            // Connect only: close immediately. Send nothing and download nothing.
-            client.Close();
-            return ProbeResult.Ok;
+            return await operation.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return ProbeResult.TimedOut;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -50,5 +61,66 @@ public sealed class TcpConnectionProbe : IConnectionProbe
         {
             return ProbeResult.Failed;
         }
+    }
+
+    private async Task<ProbeResult> ConnectAnyAsync(string host, int port, CancellationToken token)
+    {
+        IPAddress[] addresses;
+        try
+        {
+            addresses = await _resolve(host, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (SocketException)
+        {
+            return ProbeResult.Failed;
+        }
+
+        if (addresses is null || addresses.Length == 0)
+        {
+            return ProbeResult.Failed;
+        }
+
+        foreach (var address in addresses)
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                using var client = new TcpClient(address.AddressFamily);
+                await client.ConnectAsync(address, port, token).ConfigureAwait(false);
+                client.Close();
+                return ProbeResult.Ok;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (SocketException) when (token.IsCancellationRequested)
+            {
+                throw new OperationCanceledException("The connection check timed out.", token);
+            }
+            catch (SocketException)
+            {
+                // Refused or unreachable. Try the next resolved address.
+            }
+        }
+
+        return ProbeResult.Failed;
+    }
+
+    /// <summary>
+    /// <see cref="Task.WaitAsync(TimeSpan, CancellationToken)"/> can return while <paramref name="operation"/> is still running
+    /// (a resolver that ignores cancellation). Observe a later fault so it does not surface as unobserved.
+    /// </summary>
+    private static void ObserveAbandonedFaults(Task operation)
+    {
+        _ = operation.ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 }

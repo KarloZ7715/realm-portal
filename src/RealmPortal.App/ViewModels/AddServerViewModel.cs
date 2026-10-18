@@ -32,6 +32,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private readonly Action<ServerSeed>? _saveDemo;
     private readonly Action? _savePortal;
     private readonly Action _cancel;
+    private CancellationTokenSource? _probeCts;
+    private int _probeGeneration;
+    private bool _formClosed;
 
     public AddServerViewModel(ClientsViewModel clients, DemoBackend backend, Action<ServerSeed> save, Action cancel)
     {
@@ -169,10 +172,43 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
         if (_session is not null)
         {
+            if (_formClosed)
+            {
+                return;
+            }
+
+            // A new test replaces any in-flight one. The old completion must not write TestState.
+            CancelInFlightProbe();
+            var generation = ++_probeGeneration;
+            var cts = new CancellationTokenSource();
+            _probeCts = cts;
             TestState = ConnectionTest.Testing;
             var testedAddress = Address;
-            // TryParseHostAddress keeps the brackets on an IPv6 literal ("[::1]"). The probe resolves a host, not that token.
-            var result = await _probe!.ProbeAsync(HostForProbe(host), port, ConnectionProbeTimeout, CancellationToken.None).ConfigureAwait(true);
+            ProbeResult result;
+            try
+            {
+                // TryParseHostAddress keeps the brackets on an IPv6 literal ("[::1]"). The probe resolves a host, not that token.
+                result = await _probe!.ProbeAsync(HostForProbe(host), port, ConnectionProbeTimeout, cts.Token).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            finally
+            {
+                if (ReferenceEquals(_probeCts, cts))
+                {
+                    _probeCts = null;
+                    cts.Dispose();
+                }
+            }
+
+            // Closed, cancelled, or superseded while the probe was in flight: leave TestState as it is.
+            if (_formClosed || cts.IsCancellationRequested || generation != _probeGeneration)
+            {
+                return;
+            }
+
             // The field may have moved on while the probe was in flight. Do not paint the old host's result on the new address.
             if (Address != testedAddress)
             {
@@ -191,6 +227,11 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
         TestState = ConnectionTest.Testing;
         await _backend!.DelayAsync(TimeSpan.FromMilliseconds(900)).ConfigureAwait(true);
+        if (_formClosed)
+        {
+            return;
+        }
+
         var answers = !host.Contains("offline", StringComparison.OrdinalIgnoreCase)
                       && !host.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase);
         TestState = answers ? ConnectionTest.Ok : ConnectionTest.Failed;
@@ -229,15 +270,51 @@ public sealed partial class AddServerViewModel : ViewModelBase
                 return;
             }
 
+            OnFormClosed();
             _savePortal!();
             return;
         }
 
+        OnFormClosed();
         _saveDemo!(new ServerSeed(Name.Trim(), host, port, SelectedClient.Version, account.Length == 0 ? null : account, IsActive: false, IsCompatible: true));
     }
 
     [RelayCommand]
-    private void Cancel() => _cancel();
+    private void Cancel()
+    {
+        OnFormClosed();
+        _cancel();
+    }
+
+    /// <summary>
+    /// The add-server form was dismissed (Cancel, a successful save, or the shell leaving the form).
+    /// Cancels the in-flight probe so a late result does not change <see cref="TestState"/>.
+    /// </summary>
+    public void OnFormClosed()
+    {
+        _formClosed = true;
+        CancelInFlightProbe();
+    }
+
+    private void CancelInFlightProbe()
+    {
+        var cts = _probeCts;
+        _probeCts = null;
+        if (cts is null)
+        {
+            return;
+        }
+
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        cts.Dispose();
+    }
 
     partial void OnNameChanged(string value) => ClearSaveError();
 

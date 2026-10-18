@@ -165,6 +165,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         _adding.PropertyChanged -= OnSectionChanged;
+        _adding.OnFormClosed();
         _adding = null;
         OnPropertyChanged(nameof(Adding));
         OnPropertyChanged(nameof(Content));
