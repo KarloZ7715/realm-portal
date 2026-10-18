@@ -140,6 +140,34 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
+    public void PortalSave_SaveErrorFollowsLanguageSwitch()
+    {
+        using var env = new Env();
+        env.AddServer("Hand", "hand.example.org");
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+        add.Name = "Hand";
+        add.Address = "other.example.org";
+        add.SelectedClient = env.Main.Clients.Items[0];
+        add.SaveCommand.Execute(null);
+
+        Assert.Equal(Loc.Format("error.servernametaken.body", "Hand"), add.SaveError);
+        var english = add.SaveError;
+
+        Loc.Instance.SetLanguage(Language.Es);
+        try
+        {
+            add.RefreshText();
+            Assert.Equal(Loc.Format("error.servernametaken.body", "Hand"), add.SaveError);
+            Assert.NotEqual(english, add.SaveError);
+            Assert.True(add.HasSaveError);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(Language.En);
+        }
+    }
+
+    [AvaloniaFact]
     public void Reload_UsesEachServersEffectiveClientForVersionAndCompatibility()
     {
         using var env = new Env();

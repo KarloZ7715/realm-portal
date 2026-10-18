@@ -73,10 +73,16 @@ public sealed partial class AddServerViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(TestCommand))]
     private ConnectionTest _testState;
 
+    /// <summary>Service failure from the last save attempt. Text is derived so a language change re-reads it.</summary>
+    private ServiceError? _saveServiceError;
+
+    /// <summary>The last save failed without a <see cref="ServiceError"/> (unknown body).</summary>
+    private bool _saveFailedUnknown;
+
     /// <summary>Localized service failure from the last save attempt. Not a connection-test result.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSaveError))]
-    private string? _saveError;
+    public string? SaveError => _saveServiceError is null
+        ? (_saveFailedUnknown ? Loc.Get("error.unknown.body") : null)
+        : ErrorText.Body(_saveServiceError);
 
     public bool HasSaveError => SaveError is not null;
 
@@ -204,7 +210,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
                 ClientId: clientId));
             if (!result.Succeeded)
             {
-                SaveError = result.Error is { } error ? ErrorText.Body(error) : Loc.Get("error.unknown.body");
+                SetSaveError(result.Error);
                 return;
             }
 
@@ -233,12 +239,25 @@ public sealed partial class AddServerViewModel : ViewModelBase
         }
     }
 
+    private void SetSaveError(ServiceError? error)
+    {
+        _saveServiceError = error;
+        _saveFailedUnknown = error is null;
+        OnPropertyChanged(nameof(SaveError));
+        OnPropertyChanged(nameof(HasSaveError));
+    }
+
     private void ClearSaveError()
     {
-        if (SaveError is not null)
+        if (_saveServiceError is null && !_saveFailedUnknown)
         {
-            SaveError = null;
+            return;
         }
+
+        _saveServiceError = null;
+        _saveFailedUnknown = false;
+        OnPropertyChanged(nameof(SaveError));
+        OnPropertyChanged(nameof(HasSaveError));
     }
 
     [GeneratedRegex(@"^(?<host>[A-Za-z0-9](?:[A-Za-z0-9.\-]*[A-Za-z0-9])?)(?::(?<port>\d{1,5}))?$")]
