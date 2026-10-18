@@ -13,14 +13,14 @@ namespace RealmPortal.App.ViewModels;
 public sealed partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsStore _store;
-    private readonly Func<string?> _pickFolder;
+    private readonly Func<Task<string?>>? _pickFolder;
     private SettingsModel _saved;
     private bool _justSaved;
 
-    public SettingsViewModel(ISettingsStore store, Func<string?>? pickFolder = null)
+    public SettingsViewModel(ISettingsStore store, Func<Task<string?>>? pickFolder = null)
     {
         _store = store;
-        _pickFolder = pickFolder ?? (() => null);
+        _pickFolder = pickFolder;
         _saved = store.Load();
         Reset();
     }
@@ -173,9 +173,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
         && template.Contains("{exe}", StringComparison.Ordinal);
 
     [RelayCommand]
-    private void Browse()
+    private async Task BrowseAsync()
     {
-        if (_pickFolder() is { Length: > 0 } folder)
+        if (_pickFolder is null)
+        {
+            return;
+        }
+
+        var folder = await _pickFolder().ConfigureAwait(true);
+        if (folder is { Length: > 0 })
         {
             BackupFolder = folder;
         }

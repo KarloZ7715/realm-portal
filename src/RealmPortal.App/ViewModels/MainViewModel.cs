@@ -26,7 +26,7 @@ public sealed partial class MainViewModel : ObservableObject
         Clients = new ClientsViewModel(Backend);
         var settingsScreen = new SettingsViewModel(
             settings ?? new DemoSettingsStore(),
-            () => "/home/demo/.local/share/RealmPortal/backups-2");
+            () => Task.FromResult<string?>("/home/demo/.local/share/RealmPortal/backups-2"));
         settingsScreen.ApplySavedLanguage();
         settingsScreen.BackRequested += () => SectionIndex = 0;
         Settings = settingsScreen;
@@ -39,9 +39,7 @@ public sealed partial class MainViewModel : ObservableObject
         _session = session;
         Servers = new ServersViewModel(session, autoTick);
         Clients = new ClientsViewModel(session, pickFolder);
-        var settingsScreen = new SettingsViewModel(
-            new PortalSettingsStore(session),
-            pickFolder is null ? null : () => pickFolder().GetAwaiter().GetResult());
+        var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder);
         settingsScreen.ApplySavedLanguage();
         settingsScreen.BackRequested += () => SectionIndex = 0;
         Settings = settingsScreen;

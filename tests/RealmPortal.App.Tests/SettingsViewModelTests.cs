@@ -52,6 +52,14 @@ public class SettingsViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task Browse_AwaitsTheFolderPicker()
+    {
+        var vm = new SettingsViewModel(new MemoryStore(), () => Task.FromResult<string?>("/tmp/picked-backups"));
+        await vm.BrowseCommand.ExecuteAsync(null);
+        Assert.Equal("/tmp/picked-backups", vm.BackupFolder);
+    }
+
+    [AvaloniaFact]
     public void Save_RejectsEmptyOrMissingExeTemplate()
     {
         var vm = new SettingsViewModel(new MemoryStore());
