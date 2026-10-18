@@ -573,6 +573,8 @@ public sealed partial class ServersViewModel : ViewModelBase
             var running = await Task.Run(() => _session.Service.IsGameRunning(clientId)).ConfigureAwait(true);
             if (!running.Succeeded)
             {
+                // Drop back to Idle so another play or switch can start, and keep the error banner up.
+                Finish();
                 SetError(running.Error);
                 return;
             }

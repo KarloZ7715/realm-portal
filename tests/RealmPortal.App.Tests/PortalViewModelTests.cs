@@ -6,6 +6,7 @@ using RealmPortal.App.Portal;
 using RealmPortal.App.Settings;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.ClientFiles;
+using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
 using RealmPortal.Tests.Support;
@@ -27,11 +28,27 @@ public class PortalViewModelTests
             throw new InvalidOperationException("Injected process start failure.");
     }
 
+    /// <summary>Play's file apply checks the probe once. Later checks (the running watch) fail.</summary>
+    private sealed class FailAfterFirstProbe : IGameProcessProbe
+    {
+        private int _calls;
+
+        public bool IsGameRunning(string clientRoot)
+        {
+            if (Interlocked.Increment(ref _calls) > 1)
+            {
+                throw new InvalidOperationException("Injected process check failure.");
+            }
+
+            return false;
+        }
+    }
+
     private sealed class Env : IDisposable
     {
         private readonly TempDirectory _temp = new();
 
-        public Env(bool throwOnLaunch = false)
+        public Env(bool throwOnLaunch = false, IGameProcessProbe? probe = null)
         {
             Config = _temp.Combine("config");
             Projection = _temp.Combine("projection");
@@ -44,7 +61,17 @@ public class PortalViewModelTests
             Directory.CreateDirectory(Backups);
             Launch = new FakeLaunch();
             IGameLaunchService launch = throwOnLaunch ? new ThrowingLaunch() : Launch;
-            Session = PortalSession.CreateForPaths(Config, Projection, Backups, launch);
+            if (probe is null)
+            {
+                Session = PortalSession.CreateForPaths(Config, Projection, Backups, launch);
+            }
+            else
+            {
+                var getVariable = (string name) =>
+                    name == ClientFilesApplier.BackupDirectoryVariable ? Backups : null;
+                var service = new PortalService(Config, Projection, new PeClientVersionReader(), launch, probe, getVariable);
+                Session = new PortalSession(service, new UiPreferencesStore(Config), getVariable);
+            }
             var clientId = Session.Service.AddClient(Client).Value!.Id;
             Session.UiPreferences.Save(new UiPreferences("en", [clientId]));
             Loc.Instance.SetLanguage(Language.En);
@@ -250,6 +277,32 @@ public class PortalViewModelTests
         Assert.NotSame(stale, card);
         Assert.Equal(ServerOverlay.Running, card.Overlay);
         Assert.Equal(1, env.Launch.Launches);
+    }
+
+    [AvaloniaFact]
+    public async Task Play_ProcessCheckFailure_ReturnsToIdleWithError()
+    {
+        using var env = new Env(probe: new FailAfterFirstProbe());
+        var server = env.AddServer("Play", "play.example.org");
+        env.Main.Servers.ReloadFromService();
+        var card = env.Main.Servers.All.First(x => x.ServerId == server.Id);
+        await env.Main.Servers.PlayAsync(card);
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (env.Main.Servers.Phase == ServersPhase.Running && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Equal(ServersPhase.Idle, env.Main.Servers.Phase);
+        Assert.Equal(server.Id, env.Session.Service.GetStatus().Value!.Active?.Id);
+        Assert.False(env.Main.Servers.GameClosed);
+        Assert.True(env.Main.Servers.ShowBanner);
+        Assert.Contains("The process list could not be read", env.Main.Servers.BannerBody);
+        var visible = env.Main.Servers.All.Single(x => x.ServerId == server.Id);
+        Assert.Equal(ServerOverlay.None, visible.Overlay);
+        Assert.True(visible.CanAct);
+        Assert.True(visible.PlayCommand.CanExecute(null));
     }
 
     [AvaloniaFact]
