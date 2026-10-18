@@ -9,7 +9,7 @@ internal static class CaseInsensitivePath
     /// keep the canonical spelling passed in.
     /// </summary>
     /// <returns>The real segments and whether the whole path exists.</returns>
-    public static (string[] Segments, bool Exists) Resolve(string root, params string[] segments)
+    public static (string[] Segments, bool Exists) Resolve(string root, string[] segments, bool rejectAmbiguousMatches = false)
     {
         var real = new string[segments.Length];
         var current = root;
@@ -22,7 +22,7 @@ internal static class CaseInsensitivePath
                 continue;
 
             var last = i == segments.Length - 1;
-            var found = Find(current, wanted, last);
+            var found = Find(current, wanted, last, rejectAmbiguousMatches);
             if (found is null)
             {
                 exists = false;
@@ -37,20 +37,24 @@ internal static class CaseInsensitivePath
     }
 
     /// <summary>The real name of the sub-directory of <paramref name="directory"/> that matches <paramref name="wanted"/> case-insensitively, or <c>null</c>.</summary>
-    public static string? FindDirectory(string directory, string wanted) => Find(directory, wanted, wantFile: false);
+    public static string? FindDirectory(string directory, string wanted) => Find(directory, wanted, wantFile: false, rejectAmbiguousMatches: false);
 
-    private static string? Find(string directory, string wanted, bool wantFile)
+    private static string? Find(string directory, string wanted, bool wantFile, bool rejectAmbiguousMatches)
     {
         var names = wantFile
             ? Directory.EnumerateFiles(directory)
             : Directory.EnumerateDirectories(directory);
-        return names
+        var matches = names
             .Select(Path.GetFileName)
             .Where(n => n is not null && string.Equals(n, wanted, StringComparison.OrdinalIgnoreCase))
             .Order(StringComparer.Ordinal)
-            .ToList() is { Count: > 0 } matches
-            ? (matches.Contains(wanted, StringComparer.Ordinal) ? wanted : matches[0])
-            : null;
+            .ToList();
+        if (matches.Count == 0)
+            return null;
+        if (rejectAmbiguousMatches && matches.Count > 1)
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, Path.Combine(directory, wanted),
+                $"More than one path segment matches '{wanted}' with different casing; remove the duplicate.");
+        return matches.Contains(wanted, StringComparer.Ordinal) ? wanted : matches[0];
     }
 
     /// <summary>Real sub-directory names of <paramref name="directory"/> (sorted ordinally); empty when it cannot be listed.</summary>

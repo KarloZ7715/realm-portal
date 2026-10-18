@@ -62,7 +62,9 @@ public class Finding1ActivateRollbackSecurityTests
         private readonly AtomicFileWriter _inner = new();
         private int _activoWrites;
 
-        public void WriteAllBytes(string path, byte[] content)
+        public void WriteAllBytes(string path, byte[] content) => WriteAllBytes(path, content, null);
+
+        public void WriteAllBytes(string path, byte[] content, FileReplacementPermissions? permissions)
         {
             if (path == ActiveProjection.FilePath(projectionDir))
             {
@@ -71,7 +73,7 @@ public class Finding1ActivateRollbackSecurityTests
                     throw new IOException("Injected activo.json write failure.");
             }
 
-            _inner.WriteAllBytes(path, content);
+            _inner.WriteAllBytes(path, content, permissions);
         }
     }
 }

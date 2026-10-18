@@ -9,7 +9,9 @@ internal sealed record ManifestFile(
     bool Existed,
     string? BackupFile,
     string? Sha256Before,
-    string Sha256After);
+    string Sha256After,
+    int? UnixMode = null,
+    bool? WindowsReadOnly = null);
 
 /// <summary>The <c>manifest.json</c> that describes one backup.</summary>
 internal sealed record BackupManifest(
@@ -44,6 +46,8 @@ internal sealed record BackupManifest(
                 throw new JsonException("A file entry is missing path or sha256_after.");
             if (f.Existed && (string.IsNullOrWhiteSpace(f.Sha256Before) || f.BackupFile is null || !BackupFileName.IsMatch(f.BackupFile)))
                 throw new JsonException($"The entry for '{f.Path}' lacks its sha256_before or a valid backup_file.");
+            if (f.UnixMode is int mode && !Core.IO.FileReplacementPermissions.IsValidUnixMode(mode))
+                throw new JsonException($"The entry for '{f.Path}' has unix_mode {mode}, outside 0..0777.");
         }
     }
 
