@@ -16,6 +16,7 @@ public enum ConnectionTest
     Testing,
     Ok,
     Failed,
+    TimedOut,
 }
 
 /// <summary>The add-server form (demo or portal).</summary>
@@ -23,8 +24,12 @@ public sealed partial class AddServerViewModel : ViewModelBase
 {
     public const int DefaultPort = 3724;
 
+    /// <summary>How long a portal connection check waits before it reports a timeout.</summary>
+    public static readonly TimeSpan ConnectionProbeTimeout = TimeSpan.FromSeconds(3);
+
     private readonly DemoBackend? _backend;
     private readonly PortalSession? _session;
+    private readonly IConnectionProbe? _probe;
     private readonly Action<ServerSeed>? _saveDemo;
     private readonly Action? _savePortal;
     private readonly Action _cancel;
@@ -38,9 +43,10 @@ public sealed partial class AddServerViewModel : ViewModelBase
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
     }
 
-    public AddServerViewModel(ClientsViewModel clients, PortalSession session, Action save, Action cancel)
+    public AddServerViewModel(ClientsViewModel clients, PortalSession session, Action save, Action cancel, IConnectionProbe? probe = null)
     {
         _session = session;
+        _probe = probe ?? new TcpConnectionProbe();
         _savePortal = save;
         _cancel = cancel;
         Clients = clients;
@@ -92,6 +98,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     {
         ConnectionTest.Ok => ServerStatus.Ready,
         ConnectionTest.Failed => ServerStatus.NoResponse,
+        ConnectionTest.TimedOut => ServerStatus.NoResponse,
         _ => ServerStatus.Inactive,
     };
 
@@ -99,6 +106,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     {
         ConnectionTest.Ok => Loc.Get("add.result.ok"),
         ConnectionTest.Failed => Loc.Get("add.result.fail"),
+        ConnectionTest.TimedOut => Loc.Get("add.result.timeout"),
         ConnectionTest.Testing => Loc.Get("add.result.testing"),
         _ => string.Empty,
     };
@@ -161,7 +169,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     {
         Submitted = true;
         ClearSaveError();
-        if (!TryParseAddress(Address, out var host, out _))
+        if (!TryParseAddress(Address, out var host, out var port))
         {
             TestState = ConnectionTest.None;
             return;
@@ -169,8 +177,14 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
         if (_session is not null)
         {
-            // The portal does not probe the realm. Leave the badge neutral so the form never claims a successful check.
-            TestState = ConnectionTest.None;
+            TestState = ConnectionTest.Testing;
+            var result = await _probe!.ProbeAsync(host, port, ConnectionProbeTimeout, CancellationToken.None).ConfigureAwait(true);
+            TestState = result switch
+            {
+                ProbeResult.Ok => ConnectionTest.Ok,
+                ProbeResult.TimedOut => ConnectionTest.TimedOut,
+                _ => ConnectionTest.Failed,
+            };
             return;
         }
 

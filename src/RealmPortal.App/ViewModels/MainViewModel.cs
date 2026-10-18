@@ -14,6 +14,7 @@ public sealed partial class MainViewModel : ObservableObject
 {
     private readonly ViewModelBase[] _sections;
     private readonly PortalSession? _session;
+    private readonly IConnectionProbe? _probe;
     private AddServerViewModel? _adding;
 
     public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null) =>
@@ -34,9 +35,10 @@ public sealed partial class MainViewModel : ObservableObject
         WireSections();
     }
 
-    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true)
+    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null)
     {
         _session = session;
+        _probe = probe ?? new TcpConnectionProbe();
         Servers = new ServersViewModel(session, autoTick);
         Clients = new ClientsViewModel(session, pickFolder);
         var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder);
@@ -138,7 +140,7 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 Servers.ReloadFromService();
                 CloseAddServer();
-            }, CloseAddServer);
+            }, CloseAddServer, _probe);
         }
         else
         {

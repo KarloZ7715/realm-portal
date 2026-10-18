@@ -1,6 +1,9 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Avalonia.Headless.XUnit;
 using CommunityToolkit.Mvvm.Input;
+using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Settings;
@@ -29,6 +32,42 @@ public class PortalViewModelTests
     }
 
     /// <summary>Play's file apply checks the probe once. Later checks (the running watch) fail.</summary>
+    /// <summary>Returns a fixed probe result and never opens a socket.</summary>
+    private sealed class FakeProbe : IConnectionProbe
+    {
+        private readonly ProbeResult _result;
+        private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public FakeProbe(ProbeResult result, bool wait = false)
+        {
+            _result = result;
+            if (!wait)
+            {
+                _gate.TrySetResult();
+            }
+        }
+
+        public int Calls { get; private set; }
+
+        public string? Host { get; private set; }
+
+        public int Port { get; private set; }
+
+        public TimeSpan Timeout { get; private set; }
+
+        public void Release() => _gate.TrySetResult();
+
+        public async Task<ProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            Calls++;
+            Host = host;
+            Port = port;
+            Timeout = timeout;
+            await _gate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return _result;
+        }
+    }
+
     private sealed class FailAfterFirstProbe : IGameProcessProbe
     {
         private int _calls;
@@ -136,12 +175,98 @@ public class PortalViewModelTests
     public async Task PortalTest_DoesNotClaimASuccessfulConnection()
     {
         using var env = new Env();
-        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+        var probe = new FakeProbe(ProbeResult.Failed);
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { }, probe);
         add.Address = "logon.example.org:3724";
         await add.TestCommand.ExecuteAsync(null);
-        Assert.Equal(ConnectionTest.None, add.TestState);
-        Assert.False(add.HasResult);
-        Assert.Equal(string.Empty, add.ResultText);
+        Assert.Equal(ConnectionTest.Failed, add.TestState);
+        Assert.Equal("No response", add.ResultText);
+        Assert.Equal(ServerStatus.NoResponse, add.ResultStatus);
+        Assert.Equal(1, probe.Calls);
+        Assert.NotEqual(ConnectionTest.Ok, add.TestState);
+    }
+
+    [AvaloniaFact]
+    public async Task PortalTest_OpenLoopbackPort_IsOk()
+    {
+        using var env = new Env();
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            using var acceptCancel = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var accept = listener.AcceptTcpClientAsync(acceptCancel.Token);
+            env.Main.Servers.RequestAddServerCommand.Execute(null);
+            var add = env.Main.Adding!;
+            add.Address = $"127.0.0.1:{port}";
+            await add.TestCommand.ExecuteAsync(null);
+            Assert.Equal(ConnectionTest.Ok, add.TestState);
+            Assert.Equal("Connection OK", add.ResultText);
+            Assert.Equal(ServerStatus.Ready, add.ResultStatus);
+            using var client = await accept;
+            client.Close();
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task PortalTest_ClosedLoopbackPort_IsFailed()
+    {
+        using var env = new Env();
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+        add.Address = $"127.0.0.1:{port}";
+        await add.TestCommand.ExecuteAsync(null);
+        Assert.Equal(ConnectionTest.Failed, add.TestState);
+        Assert.Equal("No response", add.ResultText);
+        Assert.Equal(ServerStatus.NoResponse, add.ResultStatus);
+    }
+
+    [AvaloniaFact]
+    public async Task PortalTest_FakeProbeTimeout_ShowsTestingThenTimedOut_OnDefaultPort()
+    {
+        using var env = new Env();
+        var probe = new FakeProbe(ProbeResult.TimedOut, wait: true);
+        var main = new MainViewModel(env.Session, () => Task.FromResult<string?>(env.Client), autoTick: false, probe);
+        main.Servers.RequestAddServerCommand.Execute(null);
+        var add = main.Adding!;
+        add.Address = "127.0.0.1";
+        var run = add.TestCommand.ExecuteAsync(null);
+        Assert.Equal(ConnectionTest.Testing, add.TestState);
+        Assert.Equal("Testing…", add.ResultText);
+        Assert.Equal("Testing connection…", main.StatusText);
+        Assert.False(add.TestCommand.CanExecute(null));
+        Assert.Equal(1, probe.Calls);
+        Assert.Equal("127.0.0.1", probe.Host);
+        Assert.Equal(AddServerViewModel.DefaultPort, probe.Port);
+        Assert.Equal(3724, probe.Port);
+        Assert.Equal(AddServerViewModel.ConnectionProbeTimeout, probe.Timeout);
+
+        probe.Release();
+        await run;
+        Assert.Equal(ConnectionTest.TimedOut, add.TestState);
+        Assert.Equal("Timed out", add.ResultText);
+        Assert.Equal(ServerStatus.NoResponse, add.ResultStatus);
+        Assert.True(add.HasResult);
+
+        Loc.Instance.SetLanguage(Language.Es);
+        try
+        {
+            add.RefreshText();
+            Assert.Equal("Tiempo agotado", add.ResultText);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(Language.En);
+        }
     }
 
     [AvaloniaFact]

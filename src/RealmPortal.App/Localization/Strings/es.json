@@ -90,6 +90,7 @@
   "add.result.ok": "Conexión correcta",
   "add.result.fail": "Sin respuesta",
   "add.result.testing": "Probando…",
+  "add.result.timeout": "Tiempo agotado",
   "add.error.name": "Escribe un nombre (hasta 64 caracteres).",
   "add.error.address": "Escribe una dirección válida, por ejemplo logon.ejemplo.com:3724.",
   "add.error.client": "Elige un cliente.",
