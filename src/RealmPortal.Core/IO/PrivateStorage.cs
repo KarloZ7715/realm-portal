@@ -3,16 +3,16 @@ using RealmPortal.Core.Servers;
 namespace RealmPortal.Core.IO;
 
 /// <summary>Permission and size helpers for files owned by Realm Portal.</summary>
-internal static class PrivateStorage
+public static class PrivateStorage
 {
     public const int MaxJsonBytes = 16 * 1024 * 1024;
-    public const int MaxExecutableBytes = 64 * 1024 * 1024;
-    public const UnixFileMode PrivateDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
-    public const UnixFileMode PrivateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+    internal const int MaxExecutableBytes = 64 * 1024 * 1024;
+    internal const UnixFileMode PrivateDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+    internal const UnixFileMode PrivateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
-    public static FileReplacementPermissions PrivateFilePermissions { get; } = new((int)PrivateFileMode, null);
+    internal static FileReplacementPermissions PrivateFilePermissions { get; } = new((int)PrivateFileMode, null);
 
-    public static DirectoryInfo CreatePrivateDirectory(string path)
+    internal static DirectoryInfo CreatePrivateDirectory(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var existed = Directory.Exists(path);

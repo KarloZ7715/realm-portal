@@ -86,6 +86,22 @@ public class UiPreferencesLoadTests
         }
     }
 
+    [Fact]
+    public void Load_OversizedFile_ReturnsDefaults()
+    {
+        using var temp = new TempDirectory();
+        var config = temp.Combine("config");
+        Directory.CreateDirectory(config);
+        var path = Path.Combine(config, "ui-preferences.json");
+        using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+            file.SetLength(RealmPortal.Core.IO.PrivateStorage.MaxJsonBytes + 1L);
+
+        var loaded = new UiPreferencesStore(config).Load();
+
+        Assert.Null(loaded.LanguageCode);
+        Assert.Empty(loaded.InUseSet);
+    }
+
     [AvaloniaTheory]
     [InlineData("corrupt")]
     [InlineData("empty")]

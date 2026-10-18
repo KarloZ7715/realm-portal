@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using RealmPortal.App.Localization;
 using RealmPortal.Core.IO;
+using RealmPortal.Core.Servers;
 
 namespace RealmPortal.App.Portal;
 
@@ -25,7 +26,9 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
                 return new UiPreferences();
             }
 
-            var json = File.ReadAllText(_path);
+            using var boundedStream = new MemoryStream(PrivateStorage.ReadBounded(_path, PrivateStorage.MaxJsonBytes));
+            using var reader = new StreamReader(boundedStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            var json = reader.ReadToEnd();
             return JsonSerializer.Deserialize<UiPreferences>(json, JsonOptions) ?? new UiPreferences();
         }
         catch (Exception ex) when (IsUnreadable(ex))
@@ -41,6 +44,7 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
             or JsonException
             or NotSupportedException
             or FormatException
+            or StoreException
             or ArgumentException;
 
     public void Save(UiPreferences preferences)
