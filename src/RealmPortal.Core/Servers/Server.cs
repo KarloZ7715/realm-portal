@@ -20,6 +20,8 @@ public sealed record Server(
     string? ClientId = null)
 {
     public const int MaxNameLength = 64;
+    public const int MaxRealmLength = 64;
+    public const int MaxAccountLength = 64;
 
     /// <summary>Creates a validated server with a freshly generated id (or <paramref name="id"/> when given).</summary>
     /// <param name="extraRealmlistLines">Extra realmlist lines after <c>set realmlist</c>, such as <c>set patchlist patch.example.org</c>.</param>
@@ -36,20 +38,20 @@ public sealed record Server(
         string? clientId = null)
     {
         name = name?.Trim() ?? "";
-        if (name.Length == 0 || name.Length > MaxNameLength || HasControlCharacters(name))
-            throw new ArgumentException($"Name must be 1-{MaxNameLength} characters without control characters.", nameof(name));
+        if (name.Length == 0 || name.Length > MaxNameLength || HasForbiddenMetadataCharacters(name))
+            throw new ArgumentException($"Name must be 1-{MaxNameLength} characters without control characters, quotes, backslashes or format characters.", nameof(name));
 
         host = host?.Trim() ?? "";
         if (host.Length == 0)
             throw new ArgumentException("Host must not be empty.", nameof(host));
 
         realm = realm?.Trim() ?? "";
-        if (HasControlCharacters(realm))
-            throw new ArgumentException("Realm must not contain control characters.", nameof(realm));
+        if (realm.Length > MaxRealmLength || HasForbiddenMetadataCharacters(realm))
+            throw new ArgumentException($"Realm must be at most {MaxRealmLength} characters without quotes, backslashes or format characters.", nameof(realm));
 
         account = string.IsNullOrWhiteSpace(account) ? null : account.Trim();
-        if (account is not null && HasControlCharacters(account))
-            throw new ArgumentException("Account must not contain control characters.", nameof(account));
+        if (account is not null && (account.Length > MaxAccountLength || HasForbiddenMetadataCharacters(account)))
+            throw new ArgumentException($"Account must be at most {MaxAccountLength} characters without quotes, backslashes or format characters.", nameof(account));
 
         if (requiredClientBuild is <= 0)
             throw new ArgumentException("Client build must be a positive number.", nameof(requiredClientBuild));
@@ -61,5 +63,16 @@ public sealed record Server(
         return new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account, clientId);
     }
 
-    private static bool HasControlCharacters(string value) => value.Any(char.IsControl);
+    // Checks whole code points (Runes), so a supplementary Format character such as U+E0001 is seen as one Format
+    // character instead of two surrogates.
+    private static bool HasForbiddenMetadataCharacters(string value) =>
+        value.EnumerateRunes().Any(r => r.Value is '"' or '\\' || System.Text.Rune.IsControl(r) || IsFormatOrLineSeparator(r));
+
+    private static bool IsFormatOrLineSeparator(System.Text.Rune r)
+    {
+        var category = System.Text.Rune.GetUnicodeCategory(r);
+        return category is System.Globalization.UnicodeCategory.Format
+            or System.Globalization.UnicodeCategory.LineSeparator
+            or System.Globalization.UnicodeCategory.ParagraphSeparator;
+    }
 }
