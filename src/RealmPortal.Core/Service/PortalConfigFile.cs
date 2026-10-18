@@ -1,11 +1,12 @@
 using RealmPortal.Core.Servers;
+using RealmPortal.Core.IO;
 
 namespace RealmPortal.Core.Service;
 
 /// <summary>Size limits and permissions for small JSON config files written by the service.</summary>
 internal static class PortalConfigFile
 {
-    public const int MaxBytes = 64 * 1024;
+    public const int MaxBytes = 16 * 1024 * 1024;
 
     private static readonly object ConfigLock = new();
 
@@ -30,11 +31,7 @@ internal static class PortalConfigFile
         if (!File.Exists(path))
             throw new FileNotFoundException(path);
 
-        var info = new FileInfo(path);
-        if (info.Length > MaxBytes)
-            throw new StoreException($"'{path}' exceeds the maximum size of {MaxBytes} bytes.");
-
-        return File.ReadAllBytes(path);
+        return PrivateStorage.ReadBounded(path, MaxBytes);
     }
 
     public static void AfterWrite(string path)

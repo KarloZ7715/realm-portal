@@ -14,7 +14,8 @@ public class Finding7PortalConfigFileSecurityTests
         var config = dir.Combine("config");
         Directory.CreateDirectory(config);
         var path = Path.Combine(config, ClientStore.FileName);
-        File.WriteAllBytes(path, new byte[65 * 1024]);
+        using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+            stream.SetLength(16 * 1024 * 1024 + 1);
 
         var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch(), getVariable: Support.TestBackupDir.Variables(dir));
         var result = service.ListClients();

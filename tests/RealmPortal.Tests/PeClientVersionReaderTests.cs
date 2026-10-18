@@ -1,4 +1,5 @@
 using RealmPortal.Core.Clients;
+using RealmPortal.Core.IO;
 using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
@@ -90,6 +91,18 @@ public class PeClientVersionReaderTests
         var ex = Assert.Throws<ClientVersionException>(() => _reader.Read(dir.Path));
 
         Assert.True(ex.Kind is ClientVersionErrorKind.NotAPortableExecutable or ClientVersionErrorKind.NoVersionResource);
+    }
+
+    [Fact]
+    public void Read_RejectsWowExeLargerThanSixtyFourMiB()
+    {
+        using var dir = new TempDirectory();
+        using (var stream = new FileStream(dir.Combine("Wow.exe"), FileMode.CreateNew, FileAccess.Write))
+            stream.SetLength(PrivateStorage.MaxExecutableBytes + 1L);
+
+        var ex = Assert.Throws<ClientVersionException>(() => _reader.Read(dir.Path));
+
+        Assert.Equal(ClientVersionErrorKind.Unreadable, ex.Kind);
     }
 
     [Fact]

@@ -46,9 +46,14 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
     public void Save(UiPreferences preferences)
     {
         ArgumentNullException.ThrowIfNull(preferences);
-        Directory.CreateDirectory(configDirectory);
+        var existed = Directory.Exists(configDirectory);
+        var directory = OperatingSystem.IsWindows()
+            ? Directory.CreateDirectory(configDirectory)
+            : Directory.CreateDirectory(configDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        if (!existed && !OperatingSystem.IsWindows())
+            File.SetUnixFileMode(directory.FullName, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(preferences, JsonOptions));
-        _writer.WriteAllBytes(_path, bytes);
+        _writer.WriteAllBytes(_path, bytes, new FileReplacementPermissions((int)(UnixFileMode.UserRead | UnixFileMode.UserWrite), null));
     }
 
     public Language ResolveLanguage()

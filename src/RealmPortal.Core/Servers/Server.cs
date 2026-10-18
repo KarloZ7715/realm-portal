@@ -38,41 +38,22 @@ public sealed record Server(
         string? clientId = null)
     {
         name = name?.Trim() ?? "";
-        if (name.Length == 0 || name.Length > MaxNameLength || HasForbiddenMetadataCharacters(name))
-            throw new ArgumentException($"Name must be 1-{MaxNameLength} characters without control characters, quotes, backslashes or format characters.", nameof(name));
+        if (name.Length == 0)
+            throw new ArgumentException("Name must not be empty.", nameof(name));
 
         host = host?.Trim() ?? "";
         if (host.Length == 0)
             throw new ArgumentException("Host must not be empty.", nameof(host));
 
         realm = realm?.Trim() ?? "";
-        if (realm.Length > MaxRealmLength || HasForbiddenMetadataCharacters(realm))
-            throw new ArgumentException($"Realm must be at most {MaxRealmLength} characters without quotes, backslashes or format characters.", nameof(realm));
-
         account = string.IsNullOrWhiteSpace(account) ? null : account.Trim();
-        if (account is not null && (account.Length > MaxAccountLength || HasForbiddenMetadataCharacters(account)))
-            throw new ArgumentException($"Account must be at most {MaxAccountLength} characters without quotes, backslashes or format characters.", nameof(account));
 
         if (requiredClientBuild is <= 0)
             throw new ArgumentException("Client build must be a positive number.", nameof(requiredClientBuild));
 
         id ??= Guid.NewGuid().ToString("N");
-        if (id.Length != 32 || id.Any(c => !(c is >= '0' and <= '9' or >= 'a' and <= 'f')))
-            throw new ArgumentException("Id must be exactly 32 lowercase hexadecimal characters.", nameof(id));
-
-        return new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account, clientId);
-    }
-
-    // Checks whole code points (Runes), so a supplementary Format character such as U+E0001 is seen as one Format
-    // character instead of two surrogates.
-    private static bool HasForbiddenMetadataCharacters(string value) =>
-        value.EnumerateRunes().Any(r => r.Value is '"' or '\\' || System.Text.Rune.IsControl(r) || IsFormatOrLineSeparator(r));
-
-    private static bool IsFormatOrLineSeparator(System.Text.Rune r)
-    {
-        var category = System.Text.Rune.GetUnicodeCategory(r);
-        return category is System.Globalization.UnicodeCategory.Format
-            or System.Globalization.UnicodeCategory.LineSeparator
-            or System.Globalization.UnicodeCategory.ParagraphSeparator;
+        var server = new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account, clientId);
+        ServerValidator.Validate(server);
+        return server;
     }
 }

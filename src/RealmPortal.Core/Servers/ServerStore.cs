@@ -58,7 +58,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
         ArgumentNullException.ThrowIfNull(server);
         try
         {
-            RealmlistText.Validate(server.Realmlist);
+            ServerValidator.Validate(server);
         }
         catch (InvalidRealmlistException ex)
         {
@@ -104,7 +104,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
 
         try
         {
-            var file = JsonSerializer.Deserialize<StoreFile>(File.ReadAllBytes(FilePath), JsonOptions)
+            var file = JsonSerializer.Deserialize<StoreFile>(PrivateStorage.ReadBounded(FilePath, PrivateStorage.MaxJsonBytes), JsonOptions)
                        ?? throw new StoreException($"'{FilePath}' is empty.");
             if (file.Version != FormatVersion)
                 throw new StoreException($"'{FilePath}' has unsupported format version {file.Version}.");
@@ -132,7 +132,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
     {
         var file = new StoreFile { Version = FormatVersion, Servers = servers.Select(ToRecord).ToList() };
         var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
-        writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json));
+        writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
     }
 
     private static Server ToServer(ServerRecord r)
@@ -141,7 +141,17 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
             || r.Realmlist is null)
             throw new StoreException("A stored server is missing id, name, host or realmlist.");
 
-        return new Server(r.Id, r.Name, r.Host, r.Realm ?? "", r.Realmlist, r.RequiredClientBuild, r.Account, r.ClientId);
+        var server = new Server(r.Id, r.Name, r.Host, r.Realm ?? "", r.Realmlist, r.RequiredClientBuild, r.Account, r.ClientId);
+        try
+        {
+            ServerValidator.Validate(server);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidRealmlistException)
+        {
+            throw new StoreException($"A stored server is invalid: {ex.Message}", ex);
+        }
+
+        return server;
     }
 
     private static ServerRecord ToRecord(Server s) => new()

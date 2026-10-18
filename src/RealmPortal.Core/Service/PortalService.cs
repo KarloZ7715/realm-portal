@@ -756,7 +756,7 @@ public sealed class PortalService : IPortalService
         try
         {
             ClientPathSecurity.EnsureTrustedDirectoryPath(client.Path);
-            var manifest = BackupManifest.FromJson(File.ReadAllBytes(manifestPath), manifestPath);
+            var manifest = BackupManifest.FromJson(PrivateStorage.ReadBounded(manifestPath, PrivateStorage.MaxJsonBytes), manifestPath);
             foreach (var file in manifest.Files)
             {
                 var relative = file.Path.Replace('\\', '/');
@@ -814,7 +814,7 @@ public sealed class PortalService : IPortalService
 
         try
         {
-            var bytes = File.ReadAllBytes(manifestPath);
+            var bytes = PrivateStorage.ReadBounded(manifestPath, PrivateStorage.MaxJsonBytes);
             var manifest = BackupManifest.FromJson(bytes, manifestPath);
             return manifest.UndoneAt is null;
         }

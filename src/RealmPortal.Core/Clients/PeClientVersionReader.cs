@@ -1,4 +1,5 @@
 using PeNet;
+using RealmPortal.Core.IO;
 
 namespace RealmPortal.Core.Clients;
 
@@ -91,9 +92,9 @@ public sealed class PeClientVersionReader : IClientVersionReader
     {
         try
         {
-            return File.ReadAllBytes(path);
+            return PrivateStorage.ReadBounded(path, PrivateStorage.MaxExecutableBytes);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or RealmPortal.Core.Servers.StoreException)
         {
             throw new ClientVersionException(ClientVersionErrorKind.Unreadable, path,
                 $"'{path}' cannot be read: {ex.Message}", ex);

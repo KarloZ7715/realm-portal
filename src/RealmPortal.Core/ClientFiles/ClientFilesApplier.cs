@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using RealmPortal.Core.IO;
+using RealmPortal.Core.Servers;
 
 namespace RealmPortal.Core.ClientFiles;
 
@@ -301,7 +302,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     private void WriteUndoneAt(string manifestPath, BackupManifest manifest)
     {
         var done = manifest with { UndoneAt = _clock() };
-        Guard(() => _writer.WriteAllBytes(manifestPath, done.ToJson()), manifestPath, "update manifest");
+        Guard(() => _writer.WriteAllBytes(manifestPath, done.ToJson(), PrivateStorage.PrivateFilePermissions), manifestPath, "update manifest");
     }
 
     private (string ManifestPath, BackupManifest Manifest, byte[] Bytes)? FindBackup(string installationId, string backupId)
@@ -320,6 +321,12 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     private string WriteBackup(ClientFilesPlan plan, string clientRoot, string backupId, string backupDir, List<Target> targets)
     {
+        Guard(() => PrivateStorage.CreatePrivateDirectory(_backupRoot), _backupRoot, "create backup root");
+        var installationBackupDir = Path.GetDirectoryName(backupDir)!;
+        Guard(() => PrivateStorage.CreatePrivateDirectory(installationBackupDir), installationBackupDir, "create installation backup folder");
+        Guard(() => PrivateStorage.CreatePrivateDirectory(backupDir), backupDir, "create backup folder");
+        var filesDirectory = Path.Combine(backupDir, "files");
+        Guard(() => PrivateStorage.CreatePrivateDirectory(filesDirectory), filesDirectory, "create backup files folder");
         var files = new List<ManifestFile>();
         for (var i = 0; i < targets.Count; i++)
         {
@@ -330,12 +337,12 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             {
                 backupFile = $"files/{i}";
                 var dest = Path.Combine(backupDir, "files", i.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                Guard(() => _writer.WriteAllBytes(dest, t.Original), dest, "write backup file");
+                Guard(() => _writer.WriteAllBytes(dest, t.Original, PrivateStorage.PrivateFilePermissions), dest, "write backup file");
                 if (t.Symlink?.IsSymlink == true && !string.IsNullOrEmpty(t.Symlink.Value.Target))
                 {
                     var sidecar = dest + ".symlink";
                     var bytes = Encoding.UTF8.GetBytes(t.Symlink.Value.Target);
-                    Guard(() => _writer.WriteAllBytes(sidecar, bytes), sidecar, "write symlink sidecar");
+                    Guard(() => _writer.WriteAllBytes(sidecar, bytes, PrivateStorage.PrivateFilePermissions), sidecar, "write symlink sidecar");
                     symlinkSha256 = ClientFilesIo.Sha256Hex(bytes);
                 }
             }
@@ -363,7 +370,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             files);
         var manifestBytes = manifest.ToJson();
         var manifestPath = Path.Combine(backupDir, ManifestName);
-        Guard(() => _writer.WriteAllBytes(manifestPath, manifestBytes), manifestPath, "write manifest");
+        Guard(() => _writer.WriteAllBytes(manifestPath, manifestBytes, PrivateStorage.PrivateFilePermissions), manifestPath, "write manifest");
         return ClientFilesIo.Sha256Hex(manifestBytes);
     }
 
@@ -575,13 +582,17 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     {
         var dir = Path.Combine(_backupRoot, installationId);
         var path = Path.Combine(dir, ".lock");
-        Guard(() => Directory.CreateDirectory(dir), dir, "create backup folder");
+        Guard(() => PrivateStorage.CreatePrivateDirectory(_backupRoot), _backupRoot, "create backup root");
+        Guard(() => PrivateStorage.CreatePrivateDirectory(dir), dir, "create backup folder");
         var deadline = DateTime.UtcNow + _lockTimeout;
         while (true)
         {
             try
             {
-                return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                if (!OperatingSystem.IsWindows())
+                    File.SetUnixFileMode(path, PrivateStorage.PrivateFileMode);
+                return stream;
             }
             catch (IOException) when (DateTime.UtcNow < deadline)
             {
@@ -664,7 +675,11 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     {
         try
         {
-            return File.Exists(path) ? File.ReadAllBytes(path) : null;
+            return File.Exists(path) ? PrivateStorage.ReadBounded(path, PrivateStorage.MaxJsonBytes) : null;
+        }
+        catch (StoreException ex)
+        {
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, ex.Message, ex);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

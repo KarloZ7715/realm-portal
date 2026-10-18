@@ -107,7 +107,7 @@ public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer
         {
             var file = new StoreFile { Version = FormatVersion, Clients = clients.Select(ToRecord).ToList() };
             var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
-            writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json));
+            writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
             PortalConfigFile.AfterWrite(FilePath);
         });
     }

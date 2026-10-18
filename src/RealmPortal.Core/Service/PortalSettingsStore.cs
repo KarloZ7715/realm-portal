@@ -215,7 +215,7 @@ internal sealed class PortalSettingsStore(
         PortalConfigFile.WithConfigLock(() =>
         {
             var json = JsonSerializer.Serialize(payload, JsonOptions) + "\n";
-            writer.WriteAllBytes(path, new System.Text.UTF8Encoding(false).GetBytes(json));
+            writer.WriteAllBytes(path, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
             PortalConfigFile.AfterWrite(path);
         });
     }

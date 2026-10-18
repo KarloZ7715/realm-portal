@@ -2,6 +2,8 @@ using FsCheck;
 using FsCheck.Fluent;
 using FsCheck.Xunit;
 using RealmPortal.Core.IO;
+using RealmPortal.Core.Clients;
+using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
 using RealmPortal.Tests.Support;
 
@@ -163,5 +165,61 @@ public class ServerStoreTests
         Assert.Equal(
             Enumerable.Range(0, 8).Select(i => $"q{i}.example.org").OrderBy(h => h),
             hosts);
+    }
+
+    [Fact]
+    public void List_RejectsServersJsonLargerThanSixteenMiB()
+    {
+        using var dir = new TempDirectory();
+        var store = NewStore(dir.Combine("cfg"));
+        Directory.CreateDirectory(Path.GetDirectoryName(store.FilePath)!);
+        using (var stream = new FileStream(store.FilePath, FileMode.CreateNew, FileAccess.Write))
+            stream.SetLength(16 * 1024 * 1024 + 1);
+
+        Assert.Throws<StoreException>(() => store.List());
+    }
+
+    [Theory]
+    [InlineData("bad\u001b[31mRED", "login.example.org")]
+    [InlineData("Valid", "evil.example.org")]
+    public void List_RejectsEditedServerWithControlCharactersOrHostMismatch(string name, string host)
+    {
+        using var dir = new TempDirectory();
+        var store = NewStore(dir.Path);
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            version = 1,
+            servers = new[]
+            {
+                new { id = "0123456789abcdef0123456789abcdef", name, host, realm = "", realmlist = "set realmlist login.example.org\r\n", required_client_build = (int?)null, account = (string?)null }
+            }
+        });
+        File.WriteAllText(store.FilePath, json);
+
+        Assert.Throws<StoreException>(() => store.List());
+    }
+
+    [Fact]
+    public void AppOwnedConfigFilesAndDirectory_ArePrivateOnUnix()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        using var dir = new TempDirectory();
+        var config = dir.Combine("private-config");
+        var writer = new AtomicFileWriter();
+        var store = NewStore(config);
+        var server = store.Add(Server.Create("Alpha", "alpha.example.org"));
+        new ActiveServerManager(store, config, dir.Combine("projection"), writer).Switch(server);
+        var clientFolder = dir.Combine("client-folder");
+        Directory.CreateDirectory(clientFolder);
+        new ClientStore(config, writer).Add(clientFolder);
+        new LastSwitchJournal(config, writer).Save(new LastSwitchEntry(null, null));
+        var settings = new PortalSettingsStore(config, writer, _ => null);
+        settings.SetLauncherSettings(new LauncherSettings());
+
+        Assert.Equal(PrivateStorage.PrivateDirectoryMode, File.GetUnixFileMode(config));
+        foreach (var name in new[] { "servers.json", "clients.json", "state.json", "last-switch.json", "launcher-settings.json" })
+            Assert.Equal(PrivateStorage.PrivateFileMode, File.GetUnixFileMode(Path.Combine(config, name)));
     }
 }

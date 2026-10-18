@@ -140,6 +140,28 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
+    public void Apply_CreatesPrivateBackupDirectoriesAndFilesOnUnix()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        using var env = new Env();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        var result = env.Applier.Apply(env.Plan());
+        var installationDir = Path.Combine(env.Backups, "install-1");
+        var backupDir = Path.Combine(installationDir, result.BackupId!);
+        var filesDir = Path.Combine(backupDir, "files");
+
+        Assert.Equal(PrivateStorage.PrivateDirectoryMode, File.GetUnixFileMode(env.Backups));
+        Assert.Equal(PrivateStorage.PrivateDirectoryMode, File.GetUnixFileMode(installationDir));
+        Assert.Equal(PrivateStorage.PrivateDirectoryMode, File.GetUnixFileMode(backupDir));
+        Assert.Equal(PrivateStorage.PrivateDirectoryMode, File.GetUnixFileMode(filesDir));
+        Assert.Equal(PrivateStorage.PrivateFileMode, File.GetUnixFileMode(Path.Combine(installationDir, ".lock")));
+        Assert.Equal(PrivateStorage.PrivateFileMode, File.GetUnixFileMode(Path.Combine(backupDir, "manifest.json")));
+        Assert.Equal(PrivateStorage.PrivateFileMode, File.GetUnixFileMode(Path.Combine(filesDir, "0")));
+    }
+
+    [Fact]
     public void Undo_DeletesFilesThatDidNotExist_AndKeepsFolders()
     {
         using var env = new Env();

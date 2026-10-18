@@ -245,7 +245,7 @@ public sealed class ActiveServerManager(
 
         try
         {
-            var state = JsonSerializer.Deserialize<State>(File.ReadAllBytes(_statePath), JsonOptions)
+            var state = JsonSerializer.Deserialize<State>(PrivateStorage.ReadBounded(_statePath, PrivateStorage.MaxJsonBytes), JsonOptions)
                         ?? throw new StoreException($"'{_statePath}' is empty.");
             return state.Version == FormatVersion
                 ? state
@@ -266,7 +266,7 @@ public sealed class ActiveServerManager(
     }
 
     private void SaveState(State state) =>
-        writer.WriteAllBytes(_statePath, ActiveProjection.Utf8NoBom.GetBytes(JsonSerializer.Serialize(state, JsonOptions) + "\n"));
+        writer.WriteAllBytes(_statePath, ActiveProjection.Utf8NoBom.GetBytes(JsonSerializer.Serialize(state, JsonOptions) + "\n"), PrivateStorage.PrivateFilePermissions);
 
     private sealed record State
     {
