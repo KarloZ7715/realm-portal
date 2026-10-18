@@ -3,16 +3,19 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Portal;
+using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.ViewModels;
 
 /// <summary>
-/// The clients screen: the clients Realm Portal found and which of them are in use. Scanning and picking a folder are simulated:
-/// the list comes from <see cref="DemoData"/> and no folder is read.
+/// The clients screen. Demo mode uses <see cref="DemoData"/>; portal mode uses <see cref="IPortalService"/> and optional folder picking.
 /// </summary>
 public sealed partial class ClientsViewModel : ViewModelBase
 {
-    private readonly DemoBackend _backend;
+    private readonly DemoBackend? _backend;
+    private readonly PortalSession? _session;
+    private readonly Func<Task<string?>>? _pickFolder;
     private int _picked;
 
     public ClientsViewModel(DemoBackend backend)
@@ -20,9 +23,18 @@ public sealed partial class ClientsViewModel : ViewModelBase
         _backend = backend;
         foreach (var seed in DemoData.Clients)
         {
-            Add(seed);
+            AddDemo(seed);
         }
     }
+
+    public ClientsViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null)
+    {
+        _session = session;
+        _pickFolder = pickFolder;
+        ReloadFromService();
+    }
+
+    public event Action? ClientsChanged;
 
     public ObservableCollection<ClientItemViewModel> Items { get; } = [];
 
@@ -37,7 +49,6 @@ public sealed partial class ClientsViewModel : ViewModelBase
 
     public int InUseCount => Items.Count(i => i.IsInUse);
 
-    /// <summary>"3 clientes encontrados · 2 en uso. Solo leemos las rutas."</summary>
     public string Summary => Loc.Format(
         "clients.summary",
         Items.Count == 1 ? Loc.Get("clients.found.one") : Loc.Format("clients.found.many", Items.Count),
@@ -57,27 +68,93 @@ public sealed partial class ClientsViewModel : ViewModelBase
         OnPropertyChanged(nameof(StatusText));
     }
 
-    /// <summary>Simulated search: the same clients come back after a short wait.</summary>
+    public void ReloadFromService()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        var prefs = _session.UiPreferences.Load();
+        var inUse = prefs.InUseSet;
+        var list = _session.Service.ListClients();
+        Items.Clear();
+        if (!list.Succeeded)
+        {
+            Notice = ErrorText.Body(list.Error!);
+            return;
+        }
+
+        foreach (var entry in list.Value!)
+        {
+            AddPortal(entry, inUse.Contains(entry.Id));
+        }
+
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(StatusText));
+        ClientsChanged?.Invoke();
+    }
+
     [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task RescanAsync()
     {
+        if (_session is not null)
+        {
+            IsScanning = true;
+            Notice = null;
+            await Task.Delay(300).ConfigureAwait(true);
+            ReloadFromService();
+            IsScanning = false;
+            return;
+        }
+
         IsScanning = true;
         Notice = null;
-        await _backend.DelayAsync(TimeSpan.FromMilliseconds(900)).ConfigureAwait(true);
+        await _backend!.DelayAsync(TimeSpan.FromMilliseconds(900)).ConfigureAwait(true);
         IsScanning = false;
     }
 
-    /// <summary>Simulated folder picker: adds the next made-up folder (nothing is read from disk).</summary>
     [RelayCommand(CanExecute = nameof(CanScan))]
-    private void PickFolder()
+    private async Task PickFolderAsync()
     {
+        if (_session is not null)
+        {
+            if (_pickFolder is null)
+            {
+                Notice = Loc.Get("clients.pick.unavailable");
+                return;
+            }
+
+            var folder = await _pickFolder().ConfigureAwait(true);
+            if (string.IsNullOrWhiteSpace(folder))
+            {
+                return;
+            }
+
+            var result = await Task.Run(() => _session.Service.AddClient(folder)).ConfigureAwait(true);
+            if (!result.Succeeded)
+            {
+                Notice = ErrorText.Body(result.Error!);
+                OnPropertyChanged(nameof(StatusText));
+                return;
+            }
+
+            var prefs = _session.UiPreferences.Load();
+            var ids = prefs.InUseSet;
+            ids.Add(result.Value!.Id);
+            _session.UiPreferences.Save(prefs with { ClientsInUse = ids.ToList() });
+            Notice = Loc.Get("status.folderadded.real");
+            ReloadFromService();
+            return;
+        }
+
         if (_picked >= DemoData.PickableClients.Count)
         {
             Notice = Loc.Get("status.nomorefolders");
             return;
         }
 
-        Add(DemoData.PickableClients[_picked++]);
+        AddDemo(DemoData.PickableClients[_picked++]);
         Notice = Loc.Get("status.folderadded");
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(StatusText));
@@ -85,16 +162,40 @@ public sealed partial class ClientsViewModel : ViewModelBase
 
     private bool CanScan() => !IsScanning;
 
-    private void Add(ClientSeed seed)
+    private void AddDemo(ClientSeed seed)
     {
         var item = new ClientItemViewModel(seed);
+        WireInUse(item);
+        Items.Add(item);
+    }
+
+    private void AddPortal(Core.Service.ClientEntry entry, bool inUse)
+    {
+        var item = ClientItemViewModel.FromEntry(entry, inUse);
+        WireInUse(item);
+        Items.Add(item);
+    }
+
+    private void WireInUse(ClientItemViewModel item)
+    {
         item.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ClientItemViewModel.IsInUse))
             {
+                if (_session is not null)
+                {
+                    PersistInUse();
+                }
+
                 OnPropertyChanged(nameof(Summary));
+                ClientsChanged?.Invoke();
             }
         };
-        Items.Add(item);
+    }
+
+    private void PersistInUse()
+    {
+        var ids = Items.Where(i => i.IsInUse).Select(i => i.Id).Where(id => id is not null).Cast<string>().ToList();
+        _session!.UiPreferences.Save(_session.UiPreferences.Load() with { ClientsInUse = ids });
     }
 }

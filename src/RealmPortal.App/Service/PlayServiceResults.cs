@@ -2,7 +2,7 @@ using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.Service;
 
-/// <summary>How the UI should interpret <see cref="IPortalService.Play"/> results until the servers screen is fully wired to the service.</summary>
+/// <summary>How the servers screen interprets <see cref="IPortalService.Play"/> results when launch fails after the switch.</summary>
 public static class PlayServiceResults
 {
     /// <summary>True when the switch steps completed and only launch failed (<see cref="Consistency.AppliedLaunchFailed"/>).</summary>

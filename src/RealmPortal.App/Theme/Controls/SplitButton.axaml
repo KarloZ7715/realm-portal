@@ -72,8 +72,11 @@
       <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
       <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/></Style>
       <Style Selector="^.secondary /template/ c|SplitPlate#Plate"><Setter Property="Variant" Value="secondary"/></Style>
+      <!-- Primary plate is wax red. White is the lightest text token and clears 4.5:1 on that red and on the dark disabled plate. -->
+      <Style Selector="^:not(.secondary)"><Setter Property="Foreground" Value="{DynamicResource WhiteBrush}"/></Style>
+      <Style Selector="^:not(.secondary):disabled"><Setter Property="Foreground" Value="{DynamicResource WhiteBrush}"/></Style>
       <!-- Surface=Parchment (Figma 18:1727): #5A3D22 inner border, focus-ring-parchment; both segments share the plate -->
-      <Style Selector="^.surface-parchment:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
+      <Style Selector="^.surface-parchment.secondary:not(:disabled)"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
       <Style Selector="^.surface-parchment /template/ c|NineSlice#Ring"><Setter Property="Source" Value="focus-ring-parchment"/></Style>
       <Style Selector="^.surface-parchment:not(.secondary) /template/ c|SplitPlate#Plate"><Setter Property="Variant" Value="primary-parchment"/></Style>
     </ControlTheme>

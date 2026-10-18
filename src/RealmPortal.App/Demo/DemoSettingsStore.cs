@@ -18,7 +18,8 @@ public sealed class DemoSettingsStore : ISettingsStore
 
     public SettingsError? Save(SettingsModel settings)
     {
-        if (!string.IsNullOrWhiteSpace(settings.CommandTemplate) && !settings.CommandTemplate.Contains("{exe}", StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(settings.CommandTemplate)
+            || !settings.CommandTemplate.Contains("{exe}", StringComparison.Ordinal))
         {
             return new SettingsError("InvalidLauncherSettings");
         }
