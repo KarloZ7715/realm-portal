@@ -190,6 +190,36 @@ public class ActiveServerManagerTests
     }
 
     [Fact]
+    public void DiscardPendingUndo_WhileTheConfigLockIsHeldElsewhere_WaitsBeforeChangingState()
+    {
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        var b = env.Add("Beta");
+        var manager = env.Manager;
+        manager.Switch(a);
+        manager.Switch(b);
+        Assert.True(manager.Status().CanUndo);
+
+        Directory.CreateDirectory(env.Config);
+        using var foreign = new FileStream(
+            Path.Combine(env.Config, ConfigDirectoryLock.LockFileName),
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None);
+
+        var call = Task.Run(() => manager.DiscardPendingUndo());
+
+        Assert.False(call.Wait(TimeSpan.FromMilliseconds(400)), "discard must take the config lock before it reads the state");
+        Assert.True(manager.Status().CanUndo, "nothing may be written before the lock is granted");
+
+        foreign.Dispose();
+
+        Assert.True(call.Wait(TimeSpan.FromSeconds(15)));
+        Assert.False(manager.Status().CanUndo);
+        Assert.Equal(b, manager.GetActive());
+    }
+
+    [Fact]
     public void Status_DetectsTamperedProjection()
     {
         using var env = new Env();

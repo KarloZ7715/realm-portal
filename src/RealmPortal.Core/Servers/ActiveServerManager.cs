@@ -67,12 +67,18 @@ public sealed class ActiveServerManager(
     }
 
     /// <summary>Clears the one-level undo record without changing the active server or projection.</summary>
+    /// <remarks>The read, the check and the write happen under the config-directory lock, so a concurrent
+    /// <see cref="Switch"/>, <see cref="Undo"/> or <see cref="Remove"/> in another process cannot be overwritten
+    /// with a stale copy of <c>state.json</c>.</remarks>
     public void DiscardPendingUndo()
     {
-        var state = LoadState();
-        if (state.Undo is null)
-            return;
-        SaveState(state with { Undo = null });
+        using (store.DirectoryLock.Acquire())
+        {
+            var state = LoadState();
+            if (state.Undo is null)
+                return;
+            SaveState(state with { Undo = null });
+        }
     }
 
     /// <summary>
