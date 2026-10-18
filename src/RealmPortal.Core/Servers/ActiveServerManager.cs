@@ -213,9 +213,10 @@ public sealed class ActiveServerManager(
         try
         {
             return File.Exists(_projectionPath)
-                   && File.ReadAllBytes(_projectionPath).AsSpan().SequenceEqual(ActiveProjection.Serialize(active));
+                   && PrivateStorage.ReadBounded(_projectionPath, PrivateStorage.MaxJsonBytes)
+                       .AsSpan().SequenceEqual(ActiveProjection.Serialize(active));
         }
-        catch (Exception ex) when (ex is IOException or InvalidRealmlistException)
+        catch (Exception ex) when (ex is IOException or InvalidRealmlistException or StoreException)
         {
             // An unreadable file, or a server whose realmlist is invalid, can never be "in sync".
             return false;

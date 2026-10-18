@@ -234,6 +234,20 @@ public class ActiveServerManagerTests
     }
 
     [Fact]
+    public void Status_OversizedProjectionIsNotInSync()
+    {
+        using var env = new Env();
+        var active = env.Add("Alpha");
+        env.Manager.Switch(active);
+        using (var file = new FileStream(env.ActivoPath, FileMode.Open, FileAccess.Write, FileShare.Read))
+            file.SetLength(PrivateStorage.MaxJsonBytes + 1L);
+
+        var status = env.Manager.Status();
+
+        Assert.False(status.ProjectionInSync);
+    }
+
+    [Fact]
     public void CorruptState_Throws_AndIsNotOverwritten()
     {
         using var env = new Env();
