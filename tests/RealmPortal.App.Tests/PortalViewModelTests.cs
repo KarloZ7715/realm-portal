@@ -105,6 +105,18 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task PortalTest_DoesNotClaimASuccessfulConnection()
+    {
+        using var env = new Env();
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+        add.Address = "logon.example.org:3724";
+        await add.TestCommand.ExecuteAsync(null);
+        Assert.Equal(ConnectionTest.None, add.TestState);
+        Assert.False(add.HasResult);
+        Assert.Equal(string.Empty, add.ResultText);
+    }
+
+    [AvaloniaFact]
     public void ManualAdd_AppearsInList()
     {
         using var env = new Env();

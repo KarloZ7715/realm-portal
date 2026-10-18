@@ -153,7 +153,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
         if (_session is not null)
         {
-            TestState = ConnectionTest.Ok;
+            // The portal does not probe the realm. Leave the badge neutral so the form never claims a successful check.
+            TestState = ConnectionTest.None;
             return;
         }
 
