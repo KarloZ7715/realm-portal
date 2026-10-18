@@ -79,6 +79,52 @@ public sealed class ErrorsAndDialogTests
     }
 
     [AvaloniaFact]
+    public void ServiceErrorBodiesNeverIncludeDiagnostics()
+    {
+        const string diagnostic = "SECRET_DIAGNOSTIC_do_not_show";
+        var unexpected = new ServiceError(ServiceErrorCode.Unexpected, Diagnostic: diagnostic);
+        var inconsistent = new ServiceError(ServiceErrorCode.InconsistentState, Diagnostic: diagnostic);
+        var launch = new ServiceError(ServiceErrorCode.LaunchFailed, Diagnostic: diagnostic);
+        var applied = new ServiceError(
+            ServiceErrorCode.LaunchFailed,
+            Consistency: Consistency.AppliedLaunchFailed,
+            Diagnostic: diagnostic);
+
+        Loc.Instance.SetLanguage(Language.En);
+        Assert.Equal("Nothing was changed. Try again.", ErrorText.Body(unexpected));
+        Assert.Equal(
+            "Realm Portal could not put everything back. Review the client files.",
+            ErrorText.Body(inconsistent));
+        Assert.Equal("The switch succeeded but the game did not start.", ErrorText.Body(launch));
+        Assert.Equal(
+            "The server was applied and is now active, but the game didn't start. Check the launcher settings and try again.",
+            ErrorText.Body(applied));
+
+        Loc.Instance.SetLanguage(Language.Es);
+        Assert.Equal("No se ha modificado nada. Vuelve a intentarlo.", ErrorText.Body(unexpected));
+        Assert.Equal(
+            "Realm Portal no pudo dejar todo como estaba. Revisa los archivos del cliente.",
+            ErrorText.Body(inconsistent));
+        Assert.Equal("El cambio de servidor se hizo, pero el juego no arrancó.", ErrorText.Body(launch));
+        Assert.Equal(
+            "El servidor quedó aplicado y activo, pero el juego no se abrió. Revisa los ajustes del lanzador e inténtalo de nuevo.",
+            ErrorText.Body(applied));
+
+        foreach (var body in new[]
+        {
+            ErrorText.Body(unexpected),
+            ErrorText.Body(inconsistent),
+            ErrorText.Body(launch),
+            ErrorText.Body(applied),
+        })
+        {
+            Assert.DoesNotContain(diagnostic, body);
+        }
+
+        Loc.Instance.SetLanguage(Language.En);
+    }
+
+    [AvaloniaFact]
     public void UnknownCodeFallsBackToTheGenericMessage()
     {
         Loc.Instance.SetLanguage(Language.En);

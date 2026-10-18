@@ -46,9 +46,9 @@ public static class ErrorText
                 Body(error.Code.ToString(), FormatFileList(error.ConflictingFiles)),
             ServiceErrorCode.InvalidServerInput =>
                 Body(error.Code.ToString(), error.Field ?? string.Empty),
-            ServiceErrorCode.Unexpected or ServiceErrorCode.InconsistentState or ServiceErrorCode.LaunchFailed
-                when !string.IsNullOrEmpty(error.Diagnostic) =>
-                Body("unexpected", error.Diagnostic),
+            // error.unexpected.body is a "{0}" slot for log text. Use the generic body, which has no placeholder.
+            ServiceErrorCode.Unexpected =>
+                Body("unknown"),
             _ => Body(error.Code.ToString()),
         };
     }
