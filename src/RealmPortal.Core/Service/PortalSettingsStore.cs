@@ -179,6 +179,10 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
             {
                 throw new StoreException($"'{_storagePath}' is not valid: {ex.Message}", ex);
             }
+            catch (ArgumentException ex)
+            {
+                throw new StoreException($"'{_storagePath}' is not valid: {ex.Message}", ex);
+            }
             catch (IOException ex)
             {
                 throw new StoreException($"'{_storagePath}' cannot be read: {ex.Message}", ex);
