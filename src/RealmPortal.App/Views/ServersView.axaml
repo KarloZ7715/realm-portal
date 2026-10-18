@@ -109,7 +109,7 @@
                       </MenuItem>
                       <Separator/>
                       <MenuItem Name="MenuSwitchOnly" Classes="two-line" Command="{Binding SwitchOnlyCommand}"
-                                AutomationProperties.Name="{loc:T card.switchonly}">
+                                AutomationProperties.Name="{Binding SwitchMenuText}">
                         <MenuItem.Icon><c:Icon Data="{DynamicResource IconRefresh}" Width="14" Height="14" StrokeThickness="2.2"/></MenuItem.Icon>
                         <MenuItem.Header>
                           <StackPanel>
