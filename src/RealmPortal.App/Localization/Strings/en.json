@@ -54,6 +54,7 @@
   "toast.dismiss": "Close",
   "toast.undoconflict": "Client files changed since the switch",
   "toast.retry": "Retry",
+  "undo.last": "Undo last switch",
   "status.realmlist": "realmlist · {0}",
   "status.switching": "Switching to {0}…",
   "status.repairing": "Repairing {0}…",

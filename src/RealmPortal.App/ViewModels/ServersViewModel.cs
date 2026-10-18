@@ -42,6 +42,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     private TimeSpan _toastElapsed;
     private bool _repairRun;
     private bool _undoConflict;
+    private bool _canUndoPending;
     private string? _errorBanner;
     private ServiceError? _bannerError;
 
@@ -132,6 +133,9 @@ public sealed partial class ServersViewModel : ViewModelBase
     /// <summary>Conflict toast: run <see cref="UndoAsync"/> again after the client files are fixed. Pending undo stays.</summary>
     public bool ShowRetryUndo => ToastVisible && _undoConflict;
 
+    /// <summary>True while the service still has a pending undo, including after the toast expires, play, or a restart.</summary>
+    public bool CanUndoPending => _canUndoPending;
+
     public string ResultsText => Visible.Count == 1
         ? Loc.Format("servers.results.one", SearchText.Trim())
         : Loc.Format("servers.results.many", Visible.Count, SearchText.Trim());
@@ -204,7 +208,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(GameClosed))]
     private void Retry() => Finish();
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanUndo))]
     private async Task UndoAsync()
     {
         if (_session is not null)
@@ -226,15 +230,17 @@ public sealed partial class ServersViewModel : ViewModelBase
                     {
                         SetError(result.Error);
                     }
-
-                    return;
+                }
+                else
+                {
+                    _undoConflict = false;
+                    _bannerError = null;
+                    _errorBanner = null;
+                    HideToast();
+                    ReloadFromService();
                 }
 
-                _undoConflict = false;
-                _bannerError = null;
-                _errorBanner = null;
-                HideToast();
-                ReloadFromService();
+                RefreshUndoAvailability();
             });
             return;
         }
@@ -271,15 +277,35 @@ public sealed partial class ServersViewModel : ViewModelBase
             if (!result.Succeeded)
             {
                 SetError(result.Error);
-                return;
+            }
+            else
+            {
+                _undoConflict = false;
+                _bannerError = null;
+                _errorBanner = null;
+                HideToast();
+                ReloadFromService();
             }
 
-            _undoConflict = false;
-            _bannerError = null;
-            _errorBanner = null;
-            HideToast();
-            ReloadFromService();
+            RefreshUndoAvailability();
         });
+    }
+
+    private bool CanUndo() => _session is not null
+        ? _canUndoPending
+        : _undoFrom is not null && _undoTo is not null;
+
+    /// <summary>Reads <see cref="PortalStatus.CanUndo"/> after a reload, an operation, or startup.</summary>
+    private void RefreshUndoAvailability()
+    {
+        var canUndo = _session?.StatusOrNull()?.CanUndo == true;
+        if (_canUndoPending != canUndo)
+        {
+            _canUndoPending = canUndo;
+            OnPropertyChanged(nameof(CanUndoPending));
+        }
+
+        UndoCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand]
@@ -333,6 +359,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         if (!list.Succeeded)
         {
             SetError(list.Error);
+            RefreshUndoAvailability();
             return;
         }
 
@@ -358,6 +385,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         }
 
         Refresh();
+        RefreshUndoAvailability();
     }
 
     public Task SwitchOnlyAsync(ServerItemViewModel target)
@@ -623,6 +651,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         OnPropertyChanged(nameof(ToastText));
         OnPropertyChanged(nameof(ShowDiscardUndo));
         OnPropertyChanged(nameof(ShowRetryUndo));
+        RefreshUndoAvailability();
         if (!_undoConflict)
         {
             _toastTimer?.Start();
@@ -639,6 +668,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         OnPropertyChanged(nameof(ToastText));
         OnPropertyChanged(nameof(ShowDiscardUndo));
         OnPropertyChanged(nameof(ShowRetryUndo));
+        RefreshUndoAvailability();
     }
 
     private DispatcherTimer CreateToastTimer()

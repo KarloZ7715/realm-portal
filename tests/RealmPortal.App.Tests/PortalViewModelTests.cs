@@ -525,6 +525,96 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task PendingUndo_StaysAfterToastExpires_AndUndoStillWorks()
+    {
+        using var env = new Env();
+        var a = env.AddServer("A", "a.example.org");
+        var b = env.AddServer("B", "b.example.org");
+        env.Main.Servers.ReloadFromService();
+        Assert.False(env.Main.Servers.CanUndoPending);
+        Assert.False(env.Main.Servers.UndoCommand.CanExecute(null));
+
+        await env.Main.Servers.SwitchOnlyAsync(env.Main.Servers.All.First(s => s.ServerId == a.Id));
+        await env.Main.Servers.SwitchOnlyAsync(env.Main.Servers.All.First(s => s.ServerId == b.Id));
+        Assert.True(env.Main.Servers.ToastVisible);
+        Assert.True(env.Main.Servers.CanUndoPending);
+        Assert.True(env.Main.Servers.UndoCommand.CanExecute(null));
+
+        env.Main.Servers.AdvanceToast(ServersViewModel.ToastDuration);
+        Assert.False(env.Main.Servers.ToastVisible);
+        Assert.True(env.Main.Servers.CanUndoPending);
+        Assert.True(env.Main.Servers.UndoCommand.CanExecute(null));
+
+        await ((IAsyncRelayCommand)env.Main.Servers.UndoCommand).ExecuteAsync(null);
+        Assert.Equal(a.Id, env.Session.Service.GetStatus().Value!.Active?.Id);
+        Assert.False(env.Session.Service.GetStatus().Value!.CanUndo);
+        Assert.False(env.Main.Servers.CanUndoPending);
+        Assert.False(env.Main.Servers.UndoCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public async Task PendingUndo_StaysVisibleAfterSuccessfulPlay()
+    {
+        using var env = new Env();
+        var server = env.AddServer("Play", "play.example.org");
+        env.Main.Servers.ReloadFromService();
+        var card = env.Main.Servers.All.First(x => x.ServerId == server.Id);
+        await env.Main.Servers.PlayAsync(card);
+
+        Assert.Equal(1, env.Launch.Launches);
+        Assert.Equal(ServersPhase.Running, env.Main.Servers.Phase);
+        Assert.True(env.Session.Service.GetStatus().Value!.CanUndo);
+        Assert.True(env.Main.Servers.CanUndoPending);
+        Assert.True(env.Main.Servers.UndoCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public async Task PendingUndo_SurvivesRestart_AndDisappearsAfterUndoOrDiscard()
+    {
+        using var env = new Env();
+        var a = env.AddServer("A", "a.example.org");
+        var b = env.AddServer("B", "b.example.org");
+        var clientId = env.Session.ResolveClientId()!;
+        Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(clientId, a.Id)).Succeeded);
+        Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(clientId, b.Id)).Succeeded);
+
+        var restarted = new MainViewModel(
+            PortalSession.CreateForPaths(env.Config, env.Projection, env.Backups, env.Launch),
+            () => Task.FromResult<string?>(env.Client),
+            autoTick: false);
+        Assert.True(restarted.Servers.CanUndoPending);
+        Assert.True(restarted.Servers.UndoCommand.CanExecute(null));
+        Assert.Equal(b.Id, restarted.Servers.Active?.ServerId);
+
+        await ((IAsyncRelayCommand)restarted.Servers.UndoCommand).ExecuteAsync(null);
+        Assert.Equal(a.Id, restarted.Servers.Active?.ServerId);
+        Assert.False(restarted.Servers.CanUndoPending);
+        Assert.False(restarted.Servers.UndoCommand.CanExecute(null));
+
+        Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(clientId, b.Id)).Succeeded);
+        env.Main.Servers.ReloadFromService();
+        Assert.True(env.Main.Servers.CanUndoPending);
+        env.Main.Servers.DiscardUndoCommand.Execute(null);
+        var shown = DateTime.UtcNow.AddSeconds(5);
+        while (env.Main.Dialog is null && DateTime.UtcNow < shown)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.NotNull(env.Main.Dialog);
+        env.Main.Dialog!.ConfirmCommand.Execute(null);
+        var cleared = DateTime.UtcNow.AddSeconds(5);
+        while (env.Main.Servers.CanUndoPending && DateTime.UtcNow < cleared)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.False(env.Session.Service.GetStatus().Value!.CanUndo);
+        Assert.False(env.Main.Servers.CanUndoPending);
+        Assert.False(env.Main.Servers.UndoCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
     public async Task DiscardUndo_AfterConflict()
     {
         using var env = new Env();

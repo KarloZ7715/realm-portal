@@ -54,6 +54,7 @@
   "toast.dismiss": "Cerrar",
   "toast.undoconflict": "Los archivos del cliente cambiaron desde el cambio de servidor",
   "toast.retry": "Reintentar",
+  "undo.last": "Deshacer último cambio",
   "status.realmlist": "realmlist · {0}",
   "status.switching": "Cambiando a {0}…",
   "status.repairing": "Reparando {0}…",
