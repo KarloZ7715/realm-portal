@@ -291,7 +291,12 @@ public sealed class PortalService : IPortalService
                 try
                 {
                     ClientPathSecurity.EnsureTrustedDirectoryPath(client.Path);
-                    var undoFiles = applier.Undo(journal.ClientId!, client.Path, journal.BackupId, markUndone: false);
+                    var undoFiles = applier.Undo(
+                        journal.ClientId!,
+                        client.Path,
+                        journal.BackupId,
+                        markUndone: false,
+                        expectedManifestSha256: journal.ManifestSha256);
                     fileResults = undoFiles.Files;
                     if (undoFiles.HasConflicts || !string.Equals(undoFiles.BackupId, journal.BackupId, StringComparison.Ordinal))
                     {
@@ -501,6 +506,7 @@ public sealed class PortalService : IPortalService
                 return ServiceResult<SwitchOutcome>.Fail(planError!);
 
             string? backupId = null;
+            string? manifestSha256 = null;
             IReadOnlyList<string> changedFiles = [];
             InstallationLock? installationLock = null;
             progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Started));
@@ -511,6 +517,7 @@ public sealed class PortalService : IPortalService
                     installationLock = applier.AcquireInstallationLock(request.ClientId);
                     var applied = applier.Apply(plan, installationLock);
                     backupId = applied.BackupId;
+                    manifestSha256 = applied.ManifestSha256;
                     changedFiles = applied.Edits.Select(e => e.RelativePath.Replace('\\', '/')).ToList();
                 }
 
@@ -554,7 +561,7 @@ public sealed class PortalService : IPortalService
             installationLock?.Dispose();
 
             if (!sameServerActive)
-                _journal.Save(new LastSwitchEntry(request.ClientId, backupId));
+                _journal.Save(new LastSwitchEntry(request.ClientId, backupId, ManifestSha256: manifestSha256));
 
             var activeEntry = ToServerEntry(server, server.Id, request.ClientId, version);
             var previous = sameServerActive ? activeEntry : previousEntry;

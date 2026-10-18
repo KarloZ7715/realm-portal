@@ -33,6 +33,8 @@ The backup root is `$REALM_PORTAL_BACKUP_DIR`, else `realm-portal/backups` under
 6. On any failure every touched file is put back (created files are deleted) and the backup folder is removed, since nothing changed.
    If the revert itself fails, the backup stays so `Undo` can finish the job.
 
+`ApplyResult.ManifestSha256` is the SHA-256 (64 lowercase hex digits) of the `manifest.json` bytes just written, or null when the plan was empty and no manifest was written. Callers that undo later keep this hash outside the backup folder and pass it back as `expectedManifestSha256`.
+
 Apply and Undo of one installation are serialized, also across processes, with an exclusive lock file
 `<backupRoot>/<installationId>/.lock`; a call that cannot get it within 10 s fails with `PermissionDenied`.
 An incomplete or invalid `manifest.json` fails with `VerifyFailed`. A manifest whose `client_root` is not the installation's client
@@ -85,9 +87,11 @@ folder fails with `PathEscapesClient` before any file is read or written.
 | equals `sha256_after`, file did not exist | the file is deleted: `Deleted` (folders are never removed) |
 | anything else | `Conflict`: the file is not touched, the UI decides |
 
-Before any client file is written or deleted, Undo checks every entry: backup copies of files that existed are read and hashed, and every sidecar is checked. A backup copy whose hash no longer matches `sha256_before` is never restored (`HashMismatch`), and nothing is changed. The same is true of a `files/<n>.symlink` that exists without `symlink_sha256`, or whose bytes do not hash to that field.
+Before any client file is written or deleted, Undo checks every entry: backup copies of files that existed are read and hashed, and every sidecar is checked. A backup copy whose hash no longer matches `sha256_before` is never restored (`HashMismatch`), and nothing is changed. The same is true of a `files/<n>.symlink` that exists without `symlink_sha256`, or whose bytes do not hash to that field. A `files/<n>` that is a symbolic link or other reparse point is `VerifyFailed` and is not followed. A backup copy larger than 16 MiB is `VerifyFailed` and is not read.
 
-A sidecar is refused with `VerifyFailed` (nothing changed) when its path is itself a symlink or not a regular file, when it is larger than 4096 bytes, or when it is not valid UTF-8, is empty, or contains a NUL or other control character.
+`Undo` accepts an optional `expectedManifestSha256`. When it is set, Undo hashes the manifest bytes it read and throws `HashMismatch` if they differ, before it writes or deletes any client file. The hash belongs outside the backup folder: every file in that folder, including `manifest.json`, can be edited together. The service stores it in `last-switch.json` (see [app-service.md](app-service.md)). When the argument is omitted, Undo does not check the manifest hash. A journal written before `manifest_sha256` existed has no such field; the service then calls `Undo` without the hash, and those journals keep working as before.
+
+A sidecar is refused with `VerifyFailed` (nothing changed) when its path is itself a symlink or not a regular file, when it is larger than 4096 bytes, or when it is not valid UTF-8, is empty, or contains a NUL or other control character. A FIFO or other non-seekable sidecar is not a regular file (`VerifyFailed`, message "The symlink sidecar is not a regular file."). On Linux, if this CPU has no known `O_NOFOLLOW` value, the sidecar is refused (`VerifyFailed`) instead of being opened with a following read. A failure to bind `libc.open` is `VerifyFailed` as well.
 
 The link is recreated only when following its text one hop at a time stays inside the client. Each hop reads one link with `ResolveLinkTarget(false)` and resolves that text relative to the link's parent; symlinks in parent directories count too. The walk stops at 40 hops. The final target must exist and be a regular file inside the client. An absolute or relative target outside the client, a dangling link, or too many hops is not an error: Undo writes the original bytes back as a regular file. If creating the link fails, or the bytes read through it do not match `sha256_before`, Undo deletes only that link (never its target) and writes the original bytes as a regular file (`Restored`).
 

@@ -16,6 +16,12 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     /// <summary>How many backups are kept per installation by default.</summary>
     public const int DefaultKeepBackups = 10;
 
+    /// <summary>
+    /// A <c>files/&lt;n&gt;</c> payload larger than this is refused before it is read.
+    /// Realmlist and Config.wtf backups are a few kilobytes; the cap stops a swapped-in file from being loaded whole.
+    /// </summary>
+    internal const int MaxBackupFileBytes = 16 * 1024 * 1024;
+
     private readonly IClientFilesPlanner _planner;
     private readonly IAtomicFileWriter _writer;
     private readonly IGameProcessProbe _probe;
@@ -108,9 +114,10 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
         var backupId = NewBackupId(plan.InstallationId);
         var backupDir = Path.Combine(_backupRoot, plan.InstallationId, backupId);
+        string manifestSha256;
         try
         {
-            WriteBackup(plan, clientRoot, backupId, backupDir, targets);
+            manifestSha256 = WriteBackup(plan, clientRoot, backupId, backupDir, targets);
         }
         catch
         {
@@ -139,10 +146,16 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
 
         Prune(plan.InstallationId);
-        return new ApplyResult(backupId, plan.Edits, warnings);
+        return new ApplyResult(backupId, plan.Edits, warnings, manifestSha256);
     }
 
-    public UndoResult Undo(string installationId, string clientRoot, string? backupId = null, bool markUndone = true, InstallationLock? installationLock = null)
+    public UndoResult Undo(
+        string installationId,
+        string clientRoot,
+        string? backupId = null,
+        bool markUndone = true,
+        InstallationLock? installationLock = null,
+        string? expectedManifestSha256 = null)
     {
         if (installationLock is not null && !string.Equals(installationId, installationLock.InstallationId, StringComparison.Ordinal))
             throw new ArgumentException("The installation lock does not match the installation.", nameof(installationLock));
@@ -157,7 +170,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         installationLock ??= AcquireInstallationLock(installationId);
         try
         {
-            var (manifestPath, manifest) = backupId is null
+            var (manifestPath, manifest, manifestBytes) = backupId is null
                 ? FindPending(installationId)
                   ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
                       $"There is no applied change to undo for '{installationId}'.")
@@ -169,6 +182,16 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, clientRoot, "The pending backup id does not match the requested rollback.");
 
             ClientPaths.RequireMatchingRoots(trustedRoot, manifest.ClientRoot, manifestPath);
+
+            // manifest.json sits in the backup folder, so its bytes are not a trust anchor. A hash kept outside
+            // that folder (the last-switch journal) rejects a rewritten manifest before any client file changes.
+            // No hash means a journal written before manifest_sha256 existed; those undos are not checked.
+            if (expectedManifestSha256 is not null
+                && !string.Equals(ClientFilesIo.Sha256Hex(manifestBytes), expectedManifestSha256, StringComparison.Ordinal))
+            {
+                throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, manifestPath,
+                    $"The backup manifest '{manifestPath}' was modified; it cannot be restored safely.");
+            }
 
             if (_probe.IsGameRunning(trustedRoot))
                 throw new ClientFilesException(ClientFilesErrorCode.GameRunning, trustedRoot, "The game is running; close it before restoring its files.");
@@ -265,7 +288,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         Guard(() => _writer.WriteAllBytes(manifestPath, done.ToJson()), manifestPath, "update manifest");
     }
 
-    private (string ManifestPath, BackupManifest Manifest)? FindBackup(string installationId, string backupId)
+    private (string ManifestPath, BackupManifest Manifest, byte[] Bytes)? FindBackup(string installationId, string backupId)
     {
         var manifestPath = Path.Combine(_backupRoot, installationId, backupId, ManifestName);
         var bytes = ReadIfExists(manifestPath);
@@ -274,12 +297,12 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         var manifest = BackupManifest.FromJson(bytes, manifestPath);
         if (manifest.UndoneAt is not null)
             return null;
-        return (manifestPath, manifest);
+        return (manifestPath, manifest, bytes);
     }
 
     // ---- backup ----
 
-    private void WriteBackup(ClientFilesPlan plan, string clientRoot, string backupId, string backupDir, List<Target> targets)
+    private string WriteBackup(ClientFilesPlan plan, string clientRoot, string backupId, string backupDir, List<Target> targets)
     {
         var files = new List<ManifestFile>();
         for (var i = 0; i < targets.Count; i++)
@@ -322,11 +345,13 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             _clock(),
             null,
             files);
+        var manifestBytes = manifest.ToJson();
         var manifestPath = Path.Combine(backupDir, ManifestName);
-        Guard(() => _writer.WriteAllBytes(manifestPath, manifest.ToJson()), manifestPath, "write manifest");
+        Guard(() => _writer.WriteAllBytes(manifestPath, manifestBytes), manifestPath, "write manifest");
+        return ClientFilesIo.Sha256Hex(manifestBytes);
     }
 
-    private (string ManifestPath, BackupManifest Manifest)? FindPending(string installationId)
+    private (string ManifestPath, BackupManifest Manifest, byte[] Bytes)? FindPending(string installationId)
     {
         var dir = Path.Combine(_backupRoot, installationId);
         if (!Directory.Exists(dir))
@@ -341,7 +366,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 continue; // a backup directory that never got its manifest never touched the client
             var manifest = BackupManifest.FromJson(bytes, manifestPath);
             if (manifest.UndoneAt is null)
-                return (manifestPath, manifest);
+                return (manifestPath, manifest, bytes);
         }
 
         return null;
@@ -350,9 +375,69 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     private static byte[] ReadBackupFile(string backupDir, ManifestFile file)
     {
         var path = Path.Combine(backupDir, file.BackupFile ?? throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, backupDir, $"The manifest has no backup file for '{file.Path}'."));
-        var bytes = Guard(() => File.ReadAllBytes(path), path, "read backup file");
+        EnsureRegularBackupFile(path);
+        var bytes = Guard(() => ReadCappedBackup(path), path, "read backup file");
         if (ClientFilesIo.Sha256Hex(bytes) != file.Sha256Before)
             throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, path, $"The backup copy '{path}' was modified; it cannot be restored safely.");
+        return bytes;
+    }
+
+    /// <summary>
+    /// A symlink or other reparse point is not followed. A missing file is left for the read, which reports
+    /// <see cref="ClientFilesErrorCode.PathNotFound"/>. Anything larger than <see cref="MaxBackupFileBytes"/> is refused here.
+    /// </summary>
+    private static void EnsureRegularBackupFile(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (info.LinkTarget != null)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy is not a regular file.");
+
+            if (!info.Exists)
+            {
+                if (Directory.Exists(path))
+                    throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy is not a regular file.");
+                return;
+            }
+
+            if ((info.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory | FileAttributes.Device)) != 0)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy is not a regular file.");
+
+            if (info.Length > MaxBackupFileBytes)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                    $"The backup copy is larger than {MaxBackupFileBytes} bytes.");
+        }
+        catch (ClientFilesException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw ClientFilesIo.Map(ex, path, "read backup file");
+        }
+    }
+
+    private static byte[] ReadCappedBackup(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (!stream.CanSeek)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy is not a regular file.");
+        if (stream.Length > MaxBackupFileBytes)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                $"The backup copy is larger than {MaxBackupFileBytes} bytes.");
+
+        var length = checked((int)stream.Length);
+        var bytes = new byte[length];
+        var offset = 0;
+        while (offset < length)
+        {
+            var n = stream.Read(bytes, offset, length - offset);
+            if (n == 0)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy changed while it was read.");
+            offset += n;
+        }
+
         return bytes;
     }
 

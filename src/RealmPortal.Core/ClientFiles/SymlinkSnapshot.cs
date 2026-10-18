@@ -336,6 +336,11 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
         if (TryGetNoFollowOpenFlags(out var flags))
             return ReadSidecarNoFollow(path, flags);
 
+        // A following open would trust a symlink. Linux without a known O_NOFOLLOW value refuses instead.
+        if (OperatingSystem.IsLinux())
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                "The symlink sidecar cannot be opened without following links on this system.");
+
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         return ReadAtMost(stream, path, MaxSidecarBytes);
     }
@@ -354,7 +359,17 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
 
     private static byte[] ReadSidecarNoFollow(string path, int flags)
     {
-        var fd = open(path, flags);
+        int fd;
+        try
+        {
+            fd = open(path, flags);
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                "The symlink sidecar could not be opened without following links.", ex);
+        }
+
         if (fd < 0)
             throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
                 "The symlink sidecar is not a regular file or could not be opened.");
@@ -365,7 +380,8 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
     }
 
     /// <summary>
-    /// <c>O_NOFOLLOW</c> is not the same value on every CPU. An architecture without a known value does not call <c>open</c>.
+    /// <c>O_NOFOLLOW</c> is not the same value on every CPU. Linux without a known value returns false;
+    /// the caller refuses the sidecar instead of following it.
     /// </summary>
     private static bool TryGetNoFollowOpenFlags(out int flags)
     {
@@ -404,6 +420,11 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
 
     private static byte[] ReadAtMost(Stream stream, string path, int maxBytes)
     {
+        // A FIFO or character device is not seekable. Reject it before a read, which can block or return attacker bytes.
+        if (!stream.CanSeek)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                "The symlink sidecar is not a regular file.");
+
         var buffer = new byte[maxBytes + 1];
         var read = 0;
         while (read < buffer.Length)

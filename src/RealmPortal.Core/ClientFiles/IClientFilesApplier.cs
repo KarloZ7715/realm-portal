@@ -3,7 +3,12 @@ namespace RealmPortal.Core.ClientFiles;
 /// <summary>Outcome of <see cref="IClientFilesApplier.Apply"/>.</summary>
 /// <param name="BackupId">Id of the backup that <see cref="IClientFilesApplier.Undo"/> restores; <c>null</c> when the plan was empty.</param>
 /// <param name="Edits">The edits that were written.</param>
-public sealed record ApplyResult(string? BackupId, IReadOnlyList<ClientFileEdit> Edits, IReadOnlyList<string> Warnings)
+/// <param name="ManifestSha256">SHA-256 of the <c>manifest.json</c> bytes that were written; <c>null</c> when no backup was made.</param>
+public sealed record ApplyResult(
+    string? BackupId,
+    IReadOnlyList<ClientFileEdit> Edits,
+    IReadOnlyList<string> Warnings,
+    string? ManifestSha256 = null)
 {
     public ApplyResult(string? backupId, IReadOnlyList<ClientFileEdit> edits)
         : this(backupId, edits, [])
@@ -73,8 +78,19 @@ public interface IClientFilesApplier
     /// When <paramref name="markUndone"/> is false, restored files stay pending in the manifest until <see cref="MarkBackupUndone"/>.
     /// </summary>
     /// <param name="clientRoot">The installation's trusted client directory (must match the backup manifest).</param>
+    /// <param name="expectedManifestSha256">
+    /// SHA-256 of the manifest bytes, kept outside the backup folder. When set, the manifest just read must hash to
+    /// this value or Undo throws <see cref="ClientFilesErrorCode.HashMismatch"/> before it changes any client file.
+    /// <c>null</c> skips the check, which is how a journal written before <c>manifest_sha256</c> existed still undoes.
+    /// </param>
     /// <exception cref="ClientFilesException"><see cref="ClientFilesErrorCode.NothingToUndo"/> when no change is pending.</exception>
-    UndoResult Undo(string installationId, string clientRoot, string? backupId = null, bool markUndone = true, InstallationLock? installationLock = null);
+    UndoResult Undo(
+        string installationId,
+        string clientRoot,
+        string? backupId = null,
+        bool markUndone = true,
+        InstallationLock? installationLock = null,
+        string? expectedManifestSha256 = null);
 
     /// <summary>
     /// Marks a backup as fully undone after the application state undo has been committed.
