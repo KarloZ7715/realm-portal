@@ -18,21 +18,30 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
 
     public UiPreferences Load()
     {
-        if (!File.Exists(_path))
-        {
-            return new UiPreferences();
-        }
-
         try
         {
+            if (!File.Exists(_path))
+            {
+                return new UiPreferences();
+            }
+
             var json = File.ReadAllText(_path);
             return JsonSerializer.Deserialize<UiPreferences>(json, JsonOptions) ?? new UiPreferences();
         }
-        catch (JsonException)
+        catch (Exception ex) when (IsUnreadable(ex))
         {
+            // A missing, corrupt, or unreadable preferences file must not stop startup.
             return new UiPreferences();
         }
     }
+
+    private static bool IsUnreadable(Exception ex) =>
+        ex is IOException
+            or UnauthorizedAccessException
+            or JsonException
+            or NotSupportedException
+            or FormatException
+            or ArgumentException;
 
     public void Save(UiPreferences preferences)
     {
