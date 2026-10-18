@@ -10,6 +10,18 @@ namespace RealmPortal.App.Tests;
 public class UiPreferencesLoadTests
 {
     [Fact]
+    public void FirstScanCompleted_IsPersistedAndDefaultsToFalse()
+    {
+        using var temp = new TempDirectory();
+        var store = new UiPreferencesStore(temp.Path);
+
+        Assert.False(store.Load().FirstScanCompleted);
+        store.Save(new UiPreferences("en", ["client-1"], FirstScanCompleted: true));
+
+        Assert.True(store.Load().FirstScanCompleted);
+    }
+
+    [Fact]
     public void Save_CreatesPrivateConfigAndPreferencesOnUnix()
     {
         if (OperatingSystem.IsWindows())

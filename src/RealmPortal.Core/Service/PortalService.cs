@@ -18,6 +18,9 @@ public sealed class PortalService : IPortalService
     private readonly IAtomicFileWriter _writer;
     private readonly ServerStore _servers;
     private readonly ClientStore _clients;
+    private readonly ClientScanner _scanner;
+    private readonly ClientScanOptions _scanOptions;
+    private readonly ClientServerExtractor _serverExtractor = new();
     private readonly ActiveServerManager _active;
     private readonly LastSwitchJournal _journal;
     private readonly PortalSettingsStore _settings;
@@ -31,7 +34,9 @@ public sealed class PortalService : IPortalService
         IGameLaunchService launchService,
         IGameProcessProbe? probe = null,
         Func<string, string?>? getVariable = null,
-        IAtomicFileWriter? writer = null)
+        IAtomicFileWriter? writer = null,
+        ClientScanner? scanner = null,
+        ClientScanOptions? scanOptions = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(configDirectory);
         ArgumentException.ThrowIfNullOrWhiteSpace(projectionDirectory);
@@ -40,6 +45,8 @@ public sealed class PortalService : IPortalService
         _configDirectory = configDirectory;
         _projectionDirectory = projectionDirectory;
         _versionReader = versionReader;
+        _scanner = scanner ?? new ClientScanner(versionReader);
+        _scanOptions = scanOptions ?? new ClientScanOptions();
         _launchService = launchService;
         _probe = probe ?? new GameProcessProbe();
         _getVariable = getVariable ?? Environment.GetEnvironmentVariable;
@@ -81,6 +88,73 @@ public sealed class PortalService : IPortalService
         catch (Exception ex)
         {
             return ServiceResult<ClientEntry>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<ScanOutcome> Scan(ScanRequest? request = null, IProgress<ScanProgress>? progress = null)
+    {
+        request ??= new ScanRequest();
+        try
+        {
+            var addedClients = new List<ClientEntry>();
+            var importedServers = new List<ServerEntry>();
+            var knownIds = _clients.List().Select(client => client.Id).ToHashSet(StringComparer.Ordinal);
+            var scanOptions = _scanOptions with
+            {
+                KnownClientIds = knownIds,
+                AdditionalRoots = [.. _scanOptions.AdditionalRoots, .. request.AdditionalRoots ?? []],
+            };
+            var latestProgress = new ClientScanProgress("", 0, 0);
+            var scannerProgress = new InlineProgress<ClientScanProgress>(current =>
+            {
+                latestProgress = current;
+                progress?.Report(new ScanProgress(current.CurrentSource, current.DirectoriesInspected, current.ClientsFound, importedServers.Count));
+            });
+            var discovered = _scanner.Scan(scanOptions, scannerProgress);
+            foreach (var client in discovered)
+            {
+                // The scanner has already validated and canonicalized each candidate. Store registration must
+                // preserve its discovered origin and avoid reading candidate files a second time.
+                var stored = _clients.Add(client.Folder, name: null, origin: client.Origin);
+                if (!knownIds.Contains(stored.Id))
+                    addedClients.Add(ToClientEntry(stored, client.Version));
+                if (request.ImportServers && !knownIds.Contains(stored.Id))
+                {
+                    var extracted = _serverExtractor.Extract(client.Folder, client.Build);
+                    if (extracted is not null)
+                    {
+                        var requiredBuild = client.Build is > 0 ? client.Build : null;
+                        var identity = extracted.Identity(requiredBuild);
+                        var servers = _servers.List();
+                        var matching = servers.FirstOrDefault(server => RealmlistIdentity.FromServer(server).Equals(identity));
+                        if (matching is null)
+                        {
+                            var name = CreateImportedServerName(extracted, client.Version, servers);
+                            var created = Server.Create(name, extracted.Host, extracted.Realm, extracted.ExtraRealmlistLines,
+                                requiredBuild, extracted.Account, clientId: client.Id);
+                            _servers.Add(created);
+                            matching = created;
+                            importedServers.Add(ToServerEntry(created, _active.GetActive(client.Id)?.Id, client.Id, client.Version));
+                        }
+                        else if (matching.ClientId is null)
+                        {
+                            matching = matching with { ClientId = client.Id };
+                            _servers.Update(matching);
+                        }
+
+                        _active.SetActiveForClient(matching, client.Id);
+                    }
+                }
+                progress?.Report(new ScanProgress(latestProgress.CurrentSource, latestProgress.DirectoriesInspected,
+                    latestProgress.ClientsFound, importedServers.Count));
+            }
+
+            var allClients = _clients.List().Select(client => ToClientEntry(client)).ToList();
+            return ServiceResult<ScanOutcome>.Ok(new ScanOutcome(addedClients, importedServers, allClients));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ScanOutcome>.Fail(ServiceErrors.FromException(ex));
         }
     }
 
@@ -249,7 +323,7 @@ public sealed class PortalService : IPortalService
                 }
             }
 
-            var activeId = _active.GetActive()?.Id;
+            var activeId = _active.GetActive(clientId)?.Id;
             var rows = _servers.List()
                 .Select(s => ToServerEntry(s, activeId, clientId, clientVersion))
                 .Where(e => !compatibleOnly || e.IsCompatible)
@@ -898,6 +972,35 @@ public sealed class PortalService : IPortalService
             for (var i = locks.Count - 1; i >= 0; i--)
                 locks[i].Dispose();
         }
+    }
+
+    private static string CreateImportedServerName(ExtractedServer extracted, ClientVersion? version, IReadOnlyList<Server> existing)
+    {
+        var realm = new string((extracted.Realm ?? string.Empty).Where(c => !char.IsControl(c)).ToArray()).Trim();
+        var basis = realm.Length > 0
+            ? $"{realm} ({extracted.Host})"
+            : version is null
+                ? extracted.Host
+                : $"{extracted.Host} ({version.FileVersion.Major}.{version.FileVersion.Minor}.{version.FileVersion.Build})";
+        basis = basis.Trim();
+        if (basis.Length > Server.MaxNameLength)
+            basis = basis[..Server.MaxNameLength].TrimEnd();
+        if (basis.Length == 0)
+            basis = "Imported server";
+
+        var candidate = basis;
+        var suffix = 2;
+        while (existing.Any(server => string.Equals(server.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            var tail = $" #{suffix++}";
+            candidate = basis[..Math.Min(basis.Length, Server.MaxNameLength - tail.Length)].TrimEnd() + tail;
+        }
+        return candidate;
+    }
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
     }
 
     private ClientEntry ToClientEntry(StoredClient stored, ClientVersion? knownVersion = null)

@@ -109,6 +109,39 @@ public sealed class ActiveServerManager(
         }
     }
 
+    /// <summary>Sets a client's initial active server without changing an existing client-specific selection.</summary>
+    public void SetActiveForClient(Server server, string clientId)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+        using (store.DirectoryLock.Acquire())
+        {
+            var stored = store.List().FirstOrDefault(s => s.Id == server.Id)
+                         ?? throw new StoreException($"Server '{server.Id}' is not in the store.");
+            var state = LoadState();
+            if (state.ActiveByClient.ContainsKey(clientId))
+                return;
+
+            var activeByClient = new Dictionary<string, string>(state.ActiveByClient, StringComparer.Ordinal)
+            {
+                [clientId] = stored.Id,
+            };
+            var shouldProject = state.ActiveId is null;
+            SaveState(state with { ActiveId = shouldProject ? stored.Id : state.ActiveId, ActiveByClient = activeByClient });
+            if (!shouldProject)
+                return;
+            try
+            {
+                writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
+            }
+            catch
+            {
+                SaveState(state);
+                throw;
+            }
+        }
+    }
+
     /// <summary>Updates a server and refreshes the global projection when that server is active.</summary>
     public Server Update(Server server)
     {

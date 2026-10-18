@@ -152,7 +152,7 @@ public class PortalViewModelTests
                 Session = new PortalSession(service, new UiPreferencesStore(Config), getVariable);
             }
             var clientId = Session.Service.AddClient(Client).Value!.Id;
-            Session.UiPreferences.Save(new UiPreferences("en", [clientId]));
+            Session.UiPreferences.Save(new UiPreferences("en", [clientId], FirstScanCompleted: true));
             Loc.Instance.SetLanguage(Language.En);
             Main = new MainViewModel(Session, () => Task.FromResult<string?>(Client), autoTick: false);
         }
