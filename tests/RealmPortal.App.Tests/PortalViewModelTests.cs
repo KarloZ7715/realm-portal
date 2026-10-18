@@ -673,14 +673,19 @@ public class PortalViewModelTests
         env.Session.Service.SwitchServer(new SwitchRequest(env.Session.ResolveClientId()!, b.Id));
         env.PutRealmlist("set realmlist tamper.example.org\r\n");
         env.Main.Servers.ReloadFromService();
-        env.Main.Servers.UndoCommand.Execute(null);
-        await Task.Delay(200);
+        await ((IAsyncRelayCommand)env.Main.Servers.UndoCommand).ExecuteAsync(null);
         Assert.True(env.Main.Servers.ShowDiscardUndo);
-        env.Main.Servers.DiscardUndoCommand.Execute(null);
-        await Task.Delay(200);
+
+        var discard = ((IAsyncRelayCommand)env.Main.Servers.DiscardUndoCommand).ExecuteAsync(null);
+        var shown = DateTime.UtcNow.AddSeconds(5);
+        while (env.Main.Dialog is null && DateTime.UtcNow < shown)
+        {
+            await Task.Delay(20);
+        }
+
         Assert.NotNull(env.Main.Dialog);
         env.Main.Dialog!.ConfirmCommand.Execute(null);
-        await Task.Delay(200);
+        await discard;
         Assert.False(env.Session.Service.GetStatus().Value!.CanUndo);
     }
 
