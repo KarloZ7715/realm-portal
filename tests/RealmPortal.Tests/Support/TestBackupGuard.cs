@@ -44,5 +44,10 @@ public class BackupFolderGuardTests
         Assert.NotEqual(userDefault, root);
         var tempRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
         Assert.StartsWith(tempRoot + Path.DirectorySeparatorChar, root, StringComparison.Ordinal);
+
+        // Nothing may be written under the sentinel: a leftover means a test used the process default instead
+        // of its own backup directory. Writes made after this test ran are caught by the copy in the other
+        // test assembly, whose guard test observes the sentinel at a different point in the run.
+        Assert.Empty(Directory.EnumerateFileSystemEntries(sentinel));
     }
 }
