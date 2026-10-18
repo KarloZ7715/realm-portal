@@ -162,6 +162,8 @@
   "error.incompatibleclient.body": "This server needs build {0}; your client is {1}.",
   "error.storecorrupt.title": "Settings file damaged",
   "error.storecorrupt.body": "Realm Portal could not read its data files.",
+  "error.storelocked.title": "Settings are busy",
+  "error.storelocked.body": "Another Realm Portal window or command is using the settings. Wait a moment and try again.",
   "error.undotargetmissing.title": "Cannot undo",
   "error.undotargetmissing.body": "The previous server was removed.",
   "error.invalidlaunchersettings.title": "Invalid launcher settings",

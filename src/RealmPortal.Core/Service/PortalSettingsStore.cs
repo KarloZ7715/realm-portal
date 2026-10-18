@@ -9,7 +9,11 @@ using RealmPortal.Core.Servers;
 namespace RealmPortal.Core.Service;
 
 /// <summary>Persists backup-folder and launcher settings in the config directory.</summary>
-internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWriter writer, Func<string, string?> getVariable)
+internal sealed class PortalSettingsStore(
+    string configDirectory,
+    IAtomicFileWriter writer,
+    Func<string, string?> getVariable,
+    ConfigDirectoryLock? directoryLock = null)
 {
     private const int FormatVersion = 1;
 
@@ -24,6 +28,7 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
 
     private readonly string _storagePath = Path.Combine(configDirectory, "storage-settings.json");
     private readonly string _launcherPath = Path.Combine(configDirectory, "launcher-settings.json");
+    private readonly ConfigDirectoryLock _directoryLock = directoryLock ?? new ConfigDirectoryLock(configDirectory);
 
     public string DefaultBackupFolder => ClientFilesApplier.DefaultBackupRoot(getVariable);
 
@@ -59,12 +64,13 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
     public void SetStorageSettings(StorageSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        // Validate first: the backup-folder probe touches the folder itself and must not hold the config lock.
         var full = ValidateBackupFolder(settings.BackupFolder);
-        PortalConfigFile.WithConfigLock(() =>
+        using (_directoryLock.Acquire())
         {
             var file = new StorageFile { Version = FormatVersion, BackupFolder = full };
             Write(_storagePath, file);
-        });
+        }
     }
 
     public LauncherSettings GetLauncherSettings()
@@ -101,7 +107,7 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
     {
         ArgumentNullException.ThrowIfNull(settings);
         _ = settings.ToSpec(Path.Combine(Path.GetTempPath(), "Wow.exe"), Path.GetTempPath()).Resolve();
-        PortalConfigFile.WithConfigLock(() =>
+        using (_directoryLock.Acquire())
         {
             var file = new LauncherFile
             {
@@ -112,7 +118,7 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
                 Prefix = settings.Prefix?.ToList(),
             };
             Write(_launcherPath, file);
-        });
+        }
     }
 
     public static string ValidateBackupFolder(string folder)
@@ -194,11 +200,15 @@ internal sealed class PortalSettingsStore(string configDirectory, IAtomicFileWri
         });
     }
 
+    /// <summary>Writes one settings file; callers already hold <see cref="ConfigDirectoryLock"/>.</summary>
     private void Write<T>(string path, T payload)
     {
-        var json = JsonSerializer.Serialize(payload, JsonOptions) + "\n";
-        writer.WriteAllBytes(path, new System.Text.UTF8Encoding(false).GetBytes(json));
-        PortalConfigFile.AfterWrite(path);
+        PortalConfigFile.WithConfigLock(() =>
+        {
+            var json = JsonSerializer.Serialize(payload, JsonOptions) + "\n";
+            writer.WriteAllBytes(path, new System.Text.UTF8Encoding(false).GetBytes(json));
+            PortalConfigFile.AfterWrite(path);
+        });
     }
 
     private sealed class StorageFile

@@ -44,11 +44,13 @@ public sealed class PortalService : IPortalService
         _probe = probe ?? new GameProcessProbe();
         _getVariable = getVariable ?? Environment.GetEnvironmentVariable;
         _writer = writer ?? new AtomicFileWriter();
-        _servers = new ServerStore(configDirectory, _writer);
-        _clients = new ClientStore(configDirectory, _writer);
+        // One lock instance for every config store: one read-modify-write sequence at a time, also across processes.
+        var directoryLock = new ConfigDirectoryLock(configDirectory);
+        _servers = new ServerStore(configDirectory, _writer, directoryLock);
+        _clients = new ClientStore(configDirectory, _writer, directoryLock);
         _active = new ActiveServerManager(_servers, configDirectory, projectionDirectory, _writer);
-        _journal = new LastSwitchJournal(configDirectory, _writer);
-        _settings = new PortalSettingsStore(configDirectory, _writer, _getVariable);
+        _journal = new LastSwitchJournal(configDirectory, _writer, directoryLock);
+        _settings = new PortalSettingsStore(configDirectory, _writer, _getVariable, directoryLock);
         _activeBackupRoot = _settings.ResolveActiveBackupFolder(out _storageSettingsError);
         TryRecoverPendingStateUndo();
     }

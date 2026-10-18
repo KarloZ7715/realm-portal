@@ -11,10 +11,11 @@ namespace RealmPortal.Core.Clients;
 /// <remarks>
 /// File format: <c>{ "version": 1, "clients": [ { "id", "path" } ] }</c>.
 /// </remarks>
-public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer)
+public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer, ConfigDirectoryLock? directoryLock = null)
 {
     public const string FileName = "clients.json";
     private const int FormatVersion = 1;
+    private readonly ConfigDirectoryLock _directoryLock = directoryLock ?? new ConfigDirectoryLock(configDirectory);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -43,24 +44,30 @@ public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
         var full = ClientPathSecurity.CanonicalizeTrustedFolder(folderPath);
         var id = ClientIds.FromFolderPath(full);
-        var clients = Load().ToList();
-        var existing = clients.FirstOrDefault(c => c.Id == id);
-        if (existing is not null)
-            return existing;
+        using (_directoryLock.Acquire())
+        {
+            var clients = Load().ToList();
+            var existing = clients.FirstOrDefault(c => c.Id == id);
+            if (existing is not null)
+                return existing;
 
-        clients.Add(new StoredClient(id, full));
-        Save(clients);
-        return clients[^1];
+            clients.Add(new StoredClient(id, full));
+            Save(clients);
+            return clients[^1];
+        }
     }
 
     public bool Remove(string id)
     {
-        var clients = Load().ToList();
-        if (clients.RemoveAll(c => c.Id == id) == 0)
-            return false;
+        using (_directoryLock.Acquire())
+        {
+            var clients = Load().ToList();
+            if (clients.RemoveAll(c => c.Id == id) == 0)
+                return false;
 
-        Save(clients);
-        return true;
+            Save(clients);
+            return true;
+        }
     }
 
     private List<StoredClient> Load()

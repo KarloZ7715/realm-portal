@@ -328,4 +328,24 @@ public class ActiveServerManagerTests
 
         Assert.False(status.ProjectionInSync);
     }
+
+    [Fact]
+    public void Switch_KeepsProjectionInSync()
+    {
+        using var env = new Env();
+        var store = new ServerStore(env.Config, new AtomicFileWriter());
+        var manager = new ActiveServerManager(store, env.Config, env.Projection, new AtomicFileWriter());
+        var servers = Enumerable.Range(1, 6)
+            .Select(i => store.Add(Server.Create($"P{i}", $"p{i}.example.org")))
+            .ToList();
+
+        for (var round = 0; round < 8; round++)
+        {
+            Parallel.ForEach(servers, s => manager.Switch(s));
+            var status = manager.Status();
+            Assert.True(status.ProjectionInSync);
+            Assert.NotNull(status.Active);
+            Assert.Equal(status.Active!.Id, manager.GetActive()!.Id);
+        }
+    }
 }
