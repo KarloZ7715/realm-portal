@@ -106,7 +106,16 @@ internal sealed class PortalSettingsStore(
     public void SetLauncherSettings(LauncherSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        _ = settings.ToSpec(Path.Combine(Path.GetTempPath(), "Wow.exe"), Path.GetTempPath()).Resolve();
+        var validationExecutable = Path.GetTempFileName();
+        try
+        {
+            _ = settings.ToSpec(validationExecutable, Path.GetTempPath()).Resolve();
+        }
+        finally
+        {
+            File.Delete(validationExecutable);
+        }
+
         using (_directoryLock.Acquire())
         {
             var file = new LauncherFile

@@ -43,7 +43,7 @@ The .NET SDK/runtime (MIT) is not redistributed in this repository.
 Keep this table in sync with `Directory.Packages.props`.
 
 
-Texture, typeface and drawing assets (registered on 2026-10-17, updated with the loose assets in `assets/`). Textures were used in the Figma mockups for design direction B "Parchment and bronze" (https://www.figma.com/design/6kBPmTavrfpbceMSUvvWl3).
+Texture, typeface and drawing assets (registered on 2026-10-17, updated with the loose assets in `assets/`). The textures informed the project's "Parchment and bronze" visual direction.
 
 ## Textures (ambientCG, CC0 1.0 Universal)
 All ambientCG textures are published under CC0 1.0 (https://docs.ambientcg.com/license/): they may be copied, modified and distributed, including commercially, without asking permission or giving credit. The source is cited anyway.

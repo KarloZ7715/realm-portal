@@ -1,8 +1,8 @@
-# Linux packaging notes (F6)
+# Release packaging notes (F6)
 
 ## CI workflow
 
-The [Release (Linux packages)](https://github.com/KarloZ7715/realm-portal/actions/workflows/release-linux.yml) workflow (`.github/workflows/release-linux.yml`) builds installable artifacts on `ubuntu-22.04`:
+The [Release (Linux and Windows packages)](https://github.com/KarloZ7715/realm-portal/actions/workflows/release-linux.yml) workflow (`.github/workflows/release-linux.yml`) builds Linux packages and a Windows archive:
 
 | Trigger | Version used |
 | --- | --- |
@@ -10,15 +10,17 @@ The [Release (Linux packages)](https://github.com/KarloZ7715/realm-portal/action
 | `workflow_dispatch` | Input `version`, or `Version` from `Directory.Build.props` when empty |
 | Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix (e.g. `v0.1.0` → `0.1.0`); validated against `^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$` |
 
-It does **not** create a GitHub Release. Outputs are uploaded as a single workflow artifact named `realm-portal-linux-<version>` containing:
+It does **not** create a GitHub Release. Linux outputs are uploaded as a workflow artifact named `realm-portal-linux-<version>` containing:
 
 - `realm-portal_<version>_amd64.deb`
 - `RealmPortal-<version>-x86_64.AppImage`
 - `SHA256SUMS` (checksums for the `.deb` and AppImage)
 
+Windows output is uploaded as `realm-portal-win-x64-<version>` containing `RealmPortal-<version>-win-x64.zip` and `SHA256SUMS`. The ZIP contains the self-contained `win-x64` publish output, including `RealmPortal.App.exe`.
+
 ### Build steps (summary)
 
-1. `dotnet publish` `src/RealmPortal.App/RealmPortal.App.csproj` for `linux-x64`, self-contained, `PublishTrimmed=true`, `TrimMode=partial`, `PublishReadyToRun=true`.
+1. Restore the app project once with `--locked-mode`; its committed lock files include both `linux-x64` and `win-x64`. Each job then runs `dotnet publish --no-restore` for its RID as self-contained. Linux uses `linux-x64`, `PublishTrimmed=true`, `TrimMode=partial`, and `PublishReadyToRun=true`; Windows uses `win-x64` and `PublishReadyToRun=true`.
 2. `packaging/linux/build-packages.sh` lays out the `.deb` and AppImage from that publish directory (see below).
 3. `appimagetool` (AppImageKit release 13, pinned SHA in the workflow) produces the AppImage.
 
