@@ -3,10 +3,19 @@ using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
 
-public class GameLaunchSpecTests
+public class GameLaunchSpecTests : IDisposable
 {
-    private const string Exe = "/games/wow 3.3.5/Wow.exe";
-    private const string Dir = "/games/wow 3.3.5";
+    private readonly TempDirectory _temp = new();
+    private string Exe { get; }
+    private string Dir => _temp.Path;
+
+    public GameLaunchSpecTests()
+    {
+        Exe = _temp.Combine("Wow.exe");
+        File.WriteAllText(Exe, "test executable placeholder");
+    }
+
+    public void Dispose() => _temp.Dispose();
 
     private sealed class FakeRunner : IProcessRunner
     {
@@ -87,6 +96,58 @@ public class GameLaunchSpecTests
     [InlineData("A=B")]
     public void InvalidEnvironmentNames_AreRejected(string name) =>
         Assert.Throws<ArgumentException>(() => new GameLaunchSpec(Exe, Dir, Environment: new Dictionary<string, string?> { [name] = "x" }).Resolve());
+
+    [Theory]
+    [InlineData("LD_PRELOAD")]
+    [InlineData("ld_library_path")]
+    [InlineData("DYLD_INSERT_LIBRARIES")]
+    public void DynamicLoaderEnvironment_IsRejected(string name)
+    {
+        var error = Assert.Throws<ArgumentException>(() =>
+            new GameLaunchSpec(Exe, Dir, Environment: new Dictionary<string, string?> { [name] = "payload" }).Resolve());
+
+        Assert.Equal(GameLaunchSpec.UnsupportedSettingParameter, error.ParamName);
+    }
+
+    [Theory]
+    [InlineData("LD_PRELOAD")]
+    [InlineData("ld_library_path")]
+    [InlineData("DYLD_INSERT_LIBRARIES")]
+    public void Resolve_PreservesNullRestrictedLoaderEntry(string name)
+    {
+        var launch = new GameLaunchSpec(Exe, Dir, Environment: new Dictionary<string, string?> { [name] = null }).Resolve();
+
+        Assert.True(launch.Environment.ContainsKey(name));
+        Assert.Null(launch.Environment[name]);
+    }
+
+    [Fact]
+    public void Resolve_ComposesWineLaunchFields()
+    {
+        var winePrefix = _temp.Combine("wineprefix");
+        var spec = new GameLaunchSpec(
+            ExecutablePath: Exe,
+            WorkingDirectory: Dir,
+            CommandTemplate: "wine {exe}",
+            Arguments: ["-windowed", "-console"],
+            Environment: new Dictionary<string, string?> { ["WINEPREFIX"] = winePrefix, ["LD_PRELOAD"] = null },
+            Prefix: ["gamemoderun"]);
+
+        var launch = spec.Resolve();
+
+        Assert.Equal("gamemoderun", launch.FileName);
+        Assert.Equal(["wine", Exe, "-windowed", "-console"], launch.Arguments);
+        Assert.Equal(Dir, launch.WorkingDirectory);
+        Assert.Equal(winePrefix, launch.Environment["WINEPREFIX"]);
+        Assert.Null(launch.Environment["LD_PRELOAD"]);
+    }
+
+    [Fact]
+    public void RelativeOrMissingExecutable_IsRejected()
+    {
+        Assert.Throws<ArgumentException>(() => new GameLaunchSpec("Wow.exe", Dir).Resolve());
+        Assert.Throws<ArgumentException>(() => new GameLaunchSpec(_temp.Combine("Missing.exe"), Dir).Resolve());
+    }
 
     [Fact]
     public void EmptyExecutableOrEmptyProgram_IsRejected()

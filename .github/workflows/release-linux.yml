@@ -1,4 +1,4 @@
-name: Release (Linux packages)
+name: Release (Linux and Windows packages)
 
 on:
   workflow_dispatch:
@@ -16,6 +16,8 @@ on:
       - Directory.Build.props
       - global.json
       - Directory.Packages.props
+      - nuget.config
+      - "**/packages.lock.json"
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*"
@@ -24,8 +26,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-linux-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: release-linux-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DOTNET_NOLOGO: "true"
@@ -85,7 +87,11 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
-      # TODO(#51): After NuGet lock files land on main, use `dotnet restore --locked-mode` (and publish --no-restore).
+      - name: Restore (locked mode)
+        run: |
+          set -euo pipefail
+          dotnet restore "$APP_PROJECT" --locked-mode -p:PublishReadyToRun=true
+
       - name: Publish (linux-x64, self-contained, trimmed, ReadyToRun)
         run: |
           set -euo pipefail
@@ -93,6 +99,7 @@ jobs:
           dotnet publish "$APP_PROJECT" \
             -c Release \
             -r linux-x64 \
+            --no-restore \
             --self-contained true \
             -p:Version="$PACKAGE_VERSION" \
             -p:InformationalVersion="$PACKAGE_VERSION" \
@@ -134,6 +141,85 @@ jobs:
           path: |
             ${{ env.PACKAGE_DIR }}/*.deb
             ${{ env.PACKAGE_DIR }}/*.AppImage
+            ${{ env.PACKAGE_DIR }}/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-package:
+    name: win-x64 self-contained artifact
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      REF_NAME: ${{ github.ref_name }}
+      INPUT_VERSION: ${{ inputs.version }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve package version
+        id: version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:EVENT_NAME -eq 'pull_request') {
+            if (-not $env:PR_NUMBER) { throw 'Missing pull request number' }
+            $version = "0.0.0-pr.$($env:PR_NUMBER)"
+          } elseif ($env:EVENT_NAME -eq 'push') {
+            $version = $env:REF_NAME -replace '^v', ''
+          } elseif ($env:INPUT_VERSION) {
+            $version = $env:INPUT_VERSION
+          } else {
+            $match = Select-String -Path Directory.Build.props -Pattern '<Version>([^<]+)</Version>' | Select-Object -First 1
+            if (-not $match) { throw 'Could not determine project version' }
+            $version = $match.Matches[0].Groups[1].Value
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "Invalid package version: $version" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore (locked mode)
+        shell: pwsh
+        run: dotnet restore $env:APP_PROJECT --locked-mode -p:PublishReadyToRun=true
+
+      - name: Publish (win-x64, self-contained)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $publishDir = Join-Path $env:RUNNER_TEMP 'publish-win-x64'
+          dotnet publish $env:APP_PROJECT `
+            -c Release `
+            -r win-x64 `
+            --no-restore `
+            --self-contained true `
+            -p:Version=$env:PACKAGE_VERSION `
+            -p:InformationalVersion=$env:PACKAGE_VERSION `
+            -p:PublishReadyToRun=true `
+            -o $publishDir
+          if ($LASTEXITCODE -ne 0) { throw 'Windows publish failed' }
+          $packageDir = Join-Path $env:RUNNER_TEMP 'packages-win-x64'
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          $zipName = "RealmPortal-$($env:PACKAGE_VERSION)-win-x64.zip"
+          $zipPath = Join-Path $packageDir $zipName
+          Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText((Join-Path $packageDir 'SHA256SUMS'), "$hash  $zipName`n", [Text.Encoding]::ASCII)
+          "PACKAGE_DIR=$packageDir" >> $env:GITHUB_ENV
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: realm-portal-win-x64-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.PACKAGE_DIR }}/*.zip
             ${{ env.PACKAGE_DIR }}/SHA256SUMS
           if-no-files-found: error
           retention-days: 14

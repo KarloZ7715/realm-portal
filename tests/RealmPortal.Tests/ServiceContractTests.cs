@@ -1,6 +1,7 @@
 using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Service;
+using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
 
@@ -44,26 +45,32 @@ public class ServiceContractTests
     [Fact]
     public void ToSpec_AddsTheClientsExecutableAndFolder()
     {
+        using var temp = new TempDirectory();
+        var executable = temp.Combine("Wow.exe");
+        File.WriteAllText(executable, "test executable placeholder");
         var settings = new LauncherSettings(
             "wine {exe}",
             ["-windowed"],
             new Dictionary<string, string?> { ["WINEPREFIX"] = "/p", ["DISPLAY"] = null },
             ["gamemoderun"]);
 
-        var launch = settings.ToSpec("/games/wow/Wow.exe", "/games/wow").Resolve();
+        var launch = settings.ToSpec(executable, temp.Path).Resolve();
 
         Assert.Equal("gamemoderun", launch.FileName);
-        Assert.Equal(["wine", "/games/wow/Wow.exe", "-windowed"], launch.Arguments);
-        Assert.Equal("/games/wow", launch.WorkingDirectory);
+        Assert.Equal(["wine", executable, "-windowed"], launch.Arguments);
+        Assert.Equal(temp.Path, launch.WorkingDirectory);
         Assert.Null(launch.Environment["DISPLAY"]);
     }
 
     [Fact]
     public void LauncherSettings_Default_StartsTheExecutableDirectly()
     {
-        var launch = new LauncherSettings().ToSpec("/g/Wow.exe", "/g").Resolve();
+        using var temp = new TempDirectory();
+        var executable = temp.Combine("Wow.exe");
+        File.WriteAllText(executable, "test executable placeholder");
+        var launch = new LauncherSettings().ToSpec(executable, temp.Path).Resolve();
 
-        Assert.Equal("/g/Wow.exe", launch.FileName);
+        Assert.Equal(executable, launch.FileName);
         Assert.Empty(launch.Arguments);
     }
 

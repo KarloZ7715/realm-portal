@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- Keep release RIDs in the lock graph while CI restores without -r. -->
+    <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
     <OutputType>WinExe</OutputType>
     <RootNamespace>RealmPortal.App</RootNamespace>
     <AssemblyName>RealmPortal.App</AssemblyName>

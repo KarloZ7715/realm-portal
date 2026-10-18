@@ -112,6 +112,12 @@ credentials*.json
 service-account*.json
 token*.txt
 
+# ---- Local WoW client data (may contain account or machine details) ----
+WTF/
+*.mpq
+Wow*.exe
+Config.wtf
+
 # ---- Local user config / tools ----
 *.local
 *.local.json
