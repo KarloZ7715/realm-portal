@@ -484,6 +484,47 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task UndoConflict_ShowsRetryAndDiscard_RetrySucceedsAfterTheFileIsFixed_DismissKeepsCanUndo()
+    {
+        using var env = new Env();
+        var a = env.AddServer("A", "a.example.org");
+        var b = env.AddServer("B", "b.example.org");
+        var realmlist = Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf");
+        env.PutRealmlist("set realmlist seed.example.org\r\n");
+        Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(env.Session.ResolveClientId()!, a.Id)).Succeeded);
+        Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(env.Session.ResolveClientId()!, b.Id)).Succeeded);
+        var switched = File.ReadAllBytes(realmlist);
+        env.PutRealmlist("set realmlist tamper.example.org\r\n");
+        env.Main.Servers.ReloadFromService();
+
+        await ((IAsyncRelayCommand)env.Main.Servers.UndoCommand).ExecuteAsync(null);
+
+        Assert.True(env.Main.Servers.ToastVisible);
+        Assert.True(env.Main.Servers.ShowRetryUndo);
+        Assert.True(env.Main.Servers.ShowDiscardUndo);
+        Assert.Equal(b.Id, env.Session.Service.GetStatus().Value!.Active?.Id);
+        Assert.True(env.Session.Service.GetStatus().Value!.CanUndo);
+        Assert.Null(env.Main.Dialog);
+
+        env.Main.Servers.DismissToastCommand.Execute(null);
+        Assert.False(env.Main.Servers.ToastVisible);
+        Assert.False(env.Main.Servers.ShowRetryUndo);
+        Assert.True(env.Session.Service.GetStatus().Value!.CanUndo);
+        Assert.Null(env.Main.Dialog);
+        Assert.Equal("set realmlist tamper.example.org\r\n", Encoding.Latin1.GetString(File.ReadAllBytes(realmlist)));
+
+        env.Main.Servers.ReloadFromService();
+        File.WriteAllBytes(realmlist, switched);
+        await ((IAsyncRelayCommand)env.Main.Servers.UndoCommand).ExecuteAsync(null);
+
+        Assert.Equal(a.Id, env.Session.Service.GetStatus().Value!.Active?.Id);
+        Assert.False(env.Session.Service.GetStatus().Value!.CanUndo);
+        Assert.False(env.Main.Servers.ToastVisible);
+        Assert.False(env.Main.Servers.ShowRetryUndo);
+        Assert.False(env.Main.Servers.ShowDiscardUndo);
+    }
+
+    [AvaloniaFact]
     public async Task DiscardUndo_AfterConflict()
     {
         using var env = new Env();

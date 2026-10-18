@@ -137,11 +137,19 @@
         <c:Icon Data="{DynamicResource IconUndo}" Width="22" Height="22" Foreground="{DynamicResource BronzeLightBrush}" Margin="0,0,14,0"/>
         <TextBlock Grid.Column="1" Classes="body-sm" VerticalAlignment="Center" Foreground="{DynamicResource BoneBrush}" Text="{Binding ToastText}" TextTrimming="CharacterEllipsis"/>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
+          <Button Name="RetryUndoButton" Classes="secondary compact" Command="{Binding UndoCommand}" IsVisible="{Binding ShowRetryUndo}"
+                  AutomationProperties.Name="{loc:T toast.retry}">
+            <TextBlock Text="{loc:T toast.retry}"/>
+          </Button>
           <Button Name="DiscardUndoButton" Classes="secondary compact" Command="{Binding DiscardUndoCommand}" IsVisible="{Binding ShowDiscardUndo}">
             <TextBlock Text="{loc:T discard.confirm}"/>
           </Button>
           <Button Name="UndoButton" Classes="secondary compact" Command="{Binding UndoCommand}" IsVisible="{Binding !ShowDiscardUndo}">
             <TextBlock Text="{loc:T toast.undo}"/>
+          </Button>
+          <Button Name="DismissToastButton" Classes="link" Padding="2" Command="{Binding DismissToastCommand}"
+                  AutomationProperties.Name="{loc:T toast.dismiss}" ToolTip.Tip="{loc:T toast.dismiss}">
+            <c:Icon Data="{DynamicResource IconClose}" Width="14" Height="14" StrokeThickness="2.8"/>
           </Button>
         </StackPanel>
         <c:CountdownLine Grid.Row="1" Grid.ColumnSpan="3" Height="2" Margin="0,8,0,-6" Fraction="{Binding ToastFraction}" Brush="{DynamicResource BronzeBrush}"/>

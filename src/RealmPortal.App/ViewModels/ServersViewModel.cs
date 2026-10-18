@@ -105,7 +105,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     private bool _gameClosed;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ToastText), nameof(StatusText), nameof(ShowDiscardUndo))]
+    [NotifyPropertyChangedFor(nameof(ToastText), nameof(StatusText), nameof(ShowDiscardUndo), nameof(ShowRetryUndo))]
     private bool _toastVisible;
 
     [ObservableProperty]
@@ -128,6 +128,9 @@ public sealed partial class ServersViewModel : ViewModelBase
     public bool ShowEmpty => IsIdle && HasQuery && Visible.Count == 0;
 
     public bool ShowDiscardUndo => ToastVisible && _undoConflict;
+
+    /// <summary>Conflict toast: run <see cref="UndoAsync"/> again after the client files are fixed. Pending undo stays.</summary>
+    public bool ShowRetryUndo => ToastVisible && _undoConflict;
 
     public string ResultsText => Visible.Count == 1
         ? Loc.Format("servers.results.one", SearchText.Trim())
@@ -282,10 +285,8 @@ public sealed partial class ServersViewModel : ViewModelBase
     [RelayCommand]
     private void DismissToast()
     {
-        if (!_undoConflict)
-        {
-            HideToast();
-        }
+        // Closing the notice only hides it. A pending undo, including one stopped on a conflict, stays until Undo or Discard.
+        HideToast();
     }
 
     public void AdvanceToast(TimeSpan elapsed)
@@ -621,6 +622,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         ToastVisible = true;
         OnPropertyChanged(nameof(ToastText));
         OnPropertyChanged(nameof(ShowDiscardUndo));
+        OnPropertyChanged(nameof(ShowRetryUndo));
         if (!_undoConflict)
         {
             _toastTimer?.Start();
@@ -636,6 +638,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         _undoConflict = false;
         OnPropertyChanged(nameof(ToastText));
         OnPropertyChanged(nameof(ShowDiscardUndo));
+        OnPropertyChanged(nameof(ShowRetryUndo));
     }
 
     private DispatcherTimer CreateToastTimer()
