@@ -95,6 +95,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsBusy), nameof(IsRunning), nameof(ShowBanner), nameof(ShowSteps), nameof(StatusText), nameof(ShowResults), nameof(ShowEmpty))]
+    [NotifyCanExecuteChangedFor(nameof(UndoCommand), nameof(DiscardUndoCommand))]
     private ServersPhase _phase;
 
     [ObservableProperty]
@@ -256,7 +257,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         Refresh();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanDiscardUndo))]
     private async Task DiscardUndoAsync()
     {
         if (_session is null)
@@ -291,9 +292,12 @@ public sealed partial class ServersViewModel : ViewModelBase
         });
     }
 
-    private bool CanUndo() => _session is not null
+    private bool CanUndo() => IsIdle && (_session is not null
         ? _canUndoPending
-        : _undoFrom is not null && _undoTo is not null;
+        : _undoFrom is not null && _undoTo is not null);
+
+    /// <summary>Persistent bar and conflict toast can discard only while no switch or play is running.</summary>
+    private bool CanDiscardUndo() => IsIdle;
 
     /// <summary>Reads <see cref="PortalStatus.CanUndo"/> after a reload, an operation, or startup.</summary>
     private void RefreshUndoAvailability()

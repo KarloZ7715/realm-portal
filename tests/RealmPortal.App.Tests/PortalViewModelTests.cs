@@ -587,7 +587,34 @@ public class PortalViewModelTests
         Assert.Equal(ServersPhase.Running, env.Main.Servers.Phase);
         Assert.True(env.Session.Service.GetStatus().Value!.CanUndo);
         Assert.True(env.Main.Servers.CanUndoPending);
+        Assert.False(env.Main.Servers.UndoCommand.CanExecute(null));
+        Assert.False(env.Main.Servers.DiscardUndoCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public async Task UndoAndDiscard_AreDisabledUnlessIdle()
+    {
+        using var env = new Env();
+        var a = env.AddServer("A", "a.example.org");
+        var b = env.AddServer("B", "b.example.org");
+        env.Main.Servers.ReloadFromService();
+        await env.Main.Servers.SwitchOnlyAsync(env.Main.Servers.All.First(s => s.ServerId == a.Id));
+        await env.Main.Servers.SwitchOnlyAsync(env.Main.Servers.All.First(s => s.ServerId == b.Id));
+        Assert.Equal(ServersPhase.Idle, env.Main.Servers.Phase);
+        Assert.True(env.Main.Servers.CanUndoPending);
         Assert.True(env.Main.Servers.UndoCommand.CanExecute(null));
+        Assert.True(env.Main.Servers.DiscardUndoCommand.CanExecute(null));
+
+        foreach (var phase in new[] { ServersPhase.Switching, ServersPhase.Opening, ServersPhase.Running })
+        {
+            env.Main.Servers.Phase = phase;
+            Assert.False(env.Main.Servers.UndoCommand.CanExecute(null));
+            Assert.False(env.Main.Servers.DiscardUndoCommand.CanExecute(null));
+        }
+
+        env.Main.Servers.Phase = ServersPhase.Idle;
+        Assert.True(env.Main.Servers.UndoCommand.CanExecute(null));
+        Assert.True(env.Main.Servers.DiscardUndoCommand.CanExecute(null));
     }
 
     [AvaloniaFact]
