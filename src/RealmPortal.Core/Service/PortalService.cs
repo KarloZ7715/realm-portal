@@ -555,7 +555,7 @@ public sealed class PortalService : IPortalService
                     {
                         if (backupId is not null)
                         {
-                            var rollback = RollbackSwitchApply(applier, request.ClientId, client.Path, backupId, installationLock);
+                            var rollback = RollbackSwitchApply(applier, request.ClientId, client.Path, backupId, installationLock, manifestSha256);
                             if (!rollback.Succeeded)
                             {
                                 installationLock?.Dispose();
@@ -829,11 +829,12 @@ public sealed class PortalService : IPortalService
         string installationId,
         string clientRoot,
         string backupId,
-        InstallationLock? installationLock)
+        InstallationLock? installationLock,
+        string? manifestSha256)
     {
         try
         {
-            var undo = applier.Undo(installationId, clientRoot, backupId, markUndone: true, installationLock);
+            var undo = applier.Undo(installationId, clientRoot, backupId, markUndone: true, installationLock, manifestSha256);
             if (undo.HasConflicts || !string.Equals(undo.BackupId, backupId, StringComparison.Ordinal))
                 return ServiceResult<Unit>.Fail(ServiceErrors.Inconsistent(new ServiceError(ServiceErrorCode.InconsistentState, Consistency: Consistency.Inconsistent, Diagnostic: "Rollback reported conflicts or the wrong backup id.")));
 
