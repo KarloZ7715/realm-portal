@@ -116,6 +116,18 @@ public class CliServerFlowTests
     }
 
     [Fact]
+    public void Add_EscapesControlCharactersInCliErrors()
+    {
+        using var box = new Sandbox(clientBuild: null);
+
+        var result = box.RunWithoutClient("remove", "bad\u001b[31mname");
+
+        Assert.Equal(2, result.Code);
+        Assert.DoesNotContain('\u001b', result.Err);
+        Assert.Contains("\\u001B", result.Err);
+    }
+
+    [Fact]
     public void Status_MarksBuildMismatch_Incompatible_LikeCompatibilityFilter()
     {
         using var box = new Sandbox(clientBuild: 8606);

@@ -120,7 +120,7 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
                 ManifestSha256 = entry.ManifestSha256,
             };
             var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
-            writer.WriteAllBytes(_path, new System.Text.UTF8Encoding(false).GetBytes(json));
+            writer.WriteAllBytes(_path, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
             PortalConfigFile.AfterWrite(_path);
         });
     }

@@ -100,20 +100,20 @@ public sealed class CliApp(
         }
         catch (UsageException ex)
         {
-            error.WriteLine($"error: {ex.Message}");
+            SafeWriteLine(error, $"error: {ex.Message}");
             error.WriteLine(Usage);
             return 1;
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
         {
-            error.WriteLine($"error: {ex.Message}");
+            SafeWriteLine(error, $"error: {ex.Message}");
             return 2;
         }
     }
 
     private int Fail(ServiceError serviceError)
     {
-        error.WriteLine($"error: {ServiceCli.Describe(serviceError, _verbose)}");
+        SafeWriteLine(error, $"error: {ServiceCli.Describe(serviceError, _verbose)}");
         return 2;
     }
 
@@ -132,7 +132,7 @@ public sealed class CliApp(
             var status = service.GetStatus();
             if (status.Succeeded && status.Value!.CanUndo)
             {
-                error.WriteLine(
+                SafeWriteLine(error,
                     $"The game did not start, but '{serverName}' is still applied to this client. Run 'undo' to restore the previous server.");
             }
         }
@@ -209,7 +209,7 @@ public sealed class CliApp(
             ExtraRealmlistLines: lines));
         if (!result.Succeeded)
             return Fail(result.Error!);
-        output.WriteLine($"Added '{result.Value!.Name}' ({result.Value.Id})");
+        SafeWriteLine(output, $"Added '{result.Value!.Name}' ({result.Value.Id})");
         return 0;
     }
 
@@ -221,7 +221,7 @@ public sealed class CliApp(
         var result = service.RemoveServer(server.Id);
         if (!result.Succeeded)
             return Fail(result.Error!);
-        output.WriteLine($"Removed '{server.Name}'");
+        SafeWriteLine(output, $"Removed '{server.Name}'");
         return 0;
     }
 
@@ -240,14 +240,14 @@ public sealed class CliApp(
         if (rows.Count == 0)
         {
             var all = service.ListServers();
-            output.WriteLine(all.Succeeded && all.Value!.Count == 0 ? "No servers." : "No compatible servers.");
+            SafeWriteLine(output, all.Succeeded && all.Value!.Count == 0 ? "No servers." : "No compatible servers.");
             return 0;
         }
 
         foreach (var server in rows)
         {
             var build = server.RequiredClientBuild?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "any";
-            output.WriteLine(
+            SafeWriteLine(output,
                 $"{(server.IsActive ? "*" : " ")} {server.Id}  {server.Name}  {server.Host}  build={build}"
                 + (server.IsCompatible ? "" : "  [incompatible]"));
         }
@@ -265,13 +265,13 @@ public sealed class CliApp(
         if (clientId is null)
         {
             if (server.RequiredClientBuild is not null)
-                error.WriteLine($"warning: no --client-dir given; compatibility with build {server.RequiredClientBuild} was not checked.");
+                SafeWriteLine(error, $"warning: no --client-dir given; compatibility with build {server.RequiredClientBuild} was not checked.");
             var status = service.GetStatus();
             var previousName = status.Succeeded ? status.Value!.Active?.Name : null;
             var activated = service.ActivateWithoutClientFiles(server.Id);
             if (!activated.Succeeded)
                 return Fail(activated.Error!);
-            output.WriteLine($"Switched to '{server.Name}'" + (previousName is null || previousName == server.Name ? "" : $" (previous: '{previousName}')"));
+            SafeWriteLine(output, $"Switched to '{server.Name}'" + (previousName is null || previousName == server.Name ? "" : $" (previous: '{previousName}')"));
             return 0;
         }
 
@@ -279,7 +279,7 @@ public sealed class CliApp(
         if (!sw.Succeeded)
             return Fail(sw.Error!);
         var previous = sw.Value!.Previous?.Name;
-        output.WriteLine($"Switched to '{server.Name}'" + (previous is null || previous == server.Name ? "" : $" (previous: '{previous}')"));
+        SafeWriteLine(output, $"Switched to '{server.Name}'" + (previous is null || previous == server.Name ? "" : $" (previous: '{previous}')"));
         return 0;
     }
 
@@ -290,9 +290,9 @@ public sealed class CliApp(
         if (!result.Succeeded)
             return Fail(result.Error!);
         var restored = result.Value!.Active;
-        output.WriteLine(restored is null ? "Undone: no active server." : $"Undone: restored '{restored.Name}'.");
+        SafeWriteLine(output, restored is null ? "Undone: no active server." : $"Undone: restored '{restored.Name}'.");
         if (result.Value!.ClientFilesNotice is { } notice)
-            output.WriteLine(notice);
+            SafeWriteLine(output, notice);
         return 0;
     }
 
@@ -305,36 +305,36 @@ public sealed class CliApp(
         var status = result.Value!;
         if (status.Active is null)
         {
-            output.WriteLine("Active server: none");
+            SafeWriteLine(output, "Active server: none");
         }
         else
         {
             var s = status.Active;
-            output.WriteLine($"Active server: {s.Name} ({s.Id})");
-            output.WriteLine($"Host: {s.Host}");
-            output.WriteLine($"Realm: {(s.Realm.Length == 0 ? "-" : s.Realm)}");
-            output.WriteLine($"Required client build: {s.RequiredClientBuild?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "any"}");
+            SafeWriteLine(output, $"Active server: {s.Name} ({s.Id})");
+            SafeWriteLine(output, $"Host: {s.Host}");
+            SafeWriteLine(output, $"Realm: {(s.Realm.Length == 0 ? "-" : s.Realm)}");
+            SafeWriteLine(output, $"Required client build: {s.RequiredClientBuild?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "any"}");
         }
 
-        output.WriteLine($"activo.json: {(status.ProjectionInSync ? "in sync" : "OUT OF SYNC (run switch to repair)")}");
+        SafeWriteLine(output, $"activo.json: {(status.ProjectionInSync ? "in sync" : "OUT OF SYNC (run switch to repair)")}");
         if (status.ClientsNotMatchingActive.Count > 0 && status.Active is not null)
         {
             foreach (var client in status.ClientsNotMatchingActive)
-                output.WriteLine(ClientSyncMessages.DriftLine(status.Active.Name, client.Path));
+                SafeWriteLine(output, ClientSyncMessages.DriftLine(status.Active.Name, client.Path));
         }
 
-        output.WriteLine($"Can undo: {(status.CanUndo ? "yes" : "no")}");
+        SafeWriteLine(output, $"Can undo: {(status.CanUndo ? "yes" : "no")}");
         if (clientDir is not null)
         {
             try
             {
                 var client = versionReader.Read(clientDir);
                 var compat = status.Active is null ? "" : CompatibilityFilter.IsCompatible(status.Active, client) ? " (compatible)" : " (INCOMPATIBLE)";
-                output.WriteLine($"Client: {client}{compat}");
+                SafeWriteLine(output, $"Client: {client}{compat}");
             }
             catch (ClientVersionException ex)
             {
-                error.WriteLine($"error: {ex.Message}");
+                SafeWriteLine(error, $"error: {ex.Message}");
                 return 2;
             }
         }
@@ -370,14 +370,14 @@ public sealed class CliApp(
             {
                 var executable = GameExecutable.Find(clientDir)
                                  ?? throw new UsageException($"{GameExecutable.FileName} not found in '{clientDir}'.");
-                output.WriteLine($"Dry run: would launch {(wrapper is null ? "" : wrapper + " ")}{executable} for '{server.Name}'.");
+                SafeWriteLine(output, $"Dry run: would launch {(wrapper is null ? "" : wrapper + " ")}{executable} for '{server.Name}'.");
                 return 0;
             }
 
             var play = service.Play(new SwitchRequest(clientId, server.Id, force));
             if (!play.Succeeded)
                 return FailLaunch(play.Error!, server.Name, service);
-            output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
+            SafeWriteLine(output, $"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
             return 0;
         }
 
@@ -387,7 +387,7 @@ public sealed class CliApp(
         server = status.Value!.Active ?? throw new InvalidOperationException("no active server; run 'switch <server>' or 'launch <server>'.");
         if (!server.IsCompatible && !force)
         {
-            error.WriteLine($"error: '{server.Name}' requires client build {server.RequiredClientBuild}, but the client is incompatible (use --force to launch anyway).");
+            SafeWriteLine(error, $"error: '{server.Name}' requires client build {server.RequiredClientBuild}, but the client is incompatible (use --force to launch anyway).");
             return 2;
         }
 
@@ -395,14 +395,14 @@ public sealed class CliApp(
         {
             var executable = GameExecutable.Find(clientDir)
                              ?? throw new UsageException($"{GameExecutable.FileName} not found in '{clientDir}'.");
-            output.WriteLine($"Dry run: would launch {(wrapper is null ? "" : wrapper + " ")}{executable} for '{server.Name}'.");
+            SafeWriteLine(output, $"Dry run: would launch {(wrapper is null ? "" : wrapper + " ")}{executable} for '{server.Name}'.");
             return 0;
         }
 
         var launch = service.Play(new SwitchRequest(clientId, server.Id, force));
         if (!launch.Succeeded)
             return FailLaunch(launch.Error!, server.Name, service);
-        output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
+        SafeWriteLine(output, $"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
         return 0;
     }
 
@@ -417,11 +417,24 @@ public sealed class CliApp(
         var found = ServiceCli.FindServerEntry(list.Value!, selector);
         if (found is null)
         {
-            error.WriteLine($"error: no server matches '{selector}'.");
+            SafeWriteLine(error, $"error: no server matches '{selector}'.");
             return 2;
         }
 
         server = found;
         return 0;
+    }
+
+    private static void SafeWriteLine(TextWriter writer, string value)
+    {
+        var safe = new System.Text.StringBuilder(value.Length);
+        foreach (var character in value)
+        {
+            if (char.IsControl(character))
+                safe.Append("\\u").Append(((int)character).ToString("X4", System.Globalization.CultureInfo.InvariantCulture));
+            else
+                safe.Append(character);
+        }
+        writer.WriteLine(safe.ToString());
     }
 }

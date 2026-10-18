@@ -1,3 +1,5 @@
+using RealmPortal.Core.IO;
+
 namespace RealmPortal.Core.Servers;
 
 /// <summary>
@@ -65,7 +67,7 @@ public sealed class ConfigDirectoryLock
     {
         try
         {
-            Directory.CreateDirectory(_directory);
+            PrivateStorage.CreatePrivateDirectory(_directory);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
@@ -81,7 +83,10 @@ public sealed class ConfigDirectoryLock
         {
             try
             {
-                return new FileStream(_path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                var stream = new FileStream(_path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                if (!OperatingSystem.IsWindows())
+                    File.SetUnixFileMode(_path, PrivateStorage.PrivateFileMode);
+                return stream;
             }
             catch (IOException ex) when (IsLockContention(ex) && DateTime.UtcNow < deadline)
             {

@@ -9,6 +9,20 @@ namespace RealmPortal.App.Tests;
 
 public class UiPreferencesLoadTests
 {
+    [Fact]
+    public void Save_CreatesPrivateConfigAndPreferencesOnUnix()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        using var temp = new TempDirectory();
+        var config = temp.Combine("config");
+        new UiPreferencesStore(config).Save(new UiPreferences("en"));
+
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(config));
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(Path.Combine(config, "ui-preferences.json")));
+    }
+
     private sealed class NoLaunch : IGameLaunchService
     {
         public void Launch(GameLaunchSpec spec) => throw new InvalidOperationException("This test does not launch the game.");

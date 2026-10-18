@@ -39,7 +39,15 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
         var clearedDestinationReadOnly = false;
         try
         {
-            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
+            if (!OperatingSystem.IsWindows() && permissions?.UnixMode is int createMode)
+            {
+                if (!FileReplacementPermissions.IsValidUnixMode(createMode))
+                    throw new ArgumentOutOfRangeException(nameof(permissions), createMode, "A Unix mode must be within 0..0777.");
+                options.UnixCreateMode = (UnixFileMode)createMode;
+            }
+
+            using (var stream = new FileStream(tempPath, options))
             {
                 var target = _decorateStream?.Invoke(tempPath, stream) ?? stream;
                 target.Write(content, 0, content.Length);
