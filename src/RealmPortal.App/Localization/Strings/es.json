@@ -162,6 +162,8 @@
   "error.incompatibleclient.body": "Este servidor necesita la build {0}; tu cliente es {1}.",
   "error.storecorrupt.title": "Archivo de datos dañado",
   "error.storecorrupt.body": "Realm Portal no pudo leer sus archivos de datos.",
+  "error.storelocked.title": "Los ajustes están ocupados",
+  "error.storelocked.body": "Otra ventana o consola de Realm Portal está usando los ajustes. Espera un momento e inténtalo de nuevo.",
   "error.undotargetmissing.title": "No se puede deshacer",
   "error.undotargetmissing.body": "Se eliminó el servidor anterior.",
   "error.invalidlaunchersettings.title": "Ajustes del lanzador no válidos",
