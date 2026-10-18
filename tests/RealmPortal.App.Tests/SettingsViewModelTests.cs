@@ -1,7 +1,9 @@
 using Avalonia.Headless.XUnit;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Portal;
 using RealmPortal.App.Settings;
 using RealmPortal.App.ViewModels;
+using RealmPortal.Tests.Support;
 
 namespace RealmPortal.App.Tests;
 
@@ -74,6 +76,39 @@ public class SettingsViewModelTests
         Assert.False(vm.IsDirty);
         Assert.Equal(Language.En, Loc.Instance.Current);
         Assert.Equal("wine {exe}", vm.Template);
+    }
+
+    [AvaloniaFact]
+    public void ResolveLanguage_NullKeepsCurrent_ExplicitCodesStay()
+    {
+        using var temp = new TempDirectory();
+        var dir = temp.Combine("config");
+        Directory.CreateDirectory(dir);
+        var store = new UiPreferencesStore(dir);
+        var original = Loc.Instance.Current;
+        try
+        {
+            Loc.Instance.SetLanguage(Language.En);
+            Assert.Equal(Language.En, store.ResolveLanguage());
+            Loc.Instance.SetLanguage(Language.Es);
+            Assert.Equal(Language.Es, store.ResolveLanguage());
+
+            store.SetLanguage(Language.En);
+            Loc.Instance.SetLanguage(Language.Es);
+            Assert.Equal(Language.En, store.ResolveLanguage());
+
+            store.SetLanguage(Language.Es);
+            Loc.Instance.SetLanguage(Language.En);
+            Assert.Equal(Language.Es, store.ResolveLanguage());
+
+            store.Save(store.Load() with { LanguageCode = null });
+            Loc.Instance.SetLanguage(Language.En);
+            Assert.Equal(Language.En, store.ResolveLanguage());
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(original);
+        }
     }
 
     [AvaloniaFact]

@@ -45,7 +45,12 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
     public Language ResolveLanguage()
     {
         var code = Load().LanguageCode;
-        return code?.Equals("en", StringComparison.OrdinalIgnoreCase) == true ? Language.En : Language.Es;
+        if (code is null)
+        {
+            return Loc.Instance.Current;
+        }
+
+        return code.Equals("en", StringComparison.OrdinalIgnoreCase) ? Language.En : Language.Es;
     }
 
     public void SetLanguage(Language language) =>
