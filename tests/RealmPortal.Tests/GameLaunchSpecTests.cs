@@ -113,7 +113,7 @@ public class GameLaunchSpecTests : IDisposable
     [InlineData("LD_PRELOAD")]
     [InlineData("ld_library_path")]
     [InlineData("DYLD_INSERT_LIBRARIES")]
-    public void RestrictedLoaderEnvironment_NullValue_IsPermittedToRemove(string name)
+    public void Resolve_PreservesNullRestrictedLoaderEntry(string name)
     {
         var launch = new GameLaunchSpec(Exe, Dir, Environment: new Dictionary<string, string?> { [name] = null }).Resolve();
 
@@ -122,7 +122,7 @@ public class GameLaunchSpecTests : IDisposable
     }
 
     [Fact]
-    public void WineClient_WithTemplate_PrefixArgumentsAndWinePrefix_ResolvesCorrectly()
+    public void Resolve_ComposesWineLaunchFields()
     {
         var winePrefix = _temp.Combine("wineprefix");
         var spec = new GameLaunchSpec(

@@ -10,6 +10,7 @@ internal static class ServiceCli
     {
         if (verbose && !string.IsNullOrEmpty(error.Diagnostic)
             && error.Code is ServiceErrorCode.StoreCorrupt
+                or ServiceErrorCode.StoreLocked
                 or ServiceErrorCode.PermissionDenied
                 or ServiceErrorCode.ReadOnlyFs
                 or ServiceErrorCode.Unexpected
@@ -34,6 +35,7 @@ internal static class ServiceCli
             ServiceErrorCode.LaunchFailed => string.IsNullOrEmpty(error.Diagnostic) ? "Launch failed." : error.Diagnostic,
             ServiceErrorCode.InvalidRealmlist => error.Diagnostic ?? "The server's realmlist is invalid.",
             ServiceErrorCode.StoreCorrupt => FormatStoreCorrupt(error),
+            ServiceErrorCode.StoreLocked => "Another Realm Portal process is using the config directory; wait for it and try again.",
             ServiceErrorCode.InconsistentState => "The app state may be inconsistent; review config and client files.",
             ServiceErrorCode.UndoConflict => "Client files changed since the switch; undo stopped.",
             ServiceErrorCode.PermissionDenied => "Permission denied.",

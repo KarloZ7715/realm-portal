@@ -79,6 +79,9 @@ public enum ServiceErrorCode
     /// <summary>servers.json, state.json or the client list is unreadable or has an unsupported format (never overwritten).</summary>
     StoreCorrupt,
 
+    /// <summary>Another Realm Portal process still holds <c>.realm-portal.lock</c>; the operation made no change and can be retried.</summary>
+    StoreLocked,
+
     /// <summary>Undo cannot restore the previous server because it was removed.</summary>
     UndoTargetMissing,
 

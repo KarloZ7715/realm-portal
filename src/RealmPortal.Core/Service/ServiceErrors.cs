@@ -88,6 +88,8 @@ internal static class ServiceErrors
     public static ServiceError FromStore(StoreException ex, Consistency consistency = Consistency.Unchanged)
     {
         var msg = ex.Message;
+        if (ex.Locked)
+            return new(ServiceErrorCode.StoreLocked, Consistency: consistency, Diagnostic: msg);
         if (msg.Contains("Nothing to undo", StringComparison.OrdinalIgnoreCase))
             return new(ServiceErrorCode.NothingToUndo, Consistency: consistency, Diagnostic: msg);
         if (msg.Contains("previous server no longer exists", StringComparison.OrdinalIgnoreCase))

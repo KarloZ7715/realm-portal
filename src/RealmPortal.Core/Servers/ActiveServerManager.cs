@@ -67,12 +67,18 @@ public sealed class ActiveServerManager(
     }
 
     /// <summary>Clears the one-level undo record without changing the active server or projection.</summary>
+    /// <remarks>The read, the check and the write happen under the config-directory lock, so a concurrent
+    /// <see cref="Switch"/>, <see cref="Undo"/> or <see cref="Remove"/> in another process cannot be overwritten
+    /// with a stale copy of <c>state.json</c>.</remarks>
     public void DiscardPendingUndo()
     {
-        var state = LoadState();
-        if (state.Undo is null)
-            return;
-        SaveState(state with { Undo = null });
+        using (store.DirectoryLock.Acquire())
+        {
+            var state = LoadState();
+            if (state.Undo is null)
+                return;
+            SaveState(state with { Undo = null });
+        }
     }
 
     /// <summary>
@@ -84,33 +90,36 @@ public sealed class ActiveServerManager(
     public void Switch(Server server)
     {
         ArgumentNullException.ThrowIfNull(server);
-        var stored = store.List().FirstOrDefault(s => s.Id == server.Id)
-                     ?? throw new StoreException($"Server '{server.Name}' is not in the store.");
+        using (store.DirectoryLock.Acquire())
+        {
+            var stored = store.List().FirstOrDefault(s => s.Id == server.Id)
+                         ?? throw new StoreException($"Server '{server.Name}' is not in the store.");
 
-        var state = LoadState();
-        var previous = Resolve(state);
+            var state = LoadState();
+            var previous = Resolve(state);
 
-        try
-        {
-            RealmlistText.Validate(stored.Realmlist);
-        }
-        catch (InvalidRealmlistException ex)
-        {
-            throw ex.ForServer(stored.Name);
-        }
+            try
+            {
+                RealmlistText.Validate(stored.Realmlist);
+            }
+            catch (InvalidRealmlistException ex)
+            {
+                throw ex.ForServer(stored.Name);
+            }
 
-        var next = previous?.Id == stored.Id
-            ? state with { ActiveId = stored.Id }
-            : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } };
-        SaveState(next);
-        try
-        {
-            writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            SaveState(state);
-            throw;
+            var next = previous?.Id == stored.Id
+                ? state with { ActiveId = stored.Id }
+                : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } };
+            SaveState(next);
+            try
+            {
+                writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(stored));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                SaveState(state);
+                throw;
+            }
         }
     }
 
@@ -123,69 +132,75 @@ public sealed class ActiveServerManager(
     /// <exception cref="InvalidRealmlistException">The realmlist of the server to restore is invalid; nothing is changed.</exception>
     public Server? Undo()
     {
-        var state = LoadState();
-        if (state.Undo is null)
-            throw new StoreException("Nothing to undo.");
-
-        Server? target = null;
-        if (state.Undo.ServerId is { } id)
+        using (store.DirectoryLock.Acquire())
         {
-            target = store.List().FirstOrDefault(s => s.Id == id)
-                     ?? throw new StoreException("The previous server no longer exists; cannot undo.");
-        }
+            var state = LoadState();
+            if (state.Undo is null)
+                throw new StoreException("Nothing to undo.");
 
-        if (target is not null)
-        {
+            Server? target = null;
+            if (state.Undo.ServerId is { } id)
+            {
+                target = store.List().FirstOrDefault(s => s.Id == id)
+                         ?? throw new StoreException("The previous server no longer exists; cannot undo.");
+            }
+
+            if (target is not null)
+            {
+                try
+                {
+                    RealmlistText.Validate(target.Realmlist);
+                }
+                catch (InvalidRealmlistException ex)
+                {
+                    throw ex.ForServer(target.Name);
+                }
+            }
+
+            var stateBeforeUndo = state;
+            var nextState = new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null };
+            SaveState(nextState);
             try
             {
-                RealmlistText.Validate(target.Realmlist);
+                if (target is null)
+                    DeleteProjection();
+                else
+                    writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
             }
-            catch (InvalidRealmlistException ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or StoreException)
             {
-                throw ex.ForServer(target.Name);
+                // DeleteProjection wraps I/O failures in StoreException. Roll state back so a failed
+                // delete of activo.json does not commit ActiveId=null and drop the undo record.
+                SaveState(stateBeforeUndo);
+                throw;
             }
-        }
 
-        var stateBeforeUndo = state;
-        var nextState = new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null };
-        SaveState(nextState);
-        try
-        {
-            if (target is null)
-                DeleteProjection();
-            else
-                writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
+            return target;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or StoreException)
-        {
-            // DeleteProjection wraps I/O failures in StoreException. Roll state back so a failed
-            // delete of activo.json does not commit ActiveId=null and drop the undo record.
-            SaveState(stateBeforeUndo);
-            throw;
-        }
-
-        return target;
     }
 
     /// <summary>Removes a server from the store; when it was the active one, deactivates it and deletes <c>activo.json</c>.</summary>
     /// <returns>False when the server does not exist.</returns>
     public bool Remove(string id)
     {
-        if (!store.Remove(id))
-            return false;
-
-        var state = LoadState();
-        if (state.ActiveId == id)
+        using (store.DirectoryLock.Acquire())
         {
-            SaveState(new State { Version = FormatVersion, ActiveId = null, Undo = null });
-            DeleteProjection();
-        }
-        else if (state.Undo?.ServerId == id)
-        {
-            SaveState(state with { Undo = null });
-        }
+            if (!store.RemoveCore(id))
+                return false;
 
-        return true;
+            var state = LoadState();
+            if (state.ActiveId == id)
+            {
+                SaveState(new State { Version = FormatVersion, ActiveId = null, Undo = null });
+                DeleteProjection();
+            }
+            else if (state.Undo?.ServerId == id)
+            {
+                SaveState(state with { Undo = null });
+            }
+
+            return true;
+        }
     }
 
     private Server? Resolve(State state) =>
