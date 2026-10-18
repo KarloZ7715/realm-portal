@@ -10,9 +10,12 @@ namespace RealmPortal.App.Tests.Support;
 /// </summary>
 internal static class TestBackupGuard
 {
+    // One sentinel per process. This assembly references RealmPortal.Tests, so both copies of this module
+    // initializer run in a single test process: a per-assembly random name would leave the two copies
+    // disagreeing about the path the shared environment variable holds.
     internal static readonly string Sentinel = Path.Combine(
         Path.GetTempPath(),
-        "realm-portal-test-sentinel-" + Guid.NewGuid().ToString("N"));
+        "realm-portal-test-sentinel-" + Environment.ProcessId);
 
     [ModuleInitializer]
     internal static void Initialize()
