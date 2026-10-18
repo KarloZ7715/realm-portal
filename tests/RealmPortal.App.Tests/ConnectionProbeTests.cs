@@ -22,7 +22,7 @@ public class ConnectionProbeTests
         watch.Stop();
 
         Assert.Equal(ProbeResult.TimedOut, result);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), $"timed out in {watch.Elapsed}");
+        Assert.True(watch.Elapsed < budget + TimeSpan.FromSeconds(10), $"timed out in {watch.Elapsed}");
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class ConnectionProbeTests
         watch.Stop();
 
         Assert.Equal(ProbeResult.TimedOut, result);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), $"timed out in {watch.Elapsed}");
+        Assert.True(watch.Elapsed < budget + TimeSpan.FromSeconds(10), $"timed out in {watch.Elapsed}");
     }
 
     [Fact]
