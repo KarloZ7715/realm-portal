@@ -56,6 +56,37 @@ public class StorageSettingsStartupTests
     }
 
     [Fact]
+    public void BackupFolderWithNul_ServiceStarts_AndReportsDefaultFolder()
+    {
+        using var dir = new TempDirectory();
+        var config = dir.Combine("config");
+        var defaults = dir.Combine("default-backups");
+        Directory.CreateDirectory(config);
+        Directory.CreateDirectory(defaults);
+        var folder = dir.Combine("bad-backups");
+        var path = Path.Combine(config, "storage-settings.json");
+        // Serialize so Windows backslashes stay escaped and the path value really contains NUL.
+        var json = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["version"] = 1,
+            ["backup_folder"] = folder + "\0",
+        });
+        File.WriteAllText(path, json + "\n");
+
+        using (var document = JsonDocument.Parse(File.ReadAllText(path)))
+        {
+            var backupFolder = document.RootElement.GetProperty("backup_folder").GetString();
+            Assert.NotNull(backupFolder);
+            Assert.Contains('\0', backupFolder);
+        }
+
+        var service = Create(config, dir.Combine("projection"), defaults);
+        var status = service.GetStatus();
+        Assert.True(status.Succeeded);
+        Assert.Equal(defaults, status.Value!.BackupFolder);
+    }
+
+    [Fact]
     public void MissingBackupFolder_ServiceStillStarts_AndReportsPathNotFound()
     {
         using var dir = new TempDirectory();
@@ -80,7 +111,8 @@ public class StorageSettingsStartupTests
     [Fact]
     public void UnwritableBackupFolder_ServiceStillStarts()
     {
-        if (OperatingSystem.IsWindows())
+        // A privileged process ignores directory mode bits, so clearing write bits does not make the folder unwritable.
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
             return;
 
         using var dir = new TempDirectory();
