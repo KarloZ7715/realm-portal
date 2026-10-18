@@ -73,6 +73,13 @@ public sealed partial class AddServerViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(TestCommand))]
     private ConnectionTest _testState;
 
+    /// <summary>Localized service failure from the last save attempt. Not a connection-test result.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSaveError))]
+    private string? _saveError;
+
+    public bool HasSaveError => SaveError is not null;
+
     public bool HasResult => TestState != ConnectionTest.None;
 
     public ServerStatus ResultStatus => TestState switch
@@ -134,6 +141,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
         OnPropertyChanged(nameof(NameError));
         OnPropertyChanged(nameof(AddressError));
         OnPropertyChanged(nameof(ClientError));
+        OnPropertyChanged(nameof(SaveError));
+        OnPropertyChanged(nameof(HasSaveError));
         OnPropertyChanged(nameof(StatusText));
         foreach (var client in Clients.Items)
         {
@@ -145,6 +154,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private async Task TestAsync()
     {
         Submitted = true;
+        ClearSaveError();
         if (!TryParseAddress(Address, out var host, out _))
         {
             TestState = ConnectionTest.None;
@@ -171,6 +181,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private void Save()
     {
         Submitted = true;
+        ClearSaveError();
         if (!IsNameValid || SelectedClient is null || !TryParseAddress(Address, out var host, out var port))
         {
             return;
@@ -193,7 +204,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
                 ClientId: clientId));
             if (!result.Succeeded)
             {
-                TestState = ConnectionTest.Failed;
+                SaveError = result.Error is { } error ? ErrorText.Body(error) : Loc.Get("error.unknown.body");
                 return;
             }
 
@@ -207,11 +218,26 @@ public sealed partial class AddServerViewModel : ViewModelBase
     [RelayCommand]
     private void Cancel() => _cancel();
 
+    partial void OnNameChanged(string value) => ClearSaveError();
+
+    partial void OnAccountChanged(string value) => ClearSaveError();
+
+    partial void OnSelectedClientChanged(ClientItemViewModel? value) => ClearSaveError();
+
     partial void OnAddressChanged(string value)
     {
+        ClearSaveError();
         if (TestState != ConnectionTest.Testing)
         {
             TestState = ConnectionTest.None;
+        }
+    }
+
+    private void ClearSaveError()
+    {
+        if (SaveError is not null)
+        {
+            SaveError = null;
         }
     }
 

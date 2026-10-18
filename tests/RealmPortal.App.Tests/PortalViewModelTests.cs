@@ -117,6 +117,28 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
+    public void PortalSave_FailureShowsSaveErrorWithoutAFailedConnectionTest()
+    {
+        using var env = new Env();
+        env.AddServer("Hand", "hand.example.org");
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+        add.Name = "Hand";
+        add.Address = "other.example.org";
+        add.SelectedClient = env.Main.Clients.Items[0];
+        add.SaveCommand.Execute(null);
+
+        Assert.Equal(ConnectionTest.None, add.TestState);
+        Assert.False(add.HasResult);
+        Assert.Equal(Loc.Format("error.servernametaken.body", "Hand"), add.SaveError);
+        Assert.DoesNotContain("No response", add.SaveError, StringComparison.OrdinalIgnoreCase);
+        Assert.True(add.HasSaveError);
+
+        add.Name = "Other";
+        Assert.Null(add.SaveError);
+        Assert.False(add.HasSaveError);
+    }
+
+    [AvaloniaFact]
     public void ManualAdd_AppearsInList()
     {
         using var env = new Env();
