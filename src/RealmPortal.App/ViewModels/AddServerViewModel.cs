@@ -126,9 +126,20 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     private bool IsNameValid => Name.Trim().Length is > 0 and <= Server.MaxNameLength;
 
-    /// <summary>host or host:port; the port defaults to <see cref="DefaultPort"/>.</summary>
+    /// <summary>host or host:port; the port defaults to <see cref="DefaultPort"/>. Same rules as a realmlist host.</summary>
     public static bool TryParseAddress(string? text, out string host, out int port) =>
         RealmlistAddress.TryParseHostAddress(text, out host, out port, DefaultPort);
+
+    /// <summary>Drops the brackets around an IPv6 literal so a connect/DNS call sees <c>::1</c>, not <c>[::1]</c>.</summary>
+    internal static string HostForProbe(string host)
+    {
+        if (host.Length >= 2 && host[0] == '[' && host[^1] == ']')
+        {
+            return host[1..^1];
+        }
+
+        return host;
+    }
 
     public override void RefreshText()
     {
@@ -160,7 +171,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
         {
             TestState = ConnectionTest.Testing;
             var testedAddress = Address;
-            var result = await _probe!.ProbeAsync(host, port, ConnectionProbeTimeout, CancellationToken.None).ConfigureAwait(true);
+            // TryParseHostAddress keeps the brackets on an IPv6 literal ("[::1]"). The probe resolves a host, not that token.
+            var result = await _probe!.ProbeAsync(HostForProbe(host), port, ConnectionProbeTimeout, CancellationToken.None).ConfigureAwait(true);
             // The field may have moved on while the probe was in flight. Do not paint the old host's result on the new address.
             if (Address != testedAddress)
             {

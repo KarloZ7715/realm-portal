@@ -213,6 +213,75 @@ public class PortalViewModelTests
         }
     }
 
+    [AvaloniaTheory]
+    [InlineData("host;rm -rf")]
+    [InlineData("http://x")]
+    [InlineData("exámple.com")]
+    [InlineData("a..b")]
+    public async Task PortalTest_AddressRejectedByRealmlist_ShowsErrorAndDoesNotProbe(string address)
+    {
+        using var env = new Env();
+        var probe = new FakeProbe(ProbeResult.Ok);
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { }, probe);
+        add.Address = address;
+        await add.TestCommand.ExecuteAsync(null);
+
+        Assert.True(add.HasAddressError);
+        Assert.Equal(ConnectionTest.None, add.TestState);
+        Assert.Equal(0, probe.Calls);
+    }
+
+    [AvaloniaFact]
+    public async Task PortalTest_BracketedIpv6_IsPassedToTheProbeWithoutBrackets()
+    {
+        using var env = new Env();
+        var probe = new FakeProbe(ProbeResult.Failed);
+        var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { }, probe);
+        add.Address = "[::1]:8085";
+        await add.TestCommand.ExecuteAsync(null);
+
+        Assert.False(add.HasAddressError);
+        Assert.Equal(1, probe.Calls);
+        Assert.Equal("::1", probe.Host);
+        Assert.Equal(8085, probe.Port);
+    }
+
+    [AvaloniaFact]
+    public async Task PortalTest_Ipv6Loopback_IsOkWhenTheListenerIsAvailable()
+    {
+        if (!Socket.OSSupportsIPv6)
+        {
+            return;
+        }
+
+        TcpListener listener;
+        try
+        {
+            listener = new TcpListener(IPAddress.IPv6Loopback, 0);
+            listener.Start();
+        }
+        catch (SocketException)
+        {
+            return;
+        }
+
+        using var env = new Env();
+        try
+        {
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            var add = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+            add.Address = $"[::1]:{port}";
+            await add.TestCommand.ExecuteAsync(null);
+            Assert.False(add.HasAddressError);
+            Assert.Equal(ConnectionTest.Ok, add.TestState);
+            Assert.Equal(ServerStatus.Ready, add.ResultStatus);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     [AvaloniaFact]
     public async Task PortalTest_ClosedLoopbackPort_IsFailed()
     {
