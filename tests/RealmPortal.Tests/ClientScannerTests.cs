@@ -296,6 +296,7 @@ public class ClientScannerTests
             new ClientScanOptions
             {
                 HomeDirectory = home.Path,
+                IncludeSystemRoots = false,
                 AdditionalRoots = additional ?? [],
                 KnownClientIds = knownIds,
                 MaxDepth = maxDepth,

@@ -194,41 +194,44 @@ public sealed class ClientScanner
         if (!options.IncludeDefaultRoots)
             return roots;
 
-        if (OperatingSystem.IsWindows())
-        {
-            AddWindowsRoots(roots);
-            return roots;
-        }
-
+        // The Wine, Lutris, Steam and plain-folder layout under the home folder is shared by Linux
+        // and Windows; folders that do not exist cost nothing.
         var home = Home(options);
-        if (home is null)
-            return roots;
-
-        if (Environment.GetEnvironmentVariable("WINEPREFIX") is { Length: > 0 } winePrefix)
-            roots.Add(new Root(winePrefix, ClientOrigin.Wine, 4));
-        roots.Add(new Root(Path.Combine(home, ".wine"), ClientOrigin.Wine, 4));
-
-        foreach (var prefix in ExistingChildDirectories(Path.Combine(home, ".local", "share", "wineprefixes")))
-            roots.Add(new Root(prefix, ClientOrigin.Wine, 4));
-        foreach (var bottle in ExistingChildDirectories(Path.Combine(home, ".local", "share", "bottles", "bottles")))
-            roots.Add(new Root(Path.Combine(bottle, "drive_c"), ClientOrigin.WinePrefix, 3));
-        roots.Add(new Root(Path.Combine(home, ".local", "share", "lutris", "runners", "wine"), ClientOrigin.Wine, 3));
-
-        foreach (var configDirectory in LutrisConfigDirectories(home))
+        if (home is not null)
         {
-            foreach (var config in ExistingChildFiles(configDirectory, "*.yml"))
+            if (Environment.GetEnvironmentVariable("WINEPREFIX") is { Length: > 0 } winePrefix)
+                roots.Add(new Root(winePrefix, ClientOrigin.Wine, 4));
+            roots.Add(new Root(Path.Combine(home, ".wine"), ClientOrigin.Wine, 4));
+
+            foreach (var prefix in ExistingChildDirectories(Path.Combine(home, ".local", "share", "wineprefixes")))
+                roots.Add(new Root(prefix, ClientOrigin.Wine, 4));
+            foreach (var bottle in ExistingChildDirectories(Path.Combine(home, ".local", "share", "bottles", "bottles")))
+                roots.Add(new Root(Path.Combine(bottle, "drive_c"), ClientOrigin.WinePrefix, 3));
+            roots.Add(new Root(Path.Combine(home, ".local", "share", "lutris", "runners", "wine"), ClientOrigin.Wine, 3));
+
+            foreach (var configDirectory in LutrisConfigDirectories(home))
             {
-                foreach (var directory in LutrisGameConfigs.ReadCandidateDirectories(config))
-                    roots.Add(new Root(directory, ClientOrigin.Lutris, 2));
+                foreach (var config in ExistingChildFiles(configDirectory, "*.yml"))
+                {
+                    foreach (var directory in LutrisGameConfigs.ReadCandidateDirectories(config))
+                        roots.Add(new Root(directory, ClientOrigin.Lutris, 2));
+                }
             }
+
+            roots.Add(new Root(Path.Combine(home, "Games"), ClientOrigin.Discovered, 3));
+            roots.Add(new Root(Path.Combine(home, "Juegos"), ClientOrigin.Discovered, 3));
         }
 
         foreach (var steamRoot in SteamRoots(home))
             AddSteamRoots(roots, steamRoot);
 
-        roots.Add(new Root(Path.Combine(home, "Games"), ClientOrigin.Discovered, 3));
-        roots.Add(new Root(Path.Combine(home, "Juegos"), ClientOrigin.Discovered, 3));
-        roots.Add(new Root("/opt/games", ClientOrigin.Discovered, 3));
+        if (!options.IncludeSystemRoots)
+            return roots;
+
+        if (OperatingSystem.IsWindows())
+            AddWindowsRoots(roots);
+        else
+            roots.Add(new Root("/opt/games", ClientOrigin.Discovered, 3));
 
         return roots;
     }
@@ -243,10 +246,6 @@ public sealed class ClientScanner
                 roots.Add(new Root(path, ClientOrigin.Discovered, 2));
         }
 
-        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (profile.Length > 0)
-            roots.Add(new Root(Path.Combine(profile, "Games"), ClientOrigin.Discovered, 3));
-
         try
         {
             foreach (var drive in DriveInfo.GetDrives())
@@ -259,9 +258,6 @@ public sealed class ClientScanner
         {
             // A drive that cannot be queried is simply not a candidate.
         }
-
-        foreach (var steamRoot in SteamRoots(home: null))
-            AddSteamRoots(roots, steamRoot);
 
         AddBlizzardRegistryHints(roots);
     }
@@ -321,22 +317,21 @@ public sealed class ClientScanner
 
     private static IEnumerable<string> SteamRoots(string? home)
     {
+        if (home is not null)
+        {
+            yield return Path.Combine(home, ".steam", "steam");
+            yield return Path.Combine(home, ".steam", "root");
+            yield return Path.Combine(home, ".local", "share", "Steam");
+            yield return Path.Combine(home, ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam");
+            yield return Path.Combine(home, "snap", "steam", "common", ".local", "share", "Steam");
+        }
+
         if (OperatingSystem.IsWindows())
         {
             var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
             if (programFilesX86.Length > 0)
                 yield return Path.Combine(programFilesX86, "Steam");
-            yield break;
         }
-
-        if (home is null)
-            yield break;
-
-        yield return Path.Combine(home, ".steam", "steam");
-        yield return Path.Combine(home, ".steam", "root");
-        yield return Path.Combine(home, ".local", "share", "Steam");
-        yield return Path.Combine(home, ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam");
-        yield return Path.Combine(home, "snap", "steam", "common", ".local", "share", "Steam");
     }
 
     private static IEnumerable<string> LutrisConfigDirectories(string home)

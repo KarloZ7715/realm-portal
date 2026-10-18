@@ -12,8 +12,11 @@ public sealed record ClientScanOptions
     /// <summary>Standard platform locations only, with the default budgets.</summary>
     public static ClientScanOptions Default { get; } = new();
 
-    /// <summary>When true (default) the standard Linux/Windows candidate locations are inspected.</summary>
+    /// <summary>When true (default) the Wine, Lutris, Steam and plain-folder locations under the home folder are inspected.</summary>
     public bool IncludeDefaultRoots { get; init; } = true;
+
+    /// <summary>When true (default) the platform-wide locations (<c>/opt/games</c>, <c>Program Files</c>, drive <c>Games</c> folders, registry hints) are inspected too.</summary>
+    public bool IncludeSystemRoots { get; init; } = true;
 
     /// <summary>Extra folders to inspect in addition to the standard locations (treated as <see cref="ClientOrigin.Discovered"/>).</summary>
     public IReadOnlyList<string> AdditionalRoots { get; init; } = [];
