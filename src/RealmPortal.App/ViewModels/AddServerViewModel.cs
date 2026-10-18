@@ -89,7 +89,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     /// <summary>Localized service failure from the last save attempt. Not a connection-test result.</summary>
     public string? SaveError => _saveServiceError is null
-        ? (_saveFailedUnknown ? Loc.Get("error.unknown.body") : null)
+        ? (_saveFailedUnknown ? Loc.Get("error.state.unknown") : null)
         : ErrorText.Body(_saveServiceError);
 
     public bool HasSaveError => SaveError is not null;

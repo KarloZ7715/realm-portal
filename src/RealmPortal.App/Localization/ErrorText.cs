@@ -13,7 +13,14 @@ public static class ErrorText
 {
     public static string Title(ClientFilesErrorCode code) => Title(code.ToString());
 
-    public static string Body(ClientFilesErrorCode code, string? path = null) => Body(code.ToString(), path);
+    /// <summary>
+    /// Body for a client-files code without a <see cref="Consistency"/>.
+    /// The clients screen reports service results through <see cref="Body(ServiceError)"/>.
+    /// This overload is a pre-check helper: <see cref="PreCheckWritesNothing"/> codes are refusals before any write,
+    /// so they keep the unchanged sentence. Every other code uses the unknown-state sentence.
+    /// </summary>
+    public static string Body(ClientFilesErrorCode code, string? path = null) =>
+        Compose(Body(code.ToString(), path), PreCheckWritesNothing(code) ? Loc.Get("error.state.unchanged") : Loc.Get("error.state.unknown"));
 
     public static string Title(ServiceError error) =>
         PlayServiceResults.SwitchWasApplied(error)
@@ -26,32 +33,66 @@ public static class ErrorText
         if (PlayServiceResults.SwitchWasApplied(error))
         {
             // Diagnostic is English text for logs only, so it is not shown here.
+            // The switch is already applied, so this text must not say that nothing changed.
             return Loc.Get("error.launchfailed.applied.body");
         }
 
-        return error.Code switch
-        {
-            ServiceErrorCode.PermissionDenied or ServiceErrorCode.ReadOnlyFs or ServiceErrorCode.PathNotFound
-                or ServiceErrorCode.PathEscapesClient or ServiceErrorCode.DiskFull or ServiceErrorCode.FileSharingViolation
-                or ServiceErrorCode.ClientExecutableNotFound or ServiceErrorCode.ClientUnreadable
-                or ServiceErrorCode.ClientNotAPortableExecutable or ServiceErrorCode.ClientNoVersionResource =>
-                Body(error.Code.ToString(), error.Path ?? string.Empty),
-            ServiceErrorCode.ProcessCheckFailed =>
-                Body(error.Code.ToString()),
-            ServiceErrorCode.ServerNameTaken =>
-                Body(error.Code.ToString(), error.ServerName ?? string.Empty),
-            ServiceErrorCode.IncompatibleClient =>
-                Body(error.Code.ToString(), error.RequiredBuild, error.ClientBuild),
-            ServiceErrorCode.UndoConflict =>
-                Body(error.Code.ToString(), FormatFileList(error.ConflictingFiles)),
-            ServiceErrorCode.InvalidServerInput =>
-                Body(error.Code.ToString(), error.Field ?? string.Empty),
-            // error.unexpected.body is a "{0}" slot for log text. Use the generic body, which has no placeholder.
-            ServiceErrorCode.Unexpected =>
-                Body("unknown"),
-            _ => Body(error.Code.ToString()),
-        };
+        return Compose(CodeBody(error), StateSentence(error.Consistency));
     }
+
+    /// <summary>The code's own sentence, with placeholders filled and no claim about what was left on disk.</summary>
+    private static string CodeBody(ServiceError error) => error.Code switch
+    {
+        ServiceErrorCode.PermissionDenied or ServiceErrorCode.ReadOnlyFs or ServiceErrorCode.PathNotFound
+            or ServiceErrorCode.PathEscapesClient or ServiceErrorCode.DiskFull or ServiceErrorCode.FileSharingViolation
+            or ServiceErrorCode.ClientExecutableNotFound or ServiceErrorCode.ClientUnreadable
+            or ServiceErrorCode.ClientNotAPortableExecutable or ServiceErrorCode.ClientNoVersionResource =>
+            Body(error.Code.ToString(), error.Path ?? string.Empty),
+        ServiceErrorCode.ProcessCheckFailed =>
+            Body(error.Code.ToString()),
+        ServiceErrorCode.ServerNameTaken =>
+            Body(error.Code.ToString(), error.ServerName ?? string.Empty),
+        ServiceErrorCode.IncompatibleClient =>
+            Body(error.Code.ToString(), error.RequiredBuild, error.ClientBuild),
+        ServiceErrorCode.UndoConflict =>
+            Body(error.Code.ToString(), FormatFileList(error.ConflictingFiles)),
+        ServiceErrorCode.InvalidServerInput =>
+            Body(error.Code.ToString(), error.Field ?? string.Empty),
+        // error.unexpected.body is a "{0}" slot for log text. Use the generic body, which has no placeholder.
+        ServiceErrorCode.Unexpected =>
+            Body("unknown"),
+        _ => Body(error.Code.ToString()),
+    };
+
+    /// <summary>
+    /// What to append about the files left behind. <see cref="Consistency"/> has no null value;
+    /// anything other than unchanged, rolled back, or inconsistent uses the unknown-state sentence.
+    /// </summary>
+    private static string? StateSentence(Consistency consistency) => consistency switch
+    {
+        Consistency.Unchanged => Loc.Get("error.state.unchanged"),
+        Consistency.RolledBack => Loc.Get("error.state.rolledback"),
+        Consistency.Inconsistent => Loc.Get("error.inconsistentstate.body"),
+        _ => Loc.Get("error.state.unknown"),
+    };
+
+    private static string Compose(string body, string? state)
+    {
+        if (string.IsNullOrEmpty(state) || body.Contains(state, StringComparison.Ordinal))
+        {
+            return body;
+        }
+
+        body = body.TrimEnd();
+        return body.Length == 0 ? state : $"{body} {state}";
+    }
+
+    /// <summary>Codes that Core raises only to refuse a change before it writes client files.</summary>
+    private static bool PreCheckWritesNothing(ClientFilesErrorCode code) => code is
+        ClientFilesErrorCode.GameRunning
+        or ClientFilesErrorCode.UnsupportedClient
+        or ClientFilesErrorCode.InvalidRealmlist
+        or ClientFilesErrorCode.NothingToUndo;
 
     public static string Title(string code) => Lookup(code, "title");
 

@@ -460,7 +460,8 @@ public class PortalViewModelTests
 
         Assert.Equal(ConnectionTest.None, add.TestState);
         Assert.False(add.HasResult);
-        Assert.Equal(Loc.Format("error.servernametaken.body", "Hand"), add.SaveError);
+        Assert.Equal(ErrorText.Body(new ServiceError(ServiceErrorCode.ServerNameTaken, ServerName: "Hand")), add.SaveError);
+        Assert.Contains("Nothing was changed.", add.SaveError);
         Assert.DoesNotContain("No response", add.SaveError, StringComparison.OrdinalIgnoreCase);
         Assert.True(add.HasSaveError);
 
@@ -480,14 +481,15 @@ public class PortalViewModelTests
         add.SelectedClient = env.Main.Clients.Items[0];
         add.SaveCommand.Execute(null);
 
-        Assert.Equal(Loc.Format("error.servernametaken.body", "Hand"), add.SaveError);
+        Assert.Equal(ErrorText.Body(new ServiceError(ServiceErrorCode.ServerNameTaken, ServerName: "Hand")), add.SaveError);
         var english = add.SaveError;
 
         Loc.Instance.SetLanguage(Language.Es);
         try
         {
             add.RefreshText();
-            Assert.Equal(Loc.Format("error.servernametaken.body", "Hand"), add.SaveError);
+            Assert.Equal(ErrorText.Body(new ServiceError(ServiceErrorCode.ServerNameTaken, ServerName: "Hand")), add.SaveError);
+            Assert.Contains("No se ha modificado nada.", add.SaveError);
             Assert.NotEqual(english, add.SaveError);
             Assert.True(add.HasSaveError);
         }

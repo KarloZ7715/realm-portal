@@ -639,7 +639,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     private void SetError(ServiceError? error, string? message = null)
     {
         _bannerError = message is null ? error : null;
-        _errorBanner = message ?? (error is null ? Loc.Get("error.unknown.body") : ErrorText.Body(error));
+        _errorBanner = message ?? (error is null ? Loc.Get("error.state.unknown") : ErrorText.Body(error));
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(BannerSeverity));
