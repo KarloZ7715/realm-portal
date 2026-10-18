@@ -31,8 +31,6 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
 
     public SettingsError? Save(SettingsModel settings)
     {
-        session.UiPreferences.SetLanguage(settings.Language);
-
         var launcher = new LauncherSettings(
             settings.CommandTemplate,
             settings.Arguments,
@@ -58,6 +56,7 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
                 settings.BackupFolder);
         }
 
+        session.UiPreferences.SetLanguage(settings.Language);
         return null;
     }
 }

@@ -3,6 +3,7 @@ using Avalonia.Headless.XUnit;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
+using RealmPortal.App.Settings;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Launch;
@@ -206,6 +207,46 @@ public class PortalViewModelTests
         var card = env.Main.Servers.All.First(x => x.ServerId == s.Id);
         await env.Main.Servers.PlayAsync(card);
         Assert.Equal(1, env.Launch.Launches);
+    }
+
+    [AvaloniaFact]
+    public void Settings_PersistsLanguageOnlyAfterLauncherAndStorageSucceed()
+    {
+        using var env = new Env();
+        Assert.Equal("en", env.Session.UiPreferences.Load().LanguageCode);
+        var store = new PortalSettingsStore(env.Session);
+        var environment = new Dictionary<string, string?>();
+
+        var launcherFailed = store.Save(new SettingsModel(
+            Language.Es,
+            "missing-placeholder",
+            [],
+            [],
+            environment,
+            env.Backups));
+        Assert.NotNull(launcherFailed);
+        Assert.Equal("en", env.Session.UiPreferences.Load().LanguageCode);
+
+        var storageFailed = store.Save(new SettingsModel(
+            Language.Es,
+            "wine {exe}",
+            [],
+            [],
+            environment,
+            "relative/backups"));
+        Assert.NotNull(storageFailed);
+        Assert.Equal("en", env.Session.UiPreferences.Load().LanguageCode);
+
+        var saved = store.Save(new SettingsModel(
+            Language.Es,
+            "wine {exe}",
+            [],
+            [],
+            environment,
+            env.Backups));
+        Assert.Null(saved);
+        Assert.Equal("es", env.Session.UiPreferences.Load().LanguageCode);
+        Assert.Equal(Language.Es, env.Session.UiPreferences.ResolveLanguage());
     }
 
     [AvaloniaFact]
