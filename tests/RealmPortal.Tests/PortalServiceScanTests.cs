@@ -73,19 +73,14 @@ public sealed class PortalServiceScanTests
         var output = new StringWriter();
         var error = new StringWriter();
         var launcher = new FakeLauncher();
-        var code = Program.Run(
-            ["scan", "--root", temp.Path, "--config-dir", config, "--projection-dir", projection],
-            output,
-            error,
-            new PeClientVersionReader(),
-            launcher,
-            _ => temp.Combine("backups"));
+        var app = new CliApp(output, error, new PeClientVersionReader(), launcher,
+            _ => temp.Combine("backups"), new ClientScanOptions { IncludeDefaultRoots = false, IncludeSystemRoots = false });
+        var code = app.Run("scan", ["--root", temp.Path, "--config-dir", config, "--projection-dir", projection]);
 
         Assert.Equal(0, code);
         Assert.Empty(error.ToString());
         Assert.Contains("Scanning", output.ToString());
-        Assert.Contains("Scan complete:", output.ToString());
-        Assert.Contains("clients and", output.ToString());
+        Assert.Contains("Scan complete: 1 clients and 1 servers added.", output.ToString());
         Assert.Equal(0, launcher.Launches);
         Assert.True(File.Exists(Path.Combine(client, "Wow.exe")));
     }

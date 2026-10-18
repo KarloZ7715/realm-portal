@@ -15,7 +15,8 @@ public sealed class CliApp(
     TextWriter error,
     IClientVersionReader versionReader,
     IGameLauncher launcher,
-    Func<string, string?> getVariable)
+    Func<string, string?> getVariable,
+    ClientScanOptions? scanOptions = null)
 {
     public const string ClientDirVariable = "REALM_PORTAL_CLIENT_DIR";
 
@@ -87,7 +88,8 @@ public sealed class CliApp(
             var configDir = parsed.Get("--config-dir") ?? PortalPaths.ConfigDirectory(getVariable);
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
             var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
-            var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher), getVariable: getVariable);
+            var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher),
+                getVariable: getVariable, scanOptions: scanOptions);
             string? clientId = null;
             if (clientDir is not null && command is "list" or "switch" or "status" or "launch")
             {
