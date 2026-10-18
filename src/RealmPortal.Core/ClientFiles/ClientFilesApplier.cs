@@ -223,11 +223,27 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             {
                 var file = item.File;
                 var path = item.Path;
-                var current = ReadIfExists(path);
-                var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
+                // ReadIfExists stays for other callers. This read follows a symlink (the managed path may be one)
+                // but must not block on a FIFO or drain a device such as /dev/zero.
+                byte[]? current;
+                bool currentNotComparable;
+                try
+                {
+                    current = ReadCurrentForUndo(path, out currentNotComparable);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    throw ClientFilesIo.Map(ex, path, "read");
+                }
+
+                var currentHash = currentNotComparable || current is null ? null : ClientFilesIo.Sha256Hex(current);
 
                 UndoFileStatus status;
-                if (string.Equals(currentHash, file.Sha256Before, StringComparison.Ordinal))
+                if (currentNotComparable)
+                {
+                    status = UndoFileStatus.Conflict;
+                }
+                else if (string.Equals(currentHash, file.Sha256Before, StringComparison.Ordinal))
                 {
                     status = UndoFileStatus.AlreadyRestored;
                 }
@@ -375,70 +391,66 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     private static byte[] ReadBackupFile(string backupDir, ManifestFile file)
     {
         var path = Path.Combine(backupDir, file.BackupFile ?? throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, backupDir, $"The manifest has no backup file for '{file.Path}'."));
-        EnsureRegularBackupFile(path);
-        var bytes = Guard(() => ReadCappedBackup(path), path, "read backup file");
+        var bytes = ReadRegularBackupFile(path);
         if (ClientFilesIo.Sha256Hex(bytes) != file.Sha256Before)
             throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, path, $"The backup copy '{path}' was modified; it cannot be restored safely.");
         return bytes;
     }
 
     /// <summary>
-    /// A symlink or other reparse point is not followed. A missing file is left for the read, which reports
-    /// <see cref="ClientFilesErrorCode.PathNotFound"/>. Anything larger than <see cref="MaxBackupFileBytes"/> is refused here.
+    /// Opens <paramref name="path"/> once, without following a final symlink, and reads it only when that same
+    /// stream is a regular file no larger than <see cref="MaxBackupFileBytes"/>. There is no separate path check
+    /// before the open. A symlink, FIFO, directory, or other device is <see cref="ClientFilesErrorCode.VerifyFailed"/>.
+    /// A missing file is <see cref="ClientFilesErrorCode.PathNotFound"/>.
     /// </summary>
-    private static void EnsureRegularBackupFile(string path)
+    private static byte[] ReadRegularBackupFile(string path)
     {
+        FileStream stream;
         try
         {
-            var info = new FileInfo(path);
-            if (info.LinkTarget != null)
-                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy is not a regular file.");
-
-            if (!info.Exists)
-            {
-                if (Directory.Exists(path))
-                    throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy is not a regular file.");
-                return;
-            }
-
-            if ((info.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory | FileAttributes.Device)) != 0)
-                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy is not a regular file.");
-
-            if (info.Length > MaxBackupFileBytes)
-                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
-                    $"The backup copy is larger than {MaxBackupFileBytes} bytes.");
+            stream = SymlinkSnapshot.OpenNoFollowForRead(path);
         }
-        catch (ClientFilesException)
+        catch (ClientFilesException ex) when (ex.Code == ClientFilesErrorCode.VerifyFailed
+            && ex.Message.Contains("not a regular file", StringComparison.Ordinal))
         {
-            throw;
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                "The backup copy is not a regular file.", ex);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw ClientFilesIo.Map(ex, path, "read backup file");
         }
-    }
 
-    private static byte[] ReadCappedBackup(string path)
-    {
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (!stream.CanSeek)
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy is not a regular file.");
-        if (stream.Length > MaxBackupFileBytes)
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
-                $"The backup copy is larger than {MaxBackupFileBytes} bytes.");
-
-        var length = checked((int)stream.Length);
-        var bytes = new byte[length];
-        var offset = 0;
-        while (offset < length)
+        using (stream)
         {
-            var n = stream.Read(bytes, offset, length - offset);
-            if (n == 0)
-                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The backup copy changed while it was read.");
-            offset += n;
-        }
+            try
+            {
+                if (!SymlinkSnapshot.IsSeekableRegularFile(stream, out var length))
+                    throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                        "The backup copy is not a regular file.");
+                if (length > MaxBackupFileBytes)
+                    throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                        $"The backup copy is larger than {MaxBackupFileBytes} bytes.");
 
-        return bytes;
+                var size = checked((int)length);
+                var bytes = new byte[size];
+                var offset = 0;
+                while (offset < size)
+                {
+                    var n = stream.Read(bytes, offset, size - offset);
+                    if (n == 0)
+                        throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                            "The backup copy changed while it was read.");
+                    offset += n;
+                }
+
+                return bytes;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw ClientFilesIo.Map(ex, path, "read backup file");
+            }
+        }
     }
 
     /// <summary>
@@ -636,6 +648,52 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw ClientFilesIo.Map(ex, path, "read");
+        }
+    }
+
+    /// <summary>
+    /// Bytes of the managed file for the undo hash check, or null when the path is missing.
+    /// <paramref name="notComparable"/> is set when the file is not a regular file or is larger than
+    /// <see cref="MaxBackupFileBytes"/>. The caller records <see cref="UndoFileStatus.Conflict"/> and does not
+    /// treat those bytes as a match for <c>sha256_after</c>. The read is bounded by the stream length.
+    /// </summary>
+    private static byte[]? ReadCurrentForUndo(string path, out bool notComparable)
+    {
+        notComparable = false;
+        FileStream stream;
+        try
+        {
+            stream = SymlinkSnapshot.OpenFollowNonBlockingForRead(path);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
+
+        using (stream)
+        {
+            if (!SymlinkSnapshot.IsSeekableRegularFile(stream, out var length) || length > MaxBackupFileBytes)
+            {
+                notComparable = true;
+                return null;
+            }
+
+            var size = checked((int)length);
+            var bytes = new byte[size];
+            var offset = 0;
+            while (offset < size)
+            {
+                var n = stream.Read(bytes, offset, size - offset);
+                if (n == 0)
+                {
+                    notComparable = true;
+                    return null;
+                }
+
+                offset += n;
+            }
+
+            return bytes;
         }
     }
 

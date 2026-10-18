@@ -15,6 +15,12 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
 
     private const int O_RDONLY = 0;
 
+    /// <summary><c>ENOENT</c>. <see cref="Marshal.GetLastPInvokeError"/> returns this when <c>open</c> fails because the path is missing.</summary>
+    private const int ENOENT = 2;
+
+    private const int EPERM = 1;
+    private const int EACCES = 13;
+
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     public static SymlinkSnapshot? Capture(string path)
@@ -329,35 +335,100 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
         }
     }
 
-    private static byte[] ReadSidecarBytes(string path)
+    /// <summary>
+    /// Opens <paramref name="path"/> once for reading and does not follow the final symlink.
+    /// On Linux and macOS this is <c>open</c> with <c>O_RDONLY|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC</c>.
+    /// A missing path throws <see cref="FileNotFoundException"/> so the caller can map it to
+    /// <see cref="ClientFilesErrorCode.PathNotFound"/>. Any other failed open is
+    /// <see cref="ClientFilesErrorCode.VerifyFailed"/>.
+    /// On Windows the reparse-point attributes are checked and then a <see cref="FileStream"/> is opened.
+    /// Those are two steps: a symlink swapped in between is followed. That race remains because this path
+    /// has no <c>O_NOFOLLOW</c>.
+    /// </summary>
+    internal static FileStream OpenNoFollowForRead(string path)
     {
         if (OperatingSystem.IsWindows())
-            return ReadSidecarWindows(path);
-        if (TryGetNoFollowOpenFlags(out var flags))
-            return ReadSidecarNoFollow(path, flags);
+            return OpenWindowsNoFollow(path);
 
-        // A following open would trust a symlink. Linux without a known O_NOFOLLOW value refuses instead.
-        if (OperatingSystem.IsLinux())
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
-                "The symlink sidecar cannot be opened without following links on this system.");
+        if (!TryGetNoFollowOpenFlags(out var flags))
+        {
+            // A following open would trust a symlink. Linux without a known O_NOFOLLOW value refuses instead.
+            if (OperatingSystem.IsLinux())
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                    "The file cannot be opened without following links on this system.");
 
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        }
+
+        return OpenUnix(path, flags, followFinalLink: false);
+    }
+
+    /// <summary>
+    /// Opens <paramref name="path"/> for reading and follows a final symlink. A managed client path may be a link.
+    /// On Unix the open is <c>O_RDONLY|O_NONBLOCK|O_CLOEXEC</c> (no <c>O_NOFOLLOW</c>), so a FIFO does not block
+    /// waiting for a writer. The caller must still require a seekable regular file and a size cap: <c>O_NONBLOCK</c>
+    /// only stops the open from hanging. On Windows this is an ordinary <see cref="FileStream"/>.
+    /// A missing path throws <see cref="FileNotFoundException"/>.
+    /// </summary>
+    internal static FileStream OpenFollowNonBlockingForRead(string path)
+    {
+        if (!TryGetNonBlockingFollowFlags(out var flags))
+            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        return OpenUnix(path, flags, followFinalLink: true);
+    }
+
+    /// <summary>
+    /// True when <paramref name="stream"/> is a seekable regular file. <paramref name="length"/> is that stream's length.
+    /// A FIFO is not seekable. On Linux some character devices still report <see cref="Stream.CanSeek"/> and a length of
+    /// zero, so the opened descriptor (not the path) is also checked with <c>statx</c>.
+    /// </summary>
+    internal static bool IsSeekableRegularFile(FileStream stream, out long length)
+    {
+        length = 0;
+        if (!stream.CanSeek)
+            return false;
+        if (OperatingSystem.IsLinux() && !LinuxFdIsRegularOrUnknown(stream.SafeFileHandle))
+            return false;
+
+        try
+        {
+            length = stream.Length;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return false;
+        }
+
+        return length >= 0;
+    }
+
+    private static byte[] ReadSidecarBytes(string path)
+    {
+        using var stream = OpenNoFollowForRead(path);
         return ReadAtMost(stream, path, MaxSidecarBytes);
     }
 
-    private static byte[] ReadSidecarWindows(string path)
+    /// <summary>
+    /// Residual race on Windows: <see cref="FileInfo.LinkTarget"/> and the reparse-point attributes are read,
+    /// then <see cref="FileStream"/> opens <paramref name="path"/> by name. A symlink swapped in between is followed.
+    /// </summary>
+    private static FileStream OpenWindowsNoFollow(string path)
     {
         var info = new FileInfo(path);
-        if (!info.Exists
-            || (info.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory | FileAttributes.Device)) != 0)
+        if (info.LinkTarget != null)
             throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
-                "The symlink sidecar is not a regular file.");
+                "The file is not a regular file or could not be opened.");
 
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        return ReadAtMost(stream, path, MaxSidecarBytes);
+        // Attributes throws FileNotFoundException when the path is missing. The caller maps that to PathNotFound.
+        if ((info.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory | FileAttributes.Device)) != 0)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                "The file is not a regular file or could not be opened.");
+
+        return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
     }
 
-    private static byte[] ReadSidecarNoFollow(string path, int flags)
+    private static FileStream OpenUnix(string path, int flags, bool followFinalLink)
     {
         int fd;
         try
@@ -366,17 +437,104 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
         {
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
-                "The symlink sidecar could not be opened without following links.", ex);
+            if (!followFinalLink)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                    "The file could not be opened without following links.", ex);
+            throw new IOException($"The file '{path}' could not be opened without blocking.", ex);
         }
 
         if (fd < 0)
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
-                "The symlink sidecar is not a regular file or could not be opened.");
+        {
+            // GetLastPInvokeError must run before any other P/Invoke. 2 is ENOENT.
+            var errno = Marshal.GetLastPInvokeError();
+            if (errno == ENOENT)
+                throw new FileNotFoundException($"Could not find file '{path}'.", path);
 
-        using var handle = new SafeFileHandle((IntPtr)fd, ownsHandle: true);
-        using var stream = new FileStream(handle, FileAccess.Read);
-        return ReadAtMost(stream, path, MaxSidecarBytes);
+            if (!followFinalLink)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                    "The file is not a regular file or could not be opened.");
+
+            if (errno is EPERM or EACCES)
+                throw new UnauthorizedAccessException($"Access to the path '{path}' is denied.");
+            throw new IOException($"Could not open file '{path}' (errno {errno}).");
+        }
+
+        var handle = new SafeFileHandle((IntPtr)fd, ownsHandle: true);
+        try
+        {
+            return new FileStream(handle, FileAccess.Read);
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// <c>statx</c> on the descriptor already opened. True when it is a regular file, or when the type could not be read
+    /// (the caller still requires <see cref="Stream.CanSeek"/>). False when <c>statx</c> reports another file type.
+    /// </summary>
+    private static bool LinuxFdIsRegularOrUnknown(SafeFileHandle handle)
+    {
+        const int atEmptyPath = 0x1000;
+        const uint statxType = 1;
+        const int modeOffset = 28;
+        const ushort ifmt = 0xF000;
+        const ushort ifreg = 0x8000;
+
+        var buffer = new byte[256];
+        var added = false;
+        try
+        {
+            handle.DangerousAddRef(ref added);
+            var fd = (int)handle.DangerousGetHandle();
+            var rc = statx(fd, string.Empty, atEmptyPath, statxType, buffer);
+            if (rc < 0)
+                return true;
+
+            var mask = BitConverter.ToUInt32(buffer, 0);
+            if ((mask & statxType) == 0)
+                return true;
+
+            var mode = BitConverter.ToUInt16(buffer, modeOffset);
+            return (mode & ifmt) == ifreg;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return true;
+        }
+        finally
+        {
+            if (added)
+                handle.DangerousRelease();
+        }
+    }
+
+    /// <summary>
+    /// <c>O_RDONLY|O_NONBLOCK|O_CLOEXEC</c> without <c>O_NOFOLLOW</c>. The non-blocking and close-on-exec bits match
+    /// <see cref="TryGetNoFollowOpenFlags"/> and do not depend on the CPU, so an unknown Linux architecture still follows.
+    /// </summary>
+    private static bool TryGetNonBlockingFollowFlags(out int flags)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            const int oNonBlock = 0x4;
+            const int oCloExec = 0x1000000;
+            flags = O_RDONLY | oNonBlock | oCloExec;
+            return true;
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            const int oNonBlockLinux = 0x800;
+            const int oCloExecLinux = 0x80000;
+            flags = O_RDONLY | oNonBlockLinux | oCloExecLinux;
+            return true;
+        }
+
+        flags = 0;
+        return false;
     }
 
     /// <summary>
@@ -418,10 +576,11 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
         return true;
     }
 
-    private static byte[] ReadAtMost(Stream stream, string path, int maxBytes)
+    private static byte[] ReadAtMost(FileStream stream, string path, int maxBytes)
     {
-        // A FIFO or character device is not seekable. Reject it before a read, which can block or return attacker bytes.
-        if (!stream.CanSeek)
+        // Same descriptor OpenNoFollowForRead returned. A FIFO is not seekable; statx rejects a character device
+        // that still reports CanSeek. Reject either before a read, which can block or return attacker bytes.
+        if (!IsSeekableRegularFile(stream, out _))
             throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
                 "The symlink sidecar is not a regular file.");
 
@@ -525,4 +684,7 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
 
     [DllImport("libc", SetLastError = true)]
     private static extern int open([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags);
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int statx(int dirfd, [MarshalAs(UnmanagedType.LPUTF8Str)] string pathname, int flags, uint mask, byte[] buffer);
 }

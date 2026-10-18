@@ -517,9 +517,93 @@ public class ClientFilesSymlinkTests
         var ex = Assert.Throws<ClientFilesException>(() => applier.Undo("install-1", client));
 
         Assert.Equal(ClientFilesErrorCode.VerifyFailed, ex.Code);
-        Assert.Contains("not a regular file", ex.Message, StringComparison.Ordinal);
+        Assert.Equal("The backup copy is not a regular file.", ex.Message);
         Assert.Equal(switched, File.ReadAllText(realmPath));
         Assert.Equal(payload, File.ReadAllBytes(decoy));
+    }
+
+    [Fact]
+    public async Task Undo_BackupFileReplacedByFifo_IsVerifyFailed()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        using var env = new AppliedRealm();
+        var switched = File.ReadAllText(env.RealmPath);
+        var payloadPath = PayloadPath(env, "Data/enUS/realmlist.wtf");
+        File.Delete(payloadPath);
+        if (!TryCreateFifo(payloadPath))
+            return;
+
+        // A FIFO with no writer blocks a following open. The timeout fails the test instead of hanging the runner.
+        var undoTask = Task.Run(() => env.Applier.Undo("install-1", env.Client));
+        var finished = await Task.WhenAny(undoTask, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.True(finished == undoTask, "Undo hung while reading a FIFO backup.");
+        var ex = await Assert.ThrowsAsync<ClientFilesException>(() => undoTask);
+
+        Assert.Equal(ClientFilesErrorCode.VerifyFailed, ex.Code);
+        Assert.Equal("The backup copy is not a regular file.", ex.Message);
+        Assert.Equal(switched, File.ReadAllText(env.RealmPath));
+    }
+
+    [Fact]
+    public async Task Undo_ManagedRealmlistReplacedByFifo_IsConflict()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        using var env = new AppliedRealm();
+        File.Delete(env.RealmPath);
+        if (!TryCreateFifo(env.RealmPath))
+            return;
+
+        var undoTask = Task.Run(() => env.Applier.Undo("install-1", env.Client));
+        var finished = await Task.WhenAny(undoTask, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.True(finished == undoTask, "Undo hung while reading a FIFO realmlist.");
+        var undo = await undoTask;
+
+        Assert.Equal(UndoFileStatus.Conflict, undo.Files.Single(f => f.RelativePath == "Data/enUS/realmlist.wtf").Status);
+        Assert.Equal(0x1000, LinuxMode(env.RealmPath) & 0xF000);
+    }
+
+    [Fact]
+    public async Task Undo_ManagedRealmlistSymlinkToDevZero_IsConflict()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        using var env = new AppliedRealm();
+        File.Delete(env.RealmPath);
+        File.CreateSymbolicLink(env.RealmPath, "/dev/zero");
+
+        var undoTask = Task.Run(() => env.Applier.Undo("install-1", env.Client));
+        var finished = await Task.WhenAny(undoTask, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.True(finished == undoTask, "Undo hung while reading a symlink to /dev/zero.");
+        var undo = await undoTask;
+
+        Assert.Equal(UndoFileStatus.Conflict, undo.Files.Single(f => f.RelativePath == "Data/enUS/realmlist.wtf").Status);
+        Assert.Equal("/dev/zero", new FileInfo(env.RealmPath).LinkTarget);
+    }
+
+    private static string PayloadPath(AppliedRealm env, string relativePath)
+    {
+        var backupFile = BackupFileOf(Path.Combine(env.BackupDir, "manifest.json"), relativePath);
+        return Path.Combine(env.BackupDir, backupFile);
+    }
+
+    /// <summary><c>stat -c %f</c> is the hex <c>st_mode</c>. <c>S_IFMT</c> is <c>0xF000</c>; a FIFO is <c>0x1000</c>.</summary>
+    private static int LinuxMode(string path)
+    {
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "stat",
+            ArgumentList = { "-c", "%f", path },
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        });
+        if (process is null || !process.WaitForExit(5000))
+            throw new InvalidOperationException($"stat did not finish for '{path}'.");
+        return Convert.ToInt32(process.StandardOutput.ReadToEnd().Trim(), 16);
     }
 
     private static bool SymlinksSupported() => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
@@ -583,6 +667,29 @@ public class ClientFilesSymlinkTests
         var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(manifestPath))!;
         edit(node);
         File.WriteAllText(manifestPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private sealed class AppliedRealm : IDisposable
+    {
+        public AppliedRealm()
+        {
+            Temp = new TempDirectory();
+            Client = Temp.Combine("client");
+            var backups = Temp.Combine("backups");
+            Directory.CreateDirectory(Path.Combine(Client, "Data", "enUS"));
+            RealmPath = Path.Combine(Client, "Data", "enUS", "realmlist.wtf");
+            File.WriteAllText(RealmPath, Original);
+            Applier = new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new NeverRunning(), backups);
+            var result = Applier.Apply(Applier.Plan(new ClientFilesRequest("install-1", "profile-1", Client, V3, BlobA, "")));
+            BackupDir = Path.Combine(backups, "install-1", result.BackupId!);
+        }
+
+        public TempDirectory Temp { get; }
+        public string Client { get; }
+        public string RealmPath { get; }
+        public string BackupDir { get; }
+        public ClientFilesApplier Applier { get; }
+        public void Dispose() => Temp.Dispose();
     }
 
     private sealed class LinkedEnv(TempDirectory temp, string client, string linkPath, ClientFilesApplier applier, string manifestPath, string sidecar) : IDisposable
