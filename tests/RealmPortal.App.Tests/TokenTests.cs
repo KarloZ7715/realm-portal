@@ -15,6 +15,8 @@ public class TokenTests
     [InlineData("Wax", "#7A2723")]
     [InlineData("FocusLeather", "#F0BC82")]
     [InlineData("FocusParchment", "#0F5561")]
+    [InlineData("BronzeDark", "#5A3D22")]
+    [InlineData("Stitch", "#8A6C4A")]
     public void ColorTokensMatchTheDesignFile(string name, string hex)
     {
         var color = Res.Get<Color>(name + "Color");

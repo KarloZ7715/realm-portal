@@ -24,7 +24,9 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
         _decorateStream = decorateStream;
     }
 
-    public void WriteAllBytes(string path, byte[] content)
+    public void WriteAllBytes(string path, byte[] content) => WriteAllBytes(path, content, null);
+
+    public void WriteAllBytes(string path, byte[] content, FileReplacementPermissions? permissions)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         ArgumentNullException.ThrowIfNull(content);
@@ -34,6 +36,7 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
         Directory.CreateDirectory(directory);
 
         var tempPath = Path.Combine(directory, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+        var clearedDestinationReadOnly = false;
         try
         {
             using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -44,22 +47,92 @@ public sealed class AtomicFileWriter : IAtomicFileWriter
                 stream.Flush(flushToDisk: true);
             }
 
+            ApplyPermissionsBeforeReplace(tempPath, fullPath, permissions, ref clearedDestinationReadOnly);
             File.Move(tempPath, fullPath, overwrite: true);
+            ApplyPermissionsAfterReplace(fullPath, permissions);
         }
         catch
         {
-            try
+            // The replace did not happen: put the destination's read-only attribute back and remove the temp file
+            // (on Windows a read-only temp file cannot be deleted until the attribute is cleared).
+            TryRestoreReadOnly(fullPath, clearedDestinationReadOnly);
+            TryDeleteTemp(tempPath);
+            throw;
+        }
+    }
+
+    private static void TryRestoreReadOnly(string destinationPath, bool cleared)
+    {
+        if (!cleared)
+            return;
+        try
+        {
+            if (File.Exists(destinationPath))
+                File.SetAttributes(destinationPath, File.GetAttributes(destinationPath) | FileAttributes.ReadOnly);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static void TryDeleteTemp(string tempPath)
+    {
+        try
+        {
+            if (!File.Exists(tempPath))
+                return;
+            if (OperatingSystem.IsWindows())
             {
-                File.Delete(tempPath);
-            }
-            catch (IOException)
-            {
-            }
-            catch (UnauthorizedAccessException)
-            {
+                var attrs = File.GetAttributes(tempPath);
+                if (attrs.HasFlag(FileAttributes.ReadOnly))
+                    File.SetAttributes(tempPath, attrs & ~FileAttributes.ReadOnly);
             }
 
-            throw;
+            File.Delete(tempPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static void ApplyPermissionsBeforeReplace(
+        string tempPath, string destinationPath, FileReplacementPermissions? permissions, ref bool clearedDestinationReadOnly)
+    {
+        if (permissions is null)
+            return;
+
+        if (permissions.UnixMode is int unix && (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS()))
+        {
+            // Re-check here too: a caller-built FileReplacementPermissions must never set setuid/setgid/sticky bits.
+            if (!FileReplacementPermissions.IsValidUnixMode(unix))
+                throw new ArgumentOutOfRangeException(nameof(permissions), unix, "A Unix mode must be within 0..0777.");
+            File.SetUnixFileMode(tempPath, (UnixFileMode)(unix & FileReplacementPermissions.UnixPermissionMask));
+        }
+
+        if (OperatingSystem.IsWindows() && permissions.WindowsReadOnly is true)
+        {
+            // Make the temp file read-only first, so the file that lands at the destination already has the attribute:
+            // there is no moment (and no failure point after the rename) where the replaced file is writable.
+            File.SetAttributes(tempPath, File.GetAttributes(tempPath) | FileAttributes.ReadOnly);
+
+            if (File.Exists(destinationPath))
+            {
+                var destAttrs = File.GetAttributes(destinationPath);
+                if (destAttrs.HasFlag(FileAttributes.ReadOnly))
+                {
+                    File.SetAttributes(destinationPath, destAttrs & ~FileAttributes.ReadOnly);
+                    clearedDestinationReadOnly = true;
+                }
+            }
+        }
+    }
+
+    private static void ApplyPermissionsAfterReplace(string destinationPath, FileReplacementPermissions? permissions)
+    {
+        if (permissions?.WindowsReadOnly is true && OperatingSystem.IsWindows())
+        {
+            var attrs = File.GetAttributes(destinationPath);
+            File.SetAttributes(destinationPath, attrs | FileAttributes.ReadOnly);
         }
     }
 }

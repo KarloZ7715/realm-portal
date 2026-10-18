@@ -11,7 +11,7 @@ namespace RealmPortal.Core.Servers;
 /// </summary>
 /// <remarks>
 /// File format (UTF-8 without BOM, 2-space indent, <c>\n</c> newlines, trailing newline):
-/// <c>{ "version": 1, "servers": [ { "id", "name", "host", "realm", "realmlist", "required_client_build", "account" } ] }</c>.
+/// <c>{ "version": 1, "servers": [ { "id", "name", "host", "realm", "realmlist", "required_client_build", "account", "client_id" } ] }</c>.
 /// A missing file is an empty store; an unreadable or unsupported file raises <see cref="StoreException"/>
 /// and is never overwritten.
 /// </remarks>
@@ -127,7 +127,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
             || r.Realmlist is null)
             throw new StoreException("A stored server is missing id, name, host or realmlist.");
 
-        return new Server(r.Id, r.Name, r.Host, r.Realm ?? "", r.Realmlist, r.RequiredClientBuild, r.Account);
+        return new Server(r.Id, r.Name, r.Host, r.Realm ?? "", r.Realmlist, r.RequiredClientBuild, r.Account, r.ClientId);
     }
 
     private static ServerRecord ToRecord(Server s) => new()
@@ -139,6 +139,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
         Realmlist = s.Realmlist,
         RequiredClientBuild = s.RequiredClientBuild,
         Account = s.Account,
+        ClientId = s.ClientId,
     };
 
     private sealed class StoreFile
@@ -156,5 +157,8 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
         [JsonPropertyName("realmlist")] public string? Realmlist { get; set; }
         [JsonPropertyName("required_client_build")] public int? RequiredClientBuild { get; set; }
         [JsonPropertyName("account")] public string? Account { get; set; }
+        [JsonPropertyName("client_id")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ClientId { get; set; }
     }
 }

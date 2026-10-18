@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
@@ -14,14 +13,14 @@ namespace RealmPortal.App.ViewModels;
 public sealed partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsStore _store;
-    private readonly Func<string?> _pickFolder;
+    private readonly Func<Task<string?>>? _pickFolder;
     private SettingsModel _saved;
     private bool _justSaved;
 
-    public SettingsViewModel(ISettingsStore store, Func<string?>? pickFolder = null)
+    public SettingsViewModel(ISettingsStore store, Func<Task<string?>>? pickFolder = null)
     {
         _store = store;
-        _pickFolder = pickFolder ?? (() => null);
+        _pickFolder = pickFolder;
         _saved = store.Load();
         Reset();
     }
@@ -116,6 +115,13 @@ public sealed partial class SettingsViewModel : ViewModelBase
             return;
         }
 
+        if (!IsValidTemplate(Template))
+        {
+            ServiceErrorField = "template";
+            Changed();
+            return;
+        }
+
         IReadOnlyDictionary<string, string?> environment;
         if (Environment == LauncherText.JoinEnvironment(_saved.Environment))
         {
@@ -128,7 +134,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
         var model = new SettingsModel(
             Loc.Instance.Current,
-            string.IsNullOrWhiteSpace(Template) ? null : Template.Trim(),
+            Template.Trim(),
             LauncherText.Tokens(Prefix),
             LauncherText.Tokens(Arguments),
             environment,
@@ -156,12 +162,26 @@ public sealed partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void Back() => BackRequested?.Invoke();
+    private void Back()
+    {
+        Cancel();
+        BackRequested?.Invoke();
+    }
+
+    internal static bool IsValidTemplate(string? template) =>
+        !string.IsNullOrWhiteSpace(template)
+        && template.Contains("{exe}", StringComparison.Ordinal);
 
     [RelayCommand]
-    private void Browse()
+    private async Task BrowseAsync()
     {
-        if (_pickFolder() is { Length: > 0 } folder)
+        if (_pickFolder is null)
+        {
+            return;
+        }
+
+        var folder = await _pickFolder().ConfigureAwait(true);
+        if (folder is { Length: > 0 })
         {
             BackupFolder = folder;
         }

@@ -9,7 +9,7 @@
     <StackPanel Margin="20,10,20,0">
       <Grid ColumnDefinitions="*,Auto" Height="44">
         <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T clients.title}"/>
-        <Button Grid.Column="1" Name="PickButton" Classes="secondary compact" VerticalAlignment="Center" Command="{Binding PickFolderCommand}">
+        <Button Grid.Column="1" Name="PickButton" Classes="secondary compact" c:ButtonSurface.Surface="Parchment" VerticalAlignment="Center" Command="{Binding PickFolderCommand}">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <c:Icon Data="{DynamicResource IconFolder}" Width="16" Height="16" StrokeThickness="2"/>
             <TextBlock Text="{loc:T clients.pick}"/>
