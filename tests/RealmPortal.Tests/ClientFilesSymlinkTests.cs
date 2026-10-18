@@ -585,6 +585,31 @@ public class ClientFilesSymlinkTests
         Assert.Equal("/dev/zero", new FileInfo(env.RealmPath).LinkTarget);
     }
 
+    [Fact]
+    public async Task Undo_RecreatedLinkTargetReplacedByFifo_RestoresRegularFileWithoutHanging()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        using var env = LinkedRealmlist();
+        // The managed file was a symlink to <client>/shared-realmlist.wtf. Someone swaps that target for a
+        // FIFO, which a following, unbounded read would block on while Undo holds the installation lock.
+        var target = Path.Combine(env.Client, "shared-realmlist.wtf");
+        File.Delete(target);
+        if (!TryCreateFifo(target))
+            return;
+
+        var undoTask = Task.Run(() => env.Applier.Undo("install-1", env.Client));
+        var finished = await Task.WhenAny(undoTask, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.True(finished == undoTask, "Undo hung while reading through a recreated link to a FIFO.");
+        var undo = await undoTask;
+
+        Assert.Equal(UndoFileStatus.Restored, undo.Files.Single(f => f.RelativePath == "Data/enUS/realmlist.wtf").Status);
+        Assert.Equal(0x8000, LinuxMode(env.LinkPath) & 0xF000);
+        Assert.Equal(Original, File.ReadAllText(env.LinkPath));
+        Assert.Equal(0x1000, LinuxMode(target) & 0xF000);
+    }
+
     private static string PayloadPath(AppliedRealm env, string relativePath)
     {
         var backupFile = BackupFileOf(Path.Combine(env.BackupDir, "manifest.json"), relativePath);

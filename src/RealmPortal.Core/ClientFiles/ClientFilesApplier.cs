@@ -494,8 +494,15 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             try
             {
                 Guard(() => new SymlinkSnapshot(true, linkText).Restore(path), path, "restore symlink");
-                var through = Guard(() => File.ReadAllBytes(path), path, "read back");
-                if (string.Equals(ClientFilesIo.Sha256Hex(through), file.Sha256Before, StringComparison.Ordinal))
+                byte[]? through = null;
+                var comparable = false;
+                Guard(() =>
+                {
+                    through = ReadCurrentForUndo(path, out var notComparable);
+                    comparable = !notComparable;
+                }, path, "read back");
+                if (comparable && through is not null
+                    && string.Equals(ClientFilesIo.Sha256Hex(through), file.Sha256Before, StringComparison.Ordinal))
                     return UndoFileStatus.Restored;
             }
             catch (ClientFilesException)

@@ -560,8 +560,9 @@ internal readonly record struct SymlinkSnapshot(bool IsSymlink, string? Target)
 
         var noFollow = RuntimeInformation.ProcessArchitecture switch
         {
-            Architecture.X64 or Architecture.X86 => 0x20000,
-            Architecture.Arm or Architecture.Arm64 => 0x8000,
+            Architecture.X64 or Architecture.X86
+                or Architecture.RiscV64 or Architecture.LoongArch64 or Architecture.S390x => 0x20000,
+            Architecture.Arm or Architecture.Arm64 or Architecture.Ppc64le => 0x8000,
             _ => 0,
         };
         if (noFollow == 0)
