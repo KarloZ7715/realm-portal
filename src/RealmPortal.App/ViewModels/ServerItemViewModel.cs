@@ -117,6 +117,13 @@ public sealed partial class ServerItemViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(SealStatus), nameof(BadgeStatus), nameof(BadgeText), nameof(ShowSwitchMenu), nameof(SwitchMenuText))]
     private bool _isActive;
 
+    partial void OnIsActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanSwitchOnly));
+        OnPropertyChanged(nameof(SwitchOnlyHint));
+        SwitchOnlyCommand.NotifyCanExecuteChanged();
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BadgeStatus), nameof(BadgeText))]
     private ServerOverlay _overlay;
@@ -167,7 +174,13 @@ public sealed partial class ServerItemViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanPlay))]
     private void Play() => _play(this);
 
-    [RelayCommand(CanExecute = nameof(CanPlay))]
+    /// <summary>"Switch only" is disabled for the active server, unless its projection is out of sync and a repair can run.</summary>
+    public bool CanSwitchOnly => CanPlay && (!IsActive || NeedsRepair);
+
+    /// <summary>The line under "Switch only" in the play menu: what it does, or why it is unavailable.</summary>
+    public string SwitchOnlyHint => Loc.Get(IsActive && !NeedsRepair ? "menu.switchonly.active" : "menu.switchonly.hint");
+
+    [RelayCommand(CanExecute = nameof(CanSwitchOnly))]
     private void SwitchOnly() => _switchOnly(this);
 
     public void SetNeedsRepair(bool needsRepair)
@@ -176,20 +189,18 @@ public sealed partial class ServerItemViewModel : ObservableObject
         OnPropertyChanged(nameof(NeedsRepair));
         OnPropertyChanged(nameof(ShowSwitchMenu));
         OnPropertyChanged(nameof(SwitchMenuText));
+        OnPropertyChanged(nameof(SwitchOnlyHint));
+        OnPropertyChanged(nameof(CanSwitchOnly));
         OnPropertyChanged(nameof(BadgeText));
+        SwitchOnlyCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnCanActChanged(bool value)
     {
         OnPropertyChanged(nameof(CanPlay));
+        OnPropertyChanged(nameof(CanSwitchOnly));
         PlayCommand.NotifyCanExecuteChanged();
         SwitchOnlyCommand.NotifyCanExecuteChanged();
-    }
-
-    partial void OnIsActiveChanged(bool value)
-    {
-        OnPropertyChanged(nameof(ShowSwitchMenu));
-        OnPropertyChanged(nameof(SwitchMenuText));
     }
 
     /// <summary>Re-reads every translated text (after a language change).</summary>
@@ -198,5 +209,6 @@ public sealed partial class ServerItemViewModel : ObservableObject
         OnPropertyChanged(nameof(BadgeText));
         OnPropertyChanged(nameof(DetailText));
         OnPropertyChanged(nameof(SwitchMenuText));
+        OnPropertyChanged(nameof(SwitchOnlyHint));
     }
 }

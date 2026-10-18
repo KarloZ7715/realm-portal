@@ -9,7 +9,7 @@ review.
 - **Synchronous.** Everything underneath (applier, stores, PE reader, process probe) is synchronous file/process work, so the service is
   too and the UI wraps calls in `Task.Run`. No `async` ceremony around blocking IO.
 - **Results, not exceptions.** Every operation returns `ServiceResult<T>` (`Value` or `Error`; `Succeeded` is annotated so `Value`/`Error` are non-null without `!`); only null arguments throw. `IProgress.Report` is never called after the method returned. Every call is safe from a thread-pool thread.
-- **Progress.** `SwitchServer` and `Play` take an optional `IProgress<ServiceProgress>`. Callbacks run on the worker thread (the UI marshals).
+- **Progress.** `SwitchServer` and `Play` take an optional `IProgress<ServiceProgress>`. The service invokes `IProgress<ServiceProgress>.Report` on the **worker thread** that is running the operation (typically a thread-pool thread when the UI wrapped the call in `Task.Run`). **Where the progress handler runs** depends on the `IProgress` implementation: `Progress<T>` captures `SynchronizationContext.Current` at construction and posts callbacks to that context, so the App should create progress on the UI thread (or dispatch inside a custom `IProgress` implementation). The service does not marshal to the UI thread.
 - **No user-facing text** in Core. An error is a stable `ServiceErrorCode` plus parameters (`ServerName`, `Path`, `LineNumber`,
   `RealmlistKind`, `Field`, `RequiredBuild`, `ClientBuild`, `Consistency`); `ClientVersion`, `ConflictingFiles`, `Diagnostic` is English text for logs only.
 
@@ -54,8 +54,8 @@ already has this configuration) still reports `WriteFiles` Started/Completed wit
 (client files drifted), it applies them as a repair. When the plan is empty, it still reports `WriteFiles` Started/Completed with `BackupId == null`. In both
 cases it does **not** replace the pending single-level undo or the `last-switch.json` journal with a no-op entry: a no-op re-switch must not erase the undo
 from the previous real switch to a different server. `ActiveServerManager.Switch` is still called (projection refresh; undo in `state.json` is unchanged when
-the server was already active). In `SwitchOutcome`, `Previous` equals `Active` (the same server). When the re-switch repairs drifted files, the journal's
-`backup_id` is updated so undo still restores the correct bytes.
+the server was already active). In `SwitchOutcome`, `Previous` equals `Active` (the same server). When the re-switch repairs drifted files, the applier may
+create a new backup, but the journal's `backup_id` is **not** replaced (undo still restores the bytes from the original switch).
 
 **There is no `Account` step.** The applier never writes the account name (`Config.wtf` `accountName` is explicitly left alone, and `ClientFilesRequest` has
 no account). `Server.Account` is only a remembered label. See "Open questions".
@@ -66,33 +66,43 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 
 | Source | Codes |
 |---|---|
-| `ClientFilesException.Code` | mapped **by name**: `GameRunning`, `PermissionDenied`, `ReadOnlyFs`, `PathNotFound`, `HashMismatch`, `VerifyFailed`, `UnsupportedClient` (with `ClientVersion`), `InvalidRealmlist`, `NothingToUndo`; also `ProcessCheckFailed` once the applier raises it (the service already returns it from `IsGameRunning` when the probe throws). A test fails if the applier gets a code the service lacks. |
+| `ClientFilesException.Code` | mapped **by name**: `GameRunning`, `PermissionDenied`, `ReadOnlyFs`, `PathNotFound`, `PathEscapesClient`, `HashMismatch`, `VerifyFailed`, `UnsupportedClient` (with `ClientVersion`), `InvalidRealmlist`, `NothingToUndo`; also `ProcessCheckFailed` once the applier raises it (the service already returns it from `IsGameRunning` when the probe throws). A test fails if the applier gets a code the service lacks. |
 | `InvalidRealmlistException` | `InvalidRealmlist` with `RealmlistKind`, `LineNumber`, `ServerName` |
 | `ClientVersionException.Kind` | `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `ClientUnreadable` (a missing folder: `PathNotFound`), with `Path` |
 | `StoreException` | `StoreCorrupt`, `ServerNameTaken`, `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing` |
+| undo backup made for another client folder (manifest `client_root` differs from the registered client) | `PathEscapesClient`, `Diagnostic` names both folders; nothing is written |
+| managed path outside the allow-list, traversal/absolute/backslash/drive paths, or a managed folder linked outside the client | `PathEscapesClient`; nothing is written or deleted |
 | undo finds changed client files | `UndoConflict` with `ConflictingFiles`, `Consistency.Pending` |
 | backup folder cannot be used | `PathNotFound`, `PermissionDenied`, `ReadOnlyFs` |
 | `ArgumentException` from `Server.Create` | `InvalidServerInput` with `Field` |
 | `GameLaunchSpec.Resolve` / settings | `InvalidLauncherSettings` |
-| process start failure | `LaunchFailed` |
+| process start failure after a successful switch (`Play` only) | `LaunchFailed` with `Consistency.AppliedLaunchFailed` (switch and active server stay; undo remains available) |
+| `Play` fails in `Plan`, `WriteFiles` or `Activate` (before `Launch` starts) | that step's own code (never `LaunchFailed`) with `Consistency.Unchanged` or `RolledBack`; if the rollback after a failed `Activate` also fails, `InconsistentState` with `Consistency.Inconsistent`, exactly as for `SwitchServer` |
 | incompatible build without `Force` | `IncompatibleClient` with `RequiredBuild`, `ClientBuild` |
 | anything else | `Unexpected` (with `Diagnostic`) |
 
 `Consistency` tells the UI what a failed multi-step call left behind: `Unchanged`, `RolledBack` (steps ran and were put back), `Inconsistent`
-(`InconsistentState`: even the rollback failed; tell the user to review the client) or `Pending` (only `UndoConflict`: stopped on purpose, can be retried or discarded).
+(`InconsistentState`: even the rollback failed; tell the user to review the client), `Pending` (only `UndoConflict`: stopped on purpose, can be retried or discarded), or
+`AppliedLaunchFailed` (only `Play`: plan, apply and activate succeeded; launch failed — the client is configured, the new server is active, and undo is still available).
 
 ## Consistency between the two undo stacks
 
 Two stacks must move together: the applier's backups (per installation) and `ActiveServerManager`'s one-level undo in `state.json`. The service
-keeps a tiny journal of the **last switch** (`last-switch.json` in the config folder: client id and the backup id, or none when the plan was empty)
-so undo knows whether the switch changed any client file. One level only, like the manager.
+keeps a tiny journal of the **last switch** (`last-switch.json` in the config folder: optional `client_id` and optional `backup_id`)
+so undo knows whether **that** switch changed client files. One level only, like the manager. Every successful switch writes the journal, including
+CLI switches without `--client-dir` (`client_id` and `backup_id` both omitted). A later state-only switch **replaces** the journal so undo never
+replays a backup from an earlier `--client-dir` switch. Re-switching the **same** server to repair drifted files creates a new backup in the applier
+store but **does not** replace the journal's `backup_id` (undo still restores the original switch's bytes).
 
 - **Switch:** plan, apply, then activate. If *activate* fails after *apply* succeeded, the service runs `applier.Undo` (the backup it just made) and
   returns the activation error with `RolledBack`; if that rollback fails or reports conflicts the error is `InconsistentState` / `Inconsistent`.
   If plan or apply fails nothing changed (the applier reverts itself): `Unchanged`. The journal is written only after both succeed.
-- **Undo:** pre-flight first, changing nothing: a journal entry exists, the previous server still exists and its realmlist is valid, the game is not
-  running. Then `applier.Undo` (skipped when the switch made no backup), then `ActiveServerManager.Undo`. If the second step fails after the first
-  succeeded, the service re-applies the active server's files and reports `RolledBack`; if that fails, `InconsistentState`.
+- **Undo:** pre-flight first, changing nothing: `state.json` has a pending undo, the previous server still exists and its realmlist is valid, the game is not
+  running when client files would be touched. Then `applier.Undo` for the journal's `backup_id` only when that id is set (skipped for state-only switches),
+  then `ActiveServerManager.Undo`. Undo **never** writes client files for state-only switches (`client_id` omitted in the journal): registered clients
+  may still drift from `activo.json` until the user runs `switch <server> --client-dir <folder>`. The CLI prints whether client files were updated.
+  If the second step fails after file undo succeeded, the service re-applies the active server's
+  files and reports `RolledBack`; if that fails, `InconsistentState`.
 - **Conflicts:** when `applier.Undo` reports conflicts the app state is **not** touched and the undo stays pending. The call fails with `UndoConflict`,
   `ConflictingFiles` (the files that differ from what the switch wrote, never overwritten) and `Consistency.Pending`. Note the applier restores the files that
   did not conflict before it reports the others, so the client may be partially restored; `Undo()` again after the user fixed the files finishes the job.
@@ -104,8 +114,8 @@ so undo knows whether the switch changed any client file. One level only, like t
   by the service; the UI keeps its own file.
 - **Client of a server:** `NewServer.ClientId` / `ServerEntry.ClientId` is the preferred client chosen when the server was added (optional). It is only a label for the UI;
   `SwitchRequest` still names the client.
-- **Play** = switch + launch. A failed launch leaves the switch done (the client is configured, the server is active, undo still works) and returns
-  `LaunchFailed`.
+- **Play** = switch + launch. When launch fails after activate succeeded, the switch stays done (the client is configured, the server is active, undo still works) and the call returns
+  `LaunchFailed` with `Consistency.AppliedLaunchFailed` (not `Unchanged`).
 
 ## Launcher settings
 

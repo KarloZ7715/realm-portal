@@ -184,9 +184,10 @@ public sealed partial class AddServerViewModel : ViewModelBase
                 return;
             }
 
+            var hostForServer = port == DefaultPort ? host : $"{host}:{port}";
             var result = _session.Service.AddServer(new NewServer(
                 Name.Trim(),
-                host,
+                hostForServer,
                 Account: account.Length == 0 ? null : account,
                 ClientId: clientId));
             if (!result.Succeeded)

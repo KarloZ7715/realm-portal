@@ -122,7 +122,16 @@ public sealed partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        LauncherText.TryParseEnvironment(Environment, out var environment);
+        IReadOnlyDictionary<string, string?> environment;
+        if (Environment == LauncherText.JoinEnvironment(_saved.Environment))
+        {
+            environment = _saved.Environment;
+        }
+        else
+        {
+            LauncherText.TryParseEnvironment(Environment, out environment);
+        }
+
         var model = new SettingsModel(
             Loc.Instance.Current,
             Template.Trim(),
@@ -204,7 +213,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
         SaveCommand.NotifyCanExecuteChanged();
     }
 
-    partial void OnTemplateChanged(string value) => EditedField();
+    partial void OnTemplateChanged(string value)
+    {
+        if (ServiceErrorField == "template")
+        {
+            ServiceErrorField = null;
+        }
+
+        EditedField();
+    }
 
     partial void OnPrefixChanged(string value) => EditedField();
 
@@ -212,7 +229,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     partial void OnEnvironmentChanged(string value) => EditedField();
 
-    partial void OnBackupFolderChanged(string value) => EditedField();
+    partial void OnBackupFolderChanged(string value)
+    {
+        if (ServiceErrorField == "backup")
+        {
+            ServiceErrorField = null;
+        }
+
+        EditedField();
+    }
 
     private void EditedField()
     {

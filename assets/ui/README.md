@@ -1,6 +1,6 @@
 # Realm Portal UI kit: art for the Avalonia theme
 
-Own artwork, MIT licensed (see "Licence"). 114 pieces in `assets/ui/<group>/`, each as `name.png` (@1x) and `name@2x.png` (@2x), plus a flat vector `name.svg` where one exists. Machine-readable metadata: `assets/ui/nineslice.json`. Everything is RGBA with straight alpha, rendered natively at each scale (nothing is resampled, so there are no halos).
+Own artwork, MIT licensed (see "Licence"). 130 pieces in `assets/ui/<group>/`, each as `name.png` (@1x) and `name@2x.png` (@2x), plus a flat vector `name.svg` where one exists. Machine-readable metadata: `assets/ui/nineslice.json`. Everything is RGBA with straight alpha, rendered natively at each scale (nothing is resampled, so there are no halos).
 
 This kit answers the art requests from the Avalonia style spike (F3a). It sits **next to** the legacy frames in `assets/frames/` and does not remove them: the legacy panels (with baked shadow) and 160x40 buttons still work for the sizes the spike found acceptable.
 
@@ -68,7 +68,7 @@ Texture note: the kit's parchment grain is **procedural** (own work, seamless by
 | `button-{primary,secondary}-{normal,hover,pressed,disabled}` (8) | 160x40 | 17, 14, 17, 14 | **tile x**, centre cell 126 px, min 34x28 | leather button with tileable centre (request 2). Native 160x40 = Figma size. Height policy: 36-44 px (rows 14..26 stretch) |
 | `split-{primary,secondary}-{normal,hover,pressed,disabled}` (8) | 200x44 | 16, 14, 58, 14 | **tile x**, centre cell 126 px, min 74x28 | **one joined plate** for Play + chevron (request 4). Native 200x44 = Figma size: action part + 44 px menu part overlapping by 1 px (shared seam) |
 | `ghost-parchment-{normal,hover,pressed,disabled}` (4) | 64x40 | 14, 14, 14, 14 | stretch | ghost button on parchment (request 6): outline `#5A3D22`; hover `#C2AE84` @ 50 %; pressed @ 90 % (values from the Figma "Parchment text" component) |
-| `ghost-leather-{hover,pressed}` (2) | 64x40 | 14, 14, 14, 14 | stretch | ghost button on leather. **Optional extension**: in Figma this button has no plate (only the label goes `#EFE5CD` -> `#F6EBD2` hover -> `#C4B494` pressed). Normal and disabled have no art |
+| `ghost-leather-{hover,pressed}` (2) | 64x40 | 14, 14, 14, 14 | stretch | ghost button on leather. **Optional extension** (revised): in Figma this button has no plate (only the label goes `#EFE5CD` -> `#F6EBD2` hover -> `#C4B494` pressed). Hover = raised wood plate with a `#8A6C4A` outline; pressed = **sunken** plate (darker than the window, inner shadow) with the same outline, so the two are no longer alike. Normal and disabled have no art |
 
 Split plate, how to use:
 * Menu segment width is fixed at 44 px; the action segment grows by tiling the centre cell (the Figma plate is 157 + 44 - 1 px).
@@ -90,11 +90,14 @@ Tiling accuracy: for widths `W = 160 + 6k` (plain) or `200 + 6k` (split) the til
 | Piece | Canvas | Insets | Use |
 |---|---|---|---|
 | `input-leather-{normal,hover,focus,error,disabled}` (5) | 64x40 | 14, 14, 14, 14 | text field on leather. Border 1 px `#A8743F` (hover `#D2A268`); focus 2 px `#F0BC82`; error 2 px `#E58A7C`; disabled 1 px `#5A3D22` |
-| `input-parchment-{normal,hover,focus,error,disabled}` (5) | 64x40 | 14, 14, 14, 14 | text and search field on parchment. Border 1 px `#5A3D22` (hover `#A8743F`); focus 2 px `#0F5561`; error 2 px `#8A2A25` |
+| `input-parchment-{normal,hover,focus,error,disabled}` (5) | 64x40 | 14, 14, 14, 14 | text and search field on parchment. Border 1 px `#5A3D22` (hover `#895E33`, 4.19:1 on `#E9DDBF`; the earlier `#A8743F` gave 2.97:1); focus 2 px `#0F5561`; error 2 px `#8A2A25` |
 | `popup-leather` | 96x64 | 16, 16, 16, 16 | dropdown / context menu / tooltip on leather, bronze border + faint stitch. Put `shadow-soft` under it |
 | `popup-parchment` | 96x64 | 16, 16, 16, 16 | see 2.1 |
 
-Menu-item hover: flat colour in code (`#33241A` @ 85 % on leather, `#C2AE84` @ 50 % on parchment); no art needed.
+**Menu-item / ComboBox-item / tooltip hover (design decision, flat, no art):** a solid fill with no texture plus a 3 px bar on the item's left edge as a second cue (never colour alone).
+* On `popup-parchment`: fill `#D1BB92` (bronze `#A8743F` at 14 % over `#D8C7A0`), bar wax `#7A2723`. Ink `#2B2118` on the fill = 8.42:1, ink-soft `#54442F` = 5.00:1, bar on fill = 5.24:1.
+* On `popup-leather`: fill `#372616` (bronze at 14 % over the plate), bar `wax/light` `#E58A7C` (6.9:1 on the plate; plain wax is only 1.78:1 on leather). Bone `#EFE5CD` on the fill = 11.8:1.
+* Disabled item: text `#6B5842` (4.06:1 on `#D8C7A0`, exempt) and a sub-line that says why. Do not use `Opacity=0.5` on the whole item.
 
 ### 2.6 Controls (`controls/`)
 
@@ -106,13 +109,15 @@ Menu-item hover: flat colour in code (`#33241A` @ 85 % on leather, `#C2AE84` @ 5
 | `scrollbar-grip-{leather,parchment}` | 8x10 | none | 3-line grip centred on the thumb (hide under 28 px) |
 | `progress-track` | 48x12 | 6, 6, 6, 6 | 12 px track; stretch horizontally |
 | `progress-fill` | 32x8 | 4, 4, 4, 4 | bronze fill, 8 px high, placed at (2,2) in the track; width = value x (track - 4), min 8 |
+| `progress-track-parchment` | 48x12 | 6, 6, 6, 6 | 12 px track for parchment surfaces (border `#5A3D22`, 5.9:1 on `#D8C7A0`); stretch horizontally |
+| `progress-fill-parchment` | 32x8 | 4, 4, 4, 4 | dark-bronze fill (`#6E4B29`, 4.2:1 against the track), 8 px high, placed at (2,2); same width rule as `progress-fill` |
 | `progress-stripes-tile` | 12x8 | none | **indeterminate / "switching" overlay**: tile it horizontally over the fill and animate its x offset 0 -> 12 px (period 12, loops seamlessly) |
-| `checkbox-{leather,parchment}-{unchecked,checked,indeterminate}-{normal,hover,disabled}` (18) | 22x22 | none (fixed) | 22x22 |
-| `radio-{leather,parchment}-{off,on}-{normal,hover,disabled}` (12) | 22x22 | none (fixed) | 22x22, dot 10 px |
-| `switch-track-{leather,parchment}-{off,on}-{normal,hover,disabled}` (12) | 46x24 | 12, 0, 12, 0 | 46x24, 3-slice horizontal |
+| `checkbox-{leather,parchment}-{unchecked,checked,indeterminate}-{normal,hover,pressed,disabled}` (24) | 22x22 | none (fixed) | 22x22 |
+| `radio-{leather,parchment}-{off,on}-{normal,hover,pressed,disabled}` (16) | 22x22 | none (fixed) | 22x22, dot 10 px |
+| `switch-track-{leather,parchment}-{off,on}-{normal,hover,pressed,disabled}` (16) | 46x24 | 12, 0, 12, 0 | 46x24, 3-slice horizontal |
 | `switch-thumb-{on,off-leather,off-parchment}` (3) | 16x16 | none | 16 px; off x = 4, on x = 26 (inside a 46 px track). Disabled: 50 % opacity |
 
-Pressed state of checkbox/radio/switch has no art (use the hover art). Progress on parchment has no art.
+**Pressed state of checkbox, radio and switch track** now has art on both surfaces: a *sunken* look (darker fill + inner shadow; checked = `wax/pressed` `#5A1C19`; leather off = `#0C0705`; parchment off = `#C2AE84`), same border as normal. The thumb art is unchanged (there is no pressed thumb; widening it by ~2 px while pressed is an optional runtime effect). **Parchment hover** uses a 2 px `#5A3D22` border (normal is 1.5 px) and a `#F6EBD2` fill instead of the earlier `#A8743F` border, which was only 2.97:1 against `#E9DDBF` and weaker than the normal state (7.3:1). Progress on parchment: use `progress-track-parchment` + `progress-fill-parchment`; `progress-stripes-tile` works on both (on the dark parchment fill the light stripes are subtler).
 
 ## 3. Design corrections for the Avalonia theme (minor differences listed by the architect)
 
@@ -134,8 +139,8 @@ Pressed state of checkbox/radio/switch has no art (use the hover art). Progress 
 ## 4. Verification (report from the design workspace; the check scripts and images are not in this repository, see section 7)
 
 ```
-1) consistency (RGBA, @2x == 2 x @1x, json png size, insets fit): 114 pieces, 0 failures
-2) halo test (edge-pixel colour vs palette of solid pixels, composited on magenta/white/black): 228 PNGs, 0 above 3/255; worst 0.55/255 (progress-fill @1x)
+1) consistency (RGBA, @2x == 2 x @1x, json png size, insets fit): 130 pieces, 0 failures
+2) halo test (edge-pixel colour vs palette of solid pixels, composited on magenta/white/black): 260 PNGs, 0 above 3/255; worst 0.55/255 (progress-fill @1x)
 2b) no-baked-shadow check: for all panels, tabs, buttons, split plates, popups and inputs the solid body (alpha >= 200) reaches within 3 px of the canvas edge on every side (a baked shadow needs an 8-12 px margin)
 3) panel-tile-normal @1x seam/interior gradient ratio: top-edge 1.03, left-edge 0.79, centre-x 1.02, centre-y 0.95 (1.0 = invisible seam)
    edge SILHOUETTE (alpha) seam ratio @1x: top 0.99, left 0.86
@@ -145,7 +150,7 @@ Pressed state of checkbox/radio/switch has no art (use the hover art). Progress 
 3b) leather button: tiled strip vs directly rendered plate at widths 160/166/232/286/412 (= 160 + 6k), @1x/@2x, 3 states: max abs diff = 15/255
 3c) split plate: tiled vs direct render at widths 200/206/326/452 (= 200 + 6k): max abs diff = 16/255
 3d) leather button at widths 170/200/251 (not 160+6k): at most 48 pixels differ by > 24/255 (the shortened dash at the right cap)
-4) SVG: 101 files parse as XML and render with cairosvg at the PNG size; mean |alpha| difference vs PNG silhouette: worst 0.050 (progress-stripes-tile), median 0.000
+4) SVG: 117 files parse as XML and render with cairosvg at the PNG size; mean |alpha| difference vs PNG silhouette: worst 0.050 (progress-stripes-tile), median 0.000
 ```
 
 Visual checks (not in the repository): `test-composition-1x.png` and `-2x.png` (everything composed with the reference algorithm on leather, incl. thin rows of 44/56/64/72 px, a 960x120 tiled card, split plates with per-segment hover/pressed, focus rings), `halo-check-magenta-white-black.png` (every piece raw on magenta / white / black).
@@ -158,7 +163,7 @@ What was **not** verified: rendering inside Avalonia itself (no Avalonia run was
 * `panel-tile-*` is PNG only: a tileable torn edge cannot be a flat SVG. `panel-thin-*` has a flat SVG (same silhouette, no texture, no inner shadow).
 * Flat SVGs of textured pieces carry colour, border, stitch and silhouette but not the texture or inner shadows. They render with cairosvg; they were not rendered in Avalonia.
 * Horizontal scrollbar art is the vertical art rotated (light comes from the left instead of the top).
-* Hover for cards, ghost-on-leather plates, scrollbar, progress and its stripes, checkbox/radio/switch hover and disabled, and the popup plates are **new art that is not drawn in the Figma mockups** (only their normal/focus/etc. colours come from Figma). They follow the same tokens; review them before treating them as design-approved.
+* Hover for cards, ghost-on-leather plates, scrollbar, progress and its stripes, checkbox/radio/switch hover, pressed and disabled, progress on parchment, and the popup plates are **new art that is not drawn in the Figma mockups** (only their normal/focus/etc. colours come from Figma). They follow the same tokens; review them before treating them as design-approved.
 * Torn-edge profile is periodic every 256 px; with the 256 px centre cell, a very large panel can show the same edge ripple every 256 px (not noticeable at the sizes in the test composition).
 * Button stitch period is 6 px (see 2.3 for exact widths).
 * Menu/combobox chevrons, labels and icons are not part of the art.

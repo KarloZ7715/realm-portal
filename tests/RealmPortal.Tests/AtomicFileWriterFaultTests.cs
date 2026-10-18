@@ -108,11 +108,11 @@ public class AtomicFileWriterFaultTests
                 {
                     try
                     {
-                        applier.Undo("inst");
+                        applier.Undo("inst", client);
                     }
                     catch (ClientFilesException)
                     {
-                        applier.Undo("inst"); // the fault fired in undo: running it again finishes the job
+                        applier.Undo("inst", client); // the fault fired in undo: running it again finishes the job
                     }
                 }
 

@@ -16,18 +16,20 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly PortalSession? _session;
     private AddServerViewModel? _adding;
 
-    public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true) =>
-        new(backend ?? new DemoBackend(), autoTick);
+    public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null) =>
+        new(backend, autoTick, settings);
 
-    private MainViewModel(DemoBackend backend, bool autoTick)
+    public MainViewModel(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null)
     {
-        Backend = backend;
-        Servers = new ServersViewModel(backend, autoTick);
-        Clients = new ClientsViewModel(backend);
-        var settings = new SettingsViewModel(new DemoSettingsStore());
-        settings.ApplySavedLanguage();
-        settings.BackRequested += () => SectionIndex = 0;
-        Settings = settings;
+        Backend = backend ?? new DemoBackend();
+        Servers = new ServersViewModel(Backend, autoTick);
+        Clients = new ClientsViewModel(Backend);
+        var settingsScreen = new SettingsViewModel(
+            settings ?? new DemoSettingsStore(),
+            () => "/home/demo/.local/share/RealmPortal/backups-2");
+        settingsScreen.ApplySavedLanguage();
+        settingsScreen.BackRequested += () => SectionIndex = 0;
+        Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
     }
@@ -37,16 +39,16 @@ public sealed partial class MainViewModel : ObservableObject
         _session = session;
         Servers = new ServersViewModel(session, autoTick);
         Clients = new ClientsViewModel(session, pickFolder);
-        var settings = new SettingsViewModel(
+        var settingsScreen = new SettingsViewModel(
             new PortalSettingsStore(session),
             pickFolder is null ? null : () => pickFolder().GetAwaiter().GetResult());
-        settings.ApplySavedLanguage();
-        settings.BackRequested += () => SectionIndex = 0;
-        Settings = settings;
+        settingsScreen.ApplySavedLanguage();
+        settingsScreen.BackRequested += () => SectionIndex = 0;
+        Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
         Clients.ClientsChanged += () => Servers.ReloadFromService();
-        Servers.ConfirmDiscardAsync = ConfirmDiscardAsync;
+        Servers.ConfirmDiscardAsync = () => ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
     }
 
     public DemoBackend? Backend { get; }
@@ -55,12 +57,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ClientsViewModel Clients { get; }
 
-    public ViewModelBase Settings { get; }
+    public SettingsViewModel Settings { get; }
 
+    /// <summary>Index in the sidebar: 0 servers, 1 clients, 2 settings.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Content), nameof(StatusText))]
     private int _sectionIndex;
 
+    /// <summary>The form being filled in, or null. It belongs to the servers section: leaving the section drops it.</summary>
     public AddServerViewModel? Adding => _adding;
 
     public ViewModelBase Content => SectionIndex == 0 && _adding is not null
@@ -69,9 +73,43 @@ public sealed partial class MainViewModel : ObservableObject
 
     public string StatusText => Content.StatusText;
 
+    /// <summary>"ES · v0.1.0": the language toggle of the status bar.</summary>
     public string LanguageLabel => $"{Loc.Instance.Code} · v{AppInfo.Version}";
 
+    /// <summary>The non-affiliation note shown at the foot of the wide sidebar.</summary>
     public string Disclaimer => Loc.Instance.Current == Language.Es ? AppInfo.DisclaimerEs : AppInfo.DisclaimerEn;
+
+    /// <summary>The modal question being shown, or null.</summary>
+    [ObservableProperty]
+    private ConfirmDialogViewModel? _dialog;
+
+    /// <summary>Raised before <see cref="Dialog"/> is set so the window can capture keyboard focus.</summary>
+    public event Action? DialogOpening;
+
+    /// <summary>Raised after <see cref="Dialog"/> is cleared so the window can restore keyboard focus.</summary>
+    public event Action? DialogClosed;
+
+    /// <summary>Shows <paramref name="dialog"/> over the window and returns the user's answer; a second dialog while one is open answers false.</summary>
+    public async Task<bool> ConfirmAsync(ConfirmDialogViewModel dialog)
+    {
+        if (Dialog is not null)
+        {
+            dialog.Reject();
+            return false;
+        }
+
+        DialogOpening?.Invoke();
+        Dialog = dialog;
+        try
+        {
+            return await dialog.Result;
+        }
+        finally
+        {
+            Dialog = null;
+            DialogClosed?.Invoke();
+        }
+    }
 
     [RelayCommand]
     private void ToggleLanguage()
@@ -164,9 +202,4 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(Disclaimer));
         OnPropertyChanged(nameof(StatusText));
     }
-
-    /// <summary>
-    /// Discard confirmation until PR #34 <c>ConfirmDialog</c> is stacked: auto-confirm in tests; production uses discard strings only on the toast action.
-    /// </summary>
-    private Task<bool> ConfirmDiscardAsync() => Task.FromResult(true);
 }

@@ -98,7 +98,7 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
-    public async Task ManualAdd_AppearsInList()
+    public void ManualAdd_AppearsInList()
     {
         using var env = new Env();
         env.Main.Servers.ReloadFromService();
@@ -149,6 +149,9 @@ public class PortalViewModelTests
         await Task.Delay(200);
         Assert.True(env.Main.Servers.ShowDiscardUndo);
         env.Main.Servers.DiscardUndoCommand.Execute(null);
+        await Task.Delay(200);
+        Assert.NotNull(env.Main.Dialog);
+        env.Main.Dialog!.ConfirmCommand.Execute(null);
         await Task.Delay(200);
         Assert.False(env.Session.Service.GetStatus().Value!.CanUndo);
     }

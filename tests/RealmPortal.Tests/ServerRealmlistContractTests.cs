@@ -21,7 +21,7 @@ public class ServerRealmlistContractTests
     [Property(MaxTest = 500)]
     public Property AnyServerCreateAccepts_SatisfiesTheContract() =>
         Prop.ForAll(
-            Gen.Elements("h", "auth.gamefreedom.org", "ñ", "龍.org", "a b", "a\tb", "a\"b", "a\r\nb", "ok:3724", "😀", "")
+            Gen.Elements("h", "example.org", "ñ", "龍.org", "a b", "a\tb", "a\"b", "a\r\nb", "ok:3724", "😀", "")
                 .ToArbitrary(),
             Gen.Elements("set patchlist x", "set portal x", "set realmname y", "ñ", "a\nb", "", "  ", "tab\t", "set patchlist 'q'")
                 .ArrayOf().ToArbitrary(),

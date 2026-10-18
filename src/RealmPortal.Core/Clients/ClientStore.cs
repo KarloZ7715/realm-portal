@@ -2,6 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using RealmPortal.Core.IO;
+using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
 
 namespace RealmPortal.Core.Clients;
@@ -40,7 +41,7 @@ public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer
     public StoredClient Add(string folderPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
-        var full = Path.GetFullPath(folderPath);
+        var full = ClientPathSecurity.CanonicalizeTrustedFolder(folderPath);
         var id = ClientIds.FromFolderPath(full);
         var clients = Load().ToList();
         var existing = clients.FirstOrDefault(c => c.Id == id);
@@ -69,12 +70,15 @@ public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer
 
         try
         {
-            var file = JsonSerializer.Deserialize<StoreFile>(File.ReadAllBytes(FilePath), JsonOptions)
-                       ?? throw new StoreException($"'{FilePath}' is empty.");
-            if (file.Version != FormatVersion)
-                throw new StoreException($"'{FilePath}' has unsupported format version {file.Version}.");
+            return PortalConfigFile.WithConfigLock(() =>
+            {
+                var file = JsonSerializer.Deserialize<StoreFile>(PortalConfigFile.ReadBounded(FilePath), JsonOptions)
+                           ?? throw new StoreException($"'{FilePath}' is empty.");
+                if (file.Version != FormatVersion)
+                    throw new StoreException($"'{FilePath}' has unsupported format version {file.Version}.");
 
-            return (file.Clients ?? []).Select(ToClient).ToList();
+                return (file.Clients ?? []).Select(ToClient).ToList();
+            });
         }
         catch (JsonException ex)
         {
@@ -92,16 +96,27 @@ public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer
 
     private void Save(List<StoredClient> clients)
     {
-        var file = new StoreFile { Version = FormatVersion, Clients = clients.Select(ToRecord).ToList() };
-        var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
-        writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json));
+        PortalConfigFile.WithConfigLock(() =>
+        {
+            var file = new StoreFile { Version = FormatVersion, Clients = clients.Select(ToRecord).ToList() };
+            var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
+            writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json));
+            PortalConfigFile.AfterWrite(FilePath);
+        });
     }
 
     private static StoredClient ToClient(ClientRecord r)
     {
         if (string.IsNullOrWhiteSpace(r.Id) || string.IsNullOrWhiteSpace(r.Path))
             throw new StoreException("A stored client is missing id or path.");
-        return new StoredClient(r.Id, r.Path);
+
+        // Existence and symlink checks happen when the folder is used, not when the record is loaded.
+        var full = ClientPathSecurity.NormalizeStoredFolder(r.Path);
+        var expectedId = ClientIds.FromFolderPath(full);
+        if (!string.Equals(expectedId, r.Id, StringComparison.Ordinal))
+            throw new StoreException($"Stored client id '{r.Id}' does not match folder '{full}'.");
+
+        return new StoredClient(expectedId, full);
     }
 
     private static ClientRecord ToRecord(StoredClient c) => new() { Id = c.Id, Path = c.Path };

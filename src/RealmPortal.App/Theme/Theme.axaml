@@ -9,6 +9,7 @@
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Window.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Button.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/SplitButton.axaml"/>
+  <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/ParchmentSurfaces.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Card.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/NavTab.axaml"/>
   <StyleInclude Source="avares://RealmPortal.App/Theme/Controls/Badge.axaml"/>

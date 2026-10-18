@@ -22,7 +22,9 @@ public sealed class CliApp(
     private static readonly HashSet<string> ValueOptions =
         ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper"];
 
-    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run"];
+    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose"];
+
+    private bool _verbose;
 
     public static readonly string[] Commands = ["add", "remove", "list", "switch", "undo", "status", "launch"];
 
@@ -37,6 +39,9 @@ public sealed class CliApp(
           realm-portal undo
           realm-portal status
           realm-portal launch [<server>] [--force] [--dry-run] [--wrapper <command>]
+
+        Global options (before or after the command):
+          --verbose               print detailed error messages (paths, parse errors)
 
         Common options (they override the environment variables):
           --config-dir <dir>      app config (env REALM_PORTAL_CONFIG_DIR)
@@ -58,17 +63,22 @@ public sealed class CliApp(
 
     public bool IsCommand(string name) => Commands.Contains(name);
 
-    public int Run(string command, string[] args)
+    /// <summary>Options that may appear before the subcommand in <see cref="Program.Run"/>.</summary>
+    public static bool IsKnownLeadingOption(string arg) =>
+        arg is "--config-dir" or "--projection-dir" or "--client-dir" or "--verbose";
+
+    public int Run(string command, string[] args, bool globalVerbose = false)
     {
         try
         {
             var parsed = Parse(args);
+            _verbose = globalVerbose || parsed.Flags.Contains("--verbose");
             var configDir = parsed.Get("--config-dir") ?? PortalPaths.ConfigDirectory(getVariable);
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
             var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
             var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher), getVariable: getVariable);
             string? clientId = null;
-            if (clientDir is not null)
+            if (clientDir is not null && command is "list" or "switch" or "status" or "launch")
             {
                 var reg = service.AddClient(clientDir);
                 if (!reg.Succeeded)
@@ -103,8 +113,26 @@ public sealed class CliApp(
 
     private int Fail(ServiceError serviceError)
     {
-        error.WriteLine($"error: {ServiceCli.Describe(serviceError)}");
+        error.WriteLine($"error: {ServiceCli.Describe(serviceError, _verbose)}");
         return 2;
+    }
+
+    /// <summary>
+    /// Same failure as <see cref="Fail"/>. When launch failed after the switch was applied
+    /// (<see cref="ServiceErrorCode.LaunchFailed"/> and <see cref="Consistency.AppliedLaunchFailed"/>),
+    /// also say the server is still applied and that <c>undo</c> can restore the previous one.
+    /// </summary>
+    private int FailLaunch(ServiceError serviceError, string serverName)
+    {
+        var code = Fail(serviceError);
+        if (serviceError.Code == ServiceErrorCode.LaunchFailed
+            && serviceError.Consistency == Consistency.AppliedLaunchFailed)
+        {
+            error.WriteLine(
+                $"The game did not start, but '{serverName}' is still applied to this client. Run 'undo' to restore the previous server.");
+        }
+
+        return code;
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
@@ -118,6 +146,8 @@ public sealed class CliApp(
             if (ValueOptions.Contains(arg))
             {
                 if (i + 1 >= args.Length)
+                    throw new UsageException($"option {arg} needs a value");
+                if (args[i + 1].StartsWith("--", StringComparison.Ordinal))
                     throw new UsageException($"option {arg} needs a value");
                 if (!parsed.Options.TryGetValue(arg, out var values))
                     parsed.Options[arg] = values = [];
@@ -140,11 +170,13 @@ public sealed class CliApp(
         return parsed;
     }
 
+    private static readonly HashSet<string> GlobalCommandFlags = ["--verbose"];
+
     private static void Expect(Parsed parsed, int min, int max, string what, params string[] allowedFlags)
     {
         if (parsed.Positionals.Count < min || parsed.Positionals.Count > max)
             throw new UsageException($"wrong number of arguments (expected {what})");
-        var extra = parsed.Flags.Except(allowedFlags).FirstOrDefault();
+        var extra = parsed.Flags.Except(allowedFlags).Except(GlobalCommandFlags).FirstOrDefault();
         if (extra is not null)
             throw new UsageException($"option {extra} does not apply to this command");
     }
@@ -155,7 +187,7 @@ public sealed class CliApp(
         int? build = null;
         if (parsed.Get("--build") is { } text)
         {
-            if (!int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n))
+            if (!int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) || n <= 0)
                 throw new UsageException($"--build must be a positive integer, got '{text}'");
             build = n;
         }
@@ -179,7 +211,8 @@ public sealed class CliApp(
     private int Remove(Parsed parsed, PortalService service)
     {
         Expect(parsed, 1, 1, "<server>");
-        var server = FindOrThrow(service, parsed.Positionals[0]);
+        if (FindServer(service, parsed.Positionals[0], out var server) != 0)
+            return 2;
         var result = service.RemoveServer(server.Id);
         if (!result.Succeeded)
             return Fail(result.Error!);
@@ -220,7 +253,8 @@ public sealed class CliApp(
     private int SwitchCommand(Parsed parsed, PortalService service, string? clientId, string? clientDir)
     {
         Expect(parsed, 1, 1, "<server>", "--force");
-        var server = FindOrThrow(service, parsed.Positionals[0]);
+        if (FindServer(service, parsed.Positionals[0], out var server) != 0)
+            return 2;
         var force = parsed.Flags.Contains("--force");
 
         if (clientId is null)
@@ -252,6 +286,8 @@ public sealed class CliApp(
             return Fail(result.Error!);
         var restored = result.Value!.Active;
         output.WriteLine(restored is null ? "Undone: no active server." : $"Undone: restored '{restored.Name}'.");
+        if (result.Value!.ClientFilesNotice is { } notice)
+            output.WriteLine(notice);
         return 0;
     }
 
@@ -276,13 +312,19 @@ public sealed class CliApp(
         }
 
         output.WriteLine($"activo.json: {(status.ProjectionInSync ? "in sync" : "OUT OF SYNC (run switch to repair)")}");
+        if (status.ClientsNotMatchingActive.Count > 0 && status.Active is not null)
+        {
+            foreach (var client in status.ClientsNotMatchingActive)
+                output.WriteLine(ClientSyncMessages.DriftLine(status.Active.Name, client.Path));
+        }
+
         output.WriteLine($"Can undo: {(status.CanUndo ? "yes" : "no")}");
         if (clientDir is not null)
         {
             try
             {
                 var client = versionReader.Read(clientDir);
-                var compat = status.Active is null ? "" : status.Active.IsCompatible ? " (compatible)" : " (INCOMPATIBLE)";
+                var compat = status.Active is null ? "" : CompatibilityFilter.IsCompatible(status.Active, client) ? " (compatible)" : " (INCOMPATIBLE)";
                 output.WriteLine($"Client: {client}{compat}");
             }
             catch (ClientVersionException ex)
@@ -303,7 +345,7 @@ public sealed class CliApp(
 
         var force = parsed.Flags.Contains("--force");
         var wrapper = parsed.Get("--wrapper");
-        if (wrapper is not null)
+        if (wrapper is not null && !dryRun)
         {
             var settings = service.GetLauncherSettings();
             if (!settings.Succeeded)
@@ -317,7 +359,8 @@ public sealed class CliApp(
         ServerEntry server;
         if (parsed.Positionals.Count == 1)
         {
-            server = FindOrThrow(service, parsed.Positionals[0]);
+            if (FindServer(service, parsed.Positionals[0], out server) != 0)
+                return 2;
             if (dryRun)
             {
                 var executable = GameExecutable.Find(clientDir)
@@ -328,7 +371,7 @@ public sealed class CliApp(
 
             var play = service.Play(new SwitchRequest(clientId, server.Id, force));
             if (!play.Succeeded)
-                return Fail(play.Error!);
+                return FailLaunch(play.Error!, server.Name);
             output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
             return 0;
         }
@@ -353,18 +396,27 @@ public sealed class CliApp(
 
         var launch = service.Play(new SwitchRequest(clientId, server.Id, force));
         if (!launch.Succeeded)
-            return Fail(launch.Error!);
+            return FailLaunch(launch.Error!, server.Name);
         output.WriteLine($"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
         return 0;
     }
 
-    private static ServerEntry FindOrThrow(PortalService service, string selector)
+    /// <summary>Resolves a server selector. Returns 0 on success, or 2 after writing an error.</summary>
+    private int FindServer(PortalService service, string selector, out ServerEntry server)
     {
+        server = null!;
         var list = service.ListServers();
         if (!list.Succeeded)
-            throw new StoreException(list.Error!.Diagnostic);
-        var found = ServiceCli.FindServerEntry(list.Value!, selector)
-                    ?? throw new InvalidOperationException($"no server matches '{selector}'.");
-        return found;
+            return Fail(list.Error!);
+
+        var found = ServiceCli.FindServerEntry(list.Value!, selector);
+        if (found is null)
+        {
+            error.WriteLine($"error: no server matches '{selector}'.");
+            return 2;
+        }
+
+        server = found;
+        return 0;
     }
 }

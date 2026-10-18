@@ -6,6 +6,7 @@ using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
+using RealmPortal.App.Service;
 using RealmPortal.Core.Service;
 using StepState = RealmPortal.App.Controls.StepState;
 
@@ -75,7 +76,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public bool IsPortal => _session is not null;
 
-    /// <summary>When undo conflicts, asks before <see cref="IPortalService.DiscardUndo"/> (ConfirmDialog from PR #34 when stacked).</summary>
+    /// <summary>When undo conflicts, asks before <see cref="IPortalService.DiscardUndo"/> via <see cref="ConfirmDialogViewModel"/>.</summary>
     public Func<Task<bool>>? ConfirmDiscardAsync { get; set; }
 
     public ObservableCollection<ServerItemViewModel> Visible { get; } = [];
@@ -210,7 +211,7 @@ public sealed partial class ServersViewModel : ViewModelBase
                     if (result.Error!.Code == ServiceErrorCode.UndoConflict)
                     {
                         _undoConflict = true;
-                        _errorBanner = ServiceErrorText.Body(result.Error);
+                        _errorBanner = ErrorText.Body(result.Error);
                         ShowToast();
                         Refresh();
                     }
@@ -223,6 +224,7 @@ public sealed partial class ServersViewModel : ViewModelBase
                 }
 
                 _undoConflict = false;
+                _errorBanner = null;
                 HideToast();
                 ReloadFromService();
             });
@@ -419,12 +421,21 @@ public sealed partial class ServersViewModel : ViewModelBase
 
         if (!result.Succeeded)
         {
+            var appliedLaunch = play && PlayServiceResults.ShouldRefreshStatusAfterFailure(result);
             SetError(result.Error);
             target.Overlay = ServerOverlay.None;
             Phase = ServersPhase.Idle;
             _repairRun = false;
             _target = null;
             ReloadFromService();
+            if (appliedLaunch && result.Error is { } launchError && PlayServiceResults.UndoRemainsAvailable(launchError)
+                && _session.StatusOrNull()?.CanUndo == true)
+            {
+                var activeId = _session.StatusOrNull()?.Active?.Id;
+                _undoTo = activeId is null ? null : _all.FirstOrDefault(s => s.ServerId == activeId);
+                ShowToast();
+            }
+
             return;
         }
 
@@ -573,7 +584,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     private void SetError(ServiceError? error, string? message = null)
     {
-        _errorBanner = message ?? (error is null ? Loc.Get("error.unknown.body") : ServiceErrorText.Body(error));
+        _errorBanner = message ?? (error is null ? Loc.Get("error.unknown.body") : ErrorText.Body(error));
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(BannerSeverity));

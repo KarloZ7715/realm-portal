@@ -870,7 +870,7 @@
    ],
    "mode": "stretch",
    "svg": true,
-   "note": "OPTIONAL extension (the Figma ghost button on leather has no plate, only a lighter label): faint wood-brown plate, same tone as the nav-rail hover (#33241A @85 %)."
+   "note": "OPTIONAL extension (the Figma ghost button on leather has no plate, only a lighter label): faint wood-brown plate (#33241A @85 %) with a #8A6C4A outline (4.0:1 against the window, so the plate edge is visible). Label stays #EFE5CD."
   },
   "ghost-leather-pressed": {
    "group": "buttons",
@@ -887,7 +887,7 @@
    ],
    "mode": "stretch",
    "svg": true,
-   "note": "OPTIONAL extension: darker plate with a thin inner shadow."
+   "note": "OPTIONAL extension: pressed = SUNKEN plate, darker than the window (#0C0705 @90 %) with an inner shadow and the same #8A6C4A outline. Revised: the first version (leather/950 @70 %) was indistinguishable from the window, and hover and pressed looked the same in the Avalonia gallery."
   },
   "input-leather-normal": {
    "group": "fields",
@@ -1074,7 +1074,7 @@
    ],
    "mode": "stretch",
    "svg": true,
-   "note": "dropdown / context menu / tooltip plate on leather. NO shadow baked: put shadow-soft under it. Item hover = flat #33241A @85 %."
+   "note": "dropdown / context menu / tooltip plate on leather. NO shadow baked: put shadow-soft under it. Item hover = FLAT #372616 (bronze #A8743F at 14 % over the plate, no texture) + 3 px bar on the left in wax/light #E58A7C (wax #7A2723 is only 1.78:1 on leather). Text #EFE5CD on hover = 11.8:1."
   },
   "popup-parchment": {
    "group": "popups",
@@ -1091,7 +1091,7 @@
    ],
    "mode": "stretch",
    "svg": true,
-   "note": "popover / menu plate on parchment with straight edges (use panel-thin-* if a torn edge is wanted). NO shadow baked. Item hover = #C2AE84 @50 %."
+   "note": "popover / menu plate on parchment with straight edges (use panel-thin-* if a torn edge is wanted). NO shadow baked. Item hover = FLAT #D1BB92 (bronze #A8743F at 14 % over #D8C7A0, no texture) + 3 px wax #7A2723 bar on the left. Ink #2B2118 on hover = 8.42:1, ink-soft #54442F = 5.00:1, bar on hover = 5.24:1. Same rule for ComboBox items and tooltips. Disabled item: #6B5842 text plus a line saying why."
   },
   "scrollbar-v-track-leather": {
    "group": "controls",
@@ -1419,6 +1419,40 @@
    "svg": true,
    "note": "bronze fill, 8 px high. Place at (2,2) inside the track, width = value * (track width - 4); min width 8."
   },
+  "progress-track-parchment": {
+   "group": "controls",
+   "png": [
+    48,
+    12
+   ],
+   "kind": "9slice",
+   "insets": [
+    6,
+    6,
+    6,
+    6
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "track on parchment, 12 px high; fill sits 2 px inside (fill height 8). Stretch horizontally. Border #5A3D22 = 5.9:1 against #D8C7A0."
+  },
+  "progress-fill-parchment": {
+   "group": "controls",
+   "png": [
+    32,
+    8
+   ],
+   "kind": "9slice",
+   "insets": [
+    4,
+    4,
+    4,
+    4
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "dark-bronze fill (#6E4B29) for parchment, 8 px high; 4.2:1 against the track. Place at (2,2) inside the track, width = value * (track width - 4); min width 8. Indeterminate: tile progress-stripes-tile over it (light stripes are subtler here)."
+  },
   "progress-stripes-tile": {
    "group": "controls",
    "png": [
@@ -1595,6 +1629,95 @@
    "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
   },
   "switch-track-leather-on-hover": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "checkbox-leather-unchecked-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "checkbox-leather-checked-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "checkbox-leather-indeterminate-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-leather (32x32 centred)."
+  },
+  "radio-leather-off-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-leather."
+  },
+  "radio-leather-on-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-leather."
+  },
+  "switch-track-leather-off-pressed": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-track-leather-on-pressed": {
    "group": "controls",
    "png": [
     46,
@@ -1878,6 +2001,95 @@
    "svg": true,
    "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
   },
+  "checkbox-parchment-unchecked-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "checkbox-parchment-checked-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "checkbox-parchment-indeterminate-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 checkbox, border inside bounds. Focus: focus-ring-control-parchment (32x32 centred)."
+  },
+  "radio-parchment-off-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-parchment."
+  },
+  "radio-parchment-on-pressed": {
+   "group": "controls",
+   "png": [
+    22,
+    22
+   ],
+   "kind": "image",
+   "mode": "stretch",
+   "svg": true,
+   "note": "22x22 radio; dot is 10 px. Focus: focus-ring-control-parchment."
+  },
+  "switch-track-parchment-off-pressed": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
+  "switch-track-parchment-on-pressed": {
+   "group": "controls",
+   "png": [
+    46,
+    24
+   ],
+   "kind": "9slice",
+   "insets": [
+    12,
+    0,
+    12,
+    0
+   ],
+   "mode": "stretch",
+   "svg": true,
+   "note": "46x24 track. 3-slice horizontal (insets 12,0,12,0). Thumb: switch-thumb-*, 16 px, 4 px from the track end (off: x=4, on: x=26)."
+  },
   "checkbox-parchment-unchecked-disabled": {
    "group": "controls",
    "png": [
@@ -1999,6 +2211,214 @@
    "mode": "stretch",
    "svg": true,
    "note": "thumb, 16 px circle. Disabled: 50 % opacity."
+  },
+  "button-primary-parchment-normal": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-parchment-hover": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-parchment-pressed": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-primary-parchment-disabled": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-parchment-normal": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-parchment-hover": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-parchment-pressed": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
+  },
+  "button-secondary-parchment-disabled": {
+   "group": "buttons",
+   "png": [
+    160,
+    40
+   ],
+   "kind": "9slice",
+   "insets": [
+    17,
+    14,
+    17,
+    14
+   ],
+   "mode": "tile",
+   "tile_axes": "x",
+   "tile": [
+    126,
+    null
+   ],
+   "min_size": [
+    34,
+    28
+   ],
+   "svg": true,
+   "note": "Parchment-surface button: 1.5 px bronze/dark (#5A3D22) inner border for WCAG 1.4.11 on parchment; widths = 160 + 6k are bit-identical to a direct render, other widths may show ONE shortened dash where the right cap starts (< 6 px, barely visible). Fixed-height policy: 36-44 px. No outer shadow in the art."
   }
  }
 }

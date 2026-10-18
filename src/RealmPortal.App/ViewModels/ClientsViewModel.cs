@@ -81,7 +81,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
         Items.Clear();
         if (!list.Succeeded)
         {
-            Notice = ServiceErrorText.Body(list.Error!);
+            Notice = ErrorText.Body(list.Error!);
             return;
         }
 
@@ -134,7 +134,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
             var result = await Task.Run(() => _session.Service.AddClient(folder)).ConfigureAwait(true);
             if (!result.Succeeded)
             {
-                Notice = ServiceErrorText.Body(result.Error!);
+                Notice = ErrorText.Body(result.Error!);
                 OnPropertyChanged(nameof(StatusText));
                 return;
             }

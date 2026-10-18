@@ -19,8 +19,17 @@ public enum ServiceErrorCode
     PermissionDenied,
     ReadOnlyFs,
 
+    /// <summary>Not enough space to complete the write.</summary>
+    DiskFull,
+
+    /// <summary>The file is in use by another process.</summary>
+    FileSharingViolation,
+
     /// <summary>The client directory or a path inside it does not exist.</summary>
     PathNotFound,
+
+    /// <summary>A path is outside the managed client-file allow-list (apply/undo refuse to touch it).</summary>
+    PathEscapesClient,
 
     /// <summary>A client file changed since it was planned or backed up (user or game).</summary>
     HashMismatch,
@@ -104,6 +113,12 @@ public enum Consistency
     /// restored, the active server did not change, and the undo can be finished or discarded.
     /// </summary>
     Pending,
+
+    /// <summary>
+    /// Only <see cref="IPortalService.Play"/>: plan, apply and activate succeeded but launch failed. The client is configured, the new server is active,
+    /// and undo is still available. Pair with <see cref="ServiceErrorCode.LaunchFailed"/>.
+    /// </summary>
+    AppliedLaunchFailed,
 }
 
 /// <summary>A failure as data: a stable code plus the parameters the UI needs for its message. Everything except <see cref="Code"/> is optional.</summary>
