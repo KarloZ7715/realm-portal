@@ -3,10 +3,19 @@ using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
 
-public class GameLaunchSpecTests
+public class GameLaunchSpecTests : IDisposable
 {
-    private const string Exe = "/games/wow 3.3.5/Wow.exe";
-    private const string Dir = "/games/wow 3.3.5";
+    private readonly TempDirectory _temp = new();
+    private string Exe { get; }
+    private string Dir => _temp.Path;
+
+    public GameLaunchSpecTests()
+    {
+        Exe = _temp.Combine("Wow.exe");
+        File.WriteAllText(Exe, "test executable placeholder");
+    }
+
+    public void Dispose() => _temp.Dispose();
 
     private sealed class FakeRunner : IProcessRunner
     {
@@ -87,6 +96,25 @@ public class GameLaunchSpecTests
     [InlineData("A=B")]
     public void InvalidEnvironmentNames_AreRejected(string name) =>
         Assert.Throws<ArgumentException>(() => new GameLaunchSpec(Exe, Dir, Environment: new Dictionary<string, string?> { [name] = "x" }).Resolve());
+
+    [Theory]
+    [InlineData("LD_PRELOAD")]
+    [InlineData("ld_library_path")]
+    [InlineData("DYLD_INSERT_LIBRARIES")]
+    public void DynamicLoaderEnvironment_IsRejected(string name)
+    {
+        var error = Assert.Throws<ArgumentException>(() =>
+            new GameLaunchSpec(Exe, Dir, Environment: new Dictionary<string, string?> { [name] = "payload" }).Resolve());
+
+        Assert.Equal(GameLaunchSpec.UnsupportedSettingParameter, error.ParamName);
+    }
+
+    [Fact]
+    public void RelativeOrMissingExecutable_IsRejected()
+    {
+        Assert.Throws<ArgumentException>(() => new GameLaunchSpec("Wow.exe", Dir).Resolve());
+        Assert.Throws<ArgumentException>(() => new GameLaunchSpec(_temp.Combine("Missing.exe"), Dir).Resolve());
+    }
 
     [Fact]
     public void EmptyExecutableOrEmptyProgram_IsRejected()

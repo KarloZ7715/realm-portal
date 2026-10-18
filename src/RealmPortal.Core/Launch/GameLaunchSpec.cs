@@ -23,6 +23,13 @@ public sealed record GameLaunchSpec(
     IReadOnlyDictionary<string, string?>? Environment = null,
     IReadOnlyList<string>? Prefix = null)
 {
+    private static readonly HashSet<string> RestrictedEnvironmentVariables = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "DYLD_INSERT_LIBRARIES",
+    };
+
     /// <summary><see cref="ArgumentException.ParamName"/> when a launcher cannot apply one of these settings.</summary>
     public const string UnsupportedSettingParameter = "launcherSetting";
 
@@ -32,6 +39,8 @@ public sealed record GameLaunchSpec(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ExecutablePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(WorkingDirectory);
+        if (!Path.IsPathFullyQualified(ExecutablePath) || !File.Exists(ExecutablePath))
+            throw new ArgumentException("ExecutablePath must be an existing file specified by an absolute path.", nameof(ExecutablePath));
 
         var tokens = new List<string>();
         if (Prefix is not null)
@@ -64,6 +73,8 @@ public sealed record GameLaunchSpec(
             {
                 if (string.IsNullOrEmpty(name) || name.Contains('=') || name.Contains('\0'))
                     throw new ArgumentException($"'{name}' is not a valid environment variable name.", nameof(Environment));
+                if (RestrictedEnvironmentVariables.Contains(name))
+                    throw new ArgumentException($"'{name}' is restricted because it can load arbitrary native code.", UnsupportedSettingParameter);
                 environment[name] = value;
             }
         }
