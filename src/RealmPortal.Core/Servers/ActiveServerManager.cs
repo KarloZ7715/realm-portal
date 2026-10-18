@@ -43,7 +43,7 @@ public sealed class ActiveServerManager(
     private readonly string _projectionPath = ActiveProjection.FilePath(projectionDirectory);
 
     /// <summary>The active server, or <c>null</c> when none is active (or the stored one no longer exists).</summary>
-    public Server? GetActive() => Resolve(LoadState());
+    public Server? GetActive(string? clientId = null) => Resolve(LoadState(), clientId);
 
     public ActiveStatus Status()
     {
@@ -55,15 +55,91 @@ public sealed class ActiveServerManager(
     /// <summary>The <c>server_id</c> recorded for undo, or <c>null</c> when undo would deactivate; unset when there is nothing to undo.</summary>
     public string? PendingUndoServerId => LoadState().Undo?.ServerId;
 
+    public string? GetPendingUndoServerId(string? clientId) =>
+        clientId is null ? PendingUndoServerId : LoadState().UndoByClient.GetValueOrDefault(clientId)?.ServerId;
+
+    public IReadOnlyList<string> ClientIdsWithUndoTo(string serverId) =>
+        LoadState().UndoByClient.Where(pair => pair.Value.ServerId == serverId).Select(pair => pair.Key).ToList();
+
     /// <summary>The server that <see cref="Undo"/> would restore, or <c>null</c> when undo would deactivate; <c>null</c> when there is nothing to undo.</summary>
-    public Server? GetUndoTarget()
+    public Server? GetUndoTarget(string? clientId = null)
     {
         var state = LoadState();
-        if (state.Undo is null)
+        var undo = clientId is not null ? state.UndoByClient.GetValueOrDefault(clientId) : state.Undo;
+        if (undo is null)
             return null;
-        return state.Undo.ServerId is { } id
+        return undo.ServerId is { } id
             ? store.List().FirstOrDefault(s => s.Id == id)
             : null;
+    }
+
+    /// <summary>Client ids whose per-client active state points at the given server.</summary>
+    public IReadOnlyList<string> ClientIdsActiveOn(string serverId) =>
+        LoadState().ActiveByClient.Where(pair => pair.Value == serverId).Select(pair => pair.Key).ToList();
+
+    /// <summary>Migrates per-client state when a registered folder receives a new stable id.</summary>
+    public void MigrateClientState(string oldClientId, string newClientId)
+    {
+        using (store.DirectoryLock.Acquire())
+        {
+            var state = LoadState();
+            var active = new Dictionary<string, string>(state.ActiveByClient, StringComparer.Ordinal);
+            if (active.Remove(oldClientId, out var activeServerId))
+                active[newClientId] = activeServerId;
+            var undo = new Dictionary<string, UndoRecord>(state.UndoByClient, StringComparer.Ordinal);
+            var removedUndo = undo.Remove(oldClientId); // A backup is bound to the old installation id and client root.
+            if (activeServerId is not null || removedUndo)
+                SaveState(state with { ActiveByClient = active, UndoByClient = undo });
+        }
+    }
+
+    /// <summary>Removes per-client active state and optionally its global undo record.</summary>
+    public void RemoveClientState(string clientId, bool clearGlobalUndo)
+    {
+        using (store.DirectoryLock.Acquire())
+        {
+            var state = LoadState();
+            var active = new Dictionary<string, string>(state.ActiveByClient, StringComparer.Ordinal);
+            var undo = new Dictionary<string, UndoRecord>(state.UndoByClient, StringComparer.Ordinal);
+            var changed = active.Remove(clientId) | undo.Remove(clientId);
+            if (clearGlobalUndo && state.Undo is not null)
+                changed = true;
+            if (changed)
+                SaveState(state with { ActiveByClient = active, UndoByClient = undo, Undo = clearGlobalUndo ? null : state.Undo });
+        }
+    }
+
+    /// <summary>Updates a server and refreshes the global projection when that server is active.</summary>
+    public Server Update(Server server)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        using (store.DirectoryLock.Acquire())
+        {
+            var old = store.List().FirstOrDefault(s => s.Id == server.Id)
+                      ?? throw new StoreException($"No server matches '{server.Id}'.");
+            var state = LoadState();
+            store.UpdateCore(server);
+            if (state.ActiveId != server.Id)
+                return server;
+            try
+            {
+                writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(server));
+                return server;
+            }
+            catch (Exception writeError)
+            {
+                try
+                {
+                    store.UpdateCore(old);
+                    writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(old));
+                }
+                catch (Exception rollbackError)
+                {
+                    throw new StoreException("Updating the active server failed and rollback also failed.", new AggregateException(writeError, rollbackError));
+                }
+                throw;
+            }
+        }
     }
 
     /// <summary>Clears the one-level undo record without changing the active server or projection.</summary>
@@ -107,9 +183,12 @@ public sealed class ActiveServerManager(
                 throw ex.ForServer(stored.Name);
             }
 
-            var next = previous?.Id == stored.Id
-                ? state with { ActiveId = stored.Id }
-                : new State { Version = FormatVersion, ActiveId = stored.Id, Undo = new UndoRecord { ServerId = previous?.Id } };
+            var next = state with
+            {
+                Version = FormatVersion,
+                ActiveId = stored.Id,
+                Undo = previous?.Id == stored.Id ? state.Undo : new UndoRecord { ServerId = previous?.Id },
+            };
             SaveState(next);
             try
             {
@@ -135,11 +214,12 @@ public sealed class ActiveServerManager(
         using (store.DirectoryLock.Acquire())
         {
             var state = LoadState();
-            if (state.Undo is null)
+            var undo = state.Undo;
+            if (undo is null)
                 throw new StoreException("Nothing to undo.");
 
             Server? target = null;
-            if (state.Undo.ServerId is { } id)
+            if (undo.ServerId is { } id)
             {
                 target = store.List().FirstOrDefault(s => s.Id == id)
                          ?? throw new StoreException("The previous server no longer exists; cannot undo.");
@@ -158,7 +238,12 @@ public sealed class ActiveServerManager(
             }
 
             var stateBeforeUndo = state;
-            var nextState = new State { Version = FormatVersion, ActiveId = target?.Id, Undo = null };
+            var nextState = state with
+            {
+                Version = FormatVersion,
+                ActiveId = target?.Id,
+                Undo = null,
+            };
             SaveState(nextState);
             try
             {
@@ -189,22 +274,31 @@ public sealed class ActiveServerManager(
                 return false;
 
             var state = LoadState();
+            var activeByClient = new Dictionary<string, string>(state.ActiveByClient, StringComparer.Ordinal);
+            var undoByClient = new Dictionary<string, UndoRecord>(state.UndoByClient, StringComparer.Ordinal);
+            foreach (var pair in activeByClient.Where(pair => pair.Value == id).ToList())
+                activeByClient.Remove(pair.Key);
+            foreach (var pair in undoByClient.Where(pair => pair.Value.ServerId == id).ToList())
+                undoByClient.Remove(pair.Key);
             if (state.ActiveId == id)
             {
-                SaveState(new State { Version = FormatVersion, ActiveId = null, Undo = null });
+                SaveState(state with { ActiveId = null, Undo = null, ActiveByClient = activeByClient, UndoByClient = undoByClient });
                 DeleteProjection();
             }
-            else if (state.Undo?.ServerId == id)
+            else if (state.Undo?.ServerId == id || activeByClient.Count != state.ActiveByClient.Count || undoByClient.Count != state.UndoByClient.Count)
             {
-                SaveState(state with { Undo = null });
+                SaveState(state with { Undo = state.Undo?.ServerId == id ? null : state.Undo, ActiveByClient = activeByClient, UndoByClient = undoByClient });
             }
 
             return true;
         }
     }
 
-    private Server? Resolve(State state) =>
-        state.ActiveId is null ? null : store.List().FirstOrDefault(s => s.Id == state.ActiveId);
+    private Server? Resolve(State state, string? clientId = null)
+    {
+        var activeId = clientId is not null ? state.ActiveByClient.GetValueOrDefault(clientId) ?? state.ActiveId : state.ActiveId;
+        return activeId is null ? null : store.List().FirstOrDefault(s => s.Id == activeId);
+    }
 
     private bool IsProjectionInSync(Server? active)
     {
@@ -249,7 +343,11 @@ public sealed class ActiveServerManager(
             var state = JsonSerializer.Deserialize<State>(PrivateStorage.ReadBounded(_statePath, PrivateStorage.MaxJsonBytes), JsonOptions)
                         ?? throw new StoreException($"'{_statePath}' is empty.");
             return state.Version == FormatVersion
-                ? state
+                ? state with
+                {
+                    ActiveByClient = state.ActiveByClient ?? new Dictionary<string, string>(StringComparer.Ordinal),
+                    UndoByClient = state.UndoByClient ?? new Dictionary<string, UndoRecord>(StringComparer.Ordinal),
+                }
                 : throw new StoreException($"'{_statePath}' has unsupported format version {state.Version}.");
         }
         catch (JsonException ex)
@@ -274,6 +372,8 @@ public sealed class ActiveServerManager(
         [JsonPropertyName("version")] public int Version { get; init; }
         [JsonPropertyName("active_id")] public string? ActiveId { get; init; }
         [JsonPropertyName("undo")] public UndoRecord? Undo { get; init; }
+        [JsonPropertyName("active_by_client")] public Dictionary<string, string> ActiveByClient { get; init; } = new(StringComparer.Ordinal);
+        [JsonPropertyName("undo_by_client")] public Dictionary<string, UndoRecord> UndoByClient { get; init; } = new(StringComparer.Ordinal);
     }
 
     private sealed record UndoRecord

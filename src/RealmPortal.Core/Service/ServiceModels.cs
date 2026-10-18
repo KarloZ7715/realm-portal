@@ -11,7 +11,16 @@ namespace RealmPortal.Core.Service;
 /// <param name="Path">The client folder (the one with <c>Wow.exe</c>).</param>
 /// <param name="Version">The client version; <c>null</c> when it could not be read (then <see cref="Error"/> says why).</param>
 /// <param name="Error">Why the version could not be read (<c>PathNotFound</c>, <c>ClientExecutableNotFound</c>, <c>ClientNotAPortableExecutable</c>, ...). An unreadable client is a normal list entry, not a failure of the call.</param>
-public sealed record ClientEntry(string Id, string Path, ClientVersion? Version, ServiceError? Error);
+public sealed record ClientEntry(
+    string Id,
+    string Path,
+    ClientVersion? Version,
+    ServiceError? Error,
+    string? Name = null,
+    ClientOrigin Origin = ClientOrigin.Manual);
+
+/// <summary>Request to update a registered client.</summary>
+public sealed record UpdateClientRequest(string ClientId, string? Name = null, string? Folder = null);
 
 // ---------------------------------------------------------------- servers
 
@@ -41,6 +50,18 @@ public sealed record ServerEntry(
 /// <param name="ClientId">Preferred client for this server (<see cref="ClientEntry.Id"/>), shown on its card; <c>null</c> for none. Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
 /// <param name="ExtraRealmlistLines">Extra realmlist lines after <c>set realmlist</c> (for example <c>set patchlist …</c>).</param>
 public sealed record NewServer(
+    string Name,
+    string Host,
+    string? Realm = null,
+    string? PatchlistHost = null,
+    int? RequiredClientBuild = null,
+    string? Account = null,
+    string? ClientId = null,
+    IReadOnlyList<string>? ExtraRealmlistLines = null);
+
+/// <summary>Request to update an existing server.</summary>
+public sealed record UpdateServerRequest(
+    string ServerId,
     string Name,
     string Host,
     string? Realm = null,

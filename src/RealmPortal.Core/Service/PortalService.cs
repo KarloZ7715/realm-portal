@@ -59,7 +59,7 @@ public sealed class PortalService : IPortalService
     {
         try
         {
-            return ServiceResult<IReadOnlyList<ClientEntry>>.Ok(_clients.List().Select(ToClientEntry).ToList());
+            return ServiceResult<IReadOnlyList<ClientEntry>>.Ok(_clients.List().Select(client => ToClientEntry(client)).ToList());
         }
         catch (Exception ex)
         {
@@ -67,7 +67,7 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    public ServiceResult<ClientEntry> AddClient(string folder)
+    public ServiceResult<ClientEntry> AddClient(string folder, string? name = null)
     {
         if (folder is null)
             throw new ArgumentNullException(nameof(folder));
@@ -75,8 +75,95 @@ public sealed class PortalService : IPortalService
         try
         {
             var version = ReadStoredClientVersion(folder);
-            var stored = _clients.Add(folder);
-            return ServiceResult<ClientEntry>.Ok(new ClientEntry(stored.Id, stored.Path, version, null));
+            var stored = _clients.Add(folder, name);
+            return ServiceResult<ClientEntry>.Ok(ToClientEntry(stored, version));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ClientEntry>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<ClientEntry> UpdateClient(UpdateClientRequest request)
+    {
+        if (request is null)
+            throw new ArgumentNullException(nameof(request));
+
+        try
+        {
+            var existing = _clients.FindById(request.ClientId);
+            if (existing is null)
+                return ServiceResult<ClientEntry>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+            if (TryCheckRunning(existing) is { } runningError)
+                return ServiceResult<ClientEntry>.Fail(runningError);
+
+            var newPath = request.Folder is null ? existing.Path : ClientPathSecurity.CanonicalizeTrustedFolder(request.Folder);
+            var newId = ClientIds.FromFolderPath(newPath);
+            ClientVersion? version = null;
+            if (newId != existing.Id)
+            {
+                try
+                {
+                    if (_probe.IsGameRunning(newPath))
+                        return ServiceResult<ClientEntry>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: newPath));
+                }
+                catch (Exception ex)
+                {
+                    return ServiceResult<ClientEntry>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: newPath, Diagnostic: ex.Message));
+                }
+
+                try
+                {
+                    version = ReadStoredClientVersion(newPath);
+                }
+                catch (ClientVersionException ex)
+                {
+                    return ServiceResult<ClientEntry>.Fail(ServiceErrors.FromClientVersion(ex));
+                }
+                if (_clients.FindById(newId) is not null)
+                    return ServiceResult<ClientEntry>.Fail(new ServiceError(ServiceErrorCode.ClientAlreadyExists, Path: newPath));
+            }
+            else
+            {
+                version = ReadVersionForEntry(existing.Path);
+            }
+
+            using (_servers.DirectoryLock.Acquire())
+            using (CreateApplier().AcquireInstallationLock(existing.Id))
+            using (newId == existing.Id ? null : CreateApplier().AcquireInstallationLock(newId))
+            {
+                var current = _clients.FindById(request.ClientId);
+                if (current is null)
+                    return ServiceResult<ClientEntry>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+                if (TryCheckRunning(current) is { } lockedRunning)
+                    return ServiceResult<ClientEntry>.Fail(lockedRunning);
+                if (newId != existing.Id)
+                {
+                    try
+                    {
+                        if (_probe.IsGameRunning(newPath))
+                            return ServiceResult<ClientEntry>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: newPath));
+                    }
+                    catch (Exception ex)
+                    {
+                        return ServiceResult<ClientEntry>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: newPath, Diagnostic: ex.Message));
+                    }
+                }
+
+                var updated = new StoredClient(newId, newPath, request.Name, newId == existing.Id ? existing.Origin : ClientOrigin.Manual);
+                _clients.ReplaceCore(existing.Id, updated);
+                if (newId != existing.Id)
+                {
+                    _servers.RewriteClientIdReferencesCore(existing.Id, newId);
+                    _active.MigrateClientState(existing.Id, newId);
+                    if (_journal.Load()?.ClientId == existing.Id)
+                    {
+                        _active.RemoveClientState(existing.Id, clearGlobalUndo: true);
+                        _journal.Clear();
+                    }
+                }
+                return ServiceResult<ClientEntry>.Ok(ToClientEntry(updated, version));
+            }
         }
         catch (Exception ex)
         {
@@ -91,8 +178,26 @@ public sealed class PortalService : IPortalService
 
         try
         {
-            if (!_clients.Remove(clientId))
+            var client = _clients.FindById(clientId);
+            if (client is null)
                 return ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+
+            if (TryCheckRunning(client) is { } runningError)
+                return ServiceResult<Unit>.Fail(runningError);
+
+            using (_servers.DirectoryLock.Acquire())
+            using (CreateApplier().AcquireInstallationLock(clientId))
+            {
+                if (TryCheckRunning(client) is { } lockedRunning)
+                    return ServiceResult<Unit>.Fail(lockedRunning);
+                var journal = _journal.Load();
+                _servers.RewriteClientIdReferencesCore(clientId, null);
+                _active.RemoveClientState(clientId, clearGlobalUndo: journal?.ClientId == clientId);
+                if (journal?.ClientId == clientId)
+                    _journal.Clear();
+                if (!_clients.RemoveCore(clientId))
+                    return ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+            }
             return ServiceResult<Unit>.Ok(default);
         }
         catch (Exception ex)
@@ -181,8 +286,66 @@ public sealed class PortalService : IPortalService
                 server.Account,
                 clientId: server.ClientId);
             _servers.Add(created);
-            var activeId = _active.GetActive()?.Id;
+            var activeId = _active.GetActive(server.ClientId)?.Id;
             return ServiceResult<ServerEntry>.Ok(ToServerEntry(created, activeId, server.ClientId, null));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ServerEntry>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<ServerEntry> UpdateServer(UpdateServerRequest request)
+    {
+        if (request is null)
+            throw new ArgumentNullException(nameof(request));
+
+        try
+        {
+            using var configLock = _servers.DirectoryLock.Acquire();
+            var existing = _servers.List().FirstOrDefault(s => s.Id == request.ServerId);
+            if (existing is null)
+                return ServiceResult<ServerEntry>.Fail(new ServiceError(ServiceErrorCode.ServerNotFound));
+            if (request.ClientId is not null && _clients.FindById(request.ClientId) is null)
+                return ServiceResult<ServerEntry>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+
+            IEnumerable<string>? extra = request.ExtraRealmlistLines;
+            if (extra is null && request.PatchlistHost is not null)
+                extra = [$"set patchlist {request.PatchlistHost}"];
+            var updated = Server.Create(
+                request.Name,
+                request.Host,
+                request.Realm,
+                extra,
+                request.RequiredClientBuild,
+                request.Account,
+                request.ServerId,
+                request.ClientId);
+
+            if (existing.Realmlist != updated.Realmlist
+                || existing.Realm != updated.Realm
+                || existing.RequiredClientBuild != updated.RequiredClientBuild)
+            {
+                var affectedClientIds = _active.ClientIdsActiveOn(existing.Id).ToHashSet(StringComparer.Ordinal);
+                if (_active.GetActive()?.Id == existing.Id && _journal.Load()?.ClientId is { } journalClient)
+                    affectedClientIds.Add(journalClient);
+                using var installationLocks = AcquireInstallationLocks(affectedClientIds);
+                foreach (var clientId in affectedClientIds)
+                {
+                    var client = _clients.FindById(clientId);
+                    if (client is null)
+                        continue;
+                    if (TryCheckRunning(client) is { } runningError)
+                        return ServiceResult<ServerEntry>.Fail(runningError with { ServerName = existing.Name });
+                }
+            }
+
+            _active.Update(updated);
+            var activeId = _active.GetActive(updated.ClientId)?.Id;
+            ClientVersion? clientVersion = null;
+            if (updated.ClientId is { } preferredId && _clients.FindById(preferredId) is { } preferred)
+                clientVersion = ReadVersionForEntry(preferred.Path);
+            return ServiceResult<ServerEntry>.Ok(ToServerEntry(updated, activeId, updated.ClientId, clientVersion));
         }
         catch (Exception ex)
         {
@@ -197,8 +360,30 @@ public sealed class PortalService : IPortalService
 
         try
         {
+            using var configLock = _servers.DirectoryLock.Acquire();
+            var server = _servers.List().FirstOrDefault(s => s.Id == serverId);
+            if (server is null)
+                return ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.ServerNotFound));
+            var active = _active.GetActive();
+            var pendingUndoServerId = _active.PendingUndoServerId;
+            var clientIds = _active.ClientIdsActiveOn(serverId).ToHashSet(StringComparer.Ordinal);
+            var undoClientIds = _active.ClientIdsWithUndoTo(serverId).ToHashSet(StringComparer.Ordinal);
+            if (active?.Id == serverId && _journal.Load()?.ClientId is { } journalClient)
+                clientIds.Add(journalClient);
+            using var installationLocks = AcquireInstallationLocks(clientIds);
+            foreach (var clientId in clientIds)
+            {
+                var client = _clients.FindById(clientId);
+                if (client is null)
+                    continue;
+                if (TryCheckRunning(client) is { } runningError)
+                    return ServiceResult<Unit>.Fail(runningError with { ServerName = server.Name });
+            }
+
             if (!_active.Remove(serverId))
                 return ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.ServerNotFound));
+            if (active?.Id == serverId || pendingUndoServerId == serverId || _journal.Load()?.ClientId is { } switchedClient && undoClientIds.Contains(switchedClient))
+                _journal.Clear();
             return ServiceResult<Unit>.Ok(default);
         }
         catch (Exception ex)
@@ -658,20 +843,80 @@ public sealed class PortalService : IPortalService
         return _versionReader.Read(path);
     }
 
-    private ClientEntry ToClientEntry(StoredClient stored)
+    private ClientVersion? ReadVersionForEntry(string path)
     {
         try
         {
-            var version = ReadStoredClientVersion(stored.Path);
-            return new ClientEntry(stored.Id, stored.Path, version, null);
+            return ReadStoredClientVersion(path);
+        }
+        catch (ClientVersionException)
+        {
+            return null;
+        }
+        catch (StoreException)
+        {
+            return null;
+        }
+    }
+
+    private ServiceError? TryCheckRunning(StoredClient client)
+    {
+        try
+        {
+            return _probe.IsGameRunning(client.Path)
+                ? new ServiceError(ServiceErrorCode.GameRunning, Path: client.Path)
+                : null;
+        }
+        catch (Exception ex)
+        {
+            return new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: client.Path, Diagnostic: ex.Message);
+        }
+    }
+
+    private IDisposable AcquireInstallationLocks(IEnumerable<string> clientIds)
+    {
+        var applier = CreateApplier();
+        var acquired = new List<InstallationLock>();
+        try
+        {
+            foreach (var clientId in clientIds.OrderBy(id => id, StringComparer.Ordinal))
+                acquired.Add(applier.AcquireInstallationLock(clientId));
+            return new InstallationLockSet(acquired);
+        }
+        catch
+        {
+            for (var i = acquired.Count - 1; i >= 0; i--)
+                acquired[i].Dispose();
+            throw;
+        }
+    }
+
+    private sealed class InstallationLockSet(List<InstallationLock> locks) : IDisposable
+    {
+        public void Dispose()
+        {
+            for (var i = locks.Count - 1; i >= 0; i--)
+                locks[i].Dispose();
+        }
+    }
+
+    private ClientEntry ToClientEntry(StoredClient stored, ClientVersion? knownVersion = null)
+    {
+        try
+        {
+            var version = knownVersion ?? ReadStoredClientVersion(stored.Path);
+            var displayName = stored.Name ?? (version is null ? Path.GetFileName(stored.Path) : $"WoW {version}");
+            return new ClientEntry(stored.Id, stored.Path, version, null, displayName, stored.Origin);
         }
         catch (ClientVersionException ex)
         {
-            return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromClientVersion(ex));
+            var displayName = stored.Name ?? Path.GetFileName(stored.Path);
+            return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromClientVersion(ex), displayName, stored.Origin);
         }
         catch (StoreException ex)
         {
-            return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromException(ex));
+            var displayName = stored.Name ?? Path.GetFileName(stored.Path);
+            return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromException(ex), displayName, stored.Origin);
         }
     }
 

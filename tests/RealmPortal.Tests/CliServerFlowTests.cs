@@ -353,4 +353,38 @@ public class CliServerFlowTests
         Assert.Equal(2, box.Run("launch", "Bad").Code);
         Assert.Empty(box.Launcher.Calls);
     }
+
+    [Fact]
+    public void ClientCommands_AddListEditAndRemove()
+    {
+        using var box = new Sandbox();
+
+        var add = box.RunWithoutClient("client", "add", box.Client, "--name", "Wrath");
+        Assert.Equal(0, add.Code);
+        Assert.Contains("Wrath", box.RunWithoutClient("client", "list").Out);
+
+        var edit = box.RunWithoutClient("client", "edit", "Wrath", "--name", "Wrath Updated");
+        Assert.Equal(0, edit.Code);
+        Assert.Contains("Wrath Updated", box.RunWithoutClient("client", "list").Out);
+
+        var remove = box.RunWithoutClient("client", "remove", "Wrath Updated");
+        Assert.Equal(0, remove.Code);
+        Assert.Contains("No clients.", box.RunWithoutClient("client", "list").Out);
+    }
+
+    [Fact]
+    public void ServerEdit_UpdatesFieldsAndCanBeRemoved()
+    {
+        using var box = new Sandbox(clientBuild: null);
+        Assert.Equal(0, box.RunWithoutClient("add", "Alpha", "alpha.example.org").Code);
+
+        var edit = box.RunWithoutClient("edit", "Alpha", "--name", "Beta", "--host", "beta.example.org", "--realm", "R1");
+        Assert.Equal(0, edit.Code);
+        var list = box.RunWithoutClient("list");
+        Assert.Contains("Beta", list.Out);
+        Assert.Contains("beta.example.org", list.Out);
+
+        Assert.Equal(0, box.RunWithoutClient("remove", "Beta").Code);
+        Assert.Contains("No servers.", box.RunWithoutClient("list").Out);
+    }
 }

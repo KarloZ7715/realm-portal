@@ -24,11 +24,13 @@ internal static class ServiceCli
             ServiceErrorCode.ServerNameTaken => $"A server named '{error.ServerName}' already exists.",
             ServiceErrorCode.ServerNotFound => "no server matches the selector.",
             ServiceErrorCode.ClientNotFound => "No registered client matches the request.",
+            ServiceErrorCode.ClientAlreadyExists => "A client with that folder is already registered.",
+            ServiceErrorCode.InvalidClientInput => "Client input is invalid.",
             ServiceErrorCode.IncompatibleClient =>
                 $"Server requires client build {error.RequiredBuild}, but the client is {error.ClientBuild} (use --force).",
             ServiceErrorCode.NothingToUndo => "Nothing to undo.",
             ServiceErrorCode.UndoTargetMissing => "The previous server no longer exists; cannot undo.",
-            ServiceErrorCode.GameRunning => "The game is running; close it before changing client files.",
+            ServiceErrorCode.GameRunning => "The game is running; close it before changing this client or an active server.",
             ServiceErrorCode.ProcessCheckFailed => string.IsNullOrEmpty(error.Diagnostic)
                 ? "Could not check whether the game is running."
                 : error.Diagnostic,
