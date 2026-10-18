@@ -34,6 +34,8 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     private readonly DemoBackend? _backend;
     private readonly PortalSession? _session;
+    private readonly Func<TimeSpan, Task> _delay;
+    private readonly HashSet<string> _runningClients = new(StringComparer.Ordinal);
     private readonly List<ServerItemViewModel> _all = [];
     private readonly DispatcherTimer? _toastTimer;
     private ServerItemViewModel? _target;
@@ -48,6 +50,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public ServersViewModel(DemoBackend backend, bool autoTick = true)
     {
+        _delay = Task.Delay;
         _backend = backend;
         var order = 0;
         foreach (var seed in DemoData.Servers)
@@ -65,9 +68,10 @@ public sealed partial class ServersViewModel : ViewModelBase
         Refresh();
     }
 
-    public ServersViewModel(PortalSession session, bool autoTick = true)
+    public ServersViewModel(PortalSession session, bool autoTick = true, Func<TimeSpan, Task>? delay = null)
     {
         _session = session;
+        _delay = delay ?? Task.Delay;
         if (autoTick)
         {
             _toastTimer = CreateToastTimer();
@@ -369,6 +373,13 @@ public sealed partial class ServersViewModel : ViewModelBase
         var projectionInSync = status?.ProjectionInSync ?? true;
 
         _all.Clear();
+        _runningClients.Clear();
+        foreach (var clientId in clients.Select(client => client.Id).Distinct(StringComparer.Ordinal))
+        {
+            var running = _session.Service.IsGameRunning(clientId);
+            if (running.Succeeded && running.Value)
+                _runningClients.Add(clientId);
+        }
         var order = 0;
         foreach (var entry in list.Value!)
         {
@@ -383,6 +394,8 @@ public sealed partial class ServersViewModel : ViewModelBase
                 item => _ = PlayAsync(item),
                 item => _ = SwitchOnlyAsync(item));
             card.Order = order++;
+            if (clientId is not null && _runningClients.Contains(clientId))
+                card.Overlay = ServerOverlay.Running;
             _all.Add(card);
         }
 
@@ -598,6 +611,12 @@ public sealed partial class ServersViewModel : ViewModelBase
             return;
         }
 
+        var elapsed = TimeSpan.Zero;
+        var sawRunning = false;
+        var consecutiveMisses = 0;
+        const int closeMisses = 3;
+        var interval = TimeSpan.FromMilliseconds(500);
+        var startupTimeout = TimeSpan.FromSeconds(30);
         while (Phase == ServersPhase.Running)
         {
             var running = await Task.Run(() => _session.Service.IsGameRunning(clientId)).ConfigureAwait(true);
@@ -611,17 +630,46 @@ public sealed partial class ServersViewModel : ViewModelBase
 
             if (!running.Value)
             {
-                GameClosed = true;
-                Refresh();
-                return;
+                if (sawRunning && ++consecutiveMisses >= closeMisses)
+                {
+                    GameClosed = true;
+                    Refresh();
+                    return;
+                }
+                if (!sawRunning && elapsed >= startupTimeout)
+                {
+                    GameClosed = true;
+                    Refresh();
+                    return;
+                }
+            }
+            else
+            {
+                sawRunning = true;
+                consecutiveMisses = 0;
+                _runningClients.Add(clientId);
             }
 
-            await Task.Delay(500).ConfigureAwait(true);
+            await _delay(interval).ConfigureAwait(true);
+            elapsed += interval;
         }
     }
 
     private void Finish()
     {
+        if (_session is not null && _target?.PreferredClientId is { } clientId)
+        {
+            var running = _session.Service.IsGameRunning(clientId);
+            if (running.Succeeded && running.Value)
+            {
+                _runningClients.Add(clientId);
+                GameClosed = false;
+                Phase = ServersPhase.Running;
+                Refresh();
+                return;
+            }
+            _runningClients.Remove(clientId);
+        }
         if (_target is not null)
         {
             _target.Overlay = ServerOverlay.None;
@@ -743,7 +791,8 @@ public sealed partial class ServersViewModel : ViewModelBase
 
         foreach (var item in _all)
         {
-            item.CanAct = Phase == ServersPhase.Idle;
+            item.CanAct = Phase == ServersPhase.Idle &&
+                (item.PreferredClientId is null || !_runningClients.Contains(item.PreferredClientId));
         }
 
         OnPropertyChanged(nameof(Active));
