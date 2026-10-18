@@ -17,12 +17,12 @@ public class Bug6CorruptConfigFileNameTests
         Directory.CreateDirectory(config);
         Directory.CreateDirectory(projection);
 
-        var app = CreateApp();
+        var app = CreateApp(dir);
         Assert.Equal(0, app.Run("add", ["Second", "second.example.org", "--config-dir", config, "--projection-dir", projection]));
         File.WriteAllText(Path.Combine(config, "state.json"), "garbage", Encoding.UTF8);
 
         var stderr = new StringWriter();
-        var app2 = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), _ => null);
+        var app2 = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
         Assert.Equal(2, app2.Run("switch", ["Second", "--config-dir", config, "--projection-dir", projection]));
         Assert.Contains("state.json", stderr.ToString());
         Assert.DoesNotContain("Unhandled", stderr.ToString());
@@ -39,13 +39,13 @@ public class Bug6CorruptConfigFileNameTests
         File.WriteAllText(Path.Combine(config, "servers.json"), "not-json", Encoding.UTF8);
 
         var stderr = new StringWriter();
-        var app = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), _ => null);
+        var app = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
         Assert.Equal(2, app.Run("list", ["--config-dir", config, "--projection-dir", projection]));
         Assert.Contains("servers.json", stderr.ToString());
     }
 
-    private static CliApp CreateApp() =>
-        new(new StringWriter(), new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
+    private static CliApp CreateApp(TempDirectory dir) =>
+        new(new StringWriter(), new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
 
     private sealed class FakeLauncher : IGameLauncher
     {

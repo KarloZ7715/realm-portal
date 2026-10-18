@@ -20,7 +20,7 @@ public class Bug3CorruptStateCliTests
 
         var stdout = new StringWriter();
         var stderr = new StringWriter();
-        var app = new CliApp(stdout, stderr, new PeClientVersionReader(), new FakeLauncher(), _ => null);
+        var app = new CliApp(stdout, stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
 
         Assert.Equal(0, app.Run("add", new[] { "Second", "second.example.org", "--config-dir", config, "--projection-dir", projection }));
         File.WriteAllText(Path.Combine(config, "state.json"), "garbage", Encoding.UTF8);

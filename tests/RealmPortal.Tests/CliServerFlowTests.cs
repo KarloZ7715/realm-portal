@@ -26,6 +26,9 @@ public class CliServerFlowTests
         public string Client => _dir.Combine("client");
         public string ActivoPath => ActiveProjection.FilePath(Projection);
 
+        public Func<string, string?> Variables(Func<string, string?>? inner = null) =>
+            inner is null ? TestBackupDir.Variables(_dir) : TestBackupDir.Variables(_dir, inner);
+
         public Sandbox(int? clientBuild = 12340)
         {
             Directory.CreateDirectory(Client);
@@ -46,7 +49,7 @@ public class CliServerFlowTests
             string[] common = ["--config-dir", Config, "--projection-dir", Projection];
             if (withClient)
                 common = [.. common, "--client-dir", Client];
-            var code = Program.Run([command, .. args, .. common], o, e, new PeClientVersionReader(), Launcher, _ => null);
+            var code = Program.Run([command, .. args, .. common], o, e, new PeClientVersionReader(), Launcher, Variables());
             return (code, o.ToString(), e.ToString());
         }
 
@@ -132,7 +135,7 @@ public class CliServerFlowTests
     public void Add_WithClientDir_DoesNotRegisterTheClient()
     {
         using var box = new Sandbox();
-        var app = new CliApp(new StringWriter(), new StringWriter(), new PeClientVersionReader(), box.Launcher, _ => null);
+        var app = new CliApp(new StringWriter(), new StringWriter(), new PeClientVersionReader(), box.Launcher, box.Variables());
 
         var code = app.Run("add",
         [
@@ -283,7 +286,7 @@ public class CliServerFlowTests
         var e = new StringWriter();
         string[][] commands = [["add", "Open", "o.example.org"], ["switch", "Open"], ["status"]];
         foreach (var args in commands)
-            Assert.Equal(0, Program.Run(args, o, e, new PeClientVersionReader(), box.Launcher, n => env.GetValueOrDefault(n)));
+            Assert.Equal(0, Program.Run(args, o, e, new PeClientVersionReader(), box.Launcher, box.Variables(n => env.GetValueOrDefault(n))));
 
         Assert.True(File.Exists(box.ActivoPath));
         Assert.Contains("Client: 12340", o.ToString());

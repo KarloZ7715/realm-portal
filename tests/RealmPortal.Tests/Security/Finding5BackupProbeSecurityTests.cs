@@ -37,7 +37,7 @@ public class Finding5BackupProbeSecurityTests
         Directory.CreateDirectory(Path.Combine(real, "backups"));
         File.CreateSymbolicLink(link, real);
 
-        var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch());
+        var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch(), getVariable: TestBackupDir.Variables(dir));
         var result = service.SetStorageSettings(new StorageSettings(Path.Combine(link, "backups")));
         Assert.False(result.Succeeded);
         Assert.Equal(ServiceErrorCode.PathNotFound, result.Error!.Code);

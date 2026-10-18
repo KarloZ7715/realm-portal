@@ -94,6 +94,30 @@ public class ClientFilesApplierTests
         Directory.Exists(env.Backups) ? Directory.GetDirectories(env.Backups).SelectMany(d => Directory.GetDirectories(d)).ToArray() : [];
 
     [Fact]
+    public void Undo_OversizedBackupFile_IsVerifyFailed_AndLeavesRealmlist()
+    {
+        using var env = new Env();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        var result = env.Applier.Apply(env.Plan());
+        var switched = File.ReadAllText(env.Path_("Data/enUS/realmlist.wtf"));
+        var backupDir = Path.Combine(env.Backups, "install-1", result.BackupId!);
+        var manifestPath = Path.Combine(backupDir, "manifest.json");
+        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        var backupFile = manifest.RootElement.GetProperty("files").EnumerateArray()
+            .Single(f => f.GetProperty("path").GetString() == "Data/enUS/realmlist.wtf")
+            .GetProperty("backup_file").GetString()!;
+        var payloadPath = Path.Combine(backupDir, backupFile.Replace('/', Path.DirectorySeparatorChar));
+        using (var stream = new FileStream(payloadPath, FileMode.Open, FileAccess.Write, FileShare.None))
+            stream.SetLength(ClientFilesApplier.MaxBackupFileBytes + 1);
+
+        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Undo("install-1", env.Client));
+
+        Assert.Equal(ClientFilesErrorCode.VerifyFailed, ex.Code);
+        Assert.Contains("larger", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(switched, File.ReadAllText(env.Path_("Data/enUS/realmlist.wtf")));
+    }
+
+    [Fact]
     public void Undo_AfterApply_RestoresEveryFileByteForByte()
     {
         using var env = new Env();

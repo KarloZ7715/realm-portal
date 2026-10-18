@@ -8,9 +8,10 @@ public class CliTests
 {
     private static (int Code, string Out, string Err) Run(params string[] args)
     {
+        using var dir = new TempDirectory();
         var o = new StringWriter();
         var e = new StringWriter();
-        var code = Program.Run(args, o, e, new PeClientVersionReader());
+        var code = Program.Run(args, o, e, new PeClientVersionReader(), getVariable: TestBackupDir.Variables(dir));
         return (code, o.ToString(), e.ToString());
     }
 

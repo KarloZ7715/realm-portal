@@ -9,6 +9,7 @@ namespace RealmPortal.Core.Service;
 
 /// <summary>
 /// Remembers the last successful switch for coordinated undo (<c>last-switch.json</c> in the config directory).
+/// <c>manifest_sha256</c> is optional. Journals written before the field existed omit it and still load.
 /// </summary>
 internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWriter writer, ConfigDirectoryLock? directoryLock = null)
 {
@@ -116,6 +117,7 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
                 ClientId = entry.ClientId,
                 BackupId = entry.BackupId,
                 FilesUndone = entry.FilesUndone,
+                ManifestSha256 = entry.ManifestSha256,
             };
             var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
             writer.WriteAllBytes(_path, new System.Text.UTF8Encoding(false).GetBytes(json));
@@ -131,6 +133,21 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
             throw new StoreException("last-switch backup_id is not valid.");
         if (entry.BackupId is not null && entry.ClientId is null)
             throw new StoreException("last-switch backup_id requires client_id.");
+        if (entry.ManifestSha256 is not null && !IsSha256Hex(entry.ManifestSha256))
+            throw new StoreException("last-switch manifest_sha256 is not valid.");
+    }
+
+    private static bool IsSha256Hex(string value)
+    {
+        if (value.Length != 64)
+            return false;
+        foreach (var c in value)
+        {
+            if (c is not (>= '0' and <= '9' or >= 'a' and <= 'f'))
+                return false;
+        }
+
+        return true;
     }
 
     private static LastSwitchEntry Parse(JournalFile file)
@@ -139,7 +156,7 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
             throw new StoreException($"Unsupported last-switch format version {file.Version}.");
         var clientId = string.IsNullOrWhiteSpace(file.ClientId) ? null : file.ClientId;
 
-        var entry = new LastSwitchEntry(clientId, file.BackupId, file.FilesUndone);
+        var entry = new LastSwitchEntry(clientId, file.BackupId, file.FilesUndone, file.ManifestSha256);
         ValidateEntry(entry);
         return entry;
     }
@@ -150,7 +167,12 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
         [JsonPropertyName("client_id")] public string? ClientId { get; init; }
         [JsonPropertyName("backup_id")] public string? BackupId { get; init; }
         [JsonPropertyName("files_undone")] public bool FilesUndone { get; init; }
+        [JsonPropertyName("manifest_sha256")] public string? ManifestSha256 { get; init; }
     }
 }
 
-internal sealed record LastSwitchEntry(string? ClientId, string? BackupId, bool FilesUndone = false);
+/// <param name="ManifestSha256">
+/// SHA-256 of the backup <c>manifest.json</c> bytes, or <c>null</c> when the switch wrote no backup
+/// or the journal was written before this field existed.
+/// </param>
+internal sealed record LastSwitchEntry(string? ClientId, string? BackupId, bool FilesUndone = false, string? ManifestSha256 = null);

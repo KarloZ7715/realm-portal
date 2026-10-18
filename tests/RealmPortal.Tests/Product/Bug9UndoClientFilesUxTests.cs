@@ -37,7 +37,8 @@ public class Bug9UndoClientFilesUxTests
 
         var stdout = new StringWriter();
         var stderr = new StringWriter();
-        var app = new CliApp(stdout, stderr, new PeClientVersionReader(), new FakeLauncher(), _ => null);
+        var variables = TestBackupDir.Variables(dir);
+        var app = new CliApp(stdout, stderr, new PeClientVersionReader(), new FakeLauncher(), variables);
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
         var outText = stdout.ToString();
         Assert.Contains("Client files: not changed.", outText);
@@ -45,7 +46,7 @@ public class Bug9UndoClientFilesUxTests
         Assert.DoesNotContain("run 'switch A --client-dir", outText);
 
         var statusOut = new StringWriter();
-        var statusApp = new CliApp(statusOut, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
+        var statusApp = new CliApp(statusOut, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), variables);
         Assert.Equal(0, statusApp.Run("status", ["--config-dir", config, "--projection-dir", projection]));
         Assert.Contains("Client folder out of sync:", statusOut.ToString());
     }
@@ -73,7 +74,7 @@ public class Bug9UndoClientFilesUxTests
         service.ActivateWithoutClientFiles(b.Id);
 
         var stdout = new StringWriter();
-        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), _ => null);
+        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
         var text = stdout.ToString();
         Assert.Contains("Client files: not changed.", text);
