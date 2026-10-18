@@ -67,6 +67,9 @@
       <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="RenderTransform" Value="translate(0px,1px)"/></Style>
       <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
       <Style Selector="^:disabled"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Cursor" Value="Arrow"/></Style>
+      <!-- Primary plate is wax red. White is the lightest text token and clears 4.5:1 there, including the dark disabled plate. -->
+      <Style Selector="^:not(.secondary):not(.ghost)"><Setter Property="Foreground" Value="{DynamicResource WhiteBrush}"/></Style>
+      <Style Selector="^:not(.secondary):not(.ghost):disabled"><Setter Property="Foreground" Value="{DynamicResource WhiteBrush}"/></Style>
       <Style Selector="^.compact"><Setter Property="MinHeight" Value="36"/></Style>
 
       <!-- ghost: plate art only on hover/pressed (leather) or always (parchment) -->

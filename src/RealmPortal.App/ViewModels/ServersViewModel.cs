@@ -5,6 +5,8 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Portal;
+using RealmPortal.App.Service;
 using RealmPortal.Core.Service;
 using StepState = RealmPortal.App.Controls.StepState;
 
@@ -19,8 +21,8 @@ public enum ServersPhase
 }
 
 /// <summary>
-/// The server list: search, switching, undo and play. All of it is simulated by <see cref="DemoBackend"/>.
-/// Order of the cards: the server being worked on first, then the active one, then the rest in their saved order.
+/// The server list: search, switching, undo and play. Uses <see cref="PortalSession"/> in production and
+/// <see cref="DemoBackend"/> for design-time screenshots and gallery tests.
 /// </summary>
 public sealed partial class ServersViewModel : ViewModelBase
 {
@@ -30,35 +32,58 @@ public sealed partial class ServersViewModel : ViewModelBase
     private static readonly int[] SwitchProgress = [20, 55, 85];
     private static readonly int[] OpenProgress = [25, 60, 100];
 
-    private readonly DemoBackend _backend;
-    private readonly IPortalService? _portal;
-    private readonly string? _portalClientId;
+    private readonly DemoBackend? _backend;
+    private readonly PortalSession? _session;
+    private readonly Func<TimeSpan, Task> _delay;
+    private readonly HashSet<string> _runningClients = new(StringComparer.Ordinal);
     private readonly List<ServerItemViewModel> _all = [];
     private readonly DispatcherTimer? _toastTimer;
     private ServerItemViewModel? _target;
     private ServerItemViewModel? _undoTo;
     private ServerItemViewModel? _undoFrom;
     private TimeSpan _toastElapsed;
+    private bool _repairRun;
+    private bool _undoConflict;
+    private bool _canUndoPending;
+    private ServiceError? _bannerError;
+    private string? _bannerMessageKey;
 
-    public ServersViewModel(DemoBackend backend, IPortalService? portal = null, string? portalClientId = null, bool autoTick = true)
+    public ServersViewModel(DemoBackend backend, bool autoTick = true)
     {
+        _delay = Task.Delay;
         _backend = backend;
-        _portal = portal;
-        _portalClientId = portalClientId;
         var order = 0;
         foreach (var seed in DemoData.Servers)
         {
-            _all.Add(new ServerItemViewModel(seed, item => _ = PlayAsync(item), item => _ = SwitchOnlyAsync(item)) { Order = order++ });
+            var card = ServerItemViewModel.FromSeed(seed, item => _ = PlayAsync(item), item => _ = SwitchOnlyAsync(item));
+            card.Order = order++;
+            _all.Add(card);
         }
 
         if (autoTick)
         {
-            _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-            _toastTimer.Tick += (_, _) => AdvanceToast(_toastTimer.Interval);
+            _toastTimer = CreateToastTimer();
         }
 
         Refresh();
     }
+
+    public ServersViewModel(PortalSession session, bool autoTick = true, Func<TimeSpan, Task>? delay = null)
+    {
+        _session = session;
+        _delay = delay ?? Task.Delay;
+        if (autoTick)
+        {
+            _toastTimer = CreateToastTimer();
+        }
+
+        ReloadFromService();
+    }
+
+    public bool IsPortal => _session is not null;
+
+    /// <summary>When undo conflicts, asks before <see cref="IPortalService.DiscardUndo"/> via <see cref="ConfirmDialogViewModel"/>.</summary>
+    public Func<Task<bool>>? ConfirmDiscardAsync { get; set; }
 
     public ObservableCollection<ServerItemViewModel> Visible { get; } = [];
 
@@ -74,19 +99,19 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsBusy), nameof(IsRunning), nameof(ShowBanner), nameof(ShowSteps), nameof(StatusText), nameof(ShowResults), nameof(ShowEmpty))]
+    [NotifyCanExecuteChangedFor(nameof(UndoCommand), nameof(DiscardUndoCommand))]
     private ServersPhase _phase;
 
     [ObservableProperty]
     private int _progress;
 
-    /// <summary>The simulated game was closed: "Reintentar" is enabled.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BannerSeverity), nameof(BannerHeader), nameof(BannerBody), nameof(StatusText))]
     [NotifyCanExecuteChangedFor(nameof(RetryCommand))]
     private bool _gameClosed;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ToastText), nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(ToastText), nameof(StatusText), nameof(ShowDiscardUndo), nameof(ShowRetryUndo))]
     private bool _toastVisible;
 
     [ObservableProperty]
@@ -98,7 +123,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public bool IsRunning => Phase == ServersPhase.Running;
 
-    public bool ShowBanner => Phase != ServersPhase.Idle;
+    public bool ShowBanner => Phase != ServersPhase.Idle || HasErrorBanner;
 
     public bool ShowSteps => IsBusy;
 
@@ -108,60 +133,75 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public bool ShowEmpty => IsIdle && HasQuery && Visible.Count == 0;
 
+    public bool ShowDiscardUndo => ToastVisible && _undoConflict;
+
+    /// <summary>Conflict toast: run <see cref="UndoAsync"/> again after the client files are fixed. Pending undo stays.</summary>
+    public bool ShowRetryUndo => ToastVisible && _undoConflict;
+
+    /// <summary>True while the service still has a pending undo, including after the toast expires, play, or a restart.</summary>
+    public bool CanUndoPending => _canUndoPending;
+
     public string ResultsText => Visible.Count == 1
         ? Loc.Format("servers.results.one", SearchText.Trim())
         : Loc.Format("servers.results.many", Visible.Count, SearchText.Trim());
 
     public string EmptyTitle => Loc.Format("servers.empty.title", SearchText.Trim());
 
-    public BannerSeverity BannerSeverity => Phase switch
-    {
-        ServersPhase.Running when !GameClosed => BannerSeverity.Warning,
-        _ => BannerSeverity.Info,
-    };
+    public BannerSeverity BannerSeverity => HasErrorBanner
+        ? BannerSeverity.Warning
+        : Phase switch
+        {
+            ServersPhase.Running when !GameClosed => BannerSeverity.Warning,
+            _ => BannerSeverity.Info,
+        };
 
-    public string BannerHeader => Phase switch
-    {
-        ServersPhase.Switching => Loc.Format("switch.title", _target?.Name),
-        ServersPhase.Opening => Loc.Get("open.title"),
-        ServersPhase.Running => Loc.Get(GameClosed ? "run.closed.title" : "run.title"),
-        _ => string.Empty,
-    };
+    public string BannerHeader => HasErrorBanner
+        ? _bannerError is { } error && PlayServiceResults.SwitchWasApplied(error)
+            ? ErrorText.Title(error)
+            : Loc.Get("error.banner.title")
+        : Phase switch
+        {
+            ServersPhase.Switching when _repairRun => Loc.Format("repair.title", _target?.Name),
+            ServersPhase.Switching => Loc.Format("switch.title", _target?.Name),
+            ServersPhase.Opening => Loc.Get("open.title"),
+            ServersPhase.Running => Loc.Get(GameClosed ? "run.closed.title" : "run.title"),
+            _ => string.Empty,
+        };
 
-    public string BannerBody => Phase switch
+    public string BannerBody => ErrorBannerText ?? Phase switch
     {
+        ServersPhase.Switching when _repairRun => Loc.Get("repair.body"),
         ServersPhase.Switching => Loc.Get("switch.body"),
         ServersPhase.Opening => Loc.Format("open.body", _target?.Name, _target?.ClientVersion),
         ServersPhase.Running => Loc.Get(GameClosed ? "run.closed.body" : "run.body"),
         _ => string.Empty,
     };
 
-    public string ToastText => _undoTo is null ? string.Empty : Loc.Format("toast.switched", _undoTo.Name);
+    public string ToastText => _undoConflict
+        ? Loc.Get("toast.undoconflict")
+        : _undoTo is null ? string.Empty : Loc.Format("toast.switched", _undoTo.Name);
 
-    public override string StatusText => Phase switch
-    {
-        ServersPhase.Switching => Loc.Format("status.switching", _target?.Name),
-        ServersPhase.Opening => Loc.Get("status.opening"),
-        ServersPhase.Running => GameClosed ? Loc.Get("status.closed") : Loc.Format("status.running", _target?.Name),
-        _ => ToastVisible && Active is { } active
-            ? Loc.Format("status.active", active.Name)
-            : Loc.Format("status.realmlist", Active?.Host ?? "-"),
-    };
+    public override string StatusText => ErrorBannerText is not null
+        ? ErrorBannerText
+        : Phase switch
+        {
+            ServersPhase.Switching when _repairRun => Loc.Format("status.repairing", _target?.Name),
+            ServersPhase.Switching => Loc.Format("status.switching", _target?.Name),
+            ServersPhase.Opening => Loc.Get("status.opening"),
+            ServersPhase.Running => GameClosed ? Loc.Get("status.closed") : Loc.Format("status.running", _target?.Name),
+            _ => ToastVisible && Active is { } active
+                ? Loc.Format("status.active", active.Name)
+                : Loc.Format("status.realmlist", Active?.Host ?? "-"),
+        };
 
-    /// <summary>
-    /// What the card list marks as selected: always the active server. The list may try to change it (a click); the change is refused
-    /// and the list is told to go back.
-    /// </summary>
     public ServerItemViewModel? SelectedCard
     {
         get => Active;
         set => OnPropertyChanged(nameof(SelectedCard));
     }
 
-    /// <summary>Test hook: the server a switch or launch is working on.</summary>
     public ServerItemViewModel? Target => _target;
 
-    /// <summary>Raised when the user asks to add a server (the shell opens the form).</summary>
     public event Action? AddServerRequested;
 
     [RelayCommand]
@@ -171,24 +211,41 @@ public sealed partial class ServersViewModel : ViewModelBase
     private void ClearSearch() => SearchText = string.Empty;
 
     [RelayCommand(CanExecute = nameof(GameClosed))]
-    private void Retry()
-    {
-        Finish();
-    }
+    private void Retry() => Finish();
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanUndo))]
     private async Task UndoAsync()
     {
-        if (_portal is not null && _portalClientId is not null)
+        if (_session is not null)
         {
-            var result = await Task.Run(() => _portal.Undo()).ConfigureAwait(true);
-            if (!result.Succeeded)
+            var result = await Task.Run(() => _session.Service.Undo()).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                return;
-            }
+                if (!result.Succeeded)
+                {
+                    if (result.Error!.Code == ServiceErrorCode.UndoConflict)
+                    {
+                        _undoConflict = true;
+                        _bannerError = result.Error;
+                        _bannerMessageKey = null;
+                        ShowToast();
+                        Refresh();
+                    }
+                    else
+                    {
+                        SetError(result.Error);
+                    }
+                }
+                else
+                {
+                    _undoConflict = false;
+                    ClearErrorBanner();
+                    HideToast();
+                    ReloadFromService();
+                }
 
-            HideToast();
-            Refresh();
+                RefreshUndoAvailability();
+            });
             return;
         }
 
@@ -203,13 +260,70 @@ public sealed partial class ServersViewModel : ViewModelBase
         Refresh();
     }
 
-    [RelayCommand]
-    private void DismissToast() => HideToast();
+    [RelayCommand(CanExecute = nameof(CanDiscardUndo))]
+    private async Task DiscardUndoAsync()
+    {
+        if (_session is null)
+        {
+            HideToast();
+            return;
+        }
 
-    /// <summary>Moves the toast countdown forward (the timer calls it every 100 ms; tests call it directly).</summary>
+        var confirm = ConfirmDiscardAsync ?? (() => Task.FromResult(true));
+        if (!await confirm().ConfigureAwait(true))
+        {
+            return;
+        }
+
+        var result = await Task.Run(() => _session.Service.DiscardUndo()).ConfigureAwait(false);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (!result.Succeeded)
+            {
+                SetError(result.Error);
+            }
+            else
+            {
+                _undoConflict = false;
+                ClearErrorBanner();
+                HideToast();
+                ReloadFromService();
+            }
+
+            RefreshUndoAvailability();
+        });
+    }
+
+    private bool CanUndo() => IsIdle && (_session is not null
+        ? _canUndoPending
+        : _undoFrom is not null && _undoTo is not null);
+
+    /// <summary>Persistent bar and conflict toast can discard only while no switch or play is running.</summary>
+    private bool CanDiscardUndo() => IsIdle;
+
+    /// <summary>Reads <see cref="PortalStatus.CanUndo"/> after a reload, an operation, or startup.</summary>
+    private void RefreshUndoAvailability()
+    {
+        var canUndo = _session?.StatusOrNull()?.CanUndo == true;
+        if (_canUndoPending != canUndo)
+        {
+            _canUndoPending = canUndo;
+            OnPropertyChanged(nameof(CanUndoPending));
+        }
+
+        UndoCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand]
+    private void DismissToast()
+    {
+        // Closing the notice only hides it. A pending undo, including one stopped on a conflict, stays until Undo or Discard.
+        HideToast();
+    }
+
     public void AdvanceToast(TimeSpan elapsed)
     {
-        if (!ToastVisible)
+        if (!ToastVisible || _undoConflict)
         {
             return;
         }
@@ -222,25 +336,202 @@ public sealed partial class ServersViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Adds a server to the in-memory list (the add-server form).</summary>
     public ServerItemViewModel AddServer(ServerSeed seed)
     {
-        var item = new ServerItemViewModel(seed, i => _ = PlayAsync(i), i => _ = SwitchOnlyAsync(i)) { Order = _all.Count == 0 ? 0 : _all.Max(s => s.Order) + 1 };
+        var item = ServerItemViewModel.FromSeed(seed, i => _ = PlayAsync(i), i => _ = SwitchOnlyAsync(i));
+        item.Order = _all.Count == 0 ? 0 : _all.Max(s => s.Order) + 1;
         _all.Add(item);
         SearchText = string.Empty;
         Refresh();
         return item;
     }
 
-    public Task SwitchOnlyAsync(ServerItemViewModel target) =>
-        RunAsync(target, ServersPhase.Switching, [StepKind.Copy, StepKind.Realmlist, StepKind.Account], SwitchProgress);
-
-    public Task PlayAsync(ServerItemViewModel target) =>
-        RunAsync(target, ServersPhase.Opening, [StepKind.Realmlist, StepKind.Account, StepKind.Launch], OpenProgress);
-
-    private async Task RunAsync(ServerItemViewModel target, ServersPhase phase, StepKind[] kinds, int[] progress)
+    public void ReloadFromService()
     {
-        if (Phase != ServersPhase.Idle || !target.CanPlay)
+        if (_session is null)
+        {
+            return;
+        }
+
+        var clientsResult = _session.Service.ListClients();
+        var clients = clientsResult.Succeeded ? clientsResult.Value! : [];
+        var clientsById = new Dictionary<string, ClientEntry>(clients.Count, StringComparer.Ordinal);
+        foreach (var client in clients)
+        {
+            clientsById.TryAdd(client.Id, client);
+        }
+
+        var list = _session.Service.ListServers(compatibleOnly: false);
+        if (!list.Succeeded)
+        {
+            SetError(list.Error);
+            RefreshUndoAvailability();
+            return;
+        }
+
+        var status = _session.StatusOrNull();
+        var projectionInSync = status?.ProjectionInSync ?? true;
+
+        _all.Clear();
+        _runningClients.Clear();
+        foreach (var clientId in clients.Select(client => client.Id).Distinct(StringComparer.Ordinal))
+        {
+            var running = _session.Service.IsGameRunning(clientId);
+            if (running.Succeeded && running.Value)
+                _runningClients.Add(clientId);
+        }
+        var order = 0;
+        foreach (var entry in list.Value!)
+        {
+            var clientId = _session.ResolveClientId(clients, entry.ClientId);
+            var clientVersion = clientId is not null && clientsById.TryGetValue(clientId, out var client)
+                ? client.Version
+                : null;
+            var card = ServerItemViewModel.FromEntry(
+                entry,
+                clientVersion,
+                projectionInSync,
+                item => _ = PlayAsync(item),
+                item => _ = SwitchOnlyAsync(item));
+            card.Order = order++;
+            if (clientId is not null && _runningClients.Contains(clientId))
+                card.Overlay = ServerOverlay.Running;
+            _all.Add(card);
+        }
+
+        Refresh();
+        RefreshUndoAvailability();
+    }
+
+    public Task SwitchOnlyAsync(ServerItemViewModel target)
+    {
+        target = ResolveCard(target);
+        return _session is not null
+            ? RunPortalAsync(target, play: false)
+            : RunDemoAsync(target, ServersPhase.Switching, [StepKind.Copy, StepKind.Realmlist, StepKind.Account], SwitchProgress);
+    }
+
+    public Task PlayAsync(ServerItemViewModel target)
+    {
+        target = ResolveCard(target);
+        return _session is not null
+            ? RunPortalAsync(target, play: true)
+            : RunDemoAsync(target, ServersPhase.Opening, [StepKind.Realmlist, StepKind.Account, StepKind.Launch], OpenProgress);
+    }
+
+    private ServerItemViewModel ResolveCard(ServerItemViewModel target)
+    {
+        if (target.ServerId is null)
+        {
+            return target;
+        }
+
+        return _all.FirstOrDefault(s => s.ServerId == target.ServerId) ?? target;
+    }
+
+    private async Task RunPortalAsync(ServerItemViewModel target, bool play)
+    {
+        if (Phase != ServersPhase.Idle || !target.CanPlay || target.ServerId is null || _session is null)
+        {
+            return;
+        }
+
+        var clientId = _session.ResolveClientId(target.PreferredClientId);
+        if (clientId is null)
+        {
+            SetError(null, "error.noclient.body");
+            return;
+        }
+
+        HideToast();
+        ClearErrorBanner();
+        _repairRun = target.NeedsRepair;
+        _target = target;
+        SearchText = string.Empty;
+        Steps.Clear();
+        var kinds = play ? ServiceProgressMapper.PlaySteps : ServiceProgressMapper.SwitchSteps;
+        for (var i = 0; i < kinds.Length; i++)
+        {
+            Steps.Add(new StepViewModel(i + 1, kinds[i], i == kinds.Length - 1));
+        }
+
+        Progress = 0;
+        target.Overlay = play ? ServerOverlay.Opening : ServerOverlay.Switching;
+        Phase = play ? ServersPhase.Opening : ServersPhase.Switching;
+        Refresh();
+
+        // Progress<T> is created on the UI thread before Task.Run, so callbacks are posted to its SynchronizationContext.
+        var progress = new Progress<ServiceProgress>(p =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                var percent = Progress;
+                ServiceProgressMapper.ApplyProgress(p, Steps, kinds, ref percent);
+                Progress = percent;
+                OnPropertyChanged(nameof(BannerHeader));
+                OnPropertyChanged(nameof(BannerBody));
+                OnPropertyChanged(nameof(StatusText));
+            });
+        });
+
+        var request = new SwitchRequest(clientId, target.ServerId);
+        var result = await Task.Run(() =>
+            play ? _session.Service.Play(request, progress) : _session.Service.SwitchServer(request, progress)).ConfigureAwait(true);
+
+        if (!result.Succeeded)
+        {
+            var appliedLaunch = play && PlayServiceResults.ShouldRefreshStatusAfterFailure(result);
+            SetError(result.Error);
+            target.Overlay = ServerOverlay.None;
+            Phase = ServersPhase.Idle;
+            _repairRun = false;
+            _target = null;
+            ReloadFromService();
+            if (appliedLaunch && result.Error is { } launchError && PlayServiceResults.UndoRemainsAvailable(launchError)
+                && _session.StatusOrNull()?.CanUndo == true)
+            {
+                var activeId = _session.StatusOrNull()?.Active?.Id;
+                _undoTo = activeId is null ? null : _all.FirstOrDefault(s => s.ServerId == activeId);
+                ShowToast();
+            }
+
+            return;
+        }
+
+        var outcome = result.Value!;
+        var previous = outcome.Previous;
+        if (!play)
+        {
+            target.Overlay = ServerOverlay.None;
+            Phase = ServersPhase.Idle;
+            _repairRun = false;
+            Progress = 100;
+            ReloadFromService();
+            if (_session.StatusOrNull()?.CanUndo == true)
+            {
+                _undoTo = _all.FirstOrDefault(s => s.ServerId == outcome.Active.Id);
+                _undoFrom = outcome.Previous is null
+                    ? null
+                    : _all.FirstOrDefault(s => s.ServerId == outcome.Previous.Id);
+                ShowToast();
+            }
+
+            return;
+        }
+
+        GameClosed = false;
+        Phase = ServersPhase.Running;
+        // Reload replaces every card. The running badge has to land on the new instance.
+        ReloadFromService();
+        target = ResolveCard(target);
+        _target = target;
+        target.Overlay = ServerOverlay.Running;
+        _ = WatchGamePortalAsync(clientId);
+    }
+
+    private async Task RunDemoAsync(ServerItemViewModel target, ServersPhase phase, StepKind[] kinds, int[] progress)
+    {
+        if (Phase != ServersPhase.Idle || !target.CanPlay || _backend is null)
         {
             return;
         }
@@ -300,6 +591,11 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     private async Task WatchGameAsync()
     {
+        if (_backend is null)
+        {
+            return;
+        }
+
         await _backend.GameExited.ConfigureAwait(true);
         if (Phase == ServersPhase.Running)
         {
@@ -308,8 +604,72 @@ public sealed partial class ServersViewModel : ViewModelBase
         }
     }
 
+    private async Task WatchGamePortalAsync(string clientId)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        var elapsed = TimeSpan.Zero;
+        var sawRunning = false;
+        var consecutiveMisses = 0;
+        const int closeMisses = 3;
+        var interval = TimeSpan.FromMilliseconds(500);
+        var startupTimeout = TimeSpan.FromSeconds(30);
+        while (Phase == ServersPhase.Running)
+        {
+            var running = await Task.Run(() => _session.Service.IsGameRunning(clientId)).ConfigureAwait(true);
+            if (!running.Succeeded)
+            {
+                // Drop back to Idle so another play or switch can start, and keep the error banner up.
+                Finish();
+                SetError(running.Error);
+                return;
+            }
+
+            if (!running.Value)
+            {
+                if (sawRunning && ++consecutiveMisses >= closeMisses)
+                {
+                    GameClosed = true;
+                    Refresh();
+                    return;
+                }
+                if (!sawRunning && elapsed >= startupTimeout)
+                {
+                    GameClosed = true;
+                    Refresh();
+                    return;
+                }
+            }
+            else
+            {
+                sawRunning = true;
+                consecutiveMisses = 0;
+                _runningClients.Add(clientId);
+            }
+
+            await _delay(interval).ConfigureAwait(true);
+            elapsed += interval;
+        }
+    }
+
     private void Finish()
     {
+        if (_session is not null && _target?.PreferredClientId is { } clientId)
+        {
+            var running = _session.Service.IsGameRunning(clientId);
+            if (running.Succeeded && running.Value)
+            {
+                _runningClients.Add(clientId);
+                GameClosed = false;
+                Phase = ServersPhase.Running;
+                Refresh();
+                return;
+            }
+            _runningClients.Remove(clientId);
+        }
         if (_target is not null)
         {
             _target.Overlay = ServerOverlay.None;
@@ -321,13 +681,52 @@ public sealed partial class ServersViewModel : ViewModelBase
         Refresh();
     }
 
+    /// <summary>True when an error banner is showing. The copy itself is <see cref="ErrorBannerText"/>.</summary>
+    private bool HasErrorBanner => _bannerError is not null || _bannerMessageKey is not null;
+
+    /// <summary>
+    /// Error banner copy resolved at read time, so a language change updates <see cref="BannerBody"/> and <see cref="StatusText"/>.
+    /// Service failures, including undo conflict, keep <see cref="_bannerError"/>. Message-only failures keep a localization key
+    /// (<c>error.unknown.body</c> when the failure has neither).
+    /// </summary>
+    private string? ErrorBannerText => _bannerError is { } error
+        ? ErrorText.Body(error)
+        : _bannerMessageKey is null ? null : Loc.Get(_bannerMessageKey);
+
+    /// <summary>
+    /// Shows the error banner from <paramref name="error"/>, or from <paramref name="messageKey"/> when there is no error.
+    /// Both null uses <c>error.unknown.body</c>. Text is formatted when the banner is read.
+    /// </summary>
+    private void SetError(ServiceError? error, string? messageKey = null)
+    {
+        _bannerError = messageKey is null ? error : null;
+        _bannerMessageKey = messageKey ?? (error is null ? "error.unknown.body" : null);
+        OnPropertyChanged(nameof(BannerHeader));
+        OnPropertyChanged(nameof(BannerBody));
+        OnPropertyChanged(nameof(BannerSeverity));
+        OnPropertyChanged(nameof(ShowBanner));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void ClearErrorBanner()
+    {
+        _bannerError = null;
+        _bannerMessageKey = null;
+    }
+
     private void ShowToast()
     {
         _toastElapsed = TimeSpan.Zero;
         ToastFraction = 1;
         ToastVisible = true;
         OnPropertyChanged(nameof(ToastText));
-        _toastTimer?.Start();
+        OnPropertyChanged(nameof(ShowDiscardUndo));
+        OnPropertyChanged(nameof(ShowRetryUndo));
+        RefreshUndoAvailability();
+        if (!_undoConflict)
+        {
+            _toastTimer?.Start();
+        }
     }
 
     private void HideToast()
@@ -336,7 +735,18 @@ public sealed partial class ServersViewModel : ViewModelBase
         ToastVisible = false;
         _undoFrom = null;
         _undoTo = null;
+        _undoConflict = false;
         OnPropertyChanged(nameof(ToastText));
+        OnPropertyChanged(nameof(ShowDiscardUndo));
+        OnPropertyChanged(nameof(ShowRetryUndo));
+        RefreshUndoAvailability();
+    }
+
+    private DispatcherTimer CreateToastTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        timer.Tick += (_, _) => AdvanceToast(timer.Interval);
+        return timer;
     }
 
     partial void OnSearchTextChanged(string value) => Refresh();
@@ -361,7 +771,6 @@ public sealed partial class ServersViewModel : ViewModelBase
         OnPropertyChanged(nameof(StatusText));
     }
 
-    /// <summary>Rebuilds the visible cards and the state-dependent flags.</summary>
     private void Refresh()
     {
         var query = SearchText.Trim();
@@ -382,7 +791,8 @@ public sealed partial class ServersViewModel : ViewModelBase
 
         foreach (var item in _all)
         {
-            item.CanAct = Phase == ServersPhase.Idle;
+            item.CanAct = Phase == ServersPhase.Idle &&
+                (item.PreferredClientId is null || !_runningClients.Contains(item.PreferredClientId));
         }
 
         OnPropertyChanged(nameof(Active));
@@ -394,5 +804,6 @@ public sealed partial class ServersViewModel : ViewModelBase
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(ShowBanner));
     }
 }

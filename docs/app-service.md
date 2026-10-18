@@ -69,7 +69,7 @@ no account). `Server.Account` is only a remembered label. See "Open questions".
 | `ClientFilesException.Code` | mapped **by name**: `GameRunning`, `PermissionDenied`, `ReadOnlyFs`, `PathNotFound`, `PathEscapesClient`, `HashMismatch`, `VerifyFailed`, `UnsupportedClient` (with `ClientVersion`), `InvalidRealmlist`, `NothingToUndo`; also `ProcessCheckFailed` once the applier raises it (the service already returns it from `IsGameRunning` when the probe throws). A test fails if the applier gets a code the service lacks. |
 | `InvalidRealmlistException` | `InvalidRealmlist` with `RealmlistKind`, `LineNumber`, `ServerName` |
 | `ClientVersionException.Kind` | `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `ClientUnreadable` (a missing folder: `PathNotFound`), with `Path` |
-| `StoreException` | `StoreCorrupt`, `ServerNameTaken`, `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing` |
+| `StoreException` | `StoreCorrupt`, `ServerNameTaken`, `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing`, `StoreLocked` (the config-directory lock `.realm-portal.lock` is still held by another process; nothing changed, retry) |
 | undo backup made for another client folder (manifest `client_root` differs from the registered client) | `PathEscapesClient`, `Diagnostic` names both folders; nothing is written |
 | managed path outside the allow-list, traversal/absolute/backslash/drive paths, or a managed folder linked outside the client | `PathEscapesClient`; nothing is written or deleted |
 | undo finds changed client files | `UndoConflict` with `ConflictingFiles`, `Consistency.Pending` |

@@ -147,10 +147,10 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
-    public void BrowseFillsTheBackupFolderAndBackReturnsToServers()
+    public async Task BrowseFillsTheBackupFolderAndBackReturnsToServers()
     {
         var (shell, settings) = Open();
-        settings.BrowseCommand.Execute(null);
+        await settings.BrowseCommand.ExecuteAsync(null);
         Assert.EndsWith("backups-2", settings.BackupFolder);
         Assert.True(settings.IsDirty);
         settings.BackCommand.Execute(null);

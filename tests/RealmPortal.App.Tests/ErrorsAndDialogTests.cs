@@ -5,6 +5,7 @@ using Avalonia.VisualTree;
 using RealmPortal.App.Localization;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.ClientFiles;
+using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.Tests;
 
@@ -52,6 +53,174 @@ public sealed class ErrorsAndDialogTests
         Loc.Instance.SetLanguage(Language.Es);
         Assert.Contains("/games/wow", ErrorText.Body(ClientFilesErrorCode.PermissionDenied, "/games/wow"));
         Assert.Equal("El juego está abierto", ErrorText.Title(ClientFilesErrorCode.GameRunning));
+    }
+
+    [AvaloniaFact]
+    public void ProcessCheckFailedBodyOmitsTheClientPathAndDiagnostic()
+    {
+        var error = new ServiceError(
+            ServiceErrorCode.ProcessCheckFailed,
+            Path: "/games/wow-secret",
+            Diagnostic: "probe boom");
+
+        Loc.Instance.SetLanguage(Language.En);
+        var english = ErrorText.Body(error);
+        Assert.Equal("The process list could not be read. Nothing was changed.", english);
+        Assert.DoesNotContain("/games/wow-secret", english);
+        Assert.DoesNotContain("probe boom", english);
+        Assert.DoesNotContain("{0}", english);
+
+        Loc.Instance.SetLanguage(Language.Es);
+        var spanish = ErrorText.Body(error);
+        Assert.Equal("No se pudo leer la lista de procesos. No se ha modificado nada.", spanish);
+        Assert.DoesNotContain("/games/wow-secret", spanish);
+        Assert.DoesNotContain("probe boom", spanish);
+        Assert.DoesNotContain("{0}", spanish);
+    }
+
+    [AvaloniaFact]
+    public void ServiceErrorBodiesNeverIncludeDiagnostics()
+    {
+        const string diagnostic = "SECRET_DIAGNOSTIC_do_not_show";
+        var unexpected = new ServiceError(ServiceErrorCode.Unexpected, Diagnostic: diagnostic);
+        var inconsistent = new ServiceError(
+            ServiceErrorCode.InconsistentState,
+            Consistency: Consistency.Inconsistent,
+            Diagnostic: diagnostic);
+        var launch = new ServiceError(ServiceErrorCode.LaunchFailed, Diagnostic: diagnostic);
+        var applied = new ServiceError(
+            ServiceErrorCode.LaunchFailed,
+            Consistency: Consistency.AppliedLaunchFailed,
+            Diagnostic: diagnostic);
+
+        Loc.Instance.SetLanguage(Language.En);
+        Assert.Equal("Try again. Nothing was changed.", ErrorText.Body(unexpected));
+        Assert.Equal(
+            "Realm Portal could not put everything back. Review the client files.",
+            ErrorText.Body(inconsistent));
+        Assert.Equal(
+            "The game could not be started. Check the launcher settings and try again. Nothing was changed.",
+            ErrorText.Body(launch));
+        Assert.Equal(
+            "The server was applied and is now active, but the game didn't start. Check the launcher settings and try again.",
+            ErrorText.Body(applied));
+
+        Loc.Instance.SetLanguage(Language.Es);
+        Assert.Equal("Vuelve a intentarlo. No se ha modificado nada.", ErrorText.Body(unexpected));
+        Assert.Equal(
+            "Realm Portal no pudo dejar todo como estaba. Revisa los archivos del cliente.",
+            ErrorText.Body(inconsistent));
+        Assert.Equal(
+            "No se pudo iniciar el juego. Revisa los ajustes del lanzador e inténtalo de nuevo. No se ha modificado nada.",
+            ErrorText.Body(launch));
+        Assert.Equal(
+            "El servidor quedó aplicado y activo, pero el juego no se abrió. Revisa los ajustes del lanzador e inténtalo de nuevo.",
+            ErrorText.Body(applied));
+
+        foreach (var body in new[]
+        {
+            ErrorText.Body(unexpected),
+            ErrorText.Body(inconsistent),
+            ErrorText.Body(launch),
+            ErrorText.Body(applied),
+        })
+        {
+            Assert.DoesNotContain(diagnostic, body);
+        }
+
+        Loc.Instance.SetLanguage(Language.En);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(Language.En, Consistency.Unchanged, "Nothing was changed.")]
+    [InlineData(Language.Es, Consistency.Unchanged, "No se ha modificado nada.")]
+    [InlineData(Language.En, Consistency.RolledBack, "Changes were rolled back; nothing was left half-done.")]
+    [InlineData(Language.Es, Consistency.RolledBack, "Los cambios se revirtieron; no quedó nada a medias.")]
+    public void PermissionDenied_ReassuranceFollowsConsistency(Language language, Consistency consistency, string sentence)
+    {
+        var original = Loc.Instance.Current;
+        try
+        {
+            Loc.Instance.SetLanguage(language);
+            var body = ErrorText.Body(new ServiceError(
+                ServiceErrorCode.PermissionDenied,
+                Path: "/games/wow",
+                Consistency: consistency));
+            Assert.Contains("/games/wow", body);
+            Assert.Contains(sentence, body);
+            if (consistency != Consistency.Unchanged)
+            {
+                Assert.DoesNotContain("Nothing was changed", body);
+                Assert.DoesNotContain("No se ha modificado nada", body);
+            }
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(original);
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(Language.En, Consistency.Inconsistent, "Review the client files.")]
+    [InlineData(Language.Es, Consistency.Inconsistent, "Revisa los archivos del cliente.")]
+    [InlineData(Language.En, Consistency.Pending, "Some files may have changed.")]
+    [InlineData(Language.Es, Consistency.Pending, "Puede que algunos archivos hayan cambiado.")]
+    public void PermissionDenied_InconsistentOrUnknownState_DoesNotClaimNothingChanged(
+        Language language,
+        Consistency consistency,
+        string sentence)
+    {
+        // Consistency is a non-nullable enum, so a missing value cannot be represented.
+        // Inconsistent keeps the inconsistent-state guidance. Pending (and any other value) uses the unknown-state sentence.
+        var original = Loc.Instance.Current;
+        try
+        {
+            Loc.Instance.SetLanguage(language);
+            var body = ErrorText.Body(new ServiceError(
+                ServiceErrorCode.PermissionDenied,
+                Path: "/games/wow",
+                Consistency: consistency));
+            Assert.Contains(sentence, body);
+            Assert.DoesNotContain("Nothing was changed", body);
+            Assert.DoesNotContain("No se ha modificado nada", body);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(original);
+        }
+    }
+
+    [AvaloniaFact]
+    public void ClientFilesPreCheck_KeepsUnchangedOnlyWhenNoWriteHappened()
+    {
+        var original = Loc.Instance.Current;
+        try
+        {
+            Loc.Instance.SetLanguage(Language.En);
+            var preCheck = ErrorText.Body(ClientFilesErrorCode.GameRunning);
+            Assert.Contains("Nothing was changed.", preCheck);
+            Assert.DoesNotContain("Some files may have changed", preCheck);
+
+            var afterWrite = ErrorText.Body(ClientFilesErrorCode.VerifyFailed, "/games/wow");
+            Assert.Contains("Some files may have changed.", afterWrite);
+            Assert.DoesNotContain("Nothing was changed", afterWrite);
+
+            var denied = ErrorText.Body(ClientFilesErrorCode.PermissionDenied, "/games/wow");
+            Assert.Contains("/games/wow", denied);
+            Assert.Contains("Some files may have changed.", denied);
+            Assert.DoesNotContain("Nothing was changed", denied);
+
+            Loc.Instance.SetLanguage(Language.Es);
+            Assert.Contains("No se ha modificado nada.", ErrorText.Body(ClientFilesErrorCode.NothingToUndo));
+            var spanishWrite = ErrorText.Body(ClientFilesErrorCode.PermissionDenied, "/games/wow");
+            Assert.Contains("/games/wow", spanishWrite);
+            Assert.Contains("Puede que algunos archivos hayan cambiado.", spanishWrite);
+            Assert.DoesNotContain("No se ha modificado nada", spanishWrite);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(original);
+        }
     }
 
     [AvaloniaFact]

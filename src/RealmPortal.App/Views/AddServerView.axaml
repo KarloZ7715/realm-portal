@@ -65,6 +65,10 @@
             </StackPanel>
           </StackPanel>
           </Grid>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,12,0,0" IsVisible="{Binding HasSaveError}">
+            <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+            <TextBlock Name="SaveError" Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding SaveError}"/>
+          </Grid>
         </StackPanel>
       </ContentControl>
       <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,16,0,0">

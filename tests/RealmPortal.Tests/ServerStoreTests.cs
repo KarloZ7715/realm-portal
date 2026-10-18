@@ -149,4 +149,19 @@ public class ServerStoreTests
                 store.Remove(server.Id);
             return store.List().Count == 0;
         });
+
+    [Fact]
+    public void Add_PersistsEveryServer()
+    {
+        using var dir = new TempDirectory();
+        var store = NewStore(dir.Combine("config"));
+
+        Parallel.For(0, 8, i =>
+            store.Add(Server.Create($"Q{i}", $"q{i}.example.org")));
+
+        var hosts = store.List().Select(s => s.Host).OrderBy(h => h).ToList();
+        Assert.Equal(
+            Enumerable.Range(0, 8).Select(i => $"q{i}.example.org").OrderBy(h => h),
+            hosts);
+    }
 }

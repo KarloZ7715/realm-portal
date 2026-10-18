@@ -11,7 +11,7 @@ namespace RealmPortal.Core.Service;
 /// Remembers the last successful switch for coordinated undo (<c>last-switch.json</c> in the config directory).
 /// <c>manifest_sha256</c> is optional. Journals written before the field existed omit it and still load.
 /// </summary>
-internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWriter writer)
+internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWriter writer, ConfigDirectoryLock? directoryLock = null)
 {
     public const string FileName = "last-switch.json";
     private const int FormatVersion = 1;
@@ -26,6 +26,7 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
     };
 
     private readonly string _path = Path.Combine(configDirectory, FileName);
+    private readonly ConfigDirectoryLock _directoryLock = directoryLock ?? new ConfigDirectoryLock(configDirectory);
 
     public LastSwitchEntry? Load()
     {
@@ -59,6 +60,55 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
     {
         ArgumentNullException.ThrowIfNull(entry);
         ValidateEntry(entry);
+        using (_directoryLock.Acquire())
+            Write(entry);
+    }
+
+    public void MarkFilesUndone()
+    {
+        // Load and save under one lock, so two processes cannot drop each other's flag change.
+        using (_directoryLock.Acquire())
+        {
+            var entry = Load() ?? throw new StoreException("No last-switch journal entry to update.");
+            Write(entry with { FilesUndone = true });
+        }
+    }
+
+    public void MarkFilesNotUndone()
+    {
+        using (_directoryLock.Acquire())
+        {
+            var entry = Load() ?? throw new StoreException("No last-switch journal entry to update.");
+            Write(entry with { FilesUndone = false });
+        }
+    }
+
+    public void Clear()
+    {
+        using (_directoryLock.Acquire())
+        {
+            PortalConfigFile.WithConfigLock(() =>
+            {
+                try
+                {
+                    if (File.Exists(_path))
+                        File.Delete(_path);
+                }
+                catch (IOException ex)
+                {
+                    throw new StoreException($"Cannot delete '{_path}': {ex.Message}", ex);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    throw new StoreException($"Cannot delete '{_path}': {ex.Message}", ex);
+                }
+            });
+        }
+    }
+
+    /// <summary>Writes the entry; callers already hold <see cref="ConfigDirectoryLock"/>.</summary>
+    private void Write(LastSwitchEntry entry)
+    {
         PortalConfigFile.WithConfigLock(() =>
         {
             var file = new JournalFile
@@ -72,38 +122,6 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
             var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
             writer.WriteAllBytes(_path, new System.Text.UTF8Encoding(false).GetBytes(json));
             PortalConfigFile.AfterWrite(_path);
-        });
-    }
-
-    public void MarkFilesUndone()
-    {
-        var entry = Load() ?? throw new StoreException("No last-switch journal entry to update.");
-        Save(entry with { FilesUndone = true });
-    }
-
-    public void MarkFilesNotUndone()
-    {
-        var entry = Load() ?? throw new StoreException("No last-switch journal entry to update.");
-        Save(entry with { FilesUndone = false });
-    }
-
-    public void Clear()
-    {
-        PortalConfigFile.WithConfigLock(() =>
-        {
-            try
-            {
-                if (File.Exists(_path))
-                    File.Delete(_path);
-            }
-            catch (IOException ex)
-            {
-                throw new StoreException($"Cannot delete '{_path}': {ex.Message}", ex);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                throw new StoreException($"Cannot delete '{_path}': {ex.Message}", ex);
-            }
         });
     }
 
