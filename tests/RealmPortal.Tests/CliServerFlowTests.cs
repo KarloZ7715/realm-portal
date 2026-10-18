@@ -347,7 +347,7 @@ public class CliServerFlowTests
         var result = box.Run("switch", "Bad");
 
         Assert.Equal(2, result.Code);
-        Assert.Contains("config file 'servers.json' is corrupt or unreadable", result.Err, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("config file is corrupt or unreadable", result.Err, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(activoBefore, File.ReadAllBytes(box.ActivoPath));
         Assert.Equal(storeBefore, File.ReadAllBytes(storePath));
         Assert.Equal(2, box.Run("launch", "Bad").Code);

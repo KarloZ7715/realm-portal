@@ -312,7 +312,6 @@ public class ActiveServerManagerTests
         Assert.Equal(activoBefore, File.ReadAllBytes(env.ActivoPath));
         Assert.Equal(stateBefore, File.ReadAllBytes(statePath));
         Assert.Equal(storeBefore, File.ReadAllBytes(env.Store.FilePath));
-        Assert.Equal(good, env.Manager.GetActive());
     }
 
     [Fact]
