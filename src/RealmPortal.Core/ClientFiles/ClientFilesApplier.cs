@@ -538,9 +538,23 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 }
                 else if (!ClientFilesIo.Sha256Hex(ReadIfExists(t.Path) ?? []).Equals(t.Edit.Sha256Before, StringComparison.Ordinal))
                 {
+                    var linkRestored = false;
                     if (t.Symlink?.IsSymlink == true)
-                        t.Symlink.Value.Restore(t.Path);
-                    else
+                    {
+                        try
+                        {
+                            t.Symlink.Value.Restore(t.Path);
+                            linkRestored = true;
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            // Creating the link failed after the path was unlinked: drop any leftover link so the fallback
+                            // below writes the original bytes. A missing file would make a later Undo report a conflict.
+                            SymlinkSnapshot.DeleteLinkOnly(t.Path);
+                        }
+                    }
+
+                    if (!linkRestored)
                         _writer.WriteAllBytes(t.Path, t.Original, t.Permissions?.ToReplacementPermissions());
                 }
             }
