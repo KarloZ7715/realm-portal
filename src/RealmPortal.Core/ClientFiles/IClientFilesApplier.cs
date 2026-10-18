@@ -55,10 +55,30 @@ public interface IClientFilesApplier
     ApplyResult Apply(ClientFilesPlan plan);
 
     /// <summary>
+    /// Applies a plan while an installation lock from <see cref="AcquireInstallationLock"/> is already held
+    /// (the lock is not released until the caller disposes it).
+    /// </summary>
+    ApplyResult Apply(ClientFilesPlan plan, InstallationLock installationLock);
+
+    /// <summary>Acquires the cross-process installation lock; dispose it when apply/activate/rollback is finished.</summary>
+    InstallationLock AcquireInstallationLock(string installationId);
+
+    /// <summary>
     /// Undoes the most recent applied change of the installation that has not been undone yet. Files whose current
     /// content is not what the apply wrote are reported as conflicts and never overwritten.
     /// </summary>
+    /// <summary>
+    /// Undoes a specific pending backup (or the newest pending one when <paramref name="backupId"/> is null).
+    /// <paramref name="clientRoot"/> is the trusted client folder from <see cref="Clients.ClientStore"/> (must match the backup manifest).
+    /// When <paramref name="markUndone"/> is false, restored files stay pending in the manifest until <see cref="MarkBackupUndone"/>.
+    /// </summary>
     /// <param name="clientRoot">The installation's trusted client directory (must match the backup manifest).</param>
     /// <exception cref="ClientFilesException"><see cref="ClientFilesErrorCode.NothingToUndo"/> when no change is pending.</exception>
-    UndoResult Undo(string installationId, string clientRoot);
+    UndoResult Undo(string installationId, string clientRoot, string? backupId = null, bool markUndone = true, InstallationLock? installationLock = null);
+
+    /// <summary>
+    /// Marks a backup as fully undone after the application state undo has been committed.
+    /// A backup that is already marked undone, or whose manifest is already gone, is left as it is.
+    /// </summary>
+    void MarkBackupUndone(string installationId, string backupId);
 }

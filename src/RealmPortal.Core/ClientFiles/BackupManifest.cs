@@ -54,6 +54,9 @@ internal sealed record BackupManifest(
         {
             if (f is null || string.IsNullOrWhiteSpace(f.Path) || string.IsNullOrWhiteSpace(f.Sha256After))
                 throw new JsonException("A file entry is missing path or sha256_after.");
+            // A cloned entry can share a backup file and also name a traversal path. The allow-list
+            // check comes first so Undo reports PathEscapesClient before backup-file uniqueness.
+            ClientPaths.ValidateManagedRelativePath(f.Path);
             if (!paths.Add(f.Path))
                 throw new JsonException($"Two entries share the path '{f.Path}'.");
 

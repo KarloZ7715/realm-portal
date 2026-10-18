@@ -410,7 +410,7 @@ public class ClientFilesApplierTests
         var plan = env.Plan();
         var evil = plan with { Edits = [plan.Edits[0] with { RelativePath = "../outside.txt" }] };
 
-        Assert.Equal(ClientFilesErrorCode.PathNotFound, Assert.Throws<ClientFilesException>(() => env.Applier.Apply(evil)).Code);
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, Assert.Throws<ClientFilesException>(() => env.Applier.Apply(evil)).Code);
         Assert.Throws<ArgumentException>(() => env.Applier.Apply(plan with { InstallationId = "../x" }));
         Assert.Throws<ArgumentException>(() => env.Applier.Undo("..", env.Client));
     }
@@ -441,6 +441,23 @@ public class ClientFilesApplierTests
 
         Assert.Equal(before, env.Files());
         Assert.NotNull(env.Applier.Apply(plan).BackupId); // the lock is released afterwards
+    }
+
+    [Fact]
+    public void Undo_WithALockForAnotherInstallation_ThrowsAndLeavesClientFilesUnchanged()
+    {
+        using var env = new Env();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        var plan = env.Plan();
+        var applied = env.Applier.Apply(plan);
+        var before = env.Files();
+
+        using var other = env.Applier.AcquireInstallationLock("install-2");
+        var ex = Assert.Throws<ArgumentException>(() => env.Applier.Undo("install-1", env.Client, applied.BackupId, installationLock: other));
+
+        Assert.Equal("installationLock", ex.ParamName);
+        Assert.StartsWith("The installation lock does not match the installation.", ex.Message);
+        Assert.Equal(before, env.Files());
     }
 
     [Fact]

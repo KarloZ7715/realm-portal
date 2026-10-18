@@ -35,7 +35,8 @@ The backup root is `$REALM_PORTAL_BACKUP_DIR`, else `realm-portal/backups` under
 
 Apply and Undo of one installation are serialized, also across processes, with an exclusive lock file
 `<backupRoot>/<installationId>/.lock`; a call that cannot get it within 10 s fails with `PermissionDenied`.
-An incomplete or invalid `manifest.json` fails with `VerifyFailed`.
+An incomplete or invalid `manifest.json` fails with `VerifyFailed`. A manifest whose `client_root` is not the installation's client
+folder fails with `PathEscapesClient` before any file is read or written.
 
 ## Backup layout
 

@@ -58,9 +58,25 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     public ClientFilesPlan Plan(ClientFilesRequest request) => _planner.Plan(request);
 
+    public InstallationLock AcquireInstallationLock(string installationId)
+    {
+        RequireValidIds(installationId, "-");
+        return new InstallationLock(AcquireLock(installationId), installationId);
+    }
+
     public ApplyResult Apply(ClientFilesPlan plan)
     {
+        using var installationLock = AcquireInstallationLock(plan.InstallationId);
+        return Apply(plan, installationLock);
+    }
+
+    public ApplyResult Apply(ClientFilesPlan plan, InstallationLock installationLock)
+    {
         ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(installationLock);
+        if (!string.Equals(plan.InstallationId, installationLock.InstallationId, StringComparison.Ordinal))
+            throw new ArgumentException("The installation lock does not match the plan.", nameof(installationLock));
+
         RequireValidIds(plan.InstallationId, plan.ProfileId);
         if (plan.IsEmpty)
             return new ApplyResult(null, []);
@@ -68,8 +84,6 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         var clientRoot = ClientPaths.CanonicalRoot(plan.ClientRoot);
         if (_probe.IsGameRunning(clientRoot))
             throw new ClientFilesException(ClientFilesErrorCode.GameRunning, clientRoot, "The game is running; close it before changing its files.");
-
-        using var installationLock = AcquireLock(plan.InstallationId);
 
         // Read and verify the current state of every file before touching anything.
         var targets = new List<Target>();
@@ -128,83 +142,139 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         return new ApplyResult(backupId, plan.Edits, warnings);
     }
 
-    public UndoResult Undo(string installationId, string clientRoot)
+    public UndoResult Undo(string installationId, string clientRoot, string? backupId = null, bool markUndone = true, InstallationLock? installationLock = null)
     {
+        if (installationLock is not null && !string.Equals(installationId, installationLock.InstallationId, StringComparison.Ordinal))
+            throw new ArgumentException("The installation lock does not match the installation.", nameof(installationLock));
+
         RequireValidIds(installationId, "-");
         ArgumentException.ThrowIfNullOrWhiteSpace(clientRoot);
         var trustedRoot = ClientPaths.CanonicalRoot(clientRoot);
-        using var installationLock = AcquireLock(installationId);
-        var (manifestPath, manifest) = FindPending(installationId)
-            ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
-                $"There is no applied change to undo for '{installationId}'.");
+        if (backupId is not null && !BackupIdFormat.IsValid(backupId))
+            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, clientRoot, $"Backup id '{backupId}' is not valid.");
 
-        ClientPaths.RequireMatchingRoots(trustedRoot, manifest.ClientRoot, manifestPath);
-
-        if (_probe.IsGameRunning(trustedRoot))
-            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, trustedRoot, "The game is running; close it before restoring its files.");
-
-        var backupDir = Path.GetDirectoryName(manifestPath)!;
-
-        // Resolve, hash-check and read every entry before restoring anything so a bad entry cannot leave a partial undo.
-        var resolved = manifest.Files
-            .Select(file => (file, path: ClientPaths.ResolveManagedPath(trustedRoot, file.Path)))
-            .ToList();
-        BackupManifest.EnsureBackupFilesReferenced(backupDir, manifest.Files);
-
-        var prepared = new List<PreparedUndo>(resolved.Count);
-        foreach (var (file, path) in resolved)
+        var ownsLock = installationLock is null;
+        installationLock ??= AcquireInstallationLock(installationId);
+        try
         {
-            byte[]? original = null;
-            string? linkText = null;
-            if (file.Existed)
+            var (manifestPath, manifest) = backupId is null
+                ? FindPending(installationId)
+                  ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
+                      $"There is no applied change to undo for '{installationId}'.")
+                : FindBackup(installationId, backupId)
+                  ?? throw new ClientFilesException(ClientFilesErrorCode.NothingToUndo, Path.Combine(_backupRoot, installationId),
+                      $"There is no pending backup '{backupId}' to undo for '{installationId}'.");
+
+            if (backupId is not null && !string.Equals(manifest.BackupId, backupId, StringComparison.Ordinal))
+                throw new ClientFilesException(ClientFilesErrorCode.HashMismatch, clientRoot, "The pending backup id does not match the requested rollback.");
+
+            ClientPaths.RequireMatchingRoots(trustedRoot, manifest.ClientRoot, manifestPath);
+
+            if (_probe.IsGameRunning(trustedRoot))
+                throw new ClientFilesException(ClientFilesErrorCode.GameRunning, trustedRoot, "The game is running; close it before restoring its files.");
+
+            var backupDir = Path.GetDirectoryName(manifestPath)!;
+
+            // Resolve, hash-check and read every entry before restoring anything so a bad entry cannot leave a partial undo.
+            var resolved = manifest.Files
+                .Select(file => (file, path: ClientPaths.ResolveManagedPath(trustedRoot, file.Path)))
+                .ToList();
+            BackupManifest.EnsureBackupFilesReferenced(backupDir, manifest.Files);
+
+            var prepared = new List<PreparedUndo>(resolved.Count);
+            foreach (var (file, path) in resolved)
             {
-                original = ReadBackupFile(backupDir, file);
-                linkText = ReadBoundSidecar(backupDir, file);
+                byte[]? original = null;
+                string? linkText = null;
+                if (file.Existed)
+                {
+                    original = ReadBackupFile(backupDir, file);
+                    linkText = ReadBoundSidecar(backupDir, file);
+                }
+
+                prepared.Add(new PreparedUndo(file, path, original, linkText));
             }
 
-            prepared.Add(new PreparedUndo(file, path, original, linkText));
-        }
+            var results = new List<UndoFileResult>();
+            foreach (var item in prepared)
+            {
+                var file = item.File;
+                var path = item.Path;
+                var current = ReadIfExists(path);
+                var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
 
-        var results = new List<UndoFileResult>();
-        foreach (var item in prepared)
+                UndoFileStatus status;
+                if (string.Equals(currentHash, file.Sha256Before, StringComparison.Ordinal))
+                {
+                    status = UndoFileStatus.AlreadyRestored;
+                }
+                else if (!string.Equals(currentHash, file.Sha256After, StringComparison.Ordinal))
+                {
+                    status = UndoFileStatus.Conflict;
+                }
+                else if (!file.Existed)
+                {
+                    Guard(() => File.Delete(path), path, "delete");
+                    status = UndoFileStatus.Deleted;
+                }
+                else
+                {
+                    var permissions = FileReplacementPermissions.FromUnixAndWindows(file.UnixMode, file.WindowsReadOnly);
+                    status = RestoreOriginalBytes(trustedRoot, file, path, item.Original!, item.LinkText, permissions);
+                }
+
+                results.Add(new UndoFileResult(file.Path, status));
+            }
+
+            var result = new UndoResult(manifest.BackupId, results);
+            if (!result.HasConflicts && markUndone)
+                WriteUndoneAt(manifestPath, manifest);
+
+            return result;
+        }
+        finally
         {
-            var file = item.File;
-            var path = item.Path;
-            var current = ReadIfExists(path);
-            var currentHash = current is null ? null : ClientFilesIo.Sha256Hex(current);
-
-            UndoFileStatus status;
-            if (string.Equals(currentHash, file.Sha256Before, StringComparison.Ordinal))
-            {
-                status = UndoFileStatus.AlreadyRestored;
-            }
-            else if (!string.Equals(currentHash, file.Sha256After, StringComparison.Ordinal))
-            {
-                status = UndoFileStatus.Conflict;
-            }
-            else if (!file.Existed)
-            {
-                Guard(() => File.Delete(path), path, "delete");
-                status = UndoFileStatus.Deleted;
-            }
-            else
-            {
-                var permissions = FileReplacementPermissions.FromUnixAndWindows(file.UnixMode, file.WindowsReadOnly);
-                status = RestoreOriginalBytes(trustedRoot, file, path, item.Original!, item.LinkText, permissions);
-            }
-
-            results.Add(new UndoFileResult(file.Path, status));
+            if (ownsLock)
+                installationLock.Dispose();
         }
+    }
 
-        var result = new UndoResult(manifest.BackupId, results);
-        if (!result.HasConflicts)
-        {
-            // Only a fully undone backup is retired; one with conflicts stays pending so nothing older is undone on top of it.
-            var done = manifest with { UndoneAt = _clock() };
-            Guard(() => _writer.WriteAllBytes(manifestPath, done.ToJson()), manifestPath, "update manifest");
-        }
+    public void MarkBackupUndone(string installationId, string backupId)
+    {
+        RequireValidIds(installationId, "-");
+        if (!BackupIdFormat.IsValid(backupId))
+            throw new ArgumentException("Invalid backup id.", nameof(backupId));
 
-        return result;
+        using var installationLock = AcquireInstallationLock(installationId);
+        // FindBackup hides already-undone backups. A missing or already-marked manifest is success so Undo can clear the journal.
+        var manifestPath = Path.Combine(_backupRoot, installationId, backupId, ManifestName);
+        var bytes = ReadIfExists(manifestPath);
+        if (bytes is null)
+            return;
+
+        var manifest = BackupManifest.FromJson(bytes, manifestPath);
+        if (manifest.UndoneAt is not null)
+            return;
+
+        WriteUndoneAt(manifestPath, manifest);
+    }
+
+    private void WriteUndoneAt(string manifestPath, BackupManifest manifest)
+    {
+        var done = manifest with { UndoneAt = _clock() };
+        Guard(() => _writer.WriteAllBytes(manifestPath, done.ToJson()), manifestPath, "update manifest");
+    }
+
+    private (string ManifestPath, BackupManifest Manifest)? FindBackup(string installationId, string backupId)
+    {
+        var manifestPath = Path.Combine(_backupRoot, installationId, backupId, ManifestName);
+        var bytes = ReadIfExists(manifestPath);
+        if (bytes is null)
+            return null;
+        var manifest = BackupManifest.FromJson(bytes, manifestPath);
+        if (manifest.UndoneAt is not null)
+            return null;
+        return (manifestPath, manifest);
     }
 
     // ---- backup ----
