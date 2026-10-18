@@ -73,7 +73,7 @@ public sealed record GameLaunchSpec(
             {
                 if (string.IsNullOrEmpty(name) || name.Contains('=') || name.Contains('\0'))
                     throw new ArgumentException($"'{name}' is not a valid environment variable name.", nameof(Environment));
-                if (RestrictedEnvironmentVariables.Contains(name))
+                if (RestrictedEnvironmentVariables.Contains(name) && value is not null)
                     throw new ArgumentException($"'{name}' is restricted because it can load arbitrary native code.", UnsupportedSettingParameter);
                 environment[name] = value;
             }

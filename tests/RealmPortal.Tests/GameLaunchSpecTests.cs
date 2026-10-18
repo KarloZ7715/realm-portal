@@ -109,6 +109,39 @@ public class GameLaunchSpecTests : IDisposable
         Assert.Equal(GameLaunchSpec.UnsupportedSettingParameter, error.ParamName);
     }
 
+    [Theory]
+    [InlineData("LD_PRELOAD")]
+    [InlineData("ld_library_path")]
+    [InlineData("DYLD_INSERT_LIBRARIES")]
+    public void RestrictedLoaderEnvironment_NullValue_IsPermittedToRemove(string name)
+    {
+        var launch = new GameLaunchSpec(Exe, Dir, Environment: new Dictionary<string, string?> { [name] = null }).Resolve();
+
+        Assert.True(launch.Environment.ContainsKey(name));
+        Assert.Null(launch.Environment[name]);
+    }
+
+    [Fact]
+    public void WineClient_WithTemplate_PrefixArgumentsAndWinePrefix_ResolvesCorrectly()
+    {
+        var winePrefix = _temp.Combine("wineprefix");
+        var spec = new GameLaunchSpec(
+            ExecutablePath: Exe,
+            WorkingDirectory: Dir,
+            CommandTemplate: "wine {exe}",
+            Arguments: ["-windowed", "-console"],
+            Environment: new Dictionary<string, string?> { ["WINEPREFIX"] = winePrefix, ["LD_PRELOAD"] = null },
+            Prefix: ["gamemoderun"]);
+
+        var launch = spec.Resolve();
+
+        Assert.Equal("gamemoderun", launch.FileName);
+        Assert.Equal(["wine", Exe, "-windowed", "-console"], launch.Arguments);
+        Assert.Equal(Dir, launch.WorkingDirectory);
+        Assert.Equal(winePrefix, launch.Environment["WINEPREFIX"]);
+        Assert.Null(launch.Environment["LD_PRELOAD"]);
+    }
+
     [Fact]
     public void RelativeOrMissingExecutable_IsRejected()
     {
