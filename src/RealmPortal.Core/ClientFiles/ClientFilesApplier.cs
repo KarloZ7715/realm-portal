@@ -19,11 +19,10 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     public const int DefaultKeepBackups = 10;
 
     /// <summary>
-    /// A <c>files/&lt;n&gt;</c> payload larger than this is refused before it is read.
-    /// Realmlist and Config.wtf backups are a few kilobytes; the cap stops a swapped-in file from being loaded whole.
+    /// A managed config file larger than this is refused before capture or apply.
     /// </summary>
     public const int MaxManagedConfigBytes = 1_048_576;
-    internal const int MaxBackupFileBytes = MaxManagedConfigBytes;
+    internal const int MaxBackupFileBytes = 16 * 1024 * 1024;
     private const int MaxManifestBytes = 256 * 1024;
 
     private readonly IClientFilesPlanner _planner;
