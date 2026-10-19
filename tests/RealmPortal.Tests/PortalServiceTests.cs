@@ -178,6 +178,58 @@ public class PortalServiceTests
     }
 
     [Fact]
+    public void DiscardUndo_ForClientOwningGlobalJournal_ClearsGlobalUndoRecord()
+    {
+        using var env = new Env();
+        var clientId = env.ClientId;
+        var server = Add("Server", "server.example.org", env.Service);
+        env.PutRealmlist("set realmlist original.example.org\r\n");
+        Assert.True(env.Service.SwitchServer(new SwitchRequest(clientId, server.Id)).Succeeded);
+        var before = env.ReadRealmlist();
+
+        var discarded = env.Service.DiscardUndo(clientId);
+
+        Assert.True(discarded.Succeeded);
+        Assert.False(discarded.Value!.CanUndo);
+        Assert.Equal(before, env.ReadRealmlist());
+        Assert.Equal(ServiceErrorCode.NothingToUndo, env.Service.Undo().Error!.Code);
+    }
+
+    [Fact]
+    public void RestoreBackup_OlderSnapshotForClientOwningGlobalJournal_ClearsGlobalUndoRecord()
+    {
+        using var env = new Env();
+        var clientId = env.ClientId;
+        env.PutRealmlist("set realmlist original.example.org\r\n");
+        var oldBackup = env.Service.CreateBackup(clientId).Value!;
+        var server = Add("Server", "server.example.org", env.Service);
+        Assert.True(env.Service.SwitchServer(new SwitchRequest(clientId, server.Id)).Succeeded);
+
+        var restored = env.Service.RestoreBackup(clientId, oldBackup.BackupId, force: true);
+
+        Assert.True(restored.Succeeded);
+        Assert.False(env.Service.GetStatus().Value!.CanUndo);
+        Assert.Equal(ServiceErrorCode.NothingToUndo, env.Service.Undo().Error!.Code);
+    }
+
+    [Fact]
+    public void DeleteBackup_PendingSnapshotForClientOwningGlobalJournal_ClearsGlobalUndoRecord()
+    {
+        using var env = new Env();
+        var clientId = env.ClientId;
+        var server = Add("Server", "server.example.org", env.Service);
+        var switched = env.Service.SwitchServer(new SwitchRequest(clientId, server.Id));
+        Assert.True(switched.Succeeded);
+        Assert.NotNull(switched.Value!.BackupId);
+
+        var deleted = env.Service.DeleteBackup(clientId, switched.Value.BackupId!);
+
+        Assert.True(deleted.Succeeded);
+        Assert.False(env.Service.GetStatus().Value!.CanUndo);
+        Assert.Equal(ServiceErrorCode.NothingToUndo, env.Service.Undo().Error!.Code);
+    }
+
+    [Fact]
     public void IncompatibleClient_WithoutForce_Fails()
     {
         using var env = new Env();

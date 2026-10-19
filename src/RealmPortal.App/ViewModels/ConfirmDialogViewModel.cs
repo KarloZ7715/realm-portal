@@ -63,6 +63,10 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
         new("confirm.backupconflict.title", "confirm.backupconflict.body", "confirm.backupconflict.restoreanyway",
             "confirm.cancel", [serverName, switchedAt, backupLabel], "confirm.backupconflict.discard");
 
+    public static ConfirmDialogViewModel BackupChanged(string backupLabel) =>
+        new("confirm.backupchanged.title", "confirm.backupchanged.body", "confirm.backupchanged.restore",
+            "confirm.cancel", [backupLabel]);
+
     [RelayCommand]
     private void Confirm() => Complete(ConfirmDialogChoice.Confirm);
 

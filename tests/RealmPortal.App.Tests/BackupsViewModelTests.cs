@@ -161,4 +161,32 @@ public sealed class BackupsViewModelTests
         Assert.False(vm.CreateBackupCommand.CanExecute(null));
         Assert.True(vm.IsGameRunning);
     }
+
+    [AvaloniaFact]
+    public async Task MainViewModel_PropagatesBackupStatusAndRefreshesLanguage()
+    {
+        using var env = new Env();
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.SectionIndex = 2;
+        main.Settings.OpenBackupsManagerCommand.Execute(null);
+        var vm = Assert.IsType<BackupsViewModel>(main.Content);
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        await vm.CreateBackupCommand.ExecuteAsync(null);
+
+        Assert.Equal(vm.StatusText, main.StatusText);
+        Loc.Instance.SetLanguage(Language.Es);
+        Assert.Contains("máx.", vm.CountText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(vm.StatusText, main.StatusText);
+
+        File.WriteAllText(env.Realmlist, "set realmlist edited.example\r\n");
+        var restoreTask = vm.Backups.Single().RestoreCommand.ExecuteAsync(null);
+        for (var i = 0; i < 100 && main.Dialog is null; i++)
+            await Task.Delay(10);
+        Assert.NotNull(main.Dialog);
+        Assert.False(main.Dialog!.HasSecondaryAction);
+        main.Dialog.ConfirmCommand.Execute(null);
+        await restoreTask;
+        Assert.Equal("set realmlist original.example\r\n", File.ReadAllText(env.Realmlist));
+    }
 }

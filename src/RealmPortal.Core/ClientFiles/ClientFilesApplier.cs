@@ -359,7 +359,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         var targets = CaptureManagedTargets(root);
         if (targets.Count == 0)
             throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, root, "No managed client configuration files were found to back up.");
-        var latest = ListBackups(installationId).FirstOrDefault();
+        var latest = ListBackups(installationId).FirstOrDefault(x => x.Error is null);
         if (latest is not null && IsSameSnapshot(latest, targets))
             return latest with { WasDeduplicated = true };
 
@@ -408,7 +408,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             var safety = CaptureManagedTargets(root);
             if (safety.Count > 0)
             {
-                var latest = ListBackups(installationId).FirstOrDefault();
+                var latest = ListBackups(installationId).FirstOrDefault(x => x.Error is null);
                 if (latest is null || !IsSameSnapshot(latest, safety))
                 {
                     var safetyId = NewBackupId(installationId);
@@ -482,7 +482,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
 
     private void PruneLocked(string installationId, int keep)
     {
-        var entries = ListBackups(installationId);
+        var entries = ListBackups(installationId).Where(x => x.Error is null).ToArray();
         var pending = entries.FirstOrDefault(x => x.UndoneAt is null && !x.IsManual)?.BackupId;
         foreach (var old in entries.Skip(keep).Where(x => x.BackupId != pending))
             TryDeleteDirectory(Path.Combine(_backupRoot, installationId, old.BackupId));

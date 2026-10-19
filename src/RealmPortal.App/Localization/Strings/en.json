@@ -284,5 +284,8 @@
   "confirm.backupconflict.body": "You switched to “{0}” at {1} and the Undo option is still active. Restoring this older backup ({2}) will replace the current client files. A safety backup of your current files will be saved first.",
   "confirm.backupconflict.restoreanyway": "Restore anyway",
   "confirm.backupconflict.discard": "Discard",
+  "confirm.backupchanged.title": "Client files have changed",
+  "confirm.backupchanged.body": "The client files have changed since this backup ({0}). Restoring it will replace the current files. A safety backup of the current files will be saved first.",
+  "confirm.backupchanged.restore": "Restore backup",
   "confirm.cancel": "Cancel"
 }

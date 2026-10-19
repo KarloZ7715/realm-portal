@@ -284,5 +284,8 @@
   "confirm.backupconflict.body": "Cambiaste a «{0}» a las {1} y la opción Deshacer sigue activa. Si restauras este respaldo anterior ({2}), se reemplazarán los archivos actuales del cliente. Antes se guardará una copia de seguridad del estado actual.",
   "confirm.backupconflict.restoreanyway": "Restaurar de todos modos",
   "confirm.backupconflict.discard": "Descartar",
+  "confirm.backupchanged.title": "Los archivos del cliente cambiaron",
+  "confirm.backupchanged.body": "Los archivos del cliente cambiaron desde este respaldo ({0}). Al restaurarlo se reemplazarán los archivos actuales. Antes se guardará una copia de seguridad del estado actual.",
+  "confirm.backupchanged.restore": "Restaurar respaldo",
   "confirm.cancel": "Cancelar"
 }

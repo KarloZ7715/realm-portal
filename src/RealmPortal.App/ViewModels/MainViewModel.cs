@@ -271,6 +271,7 @@ public sealed partial class MainViewModel : ObservableObject
             ConfirmDeleteBackupAsync = ConfirmDeleteBackupAsync,
             ResolveRestoreConflictAsync = ResolveRestoreConflictAsync,
         };
+        _backups.PropertyChanged += OnSectionChanged;
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
     }
@@ -279,6 +280,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (_backups is null)
             return;
+        _backups.PropertyChanged -= OnSectionChanged;
         _backups = null;
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
@@ -299,8 +301,14 @@ public sealed partial class MainViewModel : ObservableObject
         active ??= status.Succeeded ? status.Value!.Active?.Name : null;
         var pendingBackups = _session.Service.ListBackups(backup.ClientId);
         var pending = pendingBackups.Succeeded ? pendingBackups.Value!.FirstOrDefault(entry => entry.IsPendingUndo) : null;
-        active = pending?.ServerName ?? active;
-        var pendingTime = (pending?.CreatedAt ?? backup.CreatedAt).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        if (pending is not { } pendingUndo)
+        {
+            var changedDialog = ConfirmDialogViewModel.BackupChanged(BackupDescription(backup));
+            return await ChooseAsync(changedDialog).ConfigureAwait(true);
+        }
+
+        active = pendingUndo.ServerName ?? active;
+        var pendingTime = pendingUndo.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
         var dialog = ConfirmDialogViewModel.BackupConflict(active ?? Loc.Get("backups.conflict.unknownserver"), pendingTime, BackupDescription(backup));
         return await ChooseAsync(dialog).ConfigureAwait(true);
     }
@@ -373,6 +381,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         _adding?.RefreshText();
         _editingClient?.RefreshText();
+        _backups?.RefreshText();
         OnPropertyChanged(nameof(LanguageLabel));
         OnPropertyChanged(nameof(Disclaimer));
         OnPropertyChanged(nameof(StatusText));

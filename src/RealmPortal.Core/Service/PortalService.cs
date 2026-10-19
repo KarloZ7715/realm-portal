@@ -642,9 +642,15 @@ public sealed class PortalService : IPortalService
     {
         try
         {
-            _active.DiscardPendingUndo(clientId);
-            _journal.Clear(clientId);
-            return GetStatus();
+            using (_servers.DirectoryLock.Acquire())
+            {
+                var ownsGlobal = clientId is not null && _journal.Load()?.ClientId == clientId;
+                _active.DiscardPendingUndo(clientId);
+                if (ownsGlobal)
+                    _active.DiscardPendingUndo(null);
+                _journal.Clear(clientId);
+                return GetStatus();
+            }
         }
         catch (Exception ex)
         {
@@ -736,7 +742,12 @@ public sealed class PortalService : IPortalService
                     if (journal.BackupId == backupId)
                         _active.Undo(clientId, globalJournal?.ClientId);
                     else
+                    {
+                        var ownsGlobal = string.Equals(globalJournal?.ClientId, clientId, StringComparison.Ordinal);
                         _active.DiscardPendingUndo(clientId);
+                        if (ownsGlobal)
+                            _active.DiscardPendingUndo(null);
+                    }
                     _journal.Clear(clientId);
                 }
 
@@ -762,6 +773,7 @@ public sealed class PortalService : IPortalService
             using (_servers.DirectoryLock.Acquire())
             {
                 var journal = _journal.Load(clientId);
+                var globalJournal = _journal.Load();
                 try
                 {
                     CreateApplier().DeleteBackup(clientId, backupId);
@@ -773,7 +785,10 @@ public sealed class PortalService : IPortalService
 
                 if (journal?.BackupId == backupId)
                 {
+                    var ownsGlobal = string.Equals(globalJournal?.ClientId, clientId, StringComparison.Ordinal);
                     _active.DiscardPendingUndo(clientId);
+                    if (ownsGlobal)
+                        _active.DiscardPendingUndo(null);
                     _journal.Clear(clientId);
                 }
                 return ServiceResult<Unit>.Ok(default);
