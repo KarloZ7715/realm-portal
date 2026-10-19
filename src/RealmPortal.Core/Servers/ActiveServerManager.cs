@@ -221,6 +221,9 @@ public sealed class ActiveServerManager(
 
             var state = LoadState();
             var previous = Resolve(state, clientId);
+            // The global undo record tracks the global selection, which can differ from the switching client's own
+            // previous server (a client with no entry yet resolves to null while the global one still points somewhere).
+            var previousGlobal = Resolve(state);
 
             try
             {
@@ -243,7 +246,7 @@ public sealed class ActiveServerManager(
             {
                 Version = FormatVersion,
                 ActiveId = stored.Id,
-                Undo = previous?.Id == stored.Id ? state.Undo : new UndoRecord { ServerId = previous?.Id },
+                Undo = previousGlobal?.Id == stored.Id ? state.Undo : new UndoRecord { ServerId = previousGlobal?.Id },
                 ActiveByClient = activeByClient,
                 UndoByClient = undoByClient,
             };
@@ -272,6 +275,11 @@ public sealed class ActiveServerManager(
     /// it matches this client; otherwise those stay with the client that owns the global selection. Also identifies the
     /// per-client entry a global undo reverts, when known.
     /// </param>
+    /// <remarks>
+    /// The client-scoped target and the global target are resolved separately: the client-scoped target is applied
+    /// only to <c>active_by_client</c>, and the global target only to <c>active_id</c> and <c>activo.json</c>, and only
+    /// when the undo owns the global selection.
+    /// </remarks>
     /// <exception cref="StoreException">There is nothing to undo, or the server to restore no longer exists.</exception>
     /// <exception cref="InvalidRealmlistException">The realmlist of the server to restore is invalid; nothing is changed.</exception>
     public Server? Undo(string? clientId = null, string? globalJournalClientId = null)
@@ -279,47 +287,41 @@ public sealed class ActiveServerManager(
         using (store.DirectoryLock.Acquire())
         {
             var state = LoadState();
-            var undo = clientId is null ? state.Undo : state.UndoByClient.GetValueOrDefault(clientId);
-            if (undo is null)
+
+            // The record that decides whether there is anything to undo: the client's own record for a scoped
+            // undo, the global record otherwise.
+            var pending = clientId is null ? state.Undo : state.UndoByClient.GetValueOrDefault(clientId);
+            if (pending is null)
                 throw new StoreException("Nothing to undo.");
 
-            Server? target = null;
-            if (undo.ServerId is { } id)
-            {
-                target = store.List().FirstOrDefault(s => s.Id == id)
-                         ?? throw new StoreException("The previous server no longer exists; cannot undo.");
-            }
-
-            if (target is not null)
-            {
-                try
-                {
-                    RealmlistText.Validate(target.Realmlist);
-                }
-                catch (InvalidRealmlistException ex)
-                {
-                    throw ex.ForServer(target.Name);
-                }
-            }
-
             // A client-scoped undo owns the global selection only when it is the client that made the most recent
-            // switch; a global undo always does. Revert the scoped client, or for a global undo the journal's client.
+            // switch; a global undo always does. The client-scoped target and the global target are resolved and
+            // validated independently so a scoped undo never rewrites the global selection and a global undo never
+            // borrows a client's previous server.
             var ownsGlobal = clientId is null || string.Equals(clientId, globalJournalClientId, StringComparison.Ordinal);
             var affectedClient = clientId ?? globalJournalClientId;
+
+            var clientRecord = clientId is null
+                ? (globalJournalClientId is null ? null : state.UndoByClient.GetValueOrDefault(globalJournalClientId))
+                : pending;
+            var clientTarget = ResolveUndoTarget(clientRecord);
+            var globalTarget = ownsGlobal
+                ? (state.Undo is not null ? ResolveUndoTarget(state.Undo) : clientTarget)
+                : null;
 
             var stateBeforeUndo = state;
             var activeByClient = new Dictionary<string, string>(state.ActiveByClient, StringComparer.Ordinal);
             var undoByClient = new Dictionary<string, UndoRecord>(state.UndoByClient, StringComparer.Ordinal);
             if (affectedClient is not null)
             {
-                if (target is null) activeByClient.Remove(affectedClient); else activeByClient[affectedClient] = target.Id;
+                if (clientTarget is null) activeByClient.Remove(affectedClient); else activeByClient[affectedClient] = clientTarget.Id;
                 undoByClient.Remove(affectedClient);
             }
 
             var nextState = state with
             {
                 Version = FormatVersion,
-                ActiveId = ownsGlobal ? target?.Id : state.ActiveId,
+                ActiveId = ownsGlobal ? globalTarget?.Id : state.ActiveId,
                 Undo = ownsGlobal ? null : state.Undo,
                 ActiveByClient = activeByClient,
                 UndoByClient = undoByClient,
@@ -327,14 +329,14 @@ public sealed class ActiveServerManager(
             SaveState(nextState);
 
             if (!ownsGlobal)
-                return target;
+                return clientTarget;
 
             try
             {
-                if (target is null)
+                if (globalTarget is null)
                     DeleteProjection();
                 else
-                    writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(target));
+                    writer.WriteAllBytes(_projectionPath, ActiveProjection.Serialize(globalTarget));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or StoreException)
             {
@@ -344,7 +346,7 @@ public sealed class ActiveServerManager(
                 throw;
             }
 
-            return target;
+            return globalTarget;
         }
     }
 
@@ -376,6 +378,23 @@ public sealed class ActiveServerManager(
 
             return true;
         }
+    }
+
+    private Server? ResolveUndoTarget(UndoRecord? record)
+    {
+        if (record?.ServerId is not { } id)
+            return null;
+        var target = store.List().FirstOrDefault(s => s.Id == id)
+                     ?? throw new StoreException("The previous server no longer exists; cannot undo.");
+        try
+        {
+            RealmlistText.Validate(target.Realmlist);
+        }
+        catch (InvalidRealmlistException ex)
+        {
+            throw ex.ForServer(target.Name);
+        }
+        return target;
     }
 
     private Server? Resolve(State state, string? clientId = null)
