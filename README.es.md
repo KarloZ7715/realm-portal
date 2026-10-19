@@ -17,21 +17,14 @@
 
 Realm Portal es una aplicación de escritorio para servidores privados de World of Warcraft. Registra los servidores en los que juegas (nombre, dirección, reino, cuenta y build de cliente requerida), busca clientes del juego en tu equipo y apunta el cliente que elijas al servidor que selecciones.
 
-Al cambiar de servidor, Realm Portal escribe la configuración de conexión en el `realmlist.wtf` y el `WTF/Config.wtf` del propio cliente, y antes guarda una copia de esos archivos. La aplicación de escritorio hace el cambio y abre el juego; la línea de comandos expone las mismas operaciones de servidor para scripts y uso sin interfaz. La interfaz está disponible en español e inglés.
-
-<p align="center">
-  <img src="docs/screenshots/servers.png" alt="La pantalla Servidores: una lista de servidores de ejemplo, cada uno con su sello de estado y un botón Jugar" width="720">
-  <br>
-  <em>La pantalla Servidores, con servidores de ejemplo.</em>
-</p>
+Al cambiar de servidor, Realm Portal escribe la configuración de conexión en los archivos de reino gestionados del cliente (`realmlist.wtf` cuando la versión del cliente lo usa, y `WTF/Config.wtf`), y antes guarda una copia de esos archivos. La aplicación de escritorio hace el cambio y abre el juego; la línea de comandos expone las mismas operaciones de servidor para scripts y uso sin interfaz. La interfaz está disponible en español e inglés.
 
 ## Compatibilidad y requisitos
 
-- **Clientes del juego** (según su distribución de archivos, ver [docs/client-files.md](docs/client-files.md)): 1.12.1 (build 5875), 2.4.3 (8606), 3.3.5a (12340), 4.3.4 (15595) y la distribución 5.4.8. Otras versiones no están soportadas.
+- **Clientes del juego** (según su distribución de archivos, ver [docs/client-files.md](docs/client-files.md)): 1.12.1 (5875), 2.4.3 (8606), 3.3.5a (12340), 4.3.4 (15595), 5.4.8 (18414), 6.x (WoD) y 7.x (Legion). Otras versiones quedan fuera de esta cobertura.
 - **Sistemas operativos**: Linux x64 y Windows x64.
 - **Entorno de Linux**: un servidor X11 (o XWayland) y `libfontconfig1`, `libfreetype6`, `libx11-6`, `libice6`, `libsm6`.
 - Las compilaciones publicadas para Linux y Windows son autocontenidas: no necesitan un runtime de .NET aparte.
-- El cliente del juego lo aportas tú; Realm Portal no incluye ni descarga archivos del juego.
 
 ## Instalación
 
@@ -57,7 +50,7 @@ chmod +x RealmPortal-*-x86_64.AppImage
 
 ## Uso de la línea de comandos
 
-`realm-portal` gestiona los servidores sin la aplicación. Los comandos son `add`, `remove`, `edit`, `list`, `switch`, `undo`, `status`, `launch`, `client` (`list`, `add`, `edit`, `remove`) y `scan`, además de `--version` y `client-version <carpeta-del-cliente>`.
+`realm-portal` gestiona los servidores sin la aplicación. Los comandos son `add`, `remove`, `edit`, `list`, `switch`, `undo`, `status`, `launch`, `client` (`list`, `add`, `edit`, `remove`), `scan` y `client-version <carpeta>`; `--version` imprime la versión.
 
 ```bash
 realm-portal add "Warmane" logon.warmane.example.org --realm Icecrown --build 12340
@@ -76,7 +69,7 @@ Opciones comunes: `--config-dir`, `--projection-dir` y `--client-dir` apuntan la
 
 Realm Portal escribe una copia de seguridad antes de cambiar cualquier archivo del cliente, de modo que cada cambio se puede deshacer byte a byte.
 
-- **Automática**: cada cambio guarda el contenido anterior de `realmlist.wtf` y `WTF/Config.wtf` en la carpeta de respaldos (`~/.local/share/realm-portal/backups` por defecto) y conserva los 10 respaldos más recientes por cliente (el motor admite entre 1 y 50).
+- **Automática**: cada cambio guarda el contenido anterior de los archivos de reino gestionados en la carpeta de respaldos (`~/.local/share/realm-portal/backups` por defecto) y conserva los 10 respaldos más recientes por cliente.
 - **Deshacer**: `realm-portal undo`, o el aviso de Deshacer en la aplicación, restaura el servidor que estaba activo antes del último cambio. Recuerda un solo paso. Si los archivos del cliente cambiaron a mano desde el cambio, Realm Portal pregunta antes de sobrescribirlos.
 - **Manual**: en **Ajustes → Copia de seguridad**, usa **Gestionar respaldos…** para crear un respaldo, ver los guardados, restaurar uno anterior o eliminarlo. Los respaldos se guardan en la carpeta indicada en **Carpeta de respaldos**.
 
@@ -88,7 +81,7 @@ La carpeta de respaldos y las demás ubicaciones se pueden sobrescribir con `REA
 - **No** descarga ni distribuye clientes ni contenido del juego; usas tu propia copia.
 - **No incluye lista de servidores**; añades los servidores en los que quieres jugar.
 - Admite **solo servidores privados**.
-- Solo escribe el `realmlist.wtf` y el `WTF/Config.wtf` del cliente; el resto de archivos del juego no se toca.
+- Solo escribe los archivos de reino gestionados del cliente (`realmlist.wtf` cuando la versión del cliente lo usa, y `WTF/Config.wtf`); el resto de archivos del juego no se toca.
 
 ## Compilación y desarrollo
 

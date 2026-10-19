@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/branding/icon/png/realm-portal-256.png" alt="Realm Portal icon: a bronze coin split in two halves, joined by a red wax butterfly key" width="128" height="128">
+  <img src="assets/branding/icon/png/realm-portal-256.png" alt="Realm Portal icon: a bronze coin split in two halves, joined by a red wax key" width="128" height="128">
 </p>
 
 <h1 align="center">Realm Portal</h1>
@@ -17,21 +17,14 @@
 
 Realm Portal is a desktop application for World of Warcraft private servers. It registers the servers you play on (name, address, realm, account and required client build), scans your computer for game clients, and points the selected client at the server you choose.
 
-When you switch, Realm Portal writes the connection settings into the client's own `realmlist.wtf` and `WTF/Config.wtf`, and it takes a backup of those files first. The desktop app runs the switch and launches the game; the CLI exposes the same server operations for scripting and headless use. The interface is available in English and Spanish.
-
-<p align="center">
-  <img src="docs/screenshots/servers.png" alt="The Servers screen: a list of example servers, each with a state badge and a Play button" width="720">
-  <br>
-  <em>The Servers screen, shown with example servers.</em>
-</p>
+When you switch, Realm Portal writes the connection settings into the client's managed realm files (`realmlist.wtf` where the client version uses it, and `WTF/Config.wtf`), and it takes a backup of those files first. The desktop app runs the switch and launches the game; the CLI exposes the same server operations for scripting and headless use. The interface is available in English and Spanish.
 
 ## Compatibility and requirements
 
-- **Game clients** (by file layout, see [docs/client-files.md](docs/client-files.md)): 1.12.1 (build 5875), 2.4.3 (8606), 3.3.5a (12340), 4.3.4 (15595) and the 5.4.8 layout. Other versions are not supported.
+- **Game clients** (by file layout, see [docs/client-files.md](docs/client-files.md)): 1.12.1 (5875), 2.4.3 (8606), 3.3.5a (12340), 4.3.4 (15595), 5.4.8 (18414), 6.x (WoD) and 7.x (Legion). Other versions fall outside this support.
 - **Operating systems**: Linux x64 and Windows x64.
 - **Linux runtime**: an X11 server (or XWayland) and `libfontconfig1`, `libfreetype6`, `libx11-6`, `libice6`, `libsm6`.
 - The published Linux and Windows builds are self-contained: they do not need a separate .NET runtime.
-- You supply your own game client; Realm Portal does not include or download game files.
 
 ## Install
 
@@ -57,7 +50,7 @@ chmod +x RealmPortal-*-x86_64.AppImage
 
 ## Using the command line
 
-`realm-portal` manages servers without the app. The commands are `add`, `remove`, `edit`, `list`, `switch`, `undo`, `status`, `launch`, `client` (`list`, `add`, `edit`, `remove`) and `scan`, plus `--version` and `client-version <client-directory>`.
+`realm-portal` manages servers without the app. The commands are `add`, `remove`, `edit`, `list`, `switch`, `undo`, `status`, `launch`, `client` (`list`, `add`, `edit`, `remove`), `scan` and `client-version <dir>`; `--version` prints the version.
 
 ```bash
 realm-portal add "Warmane" logon.warmane.example.org --realm Icecrown --build 12340
@@ -76,7 +69,7 @@ Common options: `--config-dir`, `--projection-dir` and `--client-dir` point the 
 
 Realm Portal writes a backup before it changes any client file, so every switch can be undone byte for byte.
 
-- **Automatic**: each switch stores the previous contents of `realmlist.wtf` and `WTF/Config.wtf` in the backup folder (`~/.local/share/realm-portal/backups` by default) and keeps the 10 most recent backups per client (the engine accepts 1–50).
+- **Automatic**: each switch stores the previous contents of the managed realm files in the backup folder (`~/.local/share/realm-portal/backups` by default) and keeps the 10 most recent backups per client.
 - **Undo**: `realm-portal undo`, or the Undo notice in the app, restores the server that was active before the last switch. It remembers one step. If the client files changed by hand since the switch, Realm Portal asks before overwriting them.
 - **Manual**: in **Settings → Backup**, use **Manage backups…** to create a backup, list the saved ones, restore an older one or delete one. Backups are stored under the folder set in **Backup folder**.
 
@@ -88,7 +81,7 @@ The backup folder and the other locations can be overridden with `REALM_PORTAL_B
 - It does **not** download or distribute game clients or game content; you use your own copy of the game.
 - It includes **no server list**; you add the servers you want to play on.
 - It supports **private servers only**.
-- It writes only the client's `realmlist.wtf` and `WTF/Config.wtf`; other game files are left untouched.
+- It writes only the client's managed realm files (`realmlist.wtf` where the client version uses it, and `WTF/Config.wtf`); other game files are left untouched.
 
 ## Build and development
 
