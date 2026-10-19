@@ -230,10 +230,10 @@ public sealed class PortalService : IPortalService
                 {
                     _servers.RewriteClientIdReferencesCore(existing.Id, newId);
                     _active.MigrateClientState(existing.Id, newId);
-                    if (_journal.Load()?.ClientId == existing.Id)
+                    if (_journal.Load(existing.Id) is not null)
                     {
-                        _active.RemoveClientState(existing.Id, clearGlobalUndo: true);
-                        _journal.Clear();
+                        _active.RemoveClientState(existing.Id, clearGlobalUndo: _journal.Load()?.ClientId == existing.Id);
+                        _journal.Clear(existing.Id);
                     }
                 }
                 return ServiceResult<ClientEntry>.Ok(ToClientEntry(updated, version));
@@ -264,11 +264,12 @@ public sealed class PortalService : IPortalService
             {
                 if (TryCheckRunning(client) is { } lockedRunning)
                     return ServiceResult<Unit>.Fail(lockedRunning);
-                var journal = _journal.Load();
+                var journal = _journal.Load(clientId);
+                var globalJournal = _journal.Load();
                 _servers.RewriteClientIdReferencesCore(clientId, null);
-                _active.RemoveClientState(clientId, clearGlobalUndo: journal?.ClientId == clientId);
+                _active.RemoveClientState(clientId, clearGlobalUndo: globalJournal?.ClientId == clientId);
                 if (journal?.ClientId == clientId)
-                    _journal.Clear();
+                    _journal.Clear(clientId);
                 if (!_clients.RemoveCore(clientId))
                     return ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
             }
@@ -456,7 +457,13 @@ public sealed class PortalService : IPortalService
 
             if (!_active.Remove(serverId))
                 return ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.ServerNotFound));
-            if (active?.Id == serverId || pendingUndoServerId == serverId || _journal.Load()?.ClientId is { } switchedClient && undoClientIds.Contains(switchedClient))
+            var currentJournal = _journal.Load();
+            foreach (var clientId in clientIds.Concat(undoClientIds).Distinct(StringComparer.Ordinal))
+                if (_journal.Load(clientId) is not null)
+                    _journal.Clear(clientId);
+            if (active?.Id == serverId && currentJournal?.ClientId is null)
+                _journal.Clear();
+            else if (pendingUndoServerId == serverId && currentJournal?.ClientId is null)
                 _journal.Clear();
             return ServiceResult<Unit>.Ok(default);
         }

@@ -233,6 +233,11 @@ public class PortalServiceTests
         Assert.Contains(env.Service.ListServers(clientA.Id).Value!, s => s.Id == server1.Id && s.IsActive);
         Assert.Equal(server1.Id, env.Service.GetStatus().Value!.ActiveByClient![clientA.Id].Id);
         Assert.Equal(server1.Id, env.Service.GetStatus().Value!.ActiveByClient![clientB.Id].Id);
+        Assert.True(env.Service.RemoveClient(clientB.Id).Succeeded);
+        env.Probe.RunningPaths.Remove(Path.GetFullPath(clientA.Path));
+        var undoA = env.Service.Undo(clientA.Id);
+        Assert.True(undoA.Succeeded, undoA.Error?.Diagnostic);
+        Assert.Equal(server2.Id, undoA.Value!.Active?.Id);
         Assert.Equal(2, env.Launch.Launches);
     }
 
