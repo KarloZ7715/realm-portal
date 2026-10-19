@@ -35,6 +35,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// <summary>Raised by "Back" (the shell returns to the servers list).</summary>
     public event Action? BackRequested;
 
+    public event Action? OpenBackupsManagerRequested;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenBackupsManagerCommand))]
+    private bool _canManageBackups;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDirty), nameof(StatusText), nameof(TemplateError))]
     private string _template = string.Empty;
@@ -167,6 +173,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Cancel();
         BackRequested?.Invoke();
     }
+
+    [RelayCommand(CanExecute = nameof(CanOpenBackupsManager))]
+    private void OpenBackupsManager() => OpenBackupsManagerRequested?.Invoke();
+
+    private bool CanOpenBackupsManager() => CanManageBackups;
 
     internal static bool IsValidTemplate(string? template) =>
         !string.IsNullOrWhiteSpace(template)

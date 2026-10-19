@@ -67,6 +67,9 @@ public enum ServiceErrorCode
     /// <summary>No registered client with that id.</summary>
     ClientNotFound,
 
+    /// <summary>The requested backup is missing or has an invalid id.</summary>
+    BackupNotFound,
+
     /// <summary>A client with the requested canonical folder path is already registered.</summary>
     ClientAlreadyExists,
 

@@ -1,3 +1,5 @@
+using RealmPortal.Core.ClientFiles;
+
 namespace RealmPortal.Core.Service;
 
 /// <summary>
@@ -80,7 +82,21 @@ public interface IPortalService
     /// are not touched, the active server stays, and the next state is <see cref="ServiceErrorCode.NothingToUndo"/> (<c>CanUndo == false</c>). There is
     /// no "next pending backup": undo is single-level. The backup folder is left to the applier's retention.
     /// </summary>
-    ServiceResult<PortalStatus> DiscardUndo();
+    ServiceResult<PortalStatus> DiscardUndo(string? clientId = null);
+
+    // ------------------------------------------------------------ backups
+
+    /// <summary>Lists valid and damaged backups for a registered client, or across registered clients when null.</summary>
+    ServiceResult<IReadOnlyList<BackupEntry>> ListBackups(string? clientId = null);
+
+    /// <summary>Creates a manual snapshot for a registered client.</summary>
+    ServiceResult<BackupEntry> CreateBackup(string clientId, string? label = null);
+
+    /// <summary>Restores a named snapshot. Force creates a safety snapshot before overwriting changed files.</summary>
+    ServiceResult<RestoreBackupOutcome> RestoreBackup(string clientId, string backupId, bool force = false);
+
+    /// <summary>Deletes one snapshot from the backup store.</summary>
+    ServiceResult<Unit> DeleteBackup(string clientId, string backupId);
 
     // ------------------------------------------------------------ status and settings
 

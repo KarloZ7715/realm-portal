@@ -194,14 +194,21 @@ public sealed class ActiveServerManager(
     /// <remarks>The read, the check and the write happen under the config-directory lock, so a concurrent
     /// <see cref="Switch"/>, <see cref="Undo"/> or <see cref="Remove"/> in another process cannot be overwritten
     /// with a stale copy of <c>state.json</c>.</remarks>
-    public void DiscardPendingUndo()
+    public void DiscardPendingUndo(string? clientId = null)
     {
         using (store.DirectoryLock.Acquire())
         {
             var state = LoadState();
-            if (state.Undo is null)
+            if (clientId is null)
+            {
+                if (state.Undo is not null)
+                    SaveState(state with { Undo = null });
                 return;
-            SaveState(state with { Undo = null });
+            }
+
+            var undoByClient = new Dictionary<string, UndoRecord>(state.UndoByClient, StringComparer.Ordinal);
+            if (undoByClient.Remove(clientId))
+                SaveState(state with { UndoByClient = undoByClient });
         }
     }
 

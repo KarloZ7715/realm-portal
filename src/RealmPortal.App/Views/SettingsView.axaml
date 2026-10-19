@@ -75,7 +75,7 @@
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
               <TextBox Name="BackupBox" Classes="parchment mono" Classes.error="{Binding BackupError, Converter={x:Static ObjectConverters.IsNotNull}}"
                        Text="{Binding BackupFolder, Mode=TwoWay}"/>
-              <Button Grid.Column="1" Name="BrowseButton" Classes="secondary compact" Command="{Binding BrowseCommand}">
+              <Button Grid.Column="1" Name="BrowseButton" Classes="secondary compact" c:ButtonSurface.Surface="Parchment" Command="{Binding BrowseCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <c:Icon Data="{DynamicResource IconFolder}" Width="16" Height="16" StrokeThickness="2"/>
                   <TextBlock Text="{loc:T settings.backup.browse}"/>
@@ -84,6 +84,10 @@
             </Grid>
             <TextBlock Name="BackupError" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
                        IsVisible="{Binding BackupError, Converter={x:Static ObjectConverters.IsNotNull}}" Text="{Binding BackupError}"/>
+            <Button Name="ManageBackupsButton" Classes="secondary compact" HorizontalAlignment="Right" MinWidth="172"
+                    c:ButtonSurface.Surface="Parchment" IsEnabled="{Binding CanManageBackups}" Command="{Binding OpenBackupsManagerCommand}">
+              <TextBlock Text="{loc:T settings.backup.manage}"/>
+            </Button>
           </StackPanel>
         </ContentControl>
       </StackPanel>
