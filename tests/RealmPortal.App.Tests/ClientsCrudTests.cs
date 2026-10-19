@@ -17,16 +17,21 @@ public sealed class ClientsCrudTests
         public void Launch(GameLaunchSpec spec) => throw new InvalidOperationException("Not used by client screen tests.");
     }
 
-    private sealed class Probe(bool running = false) : IGameProcessProbe
+    private sealed class Probe(bool running = false, bool fail = false) : IGameProcessProbe
     {
-        public bool IsGameRunning(string clientRoot) => running;
+        public bool IsGameRunning(string clientRoot)
+        {
+            if (fail)
+                throw new InvalidOperationException("Process state unavailable.");
+            return running;
+        }
     }
 
     private sealed class Env : IDisposable
     {
         private readonly TempDirectory _temp = new();
 
-        public Env(bool running = false, string[]? additionalRoots = null, bool firstScanCompleted = true)
+        public Env(bool running = false, string[]? additionalRoots = null, bool firstScanCompleted = true, bool probeFails = false)
         {
             Config = _temp.Combine("config");
             Projection = _temp.Combine("projection");
@@ -37,7 +42,7 @@ public sealed class ClientsCrudTests
                 Projection,
                 new PeClientVersionReader(),
                 new NoLaunch(),
-                new Probe(running),
+                new Probe(running, probeFails),
                 name => name == ClientFilesApplier.BackupDirectoryVariable ? Backups : null,
                 scanOptions: new ClientScanOptions
                 {
@@ -171,7 +176,7 @@ public sealed class ClientsCrudTests
     }
 
     [AvaloniaFact]
-    public void RunningOrUnknownClientCannotBeEditedOrRemoved()
+    public void RunningClientCannotBeEditedOrRemoved()
     {
         using var env = new Env(running: true);
         var path = env.CreateClient("running");
@@ -180,6 +185,21 @@ public sealed class ClientsCrudTests
         var row = Assert.Single(env.Main.Clients.Items);
 
         Assert.True(row.IsRunning);
+        Assert.False(row.EditCommand.CanExecute(null));
+        Assert.False(row.RemoveCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public void UnknownStateClientCannotBeEditedOrRemoved()
+    {
+        using var env = new Env(probeFails: true);
+        var path = env.CreateClient("unknown");
+        Assert.True(env.Session.Service.AddClient(path).Succeeded);
+        env.Main.Clients.ReloadFromService();
+        var row = Assert.Single(env.Main.Clients.Items);
+
+        Assert.False(row.IsRunning);
+        Assert.True(row.IsStateUnknown);
         Assert.False(row.EditCommand.CanExecute(null));
         Assert.False(row.RemoveCommand.CanExecute(null));
     }

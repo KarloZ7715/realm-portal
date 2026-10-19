@@ -219,8 +219,9 @@ public sealed partial class MainViewModel : ObservableObject
         if (_session is not null && client.Id is { } clientId)
         {
             var servers = _session.Service.ListServers(compatibleOnly: false);
-            if (servers.Succeeded)
-                linkedCount = servers.Value!.Count(server => server.ClientId == clientId);
+            if (!servers.Succeeded)
+                return false;
+            linkedCount = servers.Value!.Count(server => server.ClientId == clientId);
         }
 
         var dialog = new ConfirmDialogViewModel(
@@ -258,6 +259,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         _adding?.RefreshText();
+        _editingClient?.RefreshText();
         OnPropertyChanged(nameof(LanguageLabel));
         OnPropertyChanged(nameof(Disclaimer));
         OnPropertyChanged(nameof(StatusText));
