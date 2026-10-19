@@ -74,7 +74,7 @@ public sealed class ClientFilesBackupManagementTests
     }
 
     [Fact]
-    public void ForcedRestore_CreatesSafetyBackupBeforeRestoringSnapshot()
+    public void RestoreBackup_WithForce_CreatesSafetyBackupBeforeRestoringSnapshot()
     {
         using var f = new Fixture();
         File.WriteAllText(f.Realmlist, "set realmlist original.example\r\n", Encoding.ASCII);
@@ -86,6 +86,28 @@ public sealed class ClientFilesBackupManagementTests
         Assert.NotNull(result.SafetyBackupId);
         Assert.Equal("set realmlist original.example\r\n", File.ReadAllText(f.Realmlist));
         Assert.Contains(f.Applier.ListBackups("client-1"), x => x.BackupId == result.SafetyBackupId && x.Label == "pre-restore");
+    }
+
+    [Fact]
+    public void Undo_KeepsPendingApplyBackupWhenPruningManualSnapshots()
+    {
+        using var f = new Fixture();
+        File.WriteAllText(f.Realmlist, "set realmlist original.example\r\n", Encoding.ASCII);
+        var plan = f.Applier.Plan(new ClientFilesRequest("client-1", "server-1", f.Client, V3,
+            "set realmlist switched.example\r\n", "Switched"));
+        f.Applier.Apply(plan);
+
+        for (var i = 1; i <= 10; i++)
+        {
+            File.WriteAllText(f.Realmlist, $"set realmlist manual-{i}.example\r\n", Encoding.ASCII);
+            f.Applier.CreateBackup("client-1", f.Client);
+        }
+
+        File.WriteAllText(f.Realmlist, "set realmlist switched.example\r\n", Encoding.ASCII);
+        var result = f.Applier.Undo("client-1", f.Client);
+
+        Assert.Equal("set realmlist original.example\r\n", File.ReadAllText(f.Realmlist));
+        Assert.Contains(result.Files, x => x.Status == UndoFileStatus.Restored);
     }
 
     [Fact]

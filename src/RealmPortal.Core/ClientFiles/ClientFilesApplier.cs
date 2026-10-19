@@ -470,7 +470,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     private void PruneLocked(string installationId, int keep)
     {
         var entries = ListBackups(installationId);
-        var pending = entries.FirstOrDefault(x => x.UndoneAt is null)?.BackupId;
+        var pending = entries.FirstOrDefault(x => x.UndoneAt is null && !x.IsManual)?.BackupId;
         foreach (var old in entries.Skip(keep).Where(x => x.BackupId != pending))
             TryDeleteDirectory(Path.Combine(_backupRoot, installationId, old.BackupId));
     }
@@ -724,7 +724,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             if (bytes is null)
                 continue; // a backup directory that never got its manifest never touched the client
             var manifest = BackupManifest.FromJson(bytes, manifestPath);
-            if (manifest.UndoneAt is null)
+            if (manifest.UndoneAt is null && !manifest.IsManual)
                 return (manifestPath, manifest, bytes);
         }
 
