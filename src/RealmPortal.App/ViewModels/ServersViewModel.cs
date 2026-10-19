@@ -7,7 +7,9 @@ using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Service;
+using RealmPortal.Core.Clients;
 using RealmPortal.Core.Service;
+using RealmPortal.Core.Servers;
 using StepState = RealmPortal.App.Controls.StepState;
 
 namespace RealmPortal.App.ViewModels;
@@ -19,6 +21,9 @@ public enum ServersPhase
     Opening,
     Running,
 }
+
+/// <summary>One entry of the Servers header client filter: "All clients in use" or one saved client.</summary>
+public sealed record ServerClientFilterOption(string? ClientId, string Label);
 
 /// <summary>
 /// The server list: search, switching, undo and play. Uses <see cref="PortalSession"/> in production and
@@ -85,7 +90,16 @@ public sealed partial class ServersViewModel : ViewModelBase
     /// <summary>When undo conflicts, asks before <see cref="IPortalService.DiscardUndo"/> via <see cref="ConfirmDialogViewModel"/>.</summary>
     public Func<Task<bool>>? ConfirmDiscardAsync { get; set; }
 
+    /// <summary>Asks the shell to confirm removing <paramref name="card"/> before <see cref="DeleteServerAsync"/> deletes it.</summary>
+    public Func<ServerItemViewModel, Task<bool>>? ConfirmDeleteServerAsync { get; set; }
+
+    /// <summary>Raised when the user picks "Edit server…" on a card; the shell opens the edit sheet.</summary>
+    public event Action<ServerItemViewModel>? EditServerRequested;
+
     public ObservableCollection<ServerItemViewModel> Visible { get; } = [];
+
+    /// <summary>Header filter items, rebuilt on every reload: "All clients in use" plus each saved client.</summary>
+    public ObservableCollection<ServerClientFilterOption> ClientFilterOptions { get; } = [];
 
     public ObservableCollection<StepViewModel> Steps { get; } = [];
 
@@ -98,7 +112,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     private string _searchText = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsBusy), nameof(IsRunning), nameof(ShowBanner), nameof(ShowSteps), nameof(StatusText), nameof(ShowResults), nameof(ShowEmpty))]
+    [NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsBusy), nameof(CanSearch), nameof(IsRunning), nameof(ShowBanner), nameof(ShowSteps), nameof(StatusText), nameof(ShowResults), nameof(ShowEmpty))]
     [NotifyCanExecuteChangedFor(nameof(UndoCommand), nameof(DiscardUndoCommand))]
     private ServersPhase _phase;
 
@@ -117,9 +131,28 @@ public sealed partial class ServersViewModel : ViewModelBase
     [ObservableProperty]
     private double _toastFraction = 1;
 
+    [ObservableProperty]
+    private ServerClientFilterOption? _selectedClientFilter;
+
+    partial void OnSelectedClientFilterChanged(ServerClientFilterOption? value) => Refresh();
+
+    private bool _hasMultipleClients;
+
+    /// <summary>True when two or more clients are saved: cards then show their target client.</summary>
+    public bool HasMultipleClients => _hasMultipleClients;
+
+    /// <summary>True when two or more clients are marked "In use": the header filter is shown.</summary>
+    public bool ShowClientFilter => ClientFilterOptions.Count > 2;
+
+    /// <summary>How many clients are running a game right now (per-client lock).</summary>
+    public int RunningCount => _runningClients.Count;
+
     public bool IsIdle => Phase == ServersPhase.Idle;
 
     public bool IsBusy => Phase is ServersPhase.Switching or ServersPhase.Opening;
+
+    /// <summary>Search and Add stay available while a game runs, and hide only during a switch or launch.</summary>
+    public bool CanSearch => !IsBusy;
 
     public bool IsRunning => Phase == ServersPhase.Running;
 
@@ -129,9 +162,9 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public bool HasQuery => !string.IsNullOrWhiteSpace(SearchText);
 
-    public bool ShowResults => IsIdle && HasQuery && Visible.Count > 0;
+    public bool ShowResults => CanSearch && HasQuery && Visible.Count > 0;
 
-    public bool ShowEmpty => IsIdle && HasQuery && Visible.Count == 0;
+    public bool ShowEmpty => CanSearch && HasQuery && Visible.Count == 0;
 
     public bool ShowDiscardUndo => ToastVisible && _undoConflict;
 
@@ -151,7 +184,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         ? BannerSeverity.Warning
         : Phase switch
         {
-            ServersPhase.Running when !GameClosed => BannerSeverity.Warning,
+            ServersPhase.Running when !GameClosed && !MultipleRunning => BannerSeverity.Warning,
             _ => BannerSeverity.Info,
         };
 
@@ -173,7 +206,9 @@ public sealed partial class ServersViewModel : ViewModelBase
         ServersPhase.Switching when _repairRun => Loc.Get("repair.body"),
         ServersPhase.Switching => Loc.Get("switch.body"),
         ServersPhase.Opening => Loc.Format("open.body", _target?.Name, _target?.ClientVersion),
-        ServersPhase.Running => Loc.Get(GameClosed ? "run.closed.body" : "run.body"),
+        ServersPhase.Running when GameClosed => Loc.Get("run.closed.body"),
+        ServersPhase.Running when MultipleRunning => Loc.Format("phase.running.multiple", _runningClients.Count, RunningSummary()),
+        ServersPhase.Running => Loc.Get("run.body"),
         _ => string.Empty,
     };
 
@@ -188,11 +223,20 @@ public sealed partial class ServersViewModel : ViewModelBase
             ServersPhase.Switching when _repairRun => Loc.Format("status.repairing", _target?.Name),
             ServersPhase.Switching => Loc.Format("status.switching", _target?.Name),
             ServersPhase.Opening => Loc.Get("status.opening"),
-            ServersPhase.Running => GameClosed ? Loc.Get("status.closed") : Loc.Format("status.running", _target?.Name),
+            ServersPhase.Running when GameClosed => Loc.Get("status.closed"),
+            ServersPhase.Running when MultipleRunning => Loc.Format("phase.running.multiple", _runningClients.Count, RunningSummary()),
+            ServersPhase.Running => Loc.Format("status.running", _target?.Name),
             _ => ToastVisible && Active is { } active
                 ? Loc.Format("status.active", active.Name)
                 : Loc.Format("status.realmlist", Active?.Host ?? "-"),
         };
+
+    private bool MultipleRunning => _runningClients.Count >= 2;
+
+    /// <summary>"Server (Client)" list of the cards currently marked as running, for the multi-game banner.</summary>
+    private string RunningSummary() => string.Join(", ", _all
+        .Where(s => s.Overlay == ServerOverlay.Running)
+        .Select(s => s.ClientDisplayName is { Length: > 0 } client ? $"{s.Name} ({client})" : s.Name));
 
     public ServerItemViewModel? SelectedCard
     {
@@ -209,6 +253,36 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     [RelayCommand]
     private void ClearSearch() => SearchText = string.Empty;
+
+    private void EditRequested(ServerItemViewModel item) => EditServerRequested?.Invoke(item);
+
+    private void DeleteRequested(ServerItemViewModel item) => _ = DeleteServerAsync(item);
+
+    /// <summary>Asks the shell to confirm, then removes the server (with its active record) and reloads the list.</summary>
+    public async Task DeleteServerAsync(ServerItemViewModel card)
+    {
+        if (_session is null || card.ServerId is null || !card.CanDelete)
+        {
+            return;
+        }
+
+        var confirm = ConfirmDeleteServerAsync;
+        if (confirm is not null && !await confirm(card).ConfigureAwait(true))
+        {
+            return;
+        }
+
+        var result = await Task.Run(() => _session.Service.RemoveServer(card.ServerId)).ConfigureAwait(true);
+        if (!result.Succeeded)
+        {
+            SetError(result.Error);
+            return;
+        }
+
+        HideToast();
+        ClearErrorBanner();
+        ReloadFromService();
+    }
 
     [RelayCommand(CanExecute = nameof(GameClosed))]
     private void Retry() => Finish();
@@ -372,6 +446,11 @@ public sealed partial class ServersViewModel : ViewModelBase
         var status = _session.StatusOrNull();
         var projectionInSync = status?.ProjectionInSync ?? true;
 
+        var inUseIds = _session.UiPreferences.Load().InUseSet;
+        var inUseClients = clients.Where(c => inUseIds.Contains(c.Id)).ToList();
+        _hasMultipleClients = clients.Count >= 2;
+        RebuildClientFilter(inUseClients);
+
         _all.Clear();
         _runningClients.Clear();
         foreach (var clientId in clients.Select(client => client.Id).Distinct(StringComparer.Ordinal))
@@ -380,6 +459,7 @@ public sealed partial class ServersViewModel : ViewModelBase
             if (running.Succeeded && running.Value)
                 _runningClients.Add(clientId);
         }
+
         var order = 0;
         foreach (var entry in list.Value!)
         {
@@ -387,20 +467,52 @@ public sealed partial class ServersViewModel : ViewModelBase
             var clientVersion = clientId is not null && clientsById.TryGetValue(clientId, out var client)
                 ? client.Version
                 : null;
+            var clientDisplayName = clientId is not null && clientsById.TryGetValue(clientId, out var resolvedClient)
+                ? ClientDisplayName(resolvedClient)
+                : null;
+            var compatibleIds = clients
+                .Where(c => c.Version is null || CompatibilityFilter.IsCompatible(entry, c.Version))
+                .Select(c => c.Id)
+                .ToHashSet(StringComparer.Ordinal);
             var card = ServerItemViewModel.FromEntry(
                 entry,
                 clientVersion,
                 projectionInSync,
                 item => _ = PlayAsync(item),
-                item => _ = SwitchOnlyAsync(item));
+                item => _ = SwitchOnlyAsync(item),
+                clientId,
+                compatibleIds,
+                _hasMultipleClients,
+                clientDisplayName,
+                EditRequested,
+                DeleteRequested);
             card.Order = order++;
             if (clientId is not null && _runningClients.Contains(clientId))
                 card.Overlay = ServerOverlay.Running;
             _all.Add(card);
         }
 
+        OnPropertyChanged(nameof(HasMultipleClients));
         Refresh();
         RefreshUndoAvailability();
+    }
+
+    private static string ClientDisplayName(ClientEntry client) =>
+        string.IsNullOrWhiteSpace(client.Name) ? client.Version?.ToString() ?? "?" : client.Name!;
+
+    /// <summary>Rebuilds the header filter: "All clients in use" followed by the clients marked in use.</summary>
+    private void RebuildClientFilter(IReadOnlyList<ClientEntry> inUseClients)
+    {
+        var keepId = SelectedClientFilter?.ClientId;
+        ClientFilterOptions.Clear();
+        ClientFilterOptions.Add(new ServerClientFilterOption(null, Loc.Get("servers.clientfilter.all")));
+        foreach (var client in inUseClients)
+        {
+            ClientFilterOptions.Add(new ServerClientFilterOption(client.Id, $"{ClientDisplayName(client)} ({client.Version?.ToString() ?? "?"})"));
+        }
+
+        SelectedClientFilter = ClientFilterOptions.FirstOrDefault(o => o.ClientId == keepId) ?? ClientFilterOptions[0];
+        OnPropertyChanged(nameof(ShowClientFilter));
     }
 
     public Task SwitchOnlyAsync(ServerItemViewModel target)
@@ -431,12 +543,20 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     private async Task RunPortalAsync(ServerItemViewModel target, bool play)
     {
-        if (Phase != ServersPhase.Idle || !target.CanPlay || target.ServerId is null || _session is null)
+        if (IsBusy || !target.CanPlay || target.ServerId is null || _session is null)
         {
             return;
         }
 
-        var clientId = _session.ResolveClientId(target.PreferredClientId);
+        // A pinned server keeps its client. An unpinned server uses the header filter's client when one is selected.
+        var preferredId = target.PreferredClientId;
+        if (preferredId is null && SelectedClientFilter?.ClientId is { } filterId
+            && target.CompatibleClientIds.Contains(filterId))
+        {
+            preferredId = filterId;
+        }
+
+        var clientId = _session.ResolveClientId(preferredId);
         if (clientId is null)
         {
             SetError(null, "error.noclient.body");
@@ -503,7 +623,8 @@ public sealed partial class ServersViewModel : ViewModelBase
         if (!play)
         {
             target.Overlay = ServerOverlay.None;
-            Phase = ServersPhase.Idle;
+            // Keep the running state when another client is still playing; only the last one returns to Idle.
+            Phase = _runningClients.Count > 0 ? ServersPhase.Running : ServersPhase.Idle;
             _repairRun = false;
             Progress = 100;
             ReloadFromService();
@@ -523,9 +644,11 @@ public sealed partial class ServersViewModel : ViewModelBase
         Phase = ServersPhase.Running;
         // Reload replaces every card. The running badge has to land on the new instance.
         ReloadFromService();
+        _runningClients.Add(clientId);
         target = ResolveCard(target);
         _target = target;
         target.Overlay = ServerOverlay.Running;
+        Refresh();
         _ = WatchGamePortalAsync(clientId);
     }
 
@@ -617,12 +740,13 @@ public sealed partial class ServersViewModel : ViewModelBase
         const int closeMisses = 3;
         var interval = TimeSpan.FromMilliseconds(500);
         var startupTimeout = TimeSpan.FromSeconds(30);
-        while (Phase == ServersPhase.Running)
+        while (_runningClients.Contains(clientId))
         {
             var running = await Task.Run(() => _session.Service.IsGameRunning(clientId)).ConfigureAwait(true);
             if (!running.Succeeded)
             {
-                // Drop back to Idle so another play or switch can start, and keep the error banner up.
+                // Drop back so another play or switch can start, and keep the error banner up.
+                MarkClientClosed(clientId);
                 Finish();
                 SetError(running.Error);
                 return;
@@ -632,14 +756,12 @@ public sealed partial class ServersViewModel : ViewModelBase
             {
                 if (sawRunning && ++consecutiveMisses >= closeMisses)
                 {
-                    GameClosed = true;
-                    Refresh();
+                    MarkClientClosed(clientId);
                     return;
                 }
                 if (!sawRunning && elapsed >= startupTimeout)
                 {
-                    GameClosed = true;
-                    Refresh();
+                    MarkClientClosed(clientId);
                     return;
                 }
             }
@@ -647,7 +769,11 @@ public sealed partial class ServersViewModel : ViewModelBase
             {
                 sawRunning = true;
                 consecutiveMisses = 0;
-                _runningClients.Add(clientId);
+                if (_runningClients.Add(clientId))
+                {
+                    OnPropertyChanged(nameof(RunningCount));
+                    Refresh();
+                }
             }
 
             await _delay(interval).ConfigureAwait(true);
@@ -655,9 +781,29 @@ public sealed partial class ServersViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Marks one client's game as closed. The closed banner (and its Retry) appears only once the last
+    /// game closes; a game still open on another client keeps that client's card locked and the rest usable.
+    /// </summary>
+    private void MarkClientClosed(string clientId)
+    {
+        if (!_runningClients.Remove(clientId))
+        {
+            return;
+        }
+
+        foreach (var card in _all.Where(c => c.EffectiveClientId == clientId))
+        {
+            card.Overlay = ServerOverlay.None;
+        }
+
+        GameClosed = _runningClients.Count == 0;
+        Refresh();
+    }
+
     private void Finish()
     {
-        if (_session is not null && _target?.PreferredClientId is { } clientId)
+        if (_session is not null && _target?.EffectiveClientId is { } clientId)
         {
             var running = _session.Service.IsGameRunning(clientId);
             if (running.Succeeded && running.Value)
@@ -677,7 +823,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
         _target = null;
         GameClosed = false;
-        Phase = ServersPhase.Idle;
+        Phase = _runningClients.Count > 0 ? ServersPhase.Running : ServersPhase.Idle;
         Refresh();
     }
 
@@ -774,8 +920,10 @@ public sealed partial class ServersViewModel : ViewModelBase
     private void Refresh()
     {
         var query = SearchText.Trim();
+        var filterClientId = SelectedClientFilter?.ClientId;
         var matches = _all
             .Where(s => query.Length == 0 || s.SearchText.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            .Where(s => filterClientId is null || s.CompatibleClientIds.Contains(filterClientId))
             .OrderBy(s => s == _target ? 0 : s.IsActive ? 1 : 2)
             .ThenBy(s => s.Order)
             .ToList();
@@ -791,8 +939,15 @@ public sealed partial class ServersViewModel : ViewModelBase
 
         foreach (var item in _all)
         {
-            item.CanAct = Phase == ServersPhase.Idle &&
-                (item.PreferredClientId is null || !_runningClients.Contains(item.PreferredClientId));
+            // A card is locked only by an in-flight switch/launch or by its own client already running a game.
+            // Cards on idle clients stay usable, so another client can be switched and launched concurrently.
+            var runningClient = item.EffectiveClientId is { } clientId && _runningClients.Contains(clientId);
+            item.CanAct = !IsBusy && !runningClient;
+            item.SetLock(
+                runningClient ? ServerCardLock.ClientRunning
+                : item.IsCompatible ? ServerCardLock.None
+                : ServerCardLock.NoInUseClient,
+                item.ClientDisplayName);
         }
 
         OnPropertyChanged(nameof(Active));
@@ -805,5 +960,6 @@ public sealed partial class ServersViewModel : ViewModelBase
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(ShowBanner));
+        OnPropertyChanged(nameof(RunningCount));
     }
 }
