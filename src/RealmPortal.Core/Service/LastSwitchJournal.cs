@@ -69,6 +69,14 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
             var byClient = existing?.ByClient is null
                 ? new Dictionary<string, JournalEntry>(StringComparer.Ordinal)
                 : new Dictionary<string, JournalEntry>(existing.ByClient, StringComparer.Ordinal);
+            // Migrate a version-1 legacy entry into the map before its fields are replaced by this write, so a
+            // pending switch for the legacy client survives saving a different client (or a state-only entry).
+            if (existing is { ByClient: null } && existing.ClientId is { } legacyClientId)
+            {
+                byClient.TryAdd(
+                    legacyClientId,
+                    JournalEntry.From(new LastSwitchEntry(legacyClientId, existing.BackupId, existing.FilesUndone, existing.ManifestSha256)));
+            }
             if (entry.ClientId is { } clientId)
                 byClient[clientId] = JournalEntry.From(entry);
             WriteFile(new JournalFile
@@ -116,31 +124,50 @@ internal sealed class LastSwitchJournal(string configDirectory, IAtomicFileWrite
     {
         using (_directoryLock.Acquire())
         {
-            if (clientId is not null)
+            var file = ReadFile();
+            if (file is null)
+                return;
+
+            if (clientId is null)
             {
-                var file = ReadFile();
-                if (file is null)
-                    return;
-                var byClient = file.ByClient is null
-                    ? new Dictionary<string, JournalEntry>(StringComparer.Ordinal)
-                    : new Dictionary<string, JournalEntry>(file.ByClient, StringComparer.Ordinal);
-                byClient.Remove(clientId);
-                if (file.ClientId == clientId)
-                {
-                    if (byClient.Count == 0)
-                    {
-                        DeleteFile();
-                        return;
-                    }
-                    var replacement = byClient.First();
-                    file = file with { ClientId = replacement.Key, BackupId = replacement.Value.BackupId,
-                        FilesUndone = replacement.Value.FilesUndone, ManifestSha256 = replacement.Value.ManifestSha256 };
-                }
-                WriteFile(file with { ByClient = byClient });
+                // Clear only the version-1 global/legacy view. Per-client entries (and their undos) survive.
+                if (file.ByClient is { Count: > 0 })
+                    WriteFile(file with { ClientId = null, BackupId = null, FilesUndone = false, ManifestSha256 = null });
+                else
+                    DeleteFile();
                 return;
             }
-            PortalConfigFile.WithConfigLock(DeleteFile);
+
+            var byClient = file.ByClient is null
+                ? new Dictionary<string, JournalEntry>(StringComparer.Ordinal)
+                : new Dictionary<string, JournalEntry>(file.ByClient, StringComparer.Ordinal);
+
+            byClient.Remove(clientId);
+            if (file.ClientId == clientId)
+                PromoteOrDelete(file, byClient);
+            else
+                WriteFile(file with { ByClient = byClient });
         }
+    }
+
+    /// <summary>Promotes the surviving per-client entry to the legacy view, or deletes the file when none remain.</summary>
+    private void PromoteOrDelete(JournalFile file, Dictionary<string, JournalEntry> byClient)
+    {
+        if (byClient.Count == 0)
+        {
+            DeleteFile();
+            return;
+        }
+
+        var replacement = byClient.First();
+        WriteFile(file with
+        {
+            ClientId = replacement.Key,
+            BackupId = replacement.Value.BackupId,
+            FilesUndone = replacement.Value.FilesUndone,
+            ManifestSha256 = replacement.Value.ManifestSha256,
+            ByClient = byClient,
+        });
     }
 
     private void DeleteFile()

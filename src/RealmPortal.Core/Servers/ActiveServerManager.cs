@@ -265,9 +265,16 @@ public sealed class ActiveServerManager(
     /// none was). One level only: a second undo without a switch in between fails.
     /// </summary>
     /// <returns>The restored server, or <c>null</c> when the result is "no active server".</returns>
+    /// <param name="clientId">The client whose undo record is consumed, or <c>null</c> for the global record.</param>
+    /// <param name="globalJournalClientId">
+    /// The client recorded as owning the most recent switch (the global journal's <c>client_id</c>). A client-scoped
+    /// undo updates the global <c>active_id</c>, the global undo record and the <c>activo.json</c> projection only when
+    /// it matches this client; otherwise those stay with the client that owns the global selection. Also identifies the
+    /// per-client entry a global undo reverts, when known.
+    /// </param>
     /// <exception cref="StoreException">There is nothing to undo, or the server to restore no longer exists.</exception>
     /// <exception cref="InvalidRealmlistException">The realmlist of the server to restore is invalid; nothing is changed.</exception>
-    public Server? Undo(string? clientId = null)
+    public Server? Undo(string? clientId = null, string? globalJournalClientId = null)
     {
         using (store.DirectoryLock.Acquire())
         {
@@ -295,32 +302,33 @@ public sealed class ActiveServerManager(
                 }
             }
 
+            // A client-scoped undo owns the global selection only when it is the client that made the most recent
+            // switch; a global undo always does. Revert the scoped client, or for a global undo the journal's client.
+            var ownsGlobal = clientId is null || string.Equals(clientId, globalJournalClientId, StringComparison.Ordinal);
+            var affectedClient = clientId ?? globalJournalClientId;
+
             var stateBeforeUndo = state;
             var activeByClient = new Dictionary<string, string>(state.ActiveByClient, StringComparer.Ordinal);
             var undoByClient = new Dictionary<string, UndoRecord>(state.UndoByClient, StringComparer.Ordinal);
-            if (clientId is null)
+            if (affectedClient is not null)
             {
-                // Global/CLI undo also clears the corresponding per-client entry when known.
-                if (state.Undo?.ServerId is { } prior && state.ActiveByClient.FirstOrDefault(p => p.Value == state.ActiveId).Key is { Length: > 0 } mappedClient)
-                {
-                    if (target is null) activeByClient.Remove(mappedClient); else activeByClient[mappedClient] = target.Id;
-                    undoByClient.Remove(mappedClient);
-                }
+                if (target is null) activeByClient.Remove(affectedClient); else activeByClient[affectedClient] = target.Id;
+                undoByClient.Remove(affectedClient);
             }
-            else
-            {
-                if (target is null) activeByClient.Remove(clientId); else activeByClient[clientId] = target.Id;
-                undoByClient.Remove(clientId);
-            }
+
             var nextState = state with
             {
                 Version = FormatVersion,
-                ActiveId = target?.Id,
-                Undo = null,
+                ActiveId = ownsGlobal ? target?.Id : state.ActiveId,
+                Undo = ownsGlobal ? null : state.Undo,
                 ActiveByClient = activeByClient,
                 UndoByClient = undoByClient,
             };
             SaveState(nextState);
+
+            if (!ownsGlobal)
+                return target;
+
             try
             {
                 if (target is null)
@@ -372,7 +380,14 @@ public sealed class ActiveServerManager(
 
     private Server? Resolve(State state, string? clientId = null)
     {
-        var activeId = clientId is not null ? state.ActiveByClient.GetValueOrDefault(clientId) ?? state.ActiveId : state.ActiveId;
+        // Legacy state.json files only carry a global active_id and an empty per-client map, so an unmapped
+        // client still falls back to it. Once any per-client selection exists, a client without its own entry
+        // has no active server instead of inheriting another client's global selection.
+        var activeId = clientId is null
+            ? state.ActiveId
+            : state.ActiveByClient.TryGetValue(clientId, out var perClient)
+                ? perClient
+                : state.ActiveByClient.Count == 0 ? state.ActiveId : null;
         return activeId is null ? null : store.List().FirstOrDefault(s => s.Id == activeId);
     }
 

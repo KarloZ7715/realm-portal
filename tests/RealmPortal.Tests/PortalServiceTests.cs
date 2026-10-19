@@ -201,7 +201,7 @@ public class PortalServiceTests
     }
 
     [Fact]
-    public void RunningClientIsBlockedWhileOtherClientCanPlayAndStateIsPerClient()
+    public void SwitchAndPlay_RunningClientIsBlockedWhileOtherClientPlaysWithPerClientState()
     {
         using var env = new Env();
         var clientA = env.Service.AddClient(env.Client).Value!;
@@ -232,13 +232,27 @@ public class PortalServiceTests
         Assert.Equal(server1.Id, env.Service.ListServers(clientA.Id).Value!.Single(s => s.IsActive).Id);
         Assert.Contains(env.Service.ListServers(clientA.Id).Value!, s => s.Id == server1.Id && s.IsActive);
         Assert.Equal(server1.Id, env.Service.GetStatus().Value!.ActiveByClient![clientA.Id].Id);
-        Assert.Equal(server1.Id, env.Service.GetStatus().Value!.ActiveByClient![clientB.Id].Id);
+        Assert.DoesNotContain(clientB.Id, env.Service.GetStatus().Value!.ActiveByClient!.Keys);
         Assert.True(env.Service.RemoveClient(clientB.Id).Succeeded);
         env.Probe.RunningPaths.Remove(Path.GetFullPath(clientA.Path));
         var undoA = env.Service.Undo(clientA.Id);
         Assert.True(undoA.Succeeded, undoA.Error?.Diagnostic);
         Assert.Equal(server2.Id, undoA.Value!.Active?.Id);
         Assert.Equal(2, env.Launch.Launches);
+    }
+
+    [Fact]
+    public void Undo_PendingStateWithoutJournal_ReportsNothingToUndo()
+    {
+        using var env = new Env();
+        var client = env.Service.AddClient(env.Client).Value!;
+        var server = env.AddServer("Server 1", "one.example.org");
+        Assert.True(env.Service.Play(new SwitchRequest(client.Id, server.Id)).Succeeded);
+        File.Delete(Path.Combine(env.Config, LastSwitchJournal.FileName));
+
+        var undo = env.Service.Undo(client.Id);
+
+        Assert.Equal(ServiceErrorCode.NothingToUndo, undo.Error!.Code);
     }
 
     /// <summary>Holds the config lock file the way another Realm Portal process would.</summary>

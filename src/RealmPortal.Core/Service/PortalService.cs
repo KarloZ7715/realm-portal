@@ -520,7 +520,11 @@ public sealed class PortalService : IPortalService
                 if (!_active.HasPendingUndo(clientId))
                     return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
 
-                var journal = _journal.Load(clientId) ?? new LastSwitchEntry(clientId, null);
+                // A pending undo in state.json without a matching journal entry cannot restore client files.
+                var journal = _journal.Load(clientId);
+                if (journal is null)
+                    return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
+                var globalJournalClientId = clientId is null ? journal.ClientId : _journal.Load()?.ClientId;
 
                 StoredClient? client = journal.ClientId is null ? null : _clients.FindById(journal.ClientId);
                 using var installationLock = client is null ? null : CreateApplier().AcquireInstallationLock(client.Id);
@@ -586,7 +590,7 @@ public sealed class PortalService : IPortalService
                 Server? restored;
                 try
                 {
-                    restored = _active.Undo(clientId);
+                    restored = _active.Undo(clientId, globalJournalClientId);
                 }
                 catch (Exception ex)
                 {
@@ -1056,10 +1060,10 @@ public sealed class PortalService : IPortalService
             if (!ClientFilesMatchFileUndoSnapshot(journal))
                 return;
 
-            _active.Undo();
+            _active.Undo(null, journal.ClientId);
             if (journal.BackupId is not null && journal.ClientId is not null)
                 CreateApplier().MarkBackupUndone(journal.ClientId, journal.BackupId);
-            _journal.Clear();
+            _journal.Clear(journal.ClientId);
         }
         catch
         {
