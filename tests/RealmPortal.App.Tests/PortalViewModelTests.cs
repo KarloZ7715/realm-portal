@@ -97,9 +97,9 @@ public class PortalViewModelTests
 
         public bool IsGameRunning(string clientRoot)
         {
-            // The initial service-backed reload now derives already-running clients from the probe.
-            // Let those reads and Play's file guard pass, then fail the watcher read.
-            if (Interlocked.Increment(ref _calls) > 3)
+            // The initial service-backed reload, Play's lock-held running check, and the applier's
+            // file guard must pass; fail only a later watcher read.
+            if (Interlocked.Increment(ref _calls) > 4)
             {
                 throw new InvalidOperationException("Injected process check failure.");
             }

@@ -153,7 +153,8 @@ public sealed record PortalStatus(
     bool CanUndo,
     bool ProjectionInSync,
     string BackupFolder,
-    IReadOnlyList<ClientEntry> ClientsNotMatchingActive);
+    IReadOnlyList<ClientEntry> ClientsNotMatchingActive,
+    IReadOnlyDictionary<string, ServerEntry>? ActiveByClient = null);
 
 /// <summary>Where backups are kept, set from the Settings screen.</summary>
 /// <param name="BackupFolder">Folder for backups. A change applies from the next start of the app (<see cref="PortalStatus.BackupFolder"/> shows the one in use); existing backups are not moved or deleted.</param>

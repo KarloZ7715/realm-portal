@@ -280,10 +280,10 @@ public sealed record UpdateServerRequest(
 
 - **Backward-compatible format (`version: 1`):**
   - `active_id` (`string?`): the most recently activated server globally, projected to `activo.json` in `projectionDirectory`.
-  - `active_by_client` (`Dictionary<string, string>?`): maps `clientId -> serverId` for each registered client that has an active server. Omitted or empty in legacy `state.json` files (treated as empty dictionary; falls back to `active_id` when a client has no entry yet).
+  - `active_by_client` (`Dictionary<string, string>?`): maps `clientId -> serverId` for each registered client that has an active server. Omitted or empty in legacy `state.json` files (treated as empty dictionary). While the map is empty a client with no entry falls back to the global `active_id`; once any per-client entry exists, a client with no entry has no active server (it does not inherit another client's global selection).
   - `undo` (`{ "server_id": string? }?`) and `undo_by_client` (`Dictionary<string, UndoRecord>?`): tracks the previous `server_id` globally and per `clientId`.
 - **`ListServers(string? clientId = null, bool compatibleOnly = false)`:**
-  - When `clientId` is provided, `ServerEntry.IsActive` is true for the server matching `active_by_client[clientId]` (or global `active_id` if `clientId` has no per-client entry yet), and `ServerEntry.IsCompatible` is evaluated against `clientId`'s `ClientVersion.Build`.
+  - When `clientId` is provided, `ServerEntry.IsActive` is true for the server matching `active_by_client[clientId]` (or global `active_id` only while `active_by_client` is empty, for legacy files), and `ServerEntry.IsCompatible` is evaluated against `clientId`'s `ClientVersion.Build`.
   - When `clientId` is `null`, `ServerEntry.IsActive` reflects global `active_id` (or whether the server is active for its preferred `Server.ClientId`).
 - **`PortalStatus`:**
   ```csharp
@@ -495,7 +495,7 @@ manifest hash, and those journals keep working as before. A value that is presen
   files and reports `RolledBack`; if that fails, `InconsistentState`.
 - **Conflicts (all-or-nothing pre-check):** Both `applier.Undo` and `applier.RestoreBackup(..., force: false)` check all target files in the manifest before writing any file. When any file differs from what the switch wrote, **no client file is modified**, the app state is **not** touched, and the undo stays pending. The call fails with `UndoConflict`, `ConflictingFiles`, and `Consistency.Pending`.
 - **Discard & Restore-anyway:**
-  - `DiscardUndo(string? clientId = null)` gives up the pending undo without touching client files or the active server. The next state is `NothingToUndo` (`CanUndo == false`).
+  - `DiscardUndo(string? clientId = null)` gives up the pending undo without touching client files or the active server. The next state is `NothingToUndo` (`CanUndo == false`). With no `clientId`, only the global/legacy `last-switch.json` entry is cleared; the `by_client` entries and matching `undo_by_client` records of other clients are preserved so their undo stays usable.
   - **Restore anyway** on a conflict invokes `RestoreBackup(new RestoreBackupRequest(clientId, backupId, Force: true))` (which snapshots current files into a pre-restore safety backup first and then restores `backupId`).
 - **Play** = switch + launch. When launch fails after activate succeeded, the switch stays done (the client is configured, the server is active, undo still works) and the call returns
   `LaunchFailed` with `Consistency.AppliedLaunchFailed` (not `Unchanged`).

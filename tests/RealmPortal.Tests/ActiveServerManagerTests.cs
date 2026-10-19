@@ -390,4 +390,91 @@ public class ActiveServerManagerTests
             Assert.Equal(status.Active!.Id, manager.GetActive()!.Id);
         }
     }
+
+    [Fact]
+    public void Resolve_ClientWithoutEntry_InheritsLegacyGlobalActive_UntilPerClientStateExists()
+    {
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        env.Manager.Switch(a);
+
+        // No per-client selection yet: an unmapped client still falls back to the legacy global active.
+        Assert.Equal(a, env.Manager.GetActive("clientx"));
+        Assert.Equal(a, env.Manager.GetActive());
+
+        env.Manager.Switch(a, "clienta");
+
+        // Once a per-client map exists, an unmapped client has no active server instead of inheriting one.
+        Assert.Equal(a, env.Manager.GetActive("clienta"));
+        Assert.Null(env.Manager.GetActive("clientx"));
+    }
+
+    [Fact]
+    public void Undo_ClientScoped_DoesNotChangeGlobalStateOwnedByAnotherClient()
+    {
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        var b = env.Add("Beta");
+        var c = env.Add("Gamma");
+        env.Manager.Switch(c, "clienta");
+        env.Manager.Switch(a, "clienta");
+        env.Manager.Switch(b, "clientb");
+
+        var restored = env.Manager.Undo("clienta", "clientb");
+
+        // A's own selection and undo revert, but the global selection and projection stay on B's server.
+        Assert.Equal(c, restored);
+        Assert.Equal(c, env.Manager.GetActive("clienta"));
+        Assert.Equal(b, env.Manager.GetActive("clientb"));
+        Assert.Equal(b, env.Manager.GetActive());
+        Assert.Equal(ActiveProjection.Serialize(b), File.ReadAllBytes(env.ActivoPath));
+        Assert.False(env.Manager.HasPendingUndo("clienta"));
+        Assert.True(env.Manager.HasPendingUndo());
+        Assert.True(env.Manager.HasPendingUndo("clientb"));
+    }
+
+    [Fact]
+    public void Undo_Global_RevertsJournalClient_NotFirstClientSharingActiveServer()
+    {
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        var b = env.Add("Beta");
+        env.Manager.Switch(a, "clienta");
+        env.Manager.Switch(b, "clientb");
+        env.Manager.Switch(a, "clientb");
+
+        var restored = env.Manager.Undo(globalJournalClientId: "clientb");
+
+        Assert.Equal(b, restored);
+        Assert.Equal(b, env.Manager.GetActive("clientb"));
+        Assert.Equal(a, env.Manager.GetActive("clienta"));
+        Assert.Equal(b, env.Manager.GetActive());
+        Assert.Equal(ActiveProjection.Serialize(b), File.ReadAllBytes(env.ActivoPath));
+        Assert.False(env.Manager.HasPendingUndo());
+    }
+
+    [Fact]
+    public void Undo_ClientScopedOwner_RestoresGlobalSelectionNotItsClientRecord()
+    {
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        var b = env.Add("Beta");
+
+        // Client A is active on Alpha through its own per-client entry, so client B has no entry yet.
+        env.Manager.Switch(a, "clienta");
+        // B's first switch: B's own record has no previous server, while the global selection moves from Alpha to Beta.
+        env.Manager.Switch(b, "clientb");
+
+        var restored = env.Manager.Undo("clientb", "clientb");
+
+        // B owns the global selection, so undo restores the global active server (Alpha) and its projection
+        // instead of deactivating it from B's empty client record.
+        Assert.Equal(a, restored);
+        Assert.Equal(a, env.Manager.GetActive());
+        Assert.Equal(ActiveProjection.Serialize(a), File.ReadAllBytes(env.ActivoPath));
+        Assert.Equal(a, env.Manager.GetActive("clienta"));
+        Assert.Null(env.Manager.GetActive("clientb"));
+        Assert.False(env.Manager.HasPendingUndo("clientb"));
+        Assert.False(env.Manager.HasPendingUndo());
+    }
 }

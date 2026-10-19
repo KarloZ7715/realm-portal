@@ -78,7 +78,7 @@ public class Finding6LastSwitchJournalSecurityTests
     }
 
     [Fact]
-    public void DiscardUndo_ClearsStateBeforeJournal()
+    public void DiscardUndo_ClearsGlobalEntryButKeepsPerClientJournal()
     {
         using var dir = new TempDirectory();
         var config = dir.Combine("config");
@@ -99,8 +99,12 @@ public class Finding6LastSwitchJournalSecurityTests
         service.SwitchServer(new SwitchRequest(clientId, b.Id));
 
         Assert.True(service.DiscardUndo().Succeeded);
-        Assert.False(File.Exists(Path.Combine(config, "last-switch.json")));
         Assert.False(service.GetStatus().Value!.CanUndo);
+
+        // The global/legacy view is cleared, but the client's own journal entry survives.
+        var journal = new LastSwitchJournal(config, new AtomicFileWriter());
+        Assert.Null(journal.Load()!.ClientId);
+        Assert.Equal(clientId, journal.Load(clientId)!.ClientId);
     }
 
     private sealed class NeverRunning : IGameProcessProbe
