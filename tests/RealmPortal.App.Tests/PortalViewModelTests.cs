@@ -97,9 +97,10 @@ public class PortalViewModelTests
 
         public bool IsGameRunning(string clientRoot)
         {
-            // Both initial screens derive already-running clients from the probe. Let those reads,
-            // Play's file guards, and the post-launch refresh pass, then fail the watcher read.
-            if (Interlocked.Increment(ref _calls) > 5)
+            // Both initial screens derive already-running clients from the probe, then Play's
+            // lock-held running check, its file guards, and the post-launch refresh must pass;
+            // fail only a later watcher read.
+            if (Interlocked.Increment(ref _calls) > 6)
             {
                 throw new InvalidOperationException("Injected process check failure.");
             }

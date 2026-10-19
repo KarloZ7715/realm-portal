@@ -73,7 +73,7 @@ public interface IPortalService
     /// never overwritten: the call fails with <see cref="ServiceErrorCode.UndoConflict"/> and <see cref="ServiceError.ConflictingFiles"/>, the
     /// active server stays and the undo remains pending, so the UI can offer to fix the files and retry, or <see cref="DiscardUndo"/>.
     /// </summary>
-    ServiceResult<UndoOutcome> Undo();
+    ServiceResult<UndoOutcome> Undo(string? clientId = null);
 
     /// <summary>
     /// Gives up the pending undo (the "Discard" button of the conflict dialog): the change can no longer be undone from the app, the client files
