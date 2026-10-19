@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.EditClientView"
+             x:DataType="vm:EditClientViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
+    <StackPanel Margin="20,10,20,0">
+      <Grid ColumnDefinitions="Auto,*" Height="44" ColumnSpacing="12">
+        <Button Name="BackButton" Classes="link caps" VerticalAlignment="Center" Command="{Binding CancelCommand}">
+          <TextBlock Text="{loc:T clients.edit.back}"/>
+        </Button>
+        <TextBlock Grid.Column="1" Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T clients.edit.title}"/>
+      </Grid>
+      <ContentControl Classes="card" Padding="22,14,22,16" Margin="0,2,0,0">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="sheet-title" Text="{Binding ClientTitle}"/>
+          <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding Version}"/>
+          <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,0,0,4"/>
+          <TextBlock Classes="body-bold" FontSize="15" Foreground="{DynamicResource InkBrush}" Text="{loc:T clients.edit.name}"/>
+          <TextBox Name="ClientNameBox" Classes="parchment" Text="{Binding Name, Mode=TwoWay}" MaxLength="64" Watermark="{loc:T clients.edit.name.watermark}"/>
+          <TextBlock Classes="body-bold" FontSize="15" Foreground="{DynamicResource InkBrush}" Text="{loc:T clients.edit.folder}"/>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Name="ClientFolderBox" Classes="parchment path" Text="{Binding Folder, Mode=TwoWay}"/>
+            <Button Grid.Column="1" Classes="secondary compact" c:ButtonSurface.Surface="Parchment" Command="{Binding BrowseCommand}">
+              <TextBlock Text="{loc:T clients.edit.browse}"/>
+            </Button>
+          </Grid>
+          <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap"/>
+          <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{loc:T clients.pick.unavailable}" IsVisible="{Binding BrowseUnavailable}" TextWrapping="Wrap"/>
+        </StackPanel>
+      </ContentControl>
+      <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,16,0,0" ColumnSpacing="12">
+        <TextBlock Classes="path" Foreground="{DynamicResource BoneSoftBrush}" VerticalAlignment="Center" Text="{Binding StatusText}"/>
+        <Button Grid.Column="1" Name="CancelButton" Classes="secondary" c:ButtonSurface.Surface="Parchment" MinWidth="130" Command="{Binding CancelCommand}">
+          <TextBlock Text="{loc:T clients.edit.cancel}"/>
+        </Button>
+        <Button Grid.Column="2" Name="SaveButton" Classes="primary" c:ButtonSurface.Surface="Parchment" MinWidth="148" IsDefault="True" Command="{Binding SaveCommand}">
+          <TextBlock Text="{loc:T clients.edit.save}"/>
+        </Button>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

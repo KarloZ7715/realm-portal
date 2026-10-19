@@ -17,6 +17,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
     private readonly PortalSession? _session;
     private readonly Func<Task<string?>>? _pickFolder;
     private int _picked;
+    private bool _firstScanStarted;
 
     public ClientsViewModel(DemoBackend backend)
     {
@@ -27,16 +28,22 @@ public sealed partial class ClientsViewModel : ViewModelBase
         }
     }
 
-    public ClientsViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null)
+    public ClientsViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool startFirstScan = true)
     {
         _session = session;
         _pickFolder = pickFolder;
         ReloadFromService();
-        if (!session.UiPreferences.Load().FirstScanCompleted)
-            _ = RunScanAsync(markFirstScanCompleted: true, reportFailure: false);
+        if (startFirstScan)
+            StartFirstScanIfNeeded();
     }
 
     public event Action? ClientsChanged;
+
+    public event Action<ClientItemViewModel>? ClientEditRequested;
+
+    public event Action? FirstScanFoundNoClients;
+
+    public Func<ClientItemViewModel, Task<bool>>? ConfirmRemoveAsync { get; set; }
 
     public ObservableCollection<ClientItemViewModel> Items { get; } = [];
 
@@ -46,7 +53,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
     private bool _isScanning;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(HasNotice))]
     private string? _notice;
 
     public int InUseCount => Items.Count(i => i.IsInUse);
@@ -55,6 +62,8 @@ public sealed partial class ClientsViewModel : ViewModelBase
         "clients.summary",
         Items.Count == 1 ? Loc.Get("clients.found.one") : Loc.Format("clients.found.many", Items.Count),
         InUseCount);
+
+    public bool HasNotice => !string.IsNullOrWhiteSpace(Notice);
 
     public override string StatusText =>
         IsScanning ? Loc.Get("status.scanning") : Notice ?? Loc.Format("status.clients", Items.Count);
@@ -89,12 +98,46 @@ public sealed partial class ClientsViewModel : ViewModelBase
 
         foreach (var entry in list.Value!)
         {
-            AddPortal(entry, inUse.Contains(entry.Id));
+            var running = _session.Service.IsGameRunning(entry.Id);
+            AddPortal(entry, inUse.Contains(entry.Id),
+                isRunning: running.Succeeded && running.Value,
+                isStateUnknown: !running.Succeeded);
         }
 
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(StatusText));
         ClientsChanged?.Invoke();
+    }
+
+    /// <summary>Re-reads each row's process state without rebuilding the list, so management
+    /// actions reflect a game that started or exited since the last reload.</summary>
+    public void RefreshRunningState()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        foreach (var item in Items)
+        {
+            if (item.Id is not { } id)
+            {
+                continue;
+            }
+
+            var running = _session.Service.IsGameRunning(id);
+            item.IsRunning = running.Succeeded && running.Value;
+            item.IsStateUnknown = !running.Succeeded;
+        }
+    }
+
+    public void StartFirstScanIfNeeded()
+    {
+        if (_session is null || _firstScanStarted)
+            return;
+        _firstScanStarted = true;
+        if (!_session.UiPreferences.Load().FirstScanCompleted)
+            _ = RunScanAsync(markFirstScanCompleted: true);
     }
 
     [RelayCommand(CanExecute = nameof(CanScan))]
@@ -104,7 +147,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
         {
             IsScanning = true;
             Notice = null;
-            await RunScanAsync(markFirstScanCompleted: true, reportFailure: true).ConfigureAwait(true);
+            await RunScanAsync(markFirstScanCompleted: true).ConfigureAwait(true);
             return;
         }
 
@@ -114,7 +157,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
         IsScanning = false;
     }
 
-    private async Task RunScanAsync(bool markFirstScanCompleted, bool reportFailure)
+    private async Task RunScanAsync(bool markFirstScanCompleted)
     {
         if (_session is null)
             return;
@@ -125,8 +168,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
             var outcome = await Task.Run(() => _session.Service.Scan()).ConfigureAwait(true);
             if (!outcome.Succeeded)
             {
-                if (reportFailure)
-                    Notice = ErrorText.Body(outcome.Error!);
+                Notice = ErrorText.Body(outcome.Error!);
                 return;
             }
 
@@ -139,8 +181,16 @@ public sealed partial class ClientsViewModel : ViewModelBase
                 ClientsInUse = inUse.ToList(),
                 FirstScanCompleted = markFirstScanCompleted || preferences.FirstScanCompleted,
             });
-            if (outcome.Value.AddedClients.Count > 0)
-                ReloadFromService();
+            var added = outcome.Value.AddedClients.Count;
+            var imported = outcome.Value.ImportedServers.Count;
+            var known = Math.Max(0, outcome.Value.AllClients.Count - added);
+            var failed = outcome.Value.AllClients.Count(client => client.Error is not null);
+            Notice = added == 0 && imported == 0
+                ? Loc.Format("scan.outcome.nochange.count", known, failed)
+                : Loc.Format("scan.outcome.summary", added, imported, known, failed);
+            ReloadFromService();
+            if (markFirstScanCompleted && outcome.Value.AllClients.Count == 0)
+                FirstScanFoundNoClients?.Invoke();
         }
         finally
         {
@@ -198,16 +248,70 @@ public sealed partial class ClientsViewModel : ViewModelBase
 
     private void AddDemo(ClientSeed seed)
     {
-        var item = new ClientItemViewModel(seed);
+        var item = new ClientItemViewModel(seed, EditRequested, itemToRemove => _ = RemoveClientAsync(itemToRemove));
         WireInUse(item);
         Items.Add(item);
     }
 
-    private void AddPortal(Core.Service.ClientEntry entry, bool inUse)
+    private void AddPortal(Core.Service.ClientEntry entry, bool inUse, bool isRunning, bool isStateUnknown)
     {
-        var item = ClientItemViewModel.FromEntry(entry, inUse);
+        var item = ClientItemViewModel.FromEntry(entry, inUse, isRunning, isStateUnknown,
+            EditRequested, itemToRemove => _ = RemoveClientAsync(itemToRemove));
         WireInUse(item);
         Items.Add(item);
+    }
+
+    private void EditRequested(ClientItemViewModel item) => ClientEditRequested?.Invoke(item);
+
+    private async Task RemoveClientAsync(ClientItemViewModel item)
+    {
+        if (ConfirmRemoveAsync is null || item.IsRunning || item.IsStateUnknown)
+            return;
+
+        if (!await ConfirmRemoveAsync(item).ConfigureAwait(true))
+            return;
+
+        if (_session is null)
+        {
+            Items.Remove(item);
+            Notice = Loc.Get("clients.remove.success");
+            OnPropertyChanged(nameof(Summary));
+            OnPropertyChanged(nameof(StatusText));
+            return;
+        }
+        if (item.Id is null)
+            return;
+
+        var result = await Task.Run(() => _session.Service.RemoveClient(item.Id)).ConfigureAwait(true);
+        if (!result.Succeeded)
+        {
+            Notice = ErrorText.Body(result.Error!);
+            return;
+        }
+
+        var preferences = _session.UiPreferences.Load();
+        var inUse = preferences.InUseSet;
+        inUse.Remove(item.Id);
+        _session.UiPreferences.Save(preferences with { ClientsInUse = inUse.ToList() });
+        Notice = Loc.Get("clients.remove.success");
+        ReloadFromService();
+    }
+
+    public void ApplyClientUpdate(string oldId, ClientEntry updated, bool inUse)
+    {
+        if (_session is null)
+            return;
+
+        var preferences = _session.UiPreferences.Load();
+        var ids = preferences.InUseSet;
+        ids.Remove(oldId);
+        if (inUse)
+            ids.Add(updated.Id);
+        else
+            ids.Remove(updated.Id);
+        _session.UiPreferences.Save(preferences with { ClientsInUse = ids.ToList() });
+        Notice = Loc.Get("clients.edit.success");
+        ReloadFromService();
     }
 
     private void WireInUse(ClientItemViewModel item)
