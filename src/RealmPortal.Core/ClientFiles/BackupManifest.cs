@@ -26,7 +26,9 @@ internal sealed record BackupManifest(
     string ClientBuild,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UndoneAt,
-    IReadOnlyList<ManifestFile> Files)
+    IReadOnlyList<ManifestFile> Files,
+    bool IsManual = false,
+    string? Label = null)
 {
     public const int CurrentVersion = 1;
 

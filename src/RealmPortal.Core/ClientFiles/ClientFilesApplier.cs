@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using RealmPortal.Core.IO;
 using RealmPortal.Core.Servers;
 
@@ -18,10 +19,11 @@ public sealed class ClientFilesApplier : IClientFilesApplier
     public const int DefaultKeepBackups = 10;
 
     /// <summary>
-    /// A <c>files/&lt;n&gt;</c> payload larger than this is refused before it is read.
-    /// Realmlist and Config.wtf backups are a few kilobytes; the cap stops a swapped-in file from being loaded whole.
+    /// A managed config file larger than this is refused before capture or apply.
     /// </summary>
+    public const int MaxManagedConfigBytes = 1_048_576;
     internal const int MaxBackupFileBytes = 16 * 1024 * 1024;
+    private const int MaxManifestBytes = 256 * 1024;
 
     private readonly IClientFilesPlanner _planner;
     private readonly IAtomicFileWriter _writer;
@@ -51,6 +53,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _lockTimeout = lockTimeout ?? TimeSpan.FromSeconds(10);
         ArgumentOutOfRangeException.ThrowIfLessThan(keepBackups, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(keepBackups, 50);
         _keepBackups = keepBackups;
     }
 
@@ -97,8 +100,15 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         var warnings = new List<string>();
         foreach (var edit in plan.Edits)
         {
+            if (edit.NewBytes.Length > MaxManagedConfigBytes)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, edit.RelativePath,
+                    $"Managed config file is larger than {MaxManagedConfigBytes} bytes.");
             var path = ClientPaths.ResolveManagedPath(clientRoot, edit.RelativePath);
-            var original = ReadIfExists(path);
+            var symlink = SymlinkSnapshot.Capture(path);
+            var original = SymlinkSnapshot.NodeExists(path) ? ReadExistingForBackup(clientRoot, path, symlink) : null;
+            if (original?.Length > MaxManagedConfigBytes)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path,
+                    $"Managed config file is larger than {MaxManagedConfigBytes} bytes.");
             var currentHash = original is null ? null : ClientFilesIo.Sha256Hex(original);
             if (!string.Equals(currentHash, edit.Sha256Before, StringComparison.Ordinal))
             {
@@ -110,7 +120,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             if (permissions is not null && FilePermissionSnapshot.IsReadOnly(path))
                 warnings.Add($"'{edit.RelativePath}' was read-only; its permissions were preserved.");
 
-            targets.Add(new Target(edit, path, original, permissions, SymlinkSnapshot.Capture(path)));
+            targets.Add(new Target(edit, path, original, permissions, symlink));
         }
 
         var backupId = NewBackupId(plan.InstallationId);
@@ -299,6 +309,171 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         WriteUndoneAt(manifestPath, manifest);
     }
 
+    public IReadOnlyList<BackupEntry> ListBackups(string? installationId = null)
+    {
+        if (installationId is not null)
+            RequireValidIds(installationId, "-");
+        IEnumerable<string> clients = installationId is null
+            ? SafeDirectories(_backupRoot).Select(Path.GetFileName).OfType<string>().Where(ClientFilesRequest.IsValidId)
+            : new[] { installationId };
+        var entries = new List<BackupEntry>();
+        foreach (var client in clients)
+        {
+            foreach (var dir in SafeDirectories(Path.Combine(_backupRoot, client)))
+            {
+                var id = Path.GetFileName(dir);
+                if (!BackupIdFormat.IsValid(id)) continue;
+                var path = Path.Combine(dir, ManifestName);
+                try
+                {
+                    var bytes = ReadBoundedNoFollow(path, MaxManifestBytes);
+                    var manifest = BackupManifest.FromJson(bytes, path);
+                    if (manifest.InstallationId != client || manifest.BackupId != id) continue;
+                    entries.Add(ToBackupEntry(manifest, false));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ClientFilesException or JsonException)
+                {
+                    // A damaged snapshot must not hide valid snapshots from the listing.
+                }
+            }
+        }
+        return entries.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.BackupId, StringComparer.Ordinal).ToArray();
+    }
+
+    public BackupEntry CreateBackup(string installationId, string clientRoot, string? label = null)
+    {
+        RequireValidIds(installationId, "-");
+        if (label?.Length > 256) throw new ArgumentException("Backup label must be 256 characters or fewer.", nameof(label));
+        var root = ClientPaths.CanonicalRoot(clientRoot);
+        using var installationLock = AcquireInstallationLock(installationId);
+        if (_probe.IsGameRunning(root))
+            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, root, "The game is running; close it before backing up its files.");
+
+        var targets = CaptureManagedTargets(root);
+        if (targets.Count == 0)
+            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, root, "No managed client configuration files were found to back up.");
+        var latest = ListBackups(installationId).FirstOrDefault();
+        if (latest is not null && IsSameSnapshot(latest, targets))
+            return latest with { WasDeduplicated = true };
+
+        var backupId = NewBackupId(installationId);
+        var backupDir = Path.Combine(_backupRoot, installationId, backupId);
+        var manifest = WriteManualBackup(installationId, root, backupId, backupDir, targets, label);
+        PruneLocked(installationId, _keepBackups);
+        return ToBackupEntry(manifest, false);
+    }
+
+    public RestoreBackupOutcome RestoreBackup(string installationId, string clientRoot, string backupId, bool force = false)
+    {
+        RequireValidIds(installationId, "-");
+        if (!BackupIdFormat.IsValid(backupId))
+            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, backupId ?? string.Empty, "The backup id is invalid.");
+        var root = ClientPaths.CanonicalRoot(clientRoot);
+        using var installationLock = AcquireInstallationLock(installationId);
+        if (_probe.IsGameRunning(root))
+            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, root, "The game is running; close it before restoring its files.");
+        var found = ReadNamedBackup(installationId, backupId);
+        if (found is null)
+            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, backupId, $"Backup '{backupId}' was not found.");
+        var (manifestPath, manifest) = found.Value;
+        ClientPaths.RequireMatchingRoots(root, manifest.ClientRoot, manifestPath);
+        var backupDir = Path.GetDirectoryName(manifestPath)!;
+        BackupManifest.EnsureBackupFilesReferenced(backupDir, manifest.Files);
+
+        var prepared = new List<PreparedUndo>(manifest.Files.Count);
+        foreach (var file in manifest.Files)
+        {
+            var path = ClientPaths.ResolveManagedPath(root, file.Path);
+            var original = file.Existed ? ReadBackupFile(backupDir, file) : null;
+            var linkText = file.Existed ? ReadBoundSidecar(backupDir, file) : null;
+            var current = ReadCurrentForUndo(path, out var notComparable);
+            var hash = notComparable || current is null ? null : ClientFilesIo.Sha256Hex(current);
+            var allowed = !notComparable && (hash == file.Sha256Before || hash == file.Sha256After);
+            if (!force && !allowed)
+                throw new ClientFilesException(ClientFilesErrorCode.UndoConflict, path,
+                    $"'{file.Path}' changed since this backup; no files were restored.");
+            prepared.Add(new PreparedUndo(file, path, original, linkText));
+        }
+
+        string? safetyBackupId = null;
+        if (force)
+        {
+            var safety = CaptureManagedTargets(root);
+            if (safety.Count > 0)
+            {
+                var latest = ListBackups(installationId).FirstOrDefault();
+                if (latest is null || !IsSameSnapshot(latest, safety))
+                {
+                    var safetyId = NewBackupId(installationId);
+                    WriteManualBackup(installationId, root, safetyId, Path.Combine(_backupRoot, installationId, safetyId), safety, "pre-restore");
+                    safetyBackupId = safetyId;
+                }
+            }
+        }
+
+        var results = new List<UndoFileResult>(prepared.Count);
+        foreach (var item in prepared)
+        {
+            if (item.File.Existed)
+            {
+                var permissions = FileReplacementPermissions.FromUnixAndWindows(item.File.UnixMode, item.File.WindowsReadOnly);
+                var status = RestoreOriginalBytes(root, item.File, item.Path, item.Original!, item.LinkText, permissions);
+                results.Add(new UndoFileResult(item.File.Path, status));
+            }
+            else
+            {
+                Guard(() => File.Delete(item.Path), item.Path, "delete");
+                results.Add(new UndoFileResult(item.File.Path, UndoFileStatus.Deleted));
+            }
+        }
+        WriteUndoneAt(manifestPath, manifest);
+        PruneLocked(installationId, _keepBackups);
+        return new RestoreBackupOutcome(backupId, safetyBackupId, results);
+    }
+
+    public void DeleteBackup(string installationId, string backupId)
+    {
+        RequireValidIds(installationId, "-");
+        if (!BackupIdFormat.IsValid(backupId))
+            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, backupId ?? string.Empty, "The backup id is invalid.");
+        using var installationLock = AcquireInstallationLock(installationId);
+        var dir = Path.Combine(_backupRoot, installationId, backupId);
+        var manifestPath = Path.Combine(dir, ManifestName);
+        if (!Directory.Exists(dir) || new DirectoryInfo(dir).LinkTarget is not null || !SymlinkSnapshot.NodeExists(manifestPath))
+            throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, dir, $"Backup '{backupId}' was not found.");
+        var manifestBytes = ReadBoundedNoFollow(manifestPath, MaxManifestBytes);
+        var manifest = BackupManifest.FromJson(manifestBytes, manifestPath);
+        if (manifest.InstallationId != installationId || manifest.BackupId != backupId)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, manifestPath, "The manifest identity does not match its folder.");
+        if (_probe.IsGameRunning(manifest.ClientRoot))
+            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, manifest.ClientRoot, "The game is running; close it before deleting a backup.");
+        try { Directory.Delete(dir, recursive: true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { throw ClientFilesIo.Map(ex, dir, "delete backup"); }
+    }
+
+    public void PruneBackups(string? installationId = null, int? keepBackups = null)
+    {
+        if (installationId is not null) RequireValidIds(installationId, "-");
+        var keep = keepBackups ?? _keepBackups;
+        if (keep is < 1 or > 50) throw new ArgumentOutOfRangeException(nameof(keepBackups), "KeepBackups must be from 1 through 50.");
+        IEnumerable<string> clients = installationId is null
+            ? SafeDirectories(_backupRoot).Select(Path.GetFileName).OfType<string>().Where(ClientFilesRequest.IsValidId).ToArray()
+            : new[] { installationId };
+        foreach (var client in clients)
+        {
+            using var installationLock = AcquireInstallationLock(client);
+            PruneLocked(client, keep);
+        }
+    }
+
+    private void PruneLocked(string installationId, int keep)
+    {
+        var entries = ListBackups(installationId);
+        var pending = entries.FirstOrDefault(x => x.UndoneAt is null && !x.IsManual)?.BackupId;
+        foreach (var old in entries.Skip(keep).Where(x => x.BackupId != pending))
+            TryDeleteDirectory(Path.Combine(_backupRoot, installationId, old.BackupId));
+    }
+
     private void WriteUndoneAt(string manifestPath, BackupManifest manifest)
     {
         var done = manifest with { UndoneAt = _clock() };
@@ -374,6 +549,166 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         return ClientFilesIo.Sha256Hex(manifestBytes);
     }
 
+    private List<ManualTarget> CaptureManagedTargets(string root)
+    {
+        var candidates = new List<string[]> { new[] { "realmlist.wtf" }, new[] { "WTF", "Config.wtf" } };
+        var data = CaseInsensitivePath.FindDirectory(root, "Data");
+        if (data is not null)
+        {
+            foreach (var locale in CaseInsensitivePath.ChildDirectories(Path.Combine(root, data)))
+                if (System.Text.RegularExpressions.Regex.IsMatch(locale, "^[a-z]{2}[A-Z]{2}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+                    candidates.Add([data, locale, "realmlist.wtf"]);
+        }
+
+        var targets = new List<ManualTarget>();
+        foreach (var candidate in candidates)
+        {
+            var (segments, exists) = CaseInsensitivePath.Resolve(root, candidate, rejectAmbiguousMatches: true);
+            if (!exists) continue;
+            var relative = string.Join('/', segments);
+            var path = ClientPaths.ResolveManagedPath(root, relative);
+            var link = SymlinkSnapshot.Capture(path);
+            var bytes = ReadManagedBounded(root, path, link);
+            if (bytes.Length > MaxManagedConfigBytes)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"Managed config file is larger than {MaxManagedConfigBytes} bytes.");
+            targets.Add(new ManualTarget(relative, path, bytes, link?.IsSymlink == true ? null : FilePermissionSnapshot.Capture(path), link));
+        }
+        return targets;
+    }
+
+    private BackupManifest WriteManualBackup(string installationId, string clientRoot, string backupId, string backupDir, List<ManualTarget> targets, string? label)
+    {
+        Guard(() => PrivateStorage.CreatePrivateDirectory(Path.GetDirectoryName(backupDir)!), Path.GetDirectoryName(backupDir)!, "create installation backup folder");
+        Guard(() => PrivateStorage.CreatePrivateDirectory(backupDir), backupDir, "create backup folder");
+        var filesDir = Path.Combine(backupDir, "files");
+        Guard(() => PrivateStorage.CreatePrivateDirectory(filesDir), filesDir, "create backup files folder");
+        var entries = new List<ManifestFile>(targets.Count);
+        for (var i = 0; i < targets.Count; i++)
+        {
+            var t = targets[i];
+            if (t.Bytes.Length > MaxManagedConfigBytes)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, t.Path, $"Managed config file is larger than {MaxManagedConfigBytes} bytes.");
+            var backupFile = $"files/{i}";
+            Guard(() => _writer.WriteAllBytes(Path.Combine(filesDir, i.ToString(System.Globalization.CultureInfo.InvariantCulture)), t.Bytes, PrivateStorage.PrivateFilePermissions), filesDir, "write backup file");
+            string? linkHash = null;
+            if (t.Symlink?.IsSymlink == true && !string.IsNullOrEmpty(t.Symlink.Value.Target))
+            {
+                var linkBytes = Encoding.UTF8.GetBytes(t.Symlink.Value.Target);
+                Guard(() => _writer.WriteAllBytes(Path.Combine(filesDir, i.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".symlink"), linkBytes, PrivateStorage.PrivateFilePermissions), filesDir, "write symlink sidecar");
+                linkHash = ClientFilesIo.Sha256Hex(linkBytes);
+            }
+            var hash = ClientFilesIo.Sha256Hex(t.Bytes);
+            entries.Add(new ManifestFile(t.RelativePath, true, backupFile, hash, hash, t.Permissions?.UnixMode, t.Permissions?.WindowsReadOnly, linkHash));
+        }
+        var manifest = new BackupManifest(BackupManifest.CurrentVersion, backupId, installationId, "manual", clientRoot,
+            "unknown", _clock(), null, entries, true, label);
+        var manifestBytes = manifest.ToJson();
+        if (manifestBytes.Length > MaxManifestBytes)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, backupDir, "The generated backup manifest exceeds the size limit.");
+        Guard(() => _writer.WriteAllBytes(Path.Combine(backupDir, ManifestName), manifestBytes, PrivateStorage.PrivateFilePermissions), backupDir, "write manifest");
+        return manifest;
+    }
+
+    private bool IsSameSnapshot(BackupEntry latest, List<ManualTarget> targets)
+    {
+        var found = ReadNamedBackup(latest.ClientId, latest.BackupId);
+        if (found is null || found.Value.Manifest.Files.Count != targets.Count) return false;
+        var prior = found.Value.Manifest.Files.OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+        var current = targets.OrderBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase).ToArray();
+        for (var i = 0; i < prior.Length; i++)
+        {
+            var p = prior[i]; var c = current[i];
+            var payload = p.BackupFile is null ? null : ReadBackupFile(Path.GetDirectoryName(found.Value.Path)!, p);
+            if (!string.Equals(p.Path, c.RelativePath, StringComparison.OrdinalIgnoreCase)
+                || payload is null || ClientFilesIo.Sha256Hex(payload) != ClientFilesIo.Sha256Hex(c.Bytes)
+                || p.UnixMode != c.Permissions?.UnixMode || p.WindowsReadOnly != c.Permissions?.WindowsReadOnly)
+                return false;
+            var link = ReadBoundSidecar(Path.GetDirectoryName(found.Value.Path)!, p);
+            if (!string.Equals(link, c.Symlink?.Target, StringComparison.Ordinal)) return false;
+        }
+        return true;
+    }
+
+    private (string Path, BackupManifest Manifest)? ReadNamedBackup(string installationId, string backupId)
+    {
+        var path = Path.Combine(_backupRoot, installationId, backupId, ManifestName);
+        if (!SymlinkSnapshot.NodeExists(path)) return null;
+        var bytes = ReadBoundedNoFollow(path, MaxManifestBytes);
+        var manifest = BackupManifest.FromJson(bytes, path);
+        if (manifest.InstallationId != installationId || manifest.BackupId != backupId)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "The manifest identity does not match its folder.");
+        return (path, manifest);
+    }
+
+    private BackupEntry ToBackupEntry(BackupManifest manifest, bool deduplicated)
+    {
+        var dir = Path.Combine(_backupRoot, manifest.InstallationId, manifest.BackupId);
+        long total = 0;
+        foreach (var file in manifest.Files.Where(f => f.BackupFile is not null))
+            total += ReadRegularBackupFile(Path.Combine(dir, file.BackupFile!)).LongLength;
+        return new BackupEntry(manifest.BackupId, manifest.InstallationId, manifest.ClientRoot, manifest.ProfileId,
+            manifest.CreatedAt, total, manifest.Files.Select(f => f.Path).ToArray(), manifest.UndoneAt,
+            manifest.IsManual, manifest.Label, deduplicated);
+    }
+
+    private static IEnumerable<string> SafeDirectories(string path)
+    {
+        try { return Directory.Exists(path) ? Directory.EnumerateDirectories(path).ToArray() : []; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return []; }
+    }
+
+    private static byte[] ReadManagedBounded(string root, string path, SymlinkSnapshot? link)
+    {
+        if (link?.IsSymlink == true)
+        {
+            if (string.IsNullOrEmpty(link.Value.Target) || !SymlinkSnapshot.ChainStaysInsideClient(root, path, link.Value.Target))
+                throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, path, "Managed config symlink does not resolve to a regular file inside the client.");
+        }
+        else
+        {
+            var bytesWithoutFollowing = ReadBoundedNoFollow(path, MaxManagedConfigBytes);
+            return bytesWithoutFollowing;
+        }
+        var bytes = ReadCurrentForUndo(path, out var invalid);
+        if (invalid || bytes is null)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "Managed config file is not a readable regular file.");
+        if (bytes.Length > MaxManagedConfigBytes)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"Managed config file is larger than {MaxManagedConfigBytes} bytes.");
+        return bytes;
+    }
+
+    private static byte[] ReadExistingForBackup(string root, string path, SymlinkSnapshot? link)
+    {
+        if (link?.IsSymlink != true)
+            return ReadBoundedNoFollow(path, MaxManagedConfigBytes);
+        // Existing apply/undo semantics preserve even links that point outside the client, but their payload read
+        // remains non-blocking and capped. Undo recreates a link only when its chain is proved to stay inside root.
+        var bytes = ReadCurrentForUndo(path, out var invalid);
+        if (invalid || bytes is null)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "Managed config symlink does not resolve to a readable regular file.");
+        if (bytes.Length > MaxManagedConfigBytes)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"Managed config file is larger than {MaxManagedConfigBytes} bytes.");
+        return bytes;
+    }
+
+    private static byte[] ReadBoundedNoFollow(string path, int maxBytes)
+    {
+        using var stream = SymlinkSnapshot.OpenNoFollowForRead(path);
+        if (!SymlinkSnapshot.IsSeekableRegularFile(stream, out var length) || length > maxBytes)
+            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"File is not a regular file within the {maxBytes}-byte limit.");
+        var bytes = new byte[checked((int)length)];
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var read = stream.Read(bytes, offset, bytes.Length - offset);
+            if (read == 0) throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "File changed while it was read.");
+            offset += read;
+        }
+        return bytes;
+    }
+
+    private sealed record ManualTarget(string RelativePath, string Path, byte[] Bytes, FilePermissionSnapshot? Permissions, SymlinkSnapshot? Symlink);
+
     private (string ManifestPath, BackupManifest Manifest, byte[] Bytes)? FindPending(string installationId)
     {
         var dir = Path.Combine(_backupRoot, installationId);
@@ -388,7 +723,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             if (bytes is null)
                 continue; // a backup directory that never got its manifest never touched the client
             var manifest = BackupManifest.FromJson(bytes, manifestPath);
-            if (manifest.UndoneAt is null)
+            if (manifest.UndoneAt is null && !manifest.IsManual)
                 return (manifestPath, manifest, bytes);
         }
 

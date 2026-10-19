@@ -32,6 +32,7 @@ public enum ClientFilesErrorCode
 
     /// <summary>A path would leave the client directory or is not managed by Realm Portal.</summary>
     PathEscapesClient,
+    UndoConflict,
 }
 
 /// <summary>Typed failure of a client-files operation. <see cref="Exception.Message"/> is a diagnostic in English, not UI text.</summary>
