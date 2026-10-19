@@ -129,7 +129,7 @@ Whenever a client is discovered by `Scan()` (with `ImportServers == true`) **or*
 3. **Deduplication key:**
    - Normalized tuple **`(NormalizedHost, NormalizedRealm, RequiredClientBuild)`**, compared case-insensitively (`StringComparison.OrdinalIgnoreCase`) on `NormalizedHost` (trimmed, lowercase `host` or `host:port`) and `NormalizedRealm` (trimmed `Realm ?? ""`), with `RequiredClientBuild == client.Version.Build`.
    - If a matching server already exists in `ServerStore`, no duplicate server is created; if that existing server has `ClientId == null`, its `ClientId` is linked to `client.Id`.
-   - Otherwise, a new `Server` is added to `ServerStore` with `RequiredClientBuild = client.Version.Build`, `ClientId = client.Id`, and an auto-generated unique `Name` (see **Open Questions #1**).
+   - Otherwise, a new `Server` is added to `ServerStore` with `RequiredClientBuild = client.Version.Build`, `ClientId = client.Id`, and an auto-generated unique `Name` (`PortalService.CreateImportedServerName`): `"{Realm} ({Host})"` when `Realm` is non-empty; otherwise `"{Host} ({Major}.{Minor}.{Patch})"` when `ClientVersion` is known, or `"{Host}"` when `ClientVersion` is `null`; capped at `<= 64` characters (`Server.MaxNameLength`) and disambiguated case-insensitively with `" #2"`, `" #3"`, ... (truncating the base prefix so `base + suffix <= 64` characters; see **Approved decisions #1**).
    - If `state.json` has no active server recorded for `client.Id` (`active_by_client[client.Id]` is unset), the extracted (or matched) server is marked active for `client.Id` in `state.json` (and if global `active_id` is `null`, sets `active_id` and writes `activo.json`).
 
 ### 1.4 First-launch flag (`FirstScanCompleted`)
@@ -530,20 +530,16 @@ manifest hash, and those journals keep working as before. A value that is presen
 
 ---
 
-## Open questions (Approval Gate — Carlos)
+## Approved decisions (Approval Gate — Carlos)
 
-1. **Auto-naming rule for servers imported during client scan (`ClientServerExtractor`).**
-   - **Context:** When `Scan()` or `AddClient()` extracts a server from a client's existing `realmlist.wtf` and `WTF/Config.wtf`, we have `Host` (always present), `Realm` (`SET realmName`, optional), and `ClientVersion` (e.g., `3.3.5a` / build `12340`), and `ServerStore` requires a unique `Name` (`<= 64` chars).
-   - **Options:**
-     - **Option A:** If `Realm` is non-empty, use `"{Realm} ({Host})"` (e.g., `"Icecrown (logon.warmane.example.org)"`); if `Realm` is empty, use `"{Host} ({Version.Major}.{Version.Minor}.{Version.Patch})"` (e.g., `"logon.warmane.example.org (3.3.5)"`). Append `" #2"`, `" #3"` on name collision.
-     - **Option B:** If `Realm` is non-empty, use `"{Realm}"` alone (disambiguating collisions as `"{Realm} ({Host})"` then `" #2"`); if `Realm` is empty, use `"{Host}"` (disambiguating across builds as `"{Host} ({Build})"`).
-   - **Recommendation:** **Option A (`"{Realm} ({Host})"` when `Realm` is present, else `"{Host} ({Version})"`).**
-   - **Rationale:** Players often have multiple private servers that share generic realm names like `"Realm 1"`, `"Highrate"`, or `"Test Realm"`, or connect multiple clients (e.g., `3.3.5a` and `1.12.1`) to the same host domain. Including both `Realm` and `Host` (or `Host` and `Version` when `Realm` is absent) makes imported cards immediately distinguishable on the Servers screen without requiring manual renaming, while virtually eliminating name collisions across multi-client scans.
+1. **Auto-naming rule for servers imported during client scan (`ClientServerExtractor` / `PortalService.CreateImportedServerName`) — Approved: Option A.**
+   - **Decision:** When `Scan()` or `AddClient()` imports a server from a client's `realmlist.wtf` / `WTF/Config.wtf`:
+     - If `Realm` (stripped of control characters and trimmed) is non-empty, use `"{Realm} ({Host})"` (e.g., `"Icecrown (logon.warmane.example.org)"`).
+     - If `Realm` is empty, use `"{Host} ({Major}.{Minor}.{Patch})"` when `ClientVersion` is available (`FileVersion.Major.Minor.Build`, e.g., `"logon.warmane.example.org (3.3.5)"`), or `"{Host}"` when `ClientVersion` is `null`.
+     - Trim and cap the base name at `<= 64` characters (`Server.MaxNameLength`, falling back to `"Imported server"` if empty).
+     - On case-insensitive name collision in `ServerStore`, append `" #2"`, `" #3"`, ..., truncating the base prefix to `Math.Min(basis.Length, 64 - tail.Length)` before appending so the final name never exceeds `64` characters.
+   - **Rationale:** Players often have multiple private servers that share generic realm names like `"Realm 1"`, `"Highrate"`, or `"Test Realm"`, or connect multiple clients (e.g., `3.3.5a` and `1.12.1`) to the same host domain. Including both `Realm` and `Host` (or `Host` and `Version` when `Realm` is absent) makes imported cards immediately distinguishable on the Servers screen without requiring manual renaming, while matching `PortalService.CreateImportedServerName` in `main`.
 
-2. **Whether the `Cache/WDB` cleanup toggle is included in Settings for `1.0.0`.**
-   - **Context:** Switching between private servers of the same build (especially `1.12.1` and `3.3.5a` custom servers) can sometimes display stale item/creature names cached in the client's `Cache/WDB/<locale>/*.wdb` folder. A toggle `CleanCacheOnSwitch` in `StorageSettings` could optionally clear `Cache/WDB` on server switch, but doing so deletes files inside the game client outside `realmlist.wtf` and `WTF/Config.wtf`.
-   - **Options:**
-     - **Option A (Defer past `1.0.0`):** Keep `StorageSettings(string BackupFolder, int KeepBackups = 10)` focused strictly on backup storage and retention; do **not** touch or delete anything under `Cache/` in `1.0.0`.
-     - **Option B (Include opt-in toggle in `1.0.0`):** Add `bool CleanCacheOnSwitch = false` (default `false`) to `StorageSettings` and delete only `*.wdb` files inside validated `Cache/WDB/<locale>/` (with `O_NOFOLLOW`) when switching to a different server.
-   - **Recommendation:** **Option A (Do NOT include `Cache/WDB` cleanup in `1.0.0`; defer to `1.1.0`).**
+2. **`Cache/WDB` cleanup toggle in Settings — Approved: Option A (excluded from `1.0.0`, deferred to `1.1.0`).**
+   - **Decision:** Do **not** include a `Cache/WDB` cleanup toggle (`CleanCacheOnSwitch`) in `1.0.0`; defer to `1.1.0`. `StorageSettings(string BackupFolder, int KeepBackups = 10)` remains focused strictly on backup storage and retention, and Realm Portal does not touch or delete anything under `Cache/` in `1.0.0`.
    - **Rationale:** Realm Portal's core security and safety guarantee (verified across PR #65 and `docs/client-files.md`) is that it **only** touches the two small text configuration files (`realmlist.wtf` and `WTF/Config.wtf`) and that every file mutation is 100% byte-reversible via small (< 16 KiB) backups. Deleting `Cache/WDB` files is either irreversible or would require backing up megabytes of binary `.wdb` cache files (violating the small-backup invariant) and expands the filesystem deletion surface inside the user's game folder right before the `1.0.0` release.
