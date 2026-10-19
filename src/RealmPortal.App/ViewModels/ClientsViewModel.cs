@@ -109,6 +109,28 @@ public sealed partial class ClientsViewModel : ViewModelBase
         ClientsChanged?.Invoke();
     }
 
+    /// <summary>Re-reads each row's process state without rebuilding the list, so management
+    /// actions reflect a game that started or exited since the last reload.</summary>
+    public void RefreshRunningState()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        foreach (var item in Items)
+        {
+            if (item.Id is not { } id)
+            {
+                continue;
+            }
+
+            var running = _session.Service.IsGameRunning(id);
+            item.IsRunning = running.Succeeded && running.Value;
+            item.IsStateUnknown = !running.Succeeded;
+        }
+    }
+
     public void StartFirstScanIfNeeded()
     {
         if (_session is null || _firstScanStarted)

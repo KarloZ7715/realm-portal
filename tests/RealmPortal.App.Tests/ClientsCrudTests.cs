@@ -17,13 +17,23 @@ public sealed class ClientsCrudTests
         public void Launch(GameLaunchSpec spec) => throw new InvalidOperationException("Not used by client screen tests.");
     }
 
-    private sealed class Probe(bool running = false, bool fail = false) : IGameProcessProbe
+    private sealed class Probe : IGameProcessProbe
     {
+        public Probe(bool running = false, bool fail = false)
+        {
+            Running = running;
+            Fail = fail;
+        }
+
+        public bool Running { get; set; }
+
+        public bool Fail { get; set; }
+
         public bool IsGameRunning(string clientRoot)
         {
-            if (fail)
+            if (Fail)
                 throw new InvalidOperationException("Process state unavailable.");
-            return running;
+            return Running;
         }
     }
 
@@ -37,12 +47,13 @@ public sealed class ClientsCrudTests
             Projection = _temp.Combine("projection");
             Backups = _temp.Combine("backups");
             Directory.CreateDirectory(Backups);
+            Probe = new Probe(running, probeFails);
             var service = new PortalService(
                 Config,
                 Projection,
                 new PeClientVersionReader(),
                 new NoLaunch(),
-                new Probe(running, probeFails),
+                Probe,
                 name => name == ClientFilesApplier.BackupDirectoryVariable ? Backups : null,
                 scanOptions: new ClientScanOptions
                 {
@@ -59,6 +70,7 @@ public sealed class ClientsCrudTests
         public string Config { get; }
         public string Projection { get; }
         public string Backups { get; }
+        public Probe Probe { get; }
         public PortalSession Session { get; }
         public MainViewModel Main { get; }
 
@@ -202,5 +214,41 @@ public sealed class ClientsCrudTests
         Assert.True(row.IsStateUnknown);
         Assert.False(row.EditCommand.CanExecute(null));
         Assert.False(row.RemoveCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public void OpeningClientsSectionRefreshesRunningState()
+    {
+        using var env = new Env();
+        var path = env.CreateClient("toggle");
+        Assert.True(env.Session.Service.AddClient(path).Succeeded);
+        env.Main.Clients.ReloadFromService();
+        var row = Assert.Single(env.Main.Clients.Items);
+        Assert.False(row.IsRunning);
+
+        env.Probe.Running = true;
+        env.Main.SectionIndex = 1;
+
+        Assert.True(row.IsRunning);
+        Assert.False(row.EditCommand.CanExecute(null));
+        Assert.False(row.RemoveCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public void ClientRunningStateRefreshesWhenGameCloses()
+    {
+        using var env = new Env(running: true);
+        var path = env.CreateClient("closing");
+        Assert.True(env.Session.Service.AddClient(path).Succeeded);
+        env.Main.Clients.ReloadFromService();
+        var row = Assert.Single(env.Main.Clients.Items);
+        Assert.True(row.IsRunning);
+
+        env.Probe.Running = false;
+        env.Main.Servers.GameClosed = true;
+
+        Assert.False(row.IsRunning);
+        Assert.True(row.EditCommand.CanExecute(null));
+        Assert.True(row.RemoveCommand.CanExecute(null));
     }
 }

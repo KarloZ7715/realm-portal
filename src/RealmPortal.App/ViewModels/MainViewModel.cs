@@ -137,6 +137,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
         if (value != 1)
             CloseEditClient();
+        else
+            Clients.RefreshRunningState();
     }
 
     private void ShowAddServer()
@@ -245,6 +247,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnSectionChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (ReferenceEquals(sender, Servers) &&
+            (e.PropertyName == nameof(ServersViewModel.GameClosed) ||
+             e.PropertyName == nameof(ServersViewModel.Phase)))
+        {
+            Clients.RefreshRunningState();
+        }
+
         if (e.PropertyName == nameof(ViewModelBase.StatusText) && ReferenceEquals(sender, Content))
         {
             OnPropertyChanged(nameof(StatusText));
