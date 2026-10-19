@@ -46,7 +46,7 @@ chmod +x RealmPortal-*-x86_64.AppImage
 2. En **Clientes**, revisa las instalaciones detectadas y marca como **En uso** las que puedas lanzar. Usa **Buscar de nuevo** para repetir la búsqueda, o **Elegir carpeta a mano** para añadir una instalación manualmente.
 3. En **Servidores**, selecciona **Añadir** e introduce el nombre y la dirección del servidor (`host` o `host:puerto`), y de forma opcional el reino, la cuenta y el cliente de destino.
 4. Selecciona un servidor y pulsa **Jugar** para cambiar los archivos del cliente y abrir el juego, o **Solo cambiar** para modificar los archivos sin lanzarlo. Los servidores incompatibles con el cliente seleccionado quedan deshabilitados.
-5. Tras un cambio, el aviso de Deshacer devuelve el cliente al servidor anterior. Los archivos del cliente se respaldan antes de cada cambio (ver [Copias de seguridad y recuperación](#copias-de-seguridad-y-recuperación)).
+5. Tras un cambio, el aviso de Deshacer permite volver al servidor anterior en el cliente. Los archivos del cliente se respaldan antes de cada cambio (ver [Copias de seguridad y recuperación](#copias-de-seguridad-y-recuperación)).
 
 ## Uso de la línea de comandos
 
@@ -71,7 +71,7 @@ Realm Portal escribe una copia de seguridad antes de cambiar cualquier archivo d
 
 - **Automática**: cada cambio guarda el contenido anterior de los archivos de reino gestionados en la carpeta de respaldos (`~/.local/share/realm-portal/backups` por defecto) y conserva los 10 respaldos más recientes por cliente.
 - **Deshacer**: `realm-portal undo`, o el aviso de Deshacer en la aplicación, restaura el servidor que estaba activo antes del último cambio. Recuerda un solo paso. Si los archivos del cliente cambiaron a mano desde el cambio, Realm Portal pregunta antes de sobrescribirlos.
-- **Manual**: en **Ajustes → Copia de seguridad**, usa **Gestionar respaldos…** para crear un respaldo, ver los guardados, restaurar uno anterior o eliminarlo. Los respaldos se guardan en la carpeta indicada en **Carpeta de respaldos**.
+- **Manual**: en **Ajustes → Copia de respaldo**, usa **Gestionar respaldos…** para crear un respaldo, ver los guardados, restaurar uno anterior o eliminarlo. Los respaldos se guardan en la carpeta indicada en **Carpeta de respaldo**.
 
 La carpeta de respaldos y las demás ubicaciones se pueden sobrescribir con `REALM_PORTAL_BACKUP_DIR`, `REALM_PORTAL_CONFIG_DIR` y `REALM_PORTAL_PROJECTION_DIR`.
 

@@ -46,7 +46,7 @@ chmod +x RealmPortal-*-x86_64.AppImage
 2. In **Clients**, confirm the detected installations and mark as **In use** the ones you can launch. Use **Search again** for a new scan, or **Pick a folder by hand** to add an installation manually.
 3. In **Servers**, select **Add** and enter the server name and address (`host` or `host:port`), and optionally the realm, the account and the target client.
 4. Select a server and choose **Play** to switch the client files and open the game, or **Switch only** to change the files without launching. Servers incompatible with the selected client are disabled.
-5. After switching, the Undo notice returns the client to the previous server. Client files are backed up before every change (see [Backups and recovery](#backups-and-recovery)).
+5. After a switch, the Undo notice lets you return the client to the previous server. Client files are backed up before every change (see [Backups and recovery](#backups-and-recovery)).
 
 ## Using the command line
 
