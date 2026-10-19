@@ -502,7 +502,7 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    public ServiceResult<UndoOutcome> Undo()
+    public ServiceResult<UndoOutcome> Undo(string? clientId = null)
     {
         try
         {
@@ -510,38 +510,30 @@ public sealed class PortalService : IPortalService
             // undo, the journal flag and the active-state restore must all describe the same switch.
             using (_servers.DirectoryLock.Acquire())
             {
-                if (!_active.Status().CanUndo)
+                if (!_active.HasPendingUndo(clientId))
                     return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
 
-                var journal = _journal.Load() ?? new LastSwitchEntry(null, null);
+                var journal = _journal.Load(clientId) ?? new LastSwitchEntry(clientId, null);
 
-                StoredClient? client = null;
-                if (journal.BackupId is not null)
+                StoredClient? client = journal.ClientId is null ? null : _clients.FindById(journal.ClientId);
+                using var installationLock = client is null ? null : CreateApplier().AcquireInstallationLock(client.Id);
+                var applier = CreateApplier();
+                if (client is not null)
                 {
-                    if (journal.ClientId is null)
-                        return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.NothingToUndo));
-
-                    client = _clients.FindById(journal.ClientId)
-                             ?? throw new StoreException("The client of the last switch is no longer registered.");
-
-                    try
-                    {
-                        if (_probe.IsGameRunning(client.Path))
-                            return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.GameRunning, Path: client.Path));
-                    }
-                    catch (Exception ex)
-                    {
-                        return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.ProcessCheckFailed, Path: client.Path, Diagnostic: ex.Message));
-                    }
+                    if (TryCheckRunning(client) is { } runningError)
+                        return ServiceResult<UndoOutcome>.Fail(runningError);
+                    // ClientFilesApplier acquires the same installation lock itself and checks the probe
+                    // again immediately before file restoration.
+                    installationLock?.Dispose();
                 }
 
-                if (_active.PendingUndoServerId is { } missingId
+                if (_active.GetPendingUndoServerId(clientId) is { } missingId
                     && _servers.List().All(s => s.Id != missingId))
                 {
                     return ServiceResult<UndoOutcome>.Fail(new ServiceError(ServiceErrorCode.UndoTargetMissing));
                 }
 
-                var undoTarget = _active.GetUndoTarget();
+                var undoTarget = _active.GetUndoTarget(clientId);
                 if (undoTarget is not null)
                 {
                     try
@@ -554,7 +546,6 @@ public sealed class PortalService : IPortalService
                     }
                 }
 
-                var applier = CreateApplier();
                 IReadOnlyList<UndoFileResult> fileResults = [];
                 if (!journal.FilesUndone && journal.BackupId is not null && client is not null)
                 {
@@ -577,7 +568,7 @@ public sealed class PortalService : IPortalService
                             return ServiceResult<UndoOutcome>.Fail(ServiceErrors.UndoConflict(conflicts));
                         }
 
-                        _journal.MarkFilesUndone();
+                        _journal.MarkFilesUndone(clientId);
                     }
                     catch (ClientFilesException ex)
                     {
@@ -588,7 +579,7 @@ public sealed class PortalService : IPortalService
                 Server? restored;
                 try
                 {
-                    restored = _active.Undo();
+                    restored = _active.Undo(clientId);
                 }
                 catch (Exception ex)
                 {
@@ -599,7 +590,7 @@ public sealed class PortalService : IPortalService
 
                     try
                     {
-                        var active = _active.GetActive()
+                        var active = _active.GetActive(clientId)
                                      ?? throw new InvalidOperationException("No active server to re-apply after a failed undo.");
                         var version = ReadStoredClientVersion(client.Path);
                         var plan = applier.Plan(BuildRequest(journal.ClientId, active, client.Path, version));
@@ -611,7 +602,7 @@ public sealed class PortalService : IPortalService
                         }
 
                         // Original backup stays pending; the client again holds its sha256_after bytes.
-                        _journal.MarkFilesNotUndone();
+                        _journal.MarkFilesNotUndone(clientId);
                     }
                     catch (Exception rollbackEx)
                     {
@@ -624,7 +615,7 @@ public sealed class PortalService : IPortalService
                 if (journal.BackupId is not null && journal.ClientId is not null)
                     applier.MarkBackupUndone(journal.ClientId, journal.BackupId);
 
-                _journal.Clear();
+                _journal.Clear(clientId);
                 var entry = restored is null ? null : ToServerEntry(restored, restored.Id, journal.ClientId, null);
                 var notice = BuildUndoClientFilesNotice(restored, fileResults, client);
                 return ServiceResult<UndoOutcome>.Ok(new UndoOutcome(entry, fileResults, notice));
@@ -661,7 +652,13 @@ public sealed class PortalService : IPortalService
                 ? []
                 : ListClientsNotMatchingActive(status.Active);
             return ServiceResult<PortalStatus>.Ok(
-                new PortalStatus(active, canUndo, status.ProjectionInSync, _activeBackupRoot, drifting));
+                new PortalStatus(active, canUndo, status.ProjectionInSync, _activeBackupRoot, drifting,
+                    _clients.List().Select(client => (client.Id, Active: _active.GetActive(client.Id)))
+                        .Where(pair => pair.Active is not null)
+                        .ToDictionary(pair => pair.Id,
+                            pair => ToServerEntry(pair.Active!, pair.Active!.Id, pair.Id,
+                                ReadVersionForEntry(_clients.FindById(pair.Id)?.Path ?? string.Empty)),
+                            StringComparer.Ordinal)));
         }
         catch (Exception ex)
         {
@@ -768,13 +765,39 @@ public sealed class PortalService : IPortalService
             }
 
             SwitchOutcome outcome;
-            // One critical section: the active-state snapshot, the plan, the file writes, the
-            // activation and the journal save must all describe the same switch, so no other
-            // process can change the active server in between. Launch stays outside the lock.
+            // Hold the installation lock even when the plan is empty: the running-process check
+            // and every state/file mutation for this client must be serialized.
             using (_servers.DirectoryLock.Acquire())
             {
+                client = _clients.FindById(request.ClientId)
+                         ?? throw new StoreException($"No registered client with id '{request.ClientId}'.");
+                server = _servers.List().FirstOrDefault(s => s.Id == request.ServerId)
+                         ?? throw new StoreException($"No server matches '{request.ServerId}'.");
+                try
+                {
+                    version = ReadStoredClientVersion(client.Path);
+                }
+                catch (ClientVersionException ex)
+                {
+                    return ServiceResult<SwitchOutcome>.Fail(ServiceErrors.FromClientVersion(ex));
+                }
+                if (!request.Force && server.RequiredClientBuild is { } currentRequired && version.Build != currentRequired)
+                    return ServiceResult<SwitchOutcome>.Fail(ServiceErrors.Incompatible(currentRequired, version.Build));
+                try
+                {
+                    RealmlistText.Validate(server.Realmlist);
+                }
+                catch (InvalidRealmlistException ex)
+                {
+                    return ServiceResult<SwitchOutcome>.Fail(ServiceErrors.FromException(ex.ForServer(server.Name)));
+                }
+
                 var applier = CreateApplier();
-                var active = _active.GetActive();
+                using var installationLock = applier.AcquireInstallationLock(request.ClientId);
+                if (TryCheckRunning(client) is { } runningError)
+                    return ServiceResult<SwitchOutcome>.Fail(runningError with { Consistency = Consistency.Unchanged });
+
+                var active = _active.GetActive(request.ClientId);
                 var sameServerActive = active?.Id == server.Id;
                 var previousEntry = active is null ? null : ToServerEntry(active, active.Id, request.ClientId, version);
 
@@ -785,13 +808,11 @@ public sealed class PortalService : IPortalService
                 string? backupId = null;
                 string? manifestSha256 = null;
                 IReadOnlyList<string> changedFiles = [];
-                InstallationLock? installationLock = null;
                 progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Started));
                 try
                 {
                     if (!plan.IsEmpty)
                     {
-                        installationLock = applier.AcquireInstallationLock(request.ClientId);
                         var applied = applier.Apply(plan, installationLock);
                         backupId = applied.BackupId;
                         manifestSha256 = applied.ManifestSha256;
@@ -802,7 +823,6 @@ public sealed class PortalService : IPortalService
                 }
                 catch (Exception ex)
                 {
-                    installationLock?.Dispose();
                     var error = ServiceErrors.FromException(ex, Consistency.Unchanged);
                     progress?.Report(new ServiceProgress(ServiceStep.WriteFiles, StepState.Failed, error));
                     return ServiceResult<SwitchOutcome>.Fail(error);
@@ -810,19 +830,17 @@ public sealed class PortalService : IPortalService
 
                 try
                 {
-                    if (!RunStep(progress, ServiceStep.Activate, () => _active.Switch(server), out var activateError))
+                    if (!RunStep(progress, ServiceStep.Activate, () => _active.Switch(server, request.ClientId), out var activateError))
                     {
                         if (backupId is not null)
                         {
                             var rollback = RollbackSwitchApply(applier, request.ClientId, client.Path, backupId, installationLock, manifestSha256);
                             if (!rollback.Succeeded)
                             {
-                                installationLock?.Dispose();
                                 return ServiceResult<SwitchOutcome>.Fail(rollback.Error!);
                             }
                         }
 
-                        installationLock?.Dispose();
                         return ServiceResult<SwitchOutcome>.Fail(activateError! with
                         {
                             Consistency = backupId is not null ? Consistency.RolledBack : Consistency.Unchanged,
@@ -831,11 +849,8 @@ public sealed class PortalService : IPortalService
                 }
                 catch
                 {
-                    installationLock?.Dispose();
                     throw;
                 }
-
-                installationLock?.Dispose();
 
                 if (!sameServerActive)
                     _journal.Save(new LastSwitchEntry(request.ClientId, backupId, ManifestSha256: manifestSha256));

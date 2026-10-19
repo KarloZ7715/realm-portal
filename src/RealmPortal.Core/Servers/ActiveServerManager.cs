@@ -45,6 +45,15 @@ public sealed class ActiveServerManager(
     /// <summary>The active server, or <c>null</c> when none is active (or the stored one no longer exists).</summary>
     public Server? GetActive(string? clientId = null) => Resolve(LoadState(), clientId);
 
+    public IReadOnlyDictionary<string, Server> GetActiveByClient()
+    {
+        var state = LoadState();
+        var servers = store.List().ToDictionary(s => s.Id, StringComparer.Ordinal);
+        return state.ActiveByClient
+            .Where(pair => servers.ContainsKey(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => servers[pair.Value], StringComparer.Ordinal);
+    }
+
     public ActiveStatus Status()
     {
         var state = LoadState();
@@ -57,6 +66,12 @@ public sealed class ActiveServerManager(
 
     public string? GetPendingUndoServerId(string? clientId) =>
         clientId is null ? PendingUndoServerId : LoadState().UndoByClient.GetValueOrDefault(clientId)?.ServerId;
+
+    public bool HasPendingUndo(string? clientId = null)
+    {
+        var state = LoadState();
+        return clientId is null ? state.Undo is not null : state.UndoByClient.ContainsKey(clientId);
+    }
 
     public IReadOnlyList<string> ClientIdsWithUndoTo(string serverId) =>
         LoadState().UndoByClient.Where(pair => pair.Value.ServerId == serverId).Select(pair => pair.Key).ToList();
@@ -196,7 +211,7 @@ public sealed class ActiveServerManager(
     /// </summary>
     /// <exception cref="StoreException">The server is not in the store.</exception>
     /// <exception cref="InvalidRealmlistException">The stored realmlist breaks the realmlist contract; nothing is written.</exception>
-    public void Switch(Server server)
+    public void Switch(Server server, string? clientId = null)
     {
         ArgumentNullException.ThrowIfNull(server);
         using (store.DirectoryLock.Acquire())
@@ -205,7 +220,7 @@ public sealed class ActiveServerManager(
                          ?? throw new StoreException($"Server '{server.Name}' is not in the store.");
 
             var state = LoadState();
-            var previous = Resolve(state);
+            var previous = Resolve(state, clientId);
 
             try
             {
@@ -216,11 +231,21 @@ public sealed class ActiveServerManager(
                 throw ex.ForServer(stored.Name);
             }
 
+            var activeByClient = new Dictionary<string, string>(state.ActiveByClient, StringComparer.Ordinal);
+            var undoByClient = new Dictionary<string, UndoRecord>(state.UndoByClient, StringComparer.Ordinal);
+            if (clientId is not null)
+            {
+                activeByClient[clientId] = stored.Id;
+                if (previous?.Id != stored.Id)
+                    undoByClient[clientId] = new UndoRecord { ServerId = previous?.Id };
+            }
             var next = state with
             {
                 Version = FormatVersion,
                 ActiveId = stored.Id,
                 Undo = previous?.Id == stored.Id ? state.Undo : new UndoRecord { ServerId = previous?.Id },
+                ActiveByClient = activeByClient,
+                UndoByClient = undoByClient,
             };
             SaveState(next);
             try
@@ -242,12 +267,12 @@ public sealed class ActiveServerManager(
     /// <returns>The restored server, or <c>null</c> when the result is "no active server".</returns>
     /// <exception cref="StoreException">There is nothing to undo, or the server to restore no longer exists.</exception>
     /// <exception cref="InvalidRealmlistException">The realmlist of the server to restore is invalid; nothing is changed.</exception>
-    public Server? Undo()
+    public Server? Undo(string? clientId = null)
     {
         using (store.DirectoryLock.Acquire())
         {
             var state = LoadState();
-            var undo = state.Undo;
+            var undo = clientId is null ? state.Undo : state.UndoByClient.GetValueOrDefault(clientId);
             if (undo is null)
                 throw new StoreException("Nothing to undo.");
 
@@ -271,11 +296,29 @@ public sealed class ActiveServerManager(
             }
 
             var stateBeforeUndo = state;
+            var activeByClient = new Dictionary<string, string>(state.ActiveByClient, StringComparer.Ordinal);
+            var undoByClient = new Dictionary<string, UndoRecord>(state.UndoByClient, StringComparer.Ordinal);
+            if (clientId is null)
+            {
+                // Global/CLI undo also clears the corresponding per-client entry when known.
+                if (state.Undo?.ServerId is { } prior && state.ActiveByClient.FirstOrDefault(p => p.Value == state.ActiveId).Key is { Length: > 0 } mappedClient)
+                {
+                    if (target is null) activeByClient.Remove(mappedClient); else activeByClient[mappedClient] = target.Id;
+                    undoByClient.Remove(mappedClient);
+                }
+            }
+            else
+            {
+                if (target is null) activeByClient.Remove(clientId); else activeByClient[clientId] = target.Id;
+                undoByClient.Remove(clientId);
+            }
             var nextState = state with
             {
                 Version = FormatVersion,
                 ActiveId = target?.Id,
                 Undo = null,
+                ActiveByClient = activeByClient,
+                UndoByClient = undoByClient,
             };
             SaveState(nextState);
             try

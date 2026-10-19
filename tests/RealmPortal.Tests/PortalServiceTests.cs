@@ -25,7 +25,8 @@ public class PortalServiceTests
 
     private sealed class NeverRunning : IGameProcessProbe
     {
-        public bool IsGameRunning(string clientRoot) => false;
+        public HashSet<string> RunningPaths { get; } = new(StringComparer.Ordinal);
+        public bool IsGameRunning(string clientRoot) => RunningPaths.Contains(Path.GetFullPath(clientRoot));
     }
 
     private sealed class Env : IDisposable
@@ -37,27 +38,33 @@ public class PortalServiceTests
             Config = _temp.Combine("config");
             Projection = _temp.Combine("projection");
             Client = _temp.Combine("client");
+            ClientB = _temp.Combine("client-b");
             Backups = _temp.Combine("backups");
             Directory.CreateDirectory(Config);
             Directory.CreateDirectory(Projection);
             Directory.CreateDirectory(Path.Combine(Client, "Data", "enUS"));
             File.WriteAllBytes(Path.Combine(Client, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+            Directory.CreateDirectory(Path.Combine(ClientB, "Data", "enUS"));
+            File.WriteAllBytes(Path.Combine(ClientB, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
             Directory.CreateDirectory(Backups);
             Launch = new FakeLaunch();
+            Probe = new NeverRunning();
             Service = new PortalService(
                 Config,
                 Projection,
                 new PeClientVersionReader(),
                 Launch,
-                new NeverRunning(),
+                Probe,
                 _ => Backups);
         }
 
         public string Config { get; }
         public string Projection { get; }
         public string Client { get; }
+        public string ClientB { get; }
         public string Backups { get; }
         public FakeLaunch Launch { get; }
+        public NeverRunning Probe { get; }
         public PortalService Service { get; }
 
         public string ClientId => Service.AddClient(Client).Value!.Id;
@@ -191,6 +198,42 @@ public class PortalServiceTests
         Assert.Equal(id1, id2);
         Assert.StartsWith("c", id1);
         Assert.Equal(17, id1.Length);
+    }
+
+    [Fact]
+    public void RunningClientIsBlockedWhileOtherClientCanPlayAndStateIsPerClient()
+    {
+        using var env = new Env();
+        var clientA = env.Service.AddClient(env.Client).Value!;
+        var clientB = env.Service.AddClient(env.ClientB).Value!;
+        var server1 = env.AddServer("Server 1", "one.example.org");
+        var server2 = env.AddServer("Server 2", "two.example.org");
+
+        Assert.True(env.Service.Play(new SwitchRequest(clientA.Id, server1.Id)).Succeeded);
+        Assert.True(env.Service.SwitchServer(new SwitchRequest(clientA.Id, server2.Id)).Succeeded);
+        Assert.True(env.Service.SwitchServer(new SwitchRequest(clientA.Id, server1.Id)).Succeeded);
+        env.Probe.RunningPaths.Add(Path.GetFullPath(clientA.Path));
+        var aFiles = File.ReadAllBytes(Path.Combine(clientA.Path, "Data", "enUS", "realmlist.wtf"));
+
+        var blockedSwitch = env.Service.SwitchServer(new SwitchRequest(clientA.Id, server2.Id));
+        var blockedPlay = env.Service.Play(new SwitchRequest(clientA.Id, server2.Id));
+        Assert.Equal(ServiceErrorCode.GameRunning, blockedSwitch.Error!.Code);
+        Assert.Equal(Consistency.Unchanged, blockedSwitch.Error.Consistency);
+        Assert.Equal(ServiceErrorCode.GameRunning, blockedPlay.Error!.Code);
+        Assert.Equal(ServiceErrorCode.GameRunning, env.Service.Undo(clientA.Id).Error!.Code);
+        Assert.Equal(aFiles, File.ReadAllBytes(Path.Combine(clientA.Path, "Data", "enUS", "realmlist.wtf")));
+
+        Assert.True(env.Service.Play(new SwitchRequest(clientB.Id, server2.Id)).Succeeded);
+        env.Probe.RunningPaths.Add(Path.GetFullPath(clientB.Path));
+        var blockedSecondPlay = env.Service.Play(new SwitchRequest(clientB.Id, server1.Id));
+        Assert.Equal(ServiceErrorCode.GameRunning, blockedSecondPlay.Error!.Code);
+        env.Probe.RunningPaths.Remove(Path.GetFullPath(clientB.Path));
+        Assert.True(env.Service.Undo(clientB.Id).Succeeded);
+        Assert.Equal(server1.Id, env.Service.ListServers(clientA.Id).Value!.Single(s => s.IsActive).Id);
+        Assert.Contains(env.Service.ListServers(clientA.Id).Value!, s => s.Id == server1.Id && s.IsActive);
+        Assert.Equal(server1.Id, env.Service.GetStatus().Value!.ActiveByClient![clientA.Id].Id);
+        Assert.Equal(server1.Id, env.Service.GetStatus().Value!.ActiveByClient![clientB.Id].Id);
+        Assert.Equal(2, env.Launch.Launches);
     }
 
     /// <summary>Holds the config lock file the way another Realm Portal process would.</summary>
