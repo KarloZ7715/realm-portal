@@ -118,6 +118,28 @@ public class ClientFilesApplierTests
     }
 
     [Fact]
+    public void Undo_RestoresLegacyBackupPayloadLargerThanManagedConfigLimit()
+    {
+        using var env = new Env();
+        env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
+        var result = env.Applier.Apply(env.Plan());
+        var backupDir = Path.Combine(env.Backups, "install-1", result.BackupId!);
+        var manifestPath = Path.Combine(backupDir, "manifest.json");
+        var manifest = BackupManifest.FromJson(File.ReadAllBytes(manifestPath), manifestPath);
+        var file = manifest.Files.Single(f => f.Path == "Data/enUS/realmlist.wtf");
+        var originalBytes = new byte[ClientFilesApplier.MaxManagedConfigBytes + 1];
+        originalBytes[^1] = (byte)'x';
+        File.WriteAllBytes(Path.Combine(backupDir, file.BackupFile!.Replace('/', Path.DirectorySeparatorChar)), originalBytes);
+        var updatedFile = file with { Sha256Before = ClientFilesIo.Sha256Hex(originalBytes) };
+        var updatedManifest = manifest with { Files = manifest.Files.Select(f => f == file ? updatedFile : f).ToArray() };
+        File.WriteAllBytes(manifestPath, updatedManifest.ToJson());
+
+        env.Applier.Undo("install-1", env.Client);
+
+        Assert.Equal(originalBytes, File.ReadAllBytes(env.Path_("Data/enUS/realmlist.wtf")));
+    }
+
+    [Fact]
     public void Undo_AfterApply_RestoresEveryFileByteForByte()
     {
         using var env = new Env();

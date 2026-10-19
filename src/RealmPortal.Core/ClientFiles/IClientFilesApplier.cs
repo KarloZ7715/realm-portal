@@ -42,6 +42,16 @@ public sealed record UndoResult(string BackupId, IReadOnlyList<UndoFileResult> F
     public bool HasConflicts => Files.Any(f => f.Status == UndoFileStatus.Conflict);
 }
 
+/// <summary>Metadata for a retained client configuration snapshot.</summary>
+public sealed record BackupEntry(
+    string BackupId, string ClientId, string ClientPath, string ServerId,
+    DateTimeOffset CreatedAt, long TotalBytes, IReadOnlyList<string> Files,
+    DateTimeOffset? UndoneAt = null, bool IsManual = false, string? Label = null,
+    bool WasDeduplicated = false);
+
+/// <summary>Outcome of restoring a named backup.</summary>
+public sealed record RestoreBackupOutcome(string RestoredBackupId, string? SafetyBackupId, IReadOnlyList<UndoFileResult> Files);
+
 /// <summary>
 /// Writes a server's realm address into a game client's files with a backup first, and undoes it byte-for-byte.
 /// Failures are <see cref="ClientFilesException"/> with a <see cref="ClientFilesErrorCode"/>.
@@ -97,4 +107,10 @@ public interface IClientFilesApplier
     /// A backup that is already marked undone, or whose manifest is already gone, is left as it is.
     /// </summary>
     void MarkBackupUndone(string installationId, string backupId);
+
+    IReadOnlyList<BackupEntry> ListBackups(string? installationId = null);
+    BackupEntry CreateBackup(string installationId, string clientRoot, string? label = null);
+    RestoreBackupOutcome RestoreBackup(string installationId, string clientRoot, string backupId, bool force = false);
+    void DeleteBackup(string installationId, string backupId);
+    void PruneBackups(string? installationId = null, int? keepBackups = null);
 }
