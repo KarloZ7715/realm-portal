@@ -47,7 +47,7 @@ public sealed record BackupEntry(
     string BackupId, string ClientId, string ClientPath, string ServerId,
     DateTimeOffset CreatedAt, long TotalBytes, IReadOnlyList<string> Files,
     DateTimeOffset? UndoneAt = null, bool IsManual = false, string? Label = null,
-    bool WasDeduplicated = false);
+    bool WasDeduplicated = false, string? ServerName = null, bool IsPendingUndo = false, string? Error = null);
 
 /// <summary>Outcome of restoring a named backup.</summary>
 public sealed record RestoreBackupOutcome(string RestoredBackupId, string? SafetyBackupId, IReadOnlyList<UndoFileResult> Files);

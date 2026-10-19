@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:service="using:RealmPortal.Core.Service"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.BackupsView"
+             x:DataType="vm:BackupsViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button"><Setter Property="c:ButtonSurface.Surface" Value="Parchment"/></Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="20,10,20,0">
+    <Grid ColumnDefinitions="Auto,*" Height="44">
+      <Button Name="BackButton" Classes="link caps" Command="{Binding BackCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="←" FontSize="18"/>
+          <TextBlock Text="{loc:T backups.back}"/>
+        </StackPanel>
+      </Button>
+      <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="16,0,0,0">
+        <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Text="{loc:T backups.title}"/>
+        <TextBlock Classes="footnote" Foreground="{DynamicResource BoneSoftBrush}" Text="{loc:T backups.subtitle}"/>
+      </StackPanel>
+    </Grid>
+
+    <ContentControl Grid.Row="1" Classes="card thin" Padding="16,12" Margin="0,6,0,8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="body-bold" Foreground="{DynamicResource InkBrush}" Text="{loc:T backups.client}"/>
+          <ComboBox Name="ClientSelector" Classes="parchment" ItemsSource="{Binding Clients}"
+                    SelectedItem="{Binding SelectedClient, Mode=TwoWay}" IsEnabled="{Binding !IsBusy}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:BackupClientOption">
+                <TextBlock Text="{Binding Label}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+        <Button Grid.Column="1" Name="CreateBackupButton" Classes="primary" MinWidth="166" VerticalAlignment="Bottom"
+                Command="{Binding CreateBackupCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <c:Icon Data="{DynamicResource IconPlus}" Width="14" Height="14" StrokeThickness="2.4"/>
+            <TextBlock Text="{loc:T backups.create}"/>
+          </StackPanel>
+        </Button>
+      </Grid>
+    </ContentControl>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+      <TextBlock Classes="sheet-title" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T backups.saved}"/>
+      <TextBlock Grid.Column="1" Classes="footnote" Foreground="{DynamicResource BoneSoftBrush}" VerticalAlignment="Center" Text="{Binding CountText}"/>
+    </Grid>
+
+    <Grid Grid.Row="3">
+      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,10,10">
+        <ItemsControl Name="BackupList" ItemsSource="{Binding Backups}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="8"/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:BackupItemViewModel">
+              <ContentControl Classes="card thin" Padding="12,8" MinHeight="62">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                  <StackPanel VerticalAlignment="Center" Spacing="3">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Classes="body-bold" Foreground="{DynamicResource InkBrush}" Text="{Binding Timestamp}"/>
+                      <TextBlock Classes="body" Foreground="{DynamicResource InkSoftBrush}" Text="·"/>
+                      <TextBlock Classes="body" Foreground="{DynamicResource InkBrush}" Text="{Binding Label}"/>
+                    </StackPanel>
+                    <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding Meta}"/>
+                    <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" IsVisible="{Binding IsDamaged}" Text="{Binding ErrorText}"/>
+                  </StackPanel>
+                  <Border Grid.Column="1" Classes="badge" VerticalAlignment="Center" IsVisible="{Binding HasBadge}">
+                    <TextBlock Classes="badge-text" Text="{Binding Badge}"/>
+                  </Border>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Button Name="RestoreBackupButton" Classes="secondary compact" MinWidth="112"
+                            Command="{Binding RestoreCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:Icon Data="{DynamicResource IconUndo}" Width="14" Height="14" StrokeThickness="2"/>
+                        <TextBlock Text="{loc:T backups.action.restore}"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Name="DeleteBackupButton" Classes="ghost surface-parchment" Width="28" Height="28" Padding="6"
+                            AutomationProperties.Name="{loc:T backups.action.delete}" Command="{Binding DeleteCommand}">
+                      <c:Icon Data="{DynamicResource IconClose}" Width="14" Height="14" StrokeThickness="2.8" Foreground="{DynamicResource WaxTextBrush}"/>
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </ContentControl>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <Border Name="EmptyNotice" Classes="notice" VerticalAlignment="Top" Padding="18" IsVisible="{Binding !HasBackups}">
+        <TextBlock Classes="body" Foreground="{DynamicResource InkBrush}" TextWrapping="Wrap" Text="{loc:T backups.empty}"/>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

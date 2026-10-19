@@ -638,17 +638,150 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    public ServiceResult<PortalStatus> DiscardUndo()
+    public ServiceResult<PortalStatus> DiscardUndo(string? clientId = null)
     {
         try
         {
-            _active.DiscardPendingUndo();
-            _journal.Clear();
+            _active.DiscardPendingUndo(clientId);
+            _journal.Clear(clientId);
             return GetStatus();
         }
         catch (Exception ex)
         {
             return ServiceResult<PortalStatus>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<IReadOnlyList<BackupEntry>> ListBackups(string? clientId = null)
+    {
+        try
+        {
+            var clients = _clients.List();
+            if (clientId is not null && clients.All(client => client.Id != clientId))
+                return ServiceResult<IReadOnlyList<BackupEntry>>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+
+            var known = clients.ToDictionary(client => client.Id, StringComparer.Ordinal);
+            var servers = _servers.List().ToDictionary(server => server.Id, server => server.Name, StringComparer.Ordinal);
+            var backups = CreateApplier().ListBackups(clientId)
+                .Where(backup => known.ContainsKey(backup.ClientId))
+                .Select(backup => EnrichBackup(backup, known[backup.ClientId].Path, servers))
+                .ToArray();
+            return ServiceResult<IReadOnlyList<BackupEntry>>.Ok(backups);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<IReadOnlyList<BackupEntry>>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<BackupEntry> CreateBackup(string clientId, string? label = null)
+    {
+        try
+        {
+            var client = _clients.FindById(clientId);
+            if (client is null)
+                return ServiceResult<BackupEntry>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+            if (TryCheckRunning(client) is { } runningError)
+                return ServiceResult<BackupEntry>.Fail(runningError);
+
+            ClientPathSecurity.EnsureTrustedDirectoryPath(client.Path);
+            var entry = CreateApplier().CreateBackup(client.Id, client.Path, label);
+            var servers = _servers.List().ToDictionary(server => server.Id, server => server.Name, StringComparer.Ordinal);
+            return ServiceResult<BackupEntry>.Ok(EnrichBackup(entry, client.Path, servers));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<BackupEntry>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<RestoreBackupOutcome> RestoreBackup(string clientId, string backupId, bool force = false)
+    {
+        try
+        {
+            var client = _clients.FindById(clientId);
+            if (client is null)
+                return ServiceResult<RestoreBackupOutcome>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+            if (TryCheckRunning(client) is { } runningError)
+                return ServiceResult<RestoreBackupOutcome>.Fail(runningError);
+
+            using (_servers.DirectoryLock.Acquire())
+            {
+                var journal = _journal.Load(clientId);
+                var globalJournal = _journal.Load();
+                if (journal?.BackupId == backupId
+                    && _active.GetPendingUndoServerId(clientId) is { } missingId
+                    && _servers.List().All(server => server.Id != missingId))
+                    return ServiceResult<RestoreBackupOutcome>.Fail(new ServiceError(ServiceErrorCode.UndoTargetMissing));
+
+                ClientPathSecurity.EnsureTrustedDirectoryPath(client.Path);
+                RestoreBackupOutcome outcome;
+                try
+                {
+                    outcome = CreateApplier().RestoreBackup(clientId, client.Path, backupId, force);
+                }
+                catch (ClientFilesException ex) when (ex.Code == ClientFilesErrorCode.UndoConflict)
+                {
+                    var path = Path.GetFullPath(ex.Path);
+                    var relative = Path.GetRelativePath(client.Path, path).Replace('\\', '/');
+                    return ServiceResult<RestoreBackupOutcome>.Fail(ServiceErrors.UndoConflict([relative]));
+                }
+                catch (ClientFilesException ex) when (ex.Code == ClientFilesErrorCode.PathNotFound)
+                {
+                    return ServiceResult<RestoreBackupOutcome>.Fail(new ServiceError(ServiceErrorCode.BackupNotFound, Path: ex.Path, Diagnostic: ex.Message));
+                }
+
+                if (journal?.BackupId is not null && _active.HasPendingUndo(clientId))
+                {
+                    if (journal.BackupId == backupId)
+                        _active.Undo(clientId, globalJournal?.ClientId);
+                    else
+                        _active.DiscardPendingUndo(clientId);
+                    _journal.Clear(clientId);
+                }
+
+                return ServiceResult<RestoreBackupOutcome>.Ok(outcome);
+            }
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<RestoreBackupOutcome>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<Unit> DeleteBackup(string clientId, string backupId)
+    {
+        try
+        {
+            var client = _clients.FindById(clientId);
+            if (client is null)
+                return ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+            if (TryCheckRunning(client) is { } runningError)
+                return ServiceResult<Unit>.Fail(runningError);
+
+            using (_servers.DirectoryLock.Acquire())
+            {
+                var journal = _journal.Load(clientId);
+                try
+                {
+                    CreateApplier().DeleteBackup(clientId, backupId);
+                }
+                catch (ClientFilesException ex) when (ex.Code == ClientFilesErrorCode.PathNotFound)
+                {
+                    return ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.BackupNotFound, Path: ex.Path, Diagnostic: ex.Message));
+                }
+
+                if (journal?.BackupId == backupId)
+                {
+                    _active.DiscardPendingUndo(clientId);
+                    _journal.Clear(clientId);
+                }
+                return ServiceResult<Unit>.Ok(default);
+            }
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<Unit>.Fail(ServiceErrors.FromException(ex));
         }
     }
 
@@ -1196,6 +1329,18 @@ public sealed class PortalService : IPortalService
         {
             return false;
         }
+    }
+
+    private BackupEntry EnrichBackup(BackupEntry backup, string clientPath, IReadOnlyDictionary<string, string> servers)
+    {
+        var pending = _active.HasPendingUndo(backup.ClientId)
+                      && _journal.Load(backup.ClientId)?.BackupId == backup.BackupId;
+        return backup with
+        {
+            ClientPath = clientPath,
+            ServerName = servers.GetValueOrDefault(backup.ServerId),
+            IsPendingUndo = pending,
+        };
     }
 
     private static ServiceResult<Unit> RollbackSwitchApply(

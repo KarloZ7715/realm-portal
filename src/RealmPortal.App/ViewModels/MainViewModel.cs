@@ -6,6 +6,7 @@ using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Settings;
 using RealmPortal.Core;
+using RealmPortal.Core.ClientFiles;
 
 namespace RealmPortal.App.ViewModels;
 
@@ -18,6 +19,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly Func<Task<string?>>? _pickFolder;
     private AddServerViewModel? _adding;
     private EditClientViewModel? _editingClient;
+    private BackupsViewModel? _backups;
 
     public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null) =>
         new(backend, autoTick, settings);
@@ -32,6 +34,8 @@ public sealed partial class MainViewModel : ObservableObject
             () => Task.FromResult<string?>("/home/demo/.local/share/RealmPortal/backups-2"));
         settingsScreen.ApplySavedLanguage();
         settingsScreen.BackRequested += () => SectionIndex = 0;
+        settingsScreen.CanManageBackups = false;
+        settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
@@ -49,6 +53,8 @@ public sealed partial class MainViewModel : ObservableObject
         var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder);
         settingsScreen.ApplySavedLanguage();
         settingsScreen.BackRequested += () => SectionIndex = 0;
+        settingsScreen.CanManageBackups = true;
+        settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
@@ -76,7 +82,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The form being filled in, or null. It belongs to the servers section: leaving the section drops it.</summary>
     public AddServerViewModel? Adding => _adding;
 
-    public ViewModelBase Content => SectionIndex == 0 && _adding is not null
+    public ViewModelBase Content => SectionIndex == 2 && _backups is not null
+        ? _backups
+        : SectionIndex == 0 && _adding is not null
         ? _adding
         : SectionIndex == 1 && _editingClient is not null
             ? _editingClient
@@ -103,17 +111,22 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Shows <paramref name="dialog"/> over the window and returns the user's answer; a second dialog while one is open answers false.</summary>
     public async Task<bool> ConfirmAsync(ConfirmDialogViewModel dialog)
     {
+        return await ChooseAsync(dialog).ConfigureAwait(true) == ConfirmDialogChoice.Confirm;
+    }
+
+    public async Task<ConfirmDialogChoice> ChooseAsync(ConfirmDialogViewModel dialog)
+    {
         if (Dialog is not null)
         {
             dialog.Reject();
-            return false;
+            return ConfirmDialogChoice.Cancel;
         }
 
         DialogOpening?.Invoke();
         Dialog = dialog;
         try
         {
-            return await dialog.Result;
+            return await dialog.Choice;
         }
         finally
         {
@@ -131,6 +144,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnSectionIndexChanged(int value)
     {
+        if (value != 2)
+            CloseBackupsManager();
         if (value != 0)
         {
             CloseAddServer();
@@ -245,6 +260,52 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
     }
+
+    private void ShowBackupsManager()
+    {
+        if (_session is null || _backups is not null)
+            return;
+
+        _backups = new BackupsViewModel(_session, backRequested: CloseBackupsManager)
+        {
+            ConfirmDeleteBackupAsync = ConfirmDeleteBackupAsync,
+            ResolveRestoreConflictAsync = ResolveRestoreConflictAsync,
+        };
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void CloseBackupsManager()
+    {
+        if (_backups is null)
+            return;
+        _backups = null;
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private async Task<bool> ConfirmDeleteBackupAsync(BackupEntry backup)
+    {
+        var dialog = new ConfirmDialogViewModel(
+            "confirm.deletebackup.title", "confirm.deletebackup.body", "confirm.deletebackup.accept",
+            "confirm.cancel", [backup.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm"), BackupDescription(backup)]);
+        return await ConfirmAsync(dialog).ConfigureAwait(true);
+    }
+
+    private async Task<ConfirmDialogChoice> ResolveRestoreConflictAsync(BackupEntry backup)
+    {
+        var status = _session!.Service.GetStatus();
+        var active = status.Succeeded ? status.Value!.ActiveByClient?.GetValueOrDefault(backup.ClientId)?.Name : null;
+        active ??= status.Succeeded ? status.Value!.Active?.Name : null;
+        var pendingBackups = _session.Service.ListBackups(backup.ClientId);
+        var pending = pendingBackups.Succeeded ? pendingBackups.Value!.FirstOrDefault(entry => entry.IsPendingUndo) : null;
+        active = pending?.ServerName ?? active;
+        var pendingTime = (pending?.CreatedAt ?? backup.CreatedAt).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        var dialog = ConfirmDialogViewModel.BackupConflict(active ?? Loc.Get("backups.conflict.unknownserver"), pendingTime, BackupDescription(backup));
+        return await ChooseAsync(dialog).ConfigureAwait(true);
+    }
+
+    private static string BackupDescription(BackupEntry backup) => backup.ServerName ?? backup.Label ?? Loc.Get("backups.item.manual");
 
     private async Task<bool> ConfirmRemoveClientAsync(ClientItemViewModel client)
     {

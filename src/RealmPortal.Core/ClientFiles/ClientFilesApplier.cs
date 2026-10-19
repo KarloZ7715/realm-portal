@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using RealmPortal.Core.IO;
@@ -333,12 +334,18 @@ public sealed class ClientFilesApplier : IClientFilesApplier
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ClientFilesException or JsonException)
                 {
-                    // A damaged snapshot must not hide valid snapshots from the listing.
+                    entries.Add(new BackupEntry(id, client, string.Empty, string.Empty, BackupCreatedAtFromId(id), 0, [], Error: ex.Message));
                 }
             }
         }
         return entries.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.BackupId, StringComparer.Ordinal).ToArray();
     }
+
+    private static DateTimeOffset BackupCreatedAtFromId(string backupId) =>
+        backupId.Length >= 19 && DateTimeOffset.TryParseExact(backupId[..19], "yyyyMMdd'T'HHmmssfff'Z'",
+            CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var value)
+            ? value
+            : DateTimeOffset.MinValue;
 
     public BackupEntry CreateBackup(string installationId, string clientRoot, string? label = null)
     {
@@ -441,12 +448,19 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         var manifestPath = Path.Combine(dir, ManifestName);
         if (!Directory.Exists(dir) || new DirectoryInfo(dir).LinkTarget is not null || !SymlinkSnapshot.NodeExists(manifestPath))
             throw new ClientFilesException(ClientFilesErrorCode.PathNotFound, dir, $"Backup '{backupId}' was not found.");
-        var manifestBytes = ReadBoundedNoFollow(manifestPath, MaxManifestBytes);
-        var manifest = BackupManifest.FromJson(manifestBytes, manifestPath);
-        if (manifest.InstallationId != installationId || manifest.BackupId != backupId)
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, manifestPath, "The manifest identity does not match its folder.");
-        if (_probe.IsGameRunning(manifest.ClientRoot))
-            throw new ClientFilesException(ClientFilesErrorCode.GameRunning, manifest.ClientRoot, "The game is running; close it before deleting a backup.");
+        try
+        {
+            var manifestBytes = ReadBoundedNoFollow(manifestPath, MaxManifestBytes);
+            var manifest = BackupManifest.FromJson(manifestBytes, manifestPath);
+            if (manifest.InstallationId != installationId || manifest.BackupId != backupId)
+                throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, manifestPath, "The manifest identity does not match its folder.");
+            if (_probe.IsGameRunning(manifest.ClientRoot))
+                throw new ClientFilesException(ClientFilesErrorCode.GameRunning, manifest.ClientRoot, "The game is running; close it before deleting a backup.");
+        }
+        catch (ClientFilesException ex) when (ex.Code == ClientFilesErrorCode.VerifyFailed)
+        {
+            // A damaged snapshot is still removable; the service checks the registered client process before this call.
+        }
         try { Directory.Delete(dir, recursive: true); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { throw ClientFilesIo.Map(ex, dir, "delete backup"); }
     }
