@@ -22,6 +22,18 @@ public sealed record ClientEntry(
 /// <summary>Request to update a registered client.</summary>
 public sealed record UpdateClientRequest(string ClientId, string? Name = null, string? Folder = null);
 
+/// <summary>Optional parameters for client and server discovery.</summary>
+public sealed record ScanRequest(bool ImportServers = true, IReadOnlyList<string>? AdditionalRoots = null);
+
+/// <summary>Progress reported while the service scans candidate folders.</summary>
+public sealed record ScanProgress(string CurrentSource, int DirectoriesInspected, int ClientsFound, int ServersImported);
+
+/// <summary>Clients and servers registered by one completed discovery pass.</summary>
+public sealed record ScanOutcome(
+    IReadOnlyList<ClientEntry> AddedClients,
+    IReadOnlyList<ServerEntry> ImportedServers,
+    IReadOnlyList<ClientEntry> AllClients);
+
 // ---------------------------------------------------------------- servers
 
 /// <summary>A server as the UI shows it.</summary>

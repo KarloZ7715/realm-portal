@@ -75,7 +75,10 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
         Save(Load() with { LanguageCode = language == Language.En ? "en" : "es" });
 }
 
-public sealed record UiPreferences(string? LanguageCode = null, IReadOnlyList<string>? ClientsInUse = null)
+public sealed record UiPreferences(
+    string? LanguageCode = null,
+    IReadOnlyList<string>? ClientsInUse = null,
+    bool FirstScanCompleted = false)
 {
     public HashSet<string> InUseSet => ClientsInUse?.ToHashSet(StringComparer.Ordinal) ?? [];
 }

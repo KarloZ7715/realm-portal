@@ -15,18 +15,19 @@ public sealed class CliApp(
     TextWriter error,
     IClientVersionReader versionReader,
     IGameLauncher launcher,
-    Func<string, string?> getVariable)
+    Func<string, string?> getVariable,
+    ClientScanOptions? scanOptions = null)
 {
     public const string ClientDirVariable = "REALM_PORTAL_CLIENT_DIR";
 
     private static readonly HashSet<string> ValueOptions =
-        ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper", "--name", "--path", "--host", "--client"];
+        ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper", "--name", "--path", "--host", "--client", "--root"];
 
     private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose"];
 
     private bool _verbose;
 
-    public static readonly string[] Commands = ["add", "remove", "list", "switch", "undo", "status", "launch", "client", "edit"];
+    public static readonly string[] Commands = ["add", "remove", "list", "switch", "undo", "status", "launch", "client", "edit", "scan"];
 
     public const string Usage = """
         Usage:
@@ -44,6 +45,7 @@ public sealed class CliApp(
           realm-portal client edit <client> [--name <name>] [--path <path>]
           realm-portal client remove <client>
           realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n>] [--account <name>] [--client <client|none>]
+          realm-portal scan [--root <folder>]...
 
         Global options (before or after the command):
           --verbose               print detailed error messages (paths, parse errors)
@@ -66,6 +68,11 @@ public sealed class CliApp(
 
     private sealed class UsageException(string message) : Exception(message);
 
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
+    }
+
     public bool IsCommand(string name) => Commands.Contains(name);
 
     /// <summary>Options that may appear before the subcommand in <see cref="Program.Run"/>.</summary>
@@ -81,7 +88,8 @@ public sealed class CliApp(
             var configDir = parsed.Get("--config-dir") ?? PortalPaths.ConfigDirectory(getVariable);
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
             var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
-            var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher), getVariable: getVariable);
+            var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher),
+                getVariable: getVariable, scanOptions: scanOptions);
             string? clientId = null;
             if (clientDir is not null && command is "list" or "switch" or "status" or "launch")
             {
@@ -102,6 +110,7 @@ public sealed class CliApp(
                 "launch" => Launch(parsed, service, clientId, clientDir, parsed.Flags.Contains("--dry-run")),
                 "client" => ClientCommand(parsed, service),
                 "edit" => EditServer(parsed, service),
+                "scan" => Scan(parsed, service),
                 _ => throw new UsageException($"unknown command '{command}'"),
             };
         }
@@ -270,6 +279,19 @@ public sealed class CliApp(
         if (!result.Succeeded)
             return Fail(result.Error!);
         SafeWriteLine(output, $"Updated '{server.Name}' to '{result.Value!.Name}' ({result.Value.Id})");
+        return 0;
+    }
+
+    private int Scan(Parsed parsed, PortalService service)
+    {
+        Expect(parsed, 0, 0, "no arguments");
+        var progress = new InlineProgress<ScanProgress>(item =>
+            SafeWriteLine(output,
+                $"Scanning {UserFacingMessages.Sanitize(item.CurrentSource)} ({item.DirectoriesInspected} directories, {item.ClientsFound} clients, {item.ServersImported} servers imported)"));
+        var result = service.Scan(new ScanRequest(AdditionalRoots: parsed.Options.GetValueOrDefault("--root")), progress);
+        if (!result.Succeeded)
+            return Fail(result.Error!);
+        SafeWriteLine(output, $"Scan complete: {result.Value!.AddedClients.Count} clients and {result.Value.ImportedServers.Count} servers added.");
         return 0;
     }
 

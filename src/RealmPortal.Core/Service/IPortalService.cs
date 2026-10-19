@@ -23,6 +23,9 @@ public interface IPortalService
     /// <summary>Registers a client folder (the one with <c>Wow.exe</c>). Fails with the version-reading codes when it is not a readable client; adding the same folder twice returns the existing entry.</summary>
     ServiceResult<ClientEntry> AddClient(string folder, string? name = null);
 
+    /// <summary>Discovers and registers known game installations and their configured servers.</summary>
+    ServiceResult<ScanOutcome> Scan(ScanRequest? request = null, IProgress<ScanProgress>? progress = null);
+
     /// <summary>Updates the name and/or path of a registered client.</summary>
     ServiceResult<ClientEntry> UpdateClient(UpdateClientRequest request);
 

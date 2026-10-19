@@ -32,6 +32,8 @@ public sealed partial class ClientsViewModel : ViewModelBase
         _session = session;
         _pickFolder = pickFolder;
         ReloadFromService();
+        if (!session.UiPreferences.Load().FirstScanCompleted)
+            _ = RunScanAsync(markFirstScanCompleted: true, reportFailure: false);
     }
 
     public event Action? ClientsChanged;
@@ -102,9 +104,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
         {
             IsScanning = true;
             Notice = null;
-            await Task.Delay(300).ConfigureAwait(true);
-            ReloadFromService();
-            IsScanning = false;
+            await RunScanAsync(markFirstScanCompleted: true, reportFailure: true).ConfigureAwait(true);
             return;
         }
 
@@ -112,6 +112,40 @@ public sealed partial class ClientsViewModel : ViewModelBase
         Notice = null;
         await _backend!.DelayAsync(TimeSpan.FromMilliseconds(900)).ConfigureAwait(true);
         IsScanning = false;
+    }
+
+    private async Task RunScanAsync(bool markFirstScanCompleted, bool reportFailure)
+    {
+        if (_session is null)
+            return;
+
+        IsScanning = true;
+        try
+        {
+            var outcome = await Task.Run(() => _session.Service.Scan()).ConfigureAwait(true);
+            if (!outcome.Succeeded)
+            {
+                if (reportFailure)
+                    Notice = ErrorText.Body(outcome.Error!);
+                return;
+            }
+
+            var preferences = _session.UiPreferences.Load();
+            var inUse = preferences.InUseSet;
+            foreach (var client in outcome.Value!.AddedClients)
+                inUse.Add(client.Id);
+            _session.UiPreferences.Save(preferences with
+            {
+                ClientsInUse = inUse.ToList(),
+                FirstScanCompleted = markFirstScanCompleted || preferences.FirstScanCompleted,
+            });
+            if (outcome.Value.AddedClients.Count > 0)
+                ReloadFromService();
+        }
+        finally
+        {
+            IsScanning = false;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanScan))]
