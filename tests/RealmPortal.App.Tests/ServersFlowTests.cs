@@ -276,7 +276,10 @@ public class ServersMenuTests
         Screenshots.Settle();
         shell.Snap("servers-menu");
         var items = card.Flyout is MenuFlyout menu ? menu.Items.OfType<MenuItem>().ToList() : throw new InvalidOperationException();
-        Assert.Equal(["MenuPlay", "MenuSwitchOnly"], items.Select(i => i.Name));
+        Assert.Equal(["MenuPlay", "MenuSwitchOnly", "MenuEdit", "MenuDelete"], items.Select(i => i.Name));
+        // Demo cards have no CRUD handlers, so the real-only actions stay hidden.
+        Assert.False(items[2].IsVisible);
+        Assert.False(items[3].IsVisible);
         var item = items[1];
         Assert.Equal("Solo cambiar", HeaderTexts(item)[0]);
         Assert.Equal("Solo cambiar", AutomationProperties.GetName(item));

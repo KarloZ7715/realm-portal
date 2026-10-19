@@ -35,6 +35,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private CancellationTokenSource? _probeCts;
     private int _probeGeneration;
     private bool _formClosed;
+    private readonly string? _editingServerId;
 
     public AddServerViewModel(ClientsViewModel clients, DemoBackend backend, Action<ServerSeed> save, Action cancel)
     {
@@ -55,7 +56,30 @@ public sealed partial class AddServerViewModel : ViewModelBase
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
     }
 
+    /// <summary>Edit mode: prefills the form from <paramref name="entry"/> and saves with <see cref="IPortalService.UpdateServer"/>.</summary>
+    public AddServerViewModel(ClientsViewModel clients, PortalSession session, ServerEntry entry, Action save, Action cancel, IConnectionProbe? probe = null)
+        : this(clients, session, save, cancel, probe)
+    {
+        _editingServerId = entry.Id;
+        Name = entry.Name;
+        Address = entry.Host;
+        Realm = entry.Realm;
+        Account = entry.Account ?? string.Empty;
+        SelectedClient = clients.Items.FirstOrDefault(c => c.Id == entry.ClientId)
+            ?? clients.Items.FirstOrDefault(c => c.IsInUse)
+            ?? clients.Items.FirstOrDefault();
+    }
+
     public ClientsViewModel Clients { get; }
+
+    /// <summary>True when the form edits an existing server instead of adding one.</summary>
+    public bool IsEditing => _editingServerId is not null;
+
+    public string FormTitle => Loc.Get(IsEditing ? "edit.server.title" : "add.title");
+
+    public string FormSubtitle => IsEditing ? Loc.Get("edit.server.subtitle") : string.Empty;
+
+    public string SaveLabel => Loc.Get(IsEditing ? "edit.server.save" : "add.save");
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NameError), nameof(HasNameError))]
@@ -64,6 +88,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AddressError), nameof(HasAddressError))]
     private string _address = string.Empty;
+
+    [ObservableProperty]
+    private string _realm = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ClientError), nameof(HasClientError))]
@@ -87,10 +114,15 @@ public sealed partial class AddServerViewModel : ViewModelBase
     /// <summary>The last save failed without a <see cref="ServiceError"/> (unknown body).</summary>
     private bool _saveFailedUnknown;
 
+    /// <summary>Localization key of a client-side save failure (for example a duplicate address).</summary>
+    private string? _saveMessageKey;
+
     /// <summary>Localized service failure from the last save attempt. Not a connection-test result.</summary>
-    public string? SaveError => _saveServiceError is null
-        ? (_saveFailedUnknown ? Loc.Get("error.state.unknown") : null)
-        : ErrorText.Body(_saveServiceError);
+    public string? SaveError => _saveServiceError is not null
+        ? ErrorText.Body(_saveServiceError)
+        : _saveMessageKey is not null ? Loc.Get(_saveMessageKey)
+        : _saveFailedUnknown ? Loc.Get("error.state.unknown")
+        : null;
 
     public bool HasSaveError => SaveError is not null;
 
@@ -152,6 +184,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
         OnPropertyChanged(nameof(ClientError));
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(FormTitle));
+        OnPropertyChanged(nameof(FormSubtitle));
+        OnPropertyChanged(nameof(SaveLabel));
         OnPropertyChanged(nameof(StatusText));
         foreach (var client in Clients.Items)
         {
@@ -250,6 +285,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         }
 
         var account = Account.Trim();
+        var realm = Realm.Trim();
         if (_session is not null)
         {
             var clientId = SelectedClient.Id;
@@ -259,11 +295,17 @@ public sealed partial class AddServerViewModel : ViewModelBase
             }
 
             var hostForServer = port == DefaultPort ? host : $"{host}:{port}";
-            var result = _session.Service.AddServer(new NewServer(
-                Name.Trim(),
-                hostForServer,
-                Account: account.Length == 0 ? null : account,
-                ClientId: clientId));
+            if (IsDuplicateAddress(hostForServer, realm))
+            {
+                SetSaveMessage("add.error.duplicate");
+                return;
+            }
+
+            var realmValue = realm.Length == 0 ? null : realm;
+            var accountValue = account.Length == 0 ? null : account;
+            var result = _editingServerId is { } serverId
+                ? _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId))
+                : _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId));
             if (!result.Succeeded)
             {
                 SetSaveError(result.Error);
@@ -277,6 +319,24 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
         OnFormClosed();
         _saveDemo!(new ServerSeed(Name.Trim(), host, port, SelectedClient.Version, account.Length == 0 ? null : account, IsActive: false, IsCompatible: true));
+    }
+
+    /// <summary>
+    /// Client-side guard for an existing host and realm: the service has no host-duplicate rule, so the
+    /// form rejects it here (<c>add.error.duplicate</c>). The server being edited is not a match for itself.
+    /// </summary>
+    private bool IsDuplicateAddress(string hostForServer, string realm)
+    {
+        var servers = _session!.Service.ListServers(compatibleOnly: false);
+        if (!servers.Succeeded)
+        {
+            return false;
+        }
+
+        return servers.Value!.Any(server =>
+            server.Id != _editingServerId
+            && string.Equals(server.Host, hostForServer, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(server.Realm.Trim(), realm, StringComparison.OrdinalIgnoreCase));
     }
 
     [RelayCommand]
@@ -322,6 +382,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     partial void OnSelectedClientChanged(ClientItemViewModel? value) => ClearSaveError();
 
+    partial void OnRealmChanged(string value) => ClearSaveError();
+
     partial void OnAddressChanged(string value)
     {
         ClearSaveError();
@@ -335,19 +397,31 @@ public sealed partial class AddServerViewModel : ViewModelBase
     {
         _saveServiceError = error;
         _saveFailedUnknown = error is null;
+        _saveMessageKey = null;
+        OnPropertyChanged(nameof(SaveError));
+        OnPropertyChanged(nameof(HasSaveError));
+    }
+
+    /// <summary>Shows a client-side save failure whose copy is a localization key.</summary>
+    private void SetSaveMessage(string messageKey)
+    {
+        _saveServiceError = null;
+        _saveFailedUnknown = false;
+        _saveMessageKey = messageKey;
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
     }
 
     private void ClearSaveError()
     {
-        if (_saveServiceError is null && !_saveFailedUnknown)
+        if (_saveServiceError is null && !_saveFailedUnknown && _saveMessageKey is null)
         {
             return;
         }
 
         _saveServiceError = null;
         _saveFailedUnknown = false;
+        _saveMessageKey = null;
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
     }

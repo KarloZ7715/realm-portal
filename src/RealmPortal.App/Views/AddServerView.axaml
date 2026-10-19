@@ -7,7 +7,8 @@
              x:DataType="vm:AddServerViewModel">
   <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
     <StackPanel Margin="20,10,20,0">
-      <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Height="44" VerticalAlignment="Center" Text="{loc:T add.title}"/>
+      <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Height="44" VerticalAlignment="Center" Text="{Binding FormTitle}"/>
+      <TextBlock Classes="footnote" Margin="0,-6,0,6" Foreground="{DynamicResource IvoryBrush}" TextWrapping="Wrap" IsVisible="{Binding IsEditing}" Text="{Binding FormSubtitle}"/>
       <ContentControl Classes="card" Padding="22,12,22,16" Margin="0,2,0,0">
         <StackPanel>
           <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,8">
@@ -15,7 +16,7 @@
             <c:Badge Grid.Column="1" Name="ResultBadge" IsVisible="{Binding HasResult}" Status="{Binding ResultStatus}" Text="{Binding ResultText}"/>
           </Grid>
           <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,0,0,14"/>
-          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="20" RowSpacing="12">
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="20" RowSpacing="12">
           <StackPanel Spacing="6" Grid.Column="0" Grid.Row="0">
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.name}"/>
             <TextBox Name="NameBox" Classes="parchment" Classes.error="{Binding HasNameError}" Text="{Binding Name, Mode=TwoWay}" MaxLength="64"/>
@@ -57,6 +58,10 @@
             </Grid>
           </StackPanel>
           <StackPanel Spacing="6" Grid.Column="1" Grid.Row="1">
+            <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.realm}"/>
+            <TextBox Name="RealmBox" Classes="parchment" Text="{Binding Realm, Mode=TwoWay}" MaxLength="64" Watermark="{loc:T add.realm.watermark}"/>
+          </StackPanel>
+          <StackPanel Spacing="6" Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="2">
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.account}"/>
             <TextBox Name="AccountBox" Classes="parchment" Text="{Binding Account, Mode=TwoWay}" MaxLength="32"/>
             <StackPanel Orientation="Horizontal" Spacing="6" >
@@ -82,7 +87,7 @@
           <TextBlock Text="{loc:T add.cancel}"/>
         </Button>
         <Button Grid.Column="3" Name="SaveButton" Width="172" Command="{Binding SaveCommand}">
-          <TextBlock Text="{loc:T add.save}"/>
+          <TextBlock Text="{Binding SaveLabel}"/>
         </Button>
       </Grid>
     </StackPanel>

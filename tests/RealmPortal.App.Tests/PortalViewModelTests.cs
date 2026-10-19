@@ -115,6 +115,14 @@ public class PortalViewModelTests
         public bool IsGameRunning(string clientRoot) => true;
     }
 
+    /// <summary>Reports the game closed until <see cref="Running"/> is set, modelling the game opening between render and click.</summary>
+    private sealed class ToggleGameProbe : IGameProcessProbe
+    {
+        public bool Running { get; set; }
+
+        public bool IsGameRunning(string clientRoot) => Running;
+    }
+
     private sealed class DelayedGameProbe : IGameProcessProbe
     {
         private int _calls;
@@ -608,11 +616,14 @@ public class PortalViewModelTests
         var original = Loc.Instance.Current;
         try
         {
-            using (var env = new Env(probe: new GameRunningProbe()))
+            var probe = new ToggleGameProbe();
+            using (var env = new Env(probe: probe))
             {
                 var server = env.AddServer("Blocked", "blocked.example.org");
                 env.Main.Servers.ReloadFromService();
                 var card = env.Main.Servers.All.First(s => s.ServerId == server.Id);
+                // The card rendered while the game was closed; the game opens before the click reaches the service.
+                probe.Running = true;
                 await env.Main.Servers.SwitchOnlyAsync(card);
 
                 var english = ServiceErrorBody("error.gamerunning.body", "error.state.unchanged");

@@ -18,11 +18,21 @@ public enum ServerOverlay
     Running,
 }
 
+/// <summary>Why a server card's Play/Switch/Edit/Delete actions are unavailable.</summary>
+public enum ServerCardLock
+{
+    None,
+    ClientRunning,
+    NoInUseClient,
+}
+
 /// <summary>One server card.</summary>
 public sealed partial class ServerItemViewModel : ObservableObject
 {
     private readonly Action<ServerItemViewModel> _play;
     private readonly Action<ServerItemViewModel> _switchOnly;
+    private readonly Action<ServerItemViewModel>? _edit;
+    private readonly Action<ServerItemViewModel>? _delete;
 
     private ServerItemViewModel(
         string? serverId,
@@ -36,7 +46,13 @@ public sealed partial class ServerItemViewModel : ObservableObject
         bool isActive,
         bool needsRepair,
         Action<ServerItemViewModel> play,
-        Action<ServerItemViewModel> switchOnly)
+        Action<ServerItemViewModel> switchOnly,
+        Action<ServerItemViewModel>? edit,
+        Action<ServerItemViewModel>? delete,
+        bool showClientLabel,
+        string? clientDisplayName,
+        string? effectiveClientId,
+        IReadOnlyCollection<string>? compatibleClientIds)
     {
         ServerId = serverId;
         PreferredClientId = preferredClientId;
@@ -50,12 +66,20 @@ public sealed partial class ServerItemViewModel : ObservableObject
         NeedsRepair = needsRepair;
         _play = play;
         _switchOnly = switchOnly;
+        _edit = edit;
+        _delete = delete;
+        ShowClientLabel = showClientLabel;
+        ClientDisplayName = clientDisplayName;
+        EffectiveClientId = effectiveClientId;
+        CompatibleClientIds = compatibleClientIds ?? [];
     }
 
     public static ServerItemViewModel FromSeed(
         ServerSeed seed,
         Action<ServerItemViewModel> play,
-        Action<ServerItemViewModel> switchOnly) =>
+        Action<ServerItemViewModel> switchOnly,
+        Action<ServerItemViewModel>? edit = null,
+        Action<ServerItemViewModel>? delete = null) =>
         new(
             null,
             null,
@@ -68,14 +92,26 @@ public sealed partial class ServerItemViewModel : ObservableObject
             seed.IsActive,
             false,
             play,
-            switchOnly);
+            switchOnly,
+            edit,
+            delete,
+            false,
+            null,
+            null,
+            null);
 
     public static ServerItemViewModel FromEntry(
         ServerEntry entry,
         ClientVersion? clientVersion,
         bool projectionInSync,
         Action<ServerItemViewModel> play,
-        Action<ServerItemViewModel> switchOnly)
+        Action<ServerItemViewModel> switchOnly,
+        string? effectiveClientId = null,
+        IReadOnlyCollection<string>? compatibleClientIds = null,
+        bool showClientLabel = false,
+        string? clientDisplayName = null,
+        Action<ServerItemViewModel>? edit = null,
+        Action<ServerItemViewModel>? delete = null)
     {
         var versionLabel = clientVersion?.ToString() ?? "?";
         var needsRepair = entry.IsActive && !projectionInSync;
@@ -94,12 +130,24 @@ public sealed partial class ServerItemViewModel : ObservableObject
             entry.IsActive,
             needsRepair,
             play,
-            switchOnly);
+            switchOnly,
+            edit,
+            delete,
+            showClientLabel,
+            clientDisplayName,
+            effectiveClientId,
+            compatibleClientIds);
     }
 
     public string? ServerId { get; }
 
     public string? PreferredClientId { get; }
+
+    /// <summary>The client this card would launch with right now (pinned, else the resolved in-use client).</summary>
+    public string? EffectiveClientId { get; }
+
+    /// <summary>Ids of the saved clients this server is compatible with (used by the header client filter).</summary>
+    public IReadOnlyCollection<string> CompatibleClientIds { get; }
 
     public string Name { get; }
 
@@ -187,6 +235,58 @@ public sealed partial class ServerItemViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSwitchOnly))]
     private void SwitchOnly() => _switchOnly(this);
 
+    /// <summary>True when the card has an edit/delete action wired (production list only).</summary>
+    public bool CanManage => _edit is not null || _delete is not null;
+
+    /// <summary>Edit is disabled while the app is busy or this card's client is running a game.</summary>
+    public bool CanEdit => _edit is not null && CanAct;
+
+    public bool CanDelete => _delete is not null && CanAct;
+
+    [RelayCommand(CanExecute = nameof(CanEdit))]
+    private void Edit() => _edit?.Invoke(this);
+
+    [RelayCommand(CanExecute = nameof(CanDelete))]
+    private void Delete() => _delete?.Invoke(this);
+
+    private ServerCardLock _lock;
+    private string? _lockClientName;
+
+    /// <summary>Why Play/Switch/Edit/Delete are locked on this card. None means the menu is fully usable.</summary>
+    public ServerCardLock Lock => _lock;
+
+    /// <summary>Resolved target client display name, shown on the card when more than one client is saved.</summary>
+    public string? ClientDisplayName { get; }
+
+    public bool ShowClientLabel { get; }
+
+    /// <summary>"Client: WotLK" line appended to the card metadata when there is more than one client.</summary>
+    public string ClientLabel => ClientDisplayName is null
+        ? string.Empty
+        : Loc.Format("servers.card.client", ClientDisplayName);
+
+    /// <summary>The disabled-reason caption under the card menu, or null when the menu is fully usable.</summary>
+    public string? MenuDisabledHint => _lock switch
+    {
+        ServerCardLock.ClientRunning => _lockClientName is null
+            ? null
+            : Loc.Format("menu.disabled.clientrunning", _lockClientName),
+        ServerCardLock.NoInUseClient => Loc.Get("menu.disabled.noinuse"),
+        _ => null,
+    };
+
+    public bool ShowMenuDisabledHint => !string.IsNullOrEmpty(MenuDisabledHint);
+
+    /// <summary>Sets the per-card lock reason (recomputed on every list refresh).</summary>
+    public void SetLock(ServerCardLock reason, string? clientName)
+    {
+        _lock = reason;
+        _lockClientName = clientName;
+        OnPropertyChanged(nameof(Lock));
+        OnPropertyChanged(nameof(MenuDisabledHint));
+        OnPropertyChanged(nameof(ShowMenuDisabledHint));
+    }
+
     public void SetNeedsRepair(bool needsRepair)
     {
         NeedsRepair = needsRepair;
@@ -203,8 +303,12 @@ public sealed partial class ServerItemViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(CanPlay));
         OnPropertyChanged(nameof(CanSwitchOnly));
+        OnPropertyChanged(nameof(CanEdit));
+        OnPropertyChanged(nameof(CanDelete));
         PlayCommand.NotifyCanExecuteChanged();
         SwitchOnlyCommand.NotifyCanExecuteChanged();
+        EditCommand.NotifyCanExecuteChanged();
+        DeleteCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Re-reads every translated text (after a language change).</summary>
@@ -214,5 +318,8 @@ public sealed partial class ServerItemViewModel : ObservableObject
         OnPropertyChanged(nameof(DetailText));
         OnPropertyChanged(nameof(SwitchMenuText));
         OnPropertyChanged(nameof(SwitchOnlyHint));
+        OnPropertyChanged(nameof(ClientLabel));
+        OnPropertyChanged(nameof(MenuDisabledHint));
+        OnPropertyChanged(nameof(ShowMenuDisabledHint));
     }
 }
