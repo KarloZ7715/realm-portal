@@ -19,6 +19,7 @@
   <Window.DataTemplates>
     <DataTemplate DataType="vm:ServersViewModel"><v:ServersView/></DataTemplate>
     <DataTemplate DataType="vm:ClientsViewModel"><v:ClientsView/></DataTemplate>
+    <DataTemplate DataType="vm:EditClientViewModel"><v:EditClientView/></DataTemplate>
     <DataTemplate DataType="vm:AddServerViewModel"><v:AddServerView/></DataTemplate>
     <DataTemplate DataType="vm:PlaceholderViewModel"><v:PlaceholderView/></DataTemplate>
     <DataTemplate DataType="vm:SettingsViewModel"><v:SettingsView/></DataTemplate>

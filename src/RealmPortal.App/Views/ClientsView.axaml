@@ -17,6 +17,8 @@
         </Button>
       </Grid>
       <TextBlock Classes="body-sm" FontSize="14" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,2,0,14" Text="{Binding Summary}"/>
+      <TextBlock Name="ScanNotice" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,0,0,12"
+                 Text="{Binding Notice}" IsVisible="{Binding HasNotice}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
 
       <!-- The sheet is drawn with the parchment tile art, so it grows with the list. -->
       <ContentControl Classes="card" Padding="22,14,22,6" Margin="0,0,0,0">
@@ -27,14 +29,33 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ClientItemViewModel">
                 <Border BorderBrush="{DynamicResource ParchmentShadowBrush}" BorderThickness="0,0,0,1" Padding="0,12">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
                     <CheckBox Classes="parchment" IsChecked="{Binding IsInUse, Mode=TwoWay}" VerticalAlignment="Center"
                               AutomationProperties.Name="{loc:T clients.inuse}" ToolTip.Tip="{loc:T clients.inuse}"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                      <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{Binding Title}"/>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{Binding Title}"/>
+                        <TextBlock Classes="body-sm" FontSize="12" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding Version}"
+                                   IsVisible="{Binding ShowNamedVersion}" VerticalAlignment="Center"/>
+                      </StackPanel>
                       <TextBlock Classes="path" FontSize="13" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding Path}" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <c:Badge Grid.Column="2" Status="Inactive" Text="{Binding OriginText}" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                      <c:Badge Status="Active" Text="{loc:T clients.state.running}" IsVisible="{Binding IsRunning}"/>
+                      <c:Badge Status="Inactive" Text="{Binding OriginText}" IsVisible="{Binding ShowOriginBadge}"/>
+                      <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T clients.state.unknown}"
+                                 IsVisible="{Binding IsStateUnknown}" ToolTip.Tip="{loc:T clients.state.unknown}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4" IsVisible="{Binding CanManage}">
+                      <Button Classes="ghost surface-parchment" Width="28" Height="28" Padding="6" Command="{Binding EditCommand}"
+                              ToolTip.Tip="{loc:T clients.action.edit}" AutomationProperties.Name="{loc:T clients.action.edit}">
+                        <c:Icon Data="{DynamicResource IconPencil}" Width="14" Height="14" StrokeThickness="1.8"/>
+                      </Button>
+                      <Button Classes="ghost surface-parchment" Width="28" Height="28" Padding="6" Command="{Binding RemoveCommand}"
+                              ToolTip.Tip="{loc:T clients.action.remove}" AutomationProperties.Name="{loc:T clients.action.remove}">
+                        <c:Icon Data="{DynamicResource IconClose}" Width="14" Height="14" StrokeThickness="2" Foreground="{DynamicResource WaxTextBrush}"/>
+                      </Button>
+                    </StackPanel>
                   </Grid>
                 </Border>
               </DataTemplate>

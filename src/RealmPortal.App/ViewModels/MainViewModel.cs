@@ -15,7 +15,9 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ViewModelBase[] _sections;
     private readonly PortalSession? _session;
     private readonly IConnectionProbe? _probe;
+    private readonly Func<Task<string?>>? _pickFolder;
     private AddServerViewModel? _adding;
+    private EditClientViewModel? _editingClient;
 
     public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null) =>
         new(backend, autoTick, settings);
@@ -33,14 +35,17 @@ public sealed partial class MainViewModel : ObservableObject
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
+        Clients.ClientEditRequested += ShowEditClient;
+        Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
     }
 
     public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null)
     {
         _session = session;
         _probe = probe ?? new TcpConnectionProbe();
+        _pickFolder = pickFolder;
         Servers = new ServersViewModel(session, autoTick);
-        Clients = new ClientsViewModel(session, pickFolder);
+        Clients = new ClientsViewModel(session, pickFolder, startFirstScan: false);
         var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder);
         settingsScreen.ApplySavedLanguage();
         settingsScreen.BackRequested += () => SectionIndex = 0;
@@ -48,7 +53,11 @@ public sealed partial class MainViewModel : ObservableObject
         _sections = [Servers, Clients, Settings];
         WireSections();
         Clients.ClientsChanged += () => Servers.ReloadFromService();
+        Clients.ClientEditRequested += ShowEditClient;
+        Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
+        Clients.FirstScanFoundNoClients += () => SectionIndex = 1;
         Servers.ConfirmDiscardAsync = () => ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
+        Clients.StartFirstScanIfNeeded();
     }
 
     public DemoBackend? Backend { get; }
@@ -69,7 +78,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ViewModelBase Content => SectionIndex == 0 && _adding is not null
         ? _adding
-        : _sections[Math.Clamp(SectionIndex, 0, _sections.Length - 1)];
+        : SectionIndex == 1 && _editingClient is not null
+            ? _editingClient
+            : _sections[Math.Clamp(SectionIndex, 0, _sections.Length - 1)];
 
     public string StatusText => Content.StatusText;
 
@@ -124,6 +135,8 @@ public sealed partial class MainViewModel : ObservableObject
         {
             CloseAddServer();
         }
+        if (value != 1)
+            CloseEditClient();
     }
 
     private void ShowAddServer()
@@ -170,6 +183,52 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(Adding));
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void ShowEditClient(ClientItemViewModel client)
+    {
+        if (_editingClient is not null || client.IsRunning || client.IsStateUnknown)
+            return;
+
+        SectionIndex = 1;
+        _editingClient = new EditClientViewModel(client, _session, _pickFolder, (item, updated) =>
+        {
+            if (updated is not null && item.Id is { } oldId)
+                Clients.ApplyClientUpdate(oldId, updated, item.IsInUse);
+            CloseEditClient();
+        }, CloseEditClient);
+        _editingClient.PropertyChanged += OnSectionChanged;
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void CloseEditClient()
+    {
+        if (_editingClient is null)
+            return;
+
+        _editingClient.PropertyChanged -= OnSectionChanged;
+        _editingClient = null;
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private async Task<bool> ConfirmRemoveClientAsync(ClientItemViewModel client)
+    {
+        var linkedCount = 0;
+        if (_session is not null && client.Id is { } clientId)
+        {
+            var servers = _session.Service.ListServers(compatibleOnly: false);
+            if (servers.Succeeded)
+                linkedCount = servers.Value!.Count(server => server.ClientId == clientId);
+        }
+
+        var dialog = new ConfirmDialogViewModel(
+            "confirm.deleteclient.title",
+            linkedCount > 0 ? "confirm.deleteclient.linkedbody" : "confirm.deleteclient.body",
+            "confirm.deleteclient.accept",
+            bodyArguments: [client.Title, client.Version]);
+        return await ConfirmAsync(dialog).ConfigureAwait(true);
     }
 
     private void WireSections()

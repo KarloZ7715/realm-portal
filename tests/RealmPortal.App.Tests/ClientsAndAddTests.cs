@@ -86,6 +86,52 @@ public class ClientsScreenTests
     }
 
     [AvaloniaFact]
+    public async Task ClientEditOpensItsSheetAndUpdatesThePreviewRow()
+    {
+        var shell = new Shell();
+        shell.Model.SectionIndex = 1;
+        var client = shell.Model.Clients.Items[0];
+
+        client.EditCommand.Execute(null);
+        await Pump();
+
+        Assert.IsType<EditClientViewModel>(shell.Model.Content);
+        Assert.Contains(shell.Window.GetVisualDescendants().OfType<TextBox>(), box => box.Name == "ClientNameBox");
+        var editor = (EditClientViewModel)shell.Model.Content;
+        editor.Name = "WotLK local";
+        editor.Folder = "/tmp/wotlk-test";
+        await editor.SaveCommand.ExecuteAsync(null);
+        await Pump();
+
+        Assert.Equal("WotLK local", client.Title);
+        Assert.Equal("/tmp/wotlk-test", client.Path);
+        Assert.Same(shell.Model.Clients, shell.Model.Content);
+    }
+
+    [AvaloniaFact]
+    public async Task ClientRemoveUsesConfirmationAndCancelKeepsTheRow()
+    {
+        var shell = new Shell();
+        shell.Model.SectionIndex = 1;
+        var clients = shell.Model.Clients;
+        var first = clients.Items[0];
+
+        first.RemoveCommand.Execute(null);
+        await Pump();
+        Assert.NotNull(shell.Model.Dialog);
+        Assert.Equal("¿Quitar este cliente?", shell.Model.Dialog!.Title);
+        shell.Model.Dialog.CancelCommand.Execute(null);
+        await Pump();
+        Assert.Equal(3, clients.Items.Count);
+
+        first.RemoveCommand.Execute(null);
+        await Pump();
+        shell.Model.Dialog!.ConfirmCommand.Execute(null);
+        await Pump();
+        Assert.Equal(2, clients.Items.Count);
+    }
+
+    [AvaloniaFact]
     public void EveryOriginHasATranslation()
     {
         foreach (var origin in Enum.GetValues<ClientOrigin>())

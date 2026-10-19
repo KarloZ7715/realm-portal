@@ -16,20 +16,27 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
     private readonly string _bodyKey;
     private readonly string _confirmKey;
     private readonly string _cancelKey;
+    private readonly object?[] _bodyArguments;
 
-    public ConfirmDialogViewModel(string titleKey, string bodyKey, string confirmKey, string cancelKey = "dialog.cancel")
+    public ConfirmDialogViewModel(
+        string titleKey,
+        string bodyKey,
+        string confirmKey,
+        string cancelKey = "dialog.cancel",
+        object?[]? bodyArguments = null)
     {
         _titleKey = titleKey;
         _bodyKey = bodyKey;
         _confirmKey = confirmKey;
         _cancelKey = cancelKey;
+        _bodyArguments = bodyArguments ?? [];
         Loc.Instance.Changed += Refresh;
         _result.Task.ContinueWith(_ => Loc.Instance.Changed -= Refresh, TaskScheduler.Default);
     }
 
     public string Title => Loc.Get(_titleKey);
 
-    public string Body => Loc.Get(_bodyKey);
+    public string Body => _bodyArguments.Length == 0 ? Loc.Get(_bodyKey) : Loc.Format(_bodyKey, _bodyArguments);
 
     public string ConfirmText => Loc.Get(_confirmKey);
 
