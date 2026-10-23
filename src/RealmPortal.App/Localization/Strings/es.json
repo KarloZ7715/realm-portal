@@ -163,7 +163,7 @@
   "error.verifyfailed.title": "No pudimos comprobar el cambio",
   "error.verifyfailed.body": "Lo escrito no coincide con lo esperado.",
   "error.unsupportedclient.title": "Cliente no compatible",
-  "error.unsupportedclient.body": "Esta versión de Realm Portal admite los clientes 1.12.1, 2.4.3, 3.3.5a, 4.3.4 y 5.4.8.",
+  "error.unsupportedclient.body": "Esta versión de Realm Portal admite los clientes 1.12.1, 2.4.3, 3.3.5a, 4.3.4, 5.4.8, 6.x (WoD) y 7.x (Legion).",
   "error.invalidrealmlist.title": "Realmlist no válido",
   "error.invalidrealmlist.body": "La dirección del servidor tiene caracteres o líneas que no se admiten en el realmlist. Revisa el servidor.",
   "error.nothingtoundo.title": "Nada que deshacer",

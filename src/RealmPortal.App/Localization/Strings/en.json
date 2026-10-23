@@ -163,7 +163,7 @@
   "error.verifyfailed.title": "We could not verify the change",
   "error.verifyfailed.body": "What was written does not match what was expected.",
   "error.unsupportedclient.title": "Unsupported client",
-  "error.unsupportedclient.body": "This version of Realm Portal supports clients 1.12.1, 2.4.3, 3.3.5a, 4.3.4 and 5.4.8.",
+  "error.unsupportedclient.body": "This version of Realm Portal supports clients 1.12.1, 2.4.3, 3.3.5a, 4.3.4, 5.4.8, 6.x (WoD) and 7.x (Legion).",
   "error.invalidrealmlist.title": "Invalid realmlist",
   "error.invalidrealmlist.body": "The server address has characters or lines that a realmlist does not allow. Check the server.",
   "error.nothingtoundo.title": "Nothing to undo",
