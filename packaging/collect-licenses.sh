@@ -15,7 +15,8 @@
 # read from <publish-dir>/RealmPortal.App.deps.json and the pack is taken from the NuGet global packages folder.
 #
 # NuGet packages: every "package" library in that deps.json must have an exact id+version row in the committed
-# licenses/nuget/packages.tsv, whose folder must exist and be non-empty; otherwise the script fails. Only our own projects
+# licenses/nuget/packages.tsv; every file the row lists must exist in its folder and be non-empty, and the folder must not hold
+# unlisted files; otherwise the script fails. Only our own projects
 # (RealmPortal.*) and the Microsoft.NETCore.App runtime pack (covered above) are allowed without a row.
 set -euo pipefail
 
@@ -97,13 +98,38 @@ done
 # --- NuGet packages ---
 MANIFEST="${ROOT_DIR}/licenses/nuget/packages.tsv"
 [[ -f "$MANIFEST" ]] || fail "missing ${MANIFEST}"
-declare -A row_license=() row_folder=()
-while IFS=$'\t' read -r id ver license folder _source; do
+declare -A row_license=() row_folder=() folder_files=()
+while IFS=$'\t' read -r id ver license folder files _source; do
   [[ -z "$id" || "$id" == \#* ]] && continue
-  [[ -n "$ver" && -n "$license" && -n "$folder" ]] || fail "malformed row in ${MANIFEST}: ${id}"
+  [[ -n "$ver" && -n "$license" && -n "$folder" && -n "$files" && -n "$_source" ]] || fail "malformed row in ${MANIFEST}: ${id}"
+  [[ "$folder" =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid folder in ${MANIFEST}: ${folder}"
+  [[ "$files" =~ ^[A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*$ ]] || fail "invalid file list in ${MANIFEST} for ${id}: ${files}"
+  if [[ -n "${folder_files[$folder]:-}" && "${folder_files[$folder]}" != "$files" ]]; then
+    fail "rows for licenses/nuget/${folder} list different files (${folder_files[$folder]} vs ${files})"
+  fi
+  folder_files["$folder"]="$files"
   row_license["${id}/${ver}"]="$license"
   row_folder["${id}/${ver}"]="$folder"
 done < <(tr -d '\r' <"$MANIFEST")
+
+# Print the problems of a license folder against its expected file list (nothing when it is complete).
+folder_problems() {
+  local folder="$1" dir="${ROOT_DIR}/licenses/nuget/$1" f
+  local -a expected=()
+  IFS=',' read -r -a expected <<<"${folder_files[$folder]}"
+  if [[ ! -d "$dir" ]]; then
+    echo "folder licenses/nuget/${folder} missing"
+    return
+  fi
+  for f in "${expected[@]}"; do
+    [[ -s "${dir}/${f}" ]] || echo "licenses/nuget/${folder}/${f} missing or empty"
+  done
+  # find (not a glob) so hidden files and subfolders are reported too.
+  while IFS= read -r f; do
+    [[ ",${folder_files[$folder]}," == *",$(basename "$f"),"* ]] || echo "licenses/nuget/${folder}/$(basename "$f") is not listed in packages.tsv"
+  done < <(find "$dir" -mindepth 1 -maxdepth 1 | LC_ALL=C sort)
+  return 0
+}
 
 # List "<type>\t<id>/<version>" for each entry of the deps.json "libraries" object.
 libraries="$(tr -d '\r' <"$deps" | awk '
@@ -131,10 +157,12 @@ while IFS=$'\t' read -r type key; do
       ;;
     package)
       folder="${row_folder[$key]:-}"
+      problems=""
+      [[ -z "$folder" ]] || problems="$(folder_problems "$folder")"
       if [[ -z "$folder" ]]; then
         missing+=("${key} (no row in licenses/nuget/packages.tsv)")
-      elif [[ ! -d "${ROOT_DIR}/licenses/nuget/${folder}" ]] || [[ -z "$(find "${ROOT_DIR}/licenses/nuget/${folder}" -type f -size +0 -print -quit)" ]]; then
-        missing+=("${key} (license folder licenses/nuget/${folder} missing or empty)")
+      elif [[ -n "$problems" ]]; then
+        while IFS= read -r problem; do missing+=("${key} (${problem})"); done <<<"$problems"
       else
         folders["$folder"]=1
         packages_list+="${key%/*}"$'\t'"${key##*/}"$'\t'"${row_license[$key]}"$'\t'"${folder}"$'\n'
@@ -171,8 +199,9 @@ done
 
 mkdir -p "${DEST_DIR}/licenses/nuget"
 for folder in "${!folders[@]}"; do
-  for f in "${ROOT_DIR}/licenses/nuget/${folder}"/*; do
-    copy_file "$f" "${DEST_DIR}/licenses/nuget/${folder}/$(basename "$f")"
+  IFS=',' read -r -a listed <<<"${folder_files[$folder]}"
+  for f in "${listed[@]}"; do
+    copy_file "${ROOT_DIR}/licenses/nuget/${folder}/${f}" "${DEST_DIR}/licenses/nuget/${folder}/${f}"
   done
 done
 {

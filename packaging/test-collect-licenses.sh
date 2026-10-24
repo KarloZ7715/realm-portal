@@ -3,16 +3,24 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COLLECT="${SCRIPT_DIR}/collect-licenses.sh"
+REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+
+# Work on a copy of the inputs the script reads, so cases can delete license files without touching the checkout.
+repo="${tmp}/repo"
+mkdir -p "${repo}/assets"
+cp -R "${REPO_DIR}/packaging" "${REPO_DIR}/licenses" "${repo}/"
+cp -R "${REPO_DIR}/assets/fonts" "${repo}/assets/"
+cp "${REPO_DIR}/LICENSE" "${REPO_DIR}/THIRD_PARTY_LICENSES.md" "${repo}/"
+COLLECT="${repo}/packaging/collect-licenses.sh"
 
 pack="${tmp}/nuget/microsoft.netcore.app.runtime.linux-x64/9.0.99"
 mkdir -p "$pack" "${tmp}/publish"
 printf 'The MIT License (MIT)\n' >"${pack}/LICENSE.TXT"
 printf 'notices\n' >"${pack}/THIRD-PARTY-NOTICES.TXT"
 
-MANIFEST="${SCRIPT_DIR}/../licenses/nuget/packages.tsv"
+MANIFEST="${repo}/licenses/nuget/packages.tsv"
 # Every package of the real manifest, as deps.json "libraries" entries (keeps the required-package rule satisfied).
 known_entries="$(tr -d '\r' <"$MANIFEST" | awk -F'\t' '!/^#/ && NF >= 4 { printf ",\n    \"%s/%s\": {\n      \"type\": \"package\",\n      \"serviceable\": true\n    }", $1, $2 }')"
 
@@ -85,6 +93,48 @@ else
   echo "FAIL: missing required package error"; cat "${tmp}/log"; failures=$((failures + 1))
 fi
 known_entries="$saved"
+
+# Every file listed for a folder is required: removing or emptying a single one fails, and so does an unlisted extra file.
+expect_file_failure() {
+  local label="$1" pattern="$2"
+  write_deps ""
+  if run; then
+    echo "FAIL: ${label} was accepted"; failures=$((failures + 1))
+  elif grep -q -F -- "$pattern" "${tmp}/log"; then
+    echo "ok: ${label} fails the build"
+  else
+    echo "FAIL: ${label} error does not name the file"; cat "${tmp}/log"; failures=$((failures + 1))
+  fi
+}
+
+nuget="${repo}/licenses/nuget"
+mv "${nuget}/penet.asn1-2.0.1/LICENSE-Apache-2.0.txt" "${tmp}/saved"
+expect_file_failure "deleting penet.asn1-2.0.1/LICENSE-Apache-2.0.txt" "penet.asn1-2.0.1/LICENSE-Apache-2.0.txt missing or empty"
+mv "${tmp}/saved" "${nuget}/penet.asn1-2.0.1/LICENSE-Apache-2.0.txt"
+
+mv "${nuget}/skiasharp-2.88.9/THIRD-PARTY-NOTICES.txt" "${tmp}/saved"
+expect_file_failure "deleting skiasharp-2.88.9/THIRD-PARTY-NOTICES.txt" "skiasharp-2.88.9/THIRD-PARTY-NOTICES.txt missing or empty"
+mv "${tmp}/saved" "${nuget}/skiasharp-2.88.9/THIRD-PARTY-NOTICES.txt"
+
+cp "${nuget}/avalonia-11.3.22/NOTICE.md" "${tmp}/saved"
+: >"${nuget}/avalonia-11.3.22/NOTICE.md"
+expect_file_failure "emptying avalonia-11.3.22/NOTICE.md" "avalonia-11.3.22/NOTICE.md missing or empty"
+mv "${tmp}/saved" "${nuget}/avalonia-11.3.22/NOTICE.md"
+
+printf 'x\n' >"${nuget}/penet-5.1.0/EXTRA.txt"
+expect_file_failure "an unlisted file in penet-5.1.0" "penet-5.1.0/EXTRA.txt is not listed"
+rm "${nuget}/penet-5.1.0/EXTRA.txt"
+
+printf 'x\n' >"${nuget}/penet-5.1.0/.hidden"
+expect_file_failure "a hidden unlisted file in penet-5.1.0" "penet-5.1.0/.hidden is not listed"
+rm "${nuget}/penet-5.1.0/.hidden"
+
+write_deps ""
+if run; then
+  echo "ok: restored license files are accepted again"
+else
+  echo "FAIL: restored license files"; cat "${tmp}/log"; failures=$((failures + 1))
+fi
 
 if [[ "$failures" -gt 0 ]]; then
   echo "${failures} failure(s)"

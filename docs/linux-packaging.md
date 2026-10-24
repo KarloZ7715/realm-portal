@@ -53,18 +53,35 @@ runtime version and source commit). It also copies `LICENSE`, `THIRD_PARTY_LICEN
 Nothing is committed for the runtime, so the notices always match the bundled patch release.
 
 NuGet packages: the full license and notice texts of every package in the published `deps.json` are committed under
-`licenses/nuget/<folder>/` and indexed in `licenses/nuget/packages.tsv` (package id, exact version, license, folder, source of
-the files). The script lists the `libraries` of the publish `deps.json` and fails the build when a `package` entry has no exact
-id+version row, its folder is missing or empty, or a required package (Avalonia, Avalonia.Angle.Windows.Natives,
-CommunityToolkit.Mvvm, HarfBuzzSharp, MicroCom.Runtime, PeNet, PeNet.Asn1, SkiaSharp, Tmds.DBus.Protocol) is absent. Only our own
-projects (`RealmPortal.*`) and the `Microsoft.NETCore.App` runtime pack are accepted without a row. It copies the used folders
-to `licenses/nuget/` and writes `licenses/nuget/PACKAGES.txt` (the packages of that build). `packaging/test-collect-licenses.sh`
-tests these rules in the Linux job, and `NuGetLicenseManifestTests` (normal CI) checks the manifest against
-`src/RealmPortal.App/packages.lock.json` and `THIRD_PARTY_LICENSES.md`, so a dependency bump without license files fails on the PR.
+`licenses/nuget/<folder>/` and indexed in `licenses/nuget/packages.tsv`, one row per package: id, exact version, license, folder,
+the comma-separated files expected in that folder, and the source of those files.
 
-When a package is added or bumped: copy its license/notice files (from the `.nupkg` when it has them, otherwise from the upstream
-repository at the matching tag or commit) into a new `licenses/nuget/<id>-<version>/` folder, update `packages.tsv` and
-`THIRD_PARTY_LICENSES.md`, and delete the old folder.
+Folders are grouped by license source, not one per package: packages released together from the same upstream with the same
+license files share one folder named after the family and version. For example, the nine `Avalonia.*` 11.3.22 packages share
+`avalonia-11.3.22/`, `SkiaSharp` and its `NativeAssets.*` packages share `skiasharp-2.88.9/`, and the `HarfBuzzSharp` packages share
+`harfbuzzsharp-8.3.1.1/`. A package with its own license source gets its own folder (e.g. `penet-5.1.0/`, `penet.asn1-2.0.1/`).
+Rows that share a folder must list the same files.
+
+The script lists the `libraries` of the publish `deps.json` and fails the build in these cases:
+- a `package` entry has no exact id+version row;
+- one of the files its row lists is missing or empty;
+- its folder holds a file the row does not list;
+- a required package (Avalonia, Avalonia.Angle.Windows.Natives, CommunityToolkit.Mvvm, HarfBuzzSharp, MicroCom.Runtime, PeNet,
+  PeNet.Asn1, SkiaSharp, Tmds.DBus.Protocol) is absent.
+
+Only our own projects (`RealmPortal.*`) and the `Microsoft.NETCore.App` runtime pack are accepted without a row. It copies the
+listed files of the used folders to `licenses/nuget/` and writes `licenses/nuget/PACKAGES.txt` (the packages of that build).
+`packaging/test-collect-licenses.sh` tests these rules in the Linux job: an unlisted package, a wrong version, a missing required
+package, a single listed file deleted or emptied, and an unlisted extra file. In normal CI, `NuGetLicenseManifestTests` checks the
+manifest against `src/RealmPortal.App/packages.lock.json` and `THIRD_PARTY_LICENSES.md`, and applies the same per-file rule to the
+committed folders. A dependency bump without license files therefore fails on the PR.
+
+When a package is added or bumped:
+1. Copy its license and notice files into `licenses/nuget/`, from the `.nupkg` when it has them, otherwise from the upstream
+   repository at the matching tag or commit. Use the shared family folder when the package comes from the same upstream release with
+   the same files (e.g. a new `Avalonia.*` package at the same version); otherwise use a new `<family>-<version>/` folder.
+2. Add or update its `packages.tsv` row, including the file list, and its row in `THIRD_PARTY_LICENSES.md`.
+3. Delete folders that no row uses any more.
 
 | Package | Location |
 | --- | --- |
