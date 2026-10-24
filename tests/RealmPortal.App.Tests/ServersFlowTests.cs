@@ -7,6 +7,7 @@ using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.ViewModels;
+using RealmPortal.Core;
 
 namespace RealmPortal.App.Tests;
 
@@ -219,12 +220,12 @@ public class ServersFlowTests
         try
         {
             loc.SetLanguage(Language.Es);
-            Assert.Equal("ES · v0.1.0", shell.Model.LanguageLabel);
+            Assert.Equal($"ES · v{AppInfo.Version}", shell.Model.LanguageLabel);
             Assert.Equal("Cliente 3.3.5a (12340) · Cuenta: demo", shell.Servers.Active!.DetailText);
             shell.Model.ToggleLanguageCommand.Execute(null);
             await Pump();
             Assert.Equal(Language.En, loc.Current);
-            Assert.Equal("EN · v0.1.0", shell.Model.LanguageLabel);
+            Assert.Equal($"EN · v{AppInfo.Version}", shell.Model.LanguageLabel);
             Assert.Equal("Client 3.3.5a (12340) · Account: demo", shell.Servers.Active!.DetailText);
             Assert.Equal("Active", shell.Servers.Active.BadgeText);
             shell.Servers.SearchText = "zzz";

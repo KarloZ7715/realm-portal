@@ -53,6 +53,20 @@ EOF
   chmod 755 "${launcher_path}"
 }
 
+# The source metainfo has no version; the <releases> entry is generated from VERSION (Directory.Build.props).
+write_metainfo() {
+  local dest="$1"
+  local release_date
+  release_date="$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%d)"
+  if grep -q '<releases' "${PACKAGING_DIR}/com.karloz7715.RealmPortal.metainfo.xml"; then
+    echo "error: metainfo must not hardcode <releases>; it is generated from the package version" >&2
+    exit 1
+  fi
+  sed "s|^</component>|  <releases>\n    <release version=\"${VERSION}\" date=\"${release_date}\"/>\n  </releases>\n</component>|" \
+    "${PACKAGING_DIR}/com.karloz7715.RealmPortal.metainfo.xml" >"${dest}"
+  grep -q "<release version=\"${VERSION}\"" "${dest}" || { echo "error: failed to write <releases> into metainfo" >&2; exit 1; }
+}
+
 # --- .deb ---
 DEB_STAGING="${ROOT_DIR}/pkg-deb/realm-portal_${VERSION}_amd64"
 DEB_INSTALL_LIB="/opt/realm-portal"
@@ -69,8 +83,7 @@ write_deb_launcher "${DEB_STAGING}/usr/bin/realm-portal"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${DEB_STAGING}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
-cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.metainfo.xml" \
-  "${DEB_STAGING}/usr/share/metainfo/com.karloz7715.RealmPortal.metainfo.xml"
+write_metainfo "${DEB_STAGING}/usr/share/metainfo/com.karloz7715.RealmPortal.metainfo.xml"
 cp -a "${PACKAGING_DIR}/icons/hicolor/." "${DEB_STAGING}/usr/share/icons/hicolor/"
 
 cat >"${DEB_STAGING}/DEBIAN/control" <<EOF
