@@ -448,7 +448,12 @@ public sealed class CliApp(
         var restored = result.Value!.Active;
         SafeWriteLine(output, restored is null ? "Undone: no active server." : $"Undone: restored '{restored.Name}'.");
         if (result.Value!.ClientFilesNotice is { } notice)
-            SafeWriteLine(output, notice);
+        {
+            // The notice is several lines joined with newlines; SafeWriteLine escapes
+            // control characters, so it has to see one line at a time.
+            foreach (var line in notice.Split('\n'))
+                SafeWriteLine(output, line.TrimEnd('\r'));
+        }
         return 0;
     }
 
