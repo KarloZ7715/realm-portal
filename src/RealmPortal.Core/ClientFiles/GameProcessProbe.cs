@@ -101,11 +101,16 @@ public sealed class GameProcessProbe : IGameProcessProbe
         }
         catch (DirectoryNotFoundException)
         {
-            return false;
+            // No task/ although /proc/<pid> is still there: cannot tell, so fail closed.
+            return Directory.Exists(procDirectory);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (UnauthorizedAccessException)
         {
             return true;
+        }
+        catch (IOException)
+        {
+            return Directory.Exists(procDirectory);
         }
 
         foreach (var task in tasks)
@@ -128,18 +133,21 @@ public sealed class GameProcessProbe : IGameProcessProbe
 
     /// <summary>
     /// Reads <c>stat</c> under a <c>/proc/&lt;pid&gt;</c> or <c>/proc/&lt;pid&gt;/task/&lt;tid&gt;</c> directory. A missing
-    /// directory or file (ENOENT), or an I/O error once the directory is gone (ESRCH), means <see cref="TaskState.Gone"/>;
-    /// any other failure, such as permission denied (EACCES), is <see cref="TaskState.Unreadable"/>.
+    /// file (ENOENT) or an I/O error (e.g. ESRCH) means <see cref="TaskState.Gone"/> only once the directory itself is gone;
+    /// otherwise, and for permission denied (EACCES), it is <see cref="TaskState.Unreadable"/>.
     /// </summary>
-    internal static TaskState ReadTaskState(string taskDirectory)
+    internal static TaskState ReadTaskState(string taskDirectory) => ReadTaskState(taskDirectory, File.ReadAllText);
+
+    /// <summary><see cref="ReadTaskState(string)"/> with an injectable file reader, so tests can simulate ESRCH.</summary>
+    internal static TaskState ReadTaskState(string taskDirectory, Func<string, string> readAllText)
     {
         try
         {
-            return StatShowsExited(File.ReadAllText(Path.Combine(taskDirectory, "stat"))) ? TaskState.Exited : TaskState.Live;
+            return StatShowsExited(readAllText(Path.Combine(taskDirectory, "stat"))) ? TaskState.Exited : TaskState.Live;
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
-            return TaskState.Gone;
+            return Directory.Exists(taskDirectory) ? TaskState.Unreadable : TaskState.Gone;
         }
         catch (UnauthorizedAccessException)
         {

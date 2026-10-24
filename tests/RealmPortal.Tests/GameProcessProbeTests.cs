@@ -118,6 +118,9 @@ public sealed class GameProcessProbeTests
         Assert.Equal(GameProcessProbe.TaskState.Gone, GameProcessProbe.ReadTaskState(proc));
 
         Directory.CreateDirectory(proc);
+        // The folder is still there but stat is missing: cannot tell, so fail closed.
+        Assert.Equal(GameProcessProbe.TaskState.Unreadable, GameProcessProbe.ReadTaskState(proc));
+
         var stat = Path.Combine(proc, "stat");
         File.WriteAllText(stat, "123 (wine) Z 1 123 123 0");
         Assert.Equal(GameProcessProbe.TaskState.Exited, GameProcessProbe.ReadTaskState(proc));
@@ -205,14 +208,70 @@ public sealed class GameProcessProbeTests
     }
 
     [Fact]
-    public void ExitedLeaderWithoutTaskDirectory_IsNotRunning()
+    public void ExitedLeaderWithoutTaskDirectory_IsRunningWhileThePidFolderExists()
     {
         if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var proc = new FakeProc(temp, "Z");
         Directory.Delete(Path.Combine(proc.Root, "task"), recursive: true);
 
+        Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, temp.Combine("client")));
+    }
+
+    [Fact]
+    public void ProcessWhosePidFolderIsGone_IsNotRunning()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var temp = new TempDirectory();
+        var proc = new FakeProc(temp, "Z");
+        Directory.Delete(proc.Root, recursive: true);
+
         Assert.False(GameProcessProbe.LinuxProcessBlocks(proc.Root, temp.Combine("client")));
+    }
+
+    [Fact]
+    public void ExitedLeaderWhoseTaskListingFailsWithAnIoError_IsRunning()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var temp = new TempDirectory();
+        var proc = new FakeProc(temp, "Z");
+        // Listing task/ fails with an I/O error (ELOOP) while /proc/<pid> still exists: fail closed.
+        var task = Path.Combine(proc.Root, "task");
+        Directory.Delete(task, recursive: true);
+        File.CreateSymbolicLink(task, task);
+
+        Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, temp.Combine("client")));
+    }
+
+    [Fact]
+    public void ExitedLeaderWithAThreadWhoseStatIsUnreadable_IsRunning()
+    {
+        if (!OperatingSystem.IsLinux() || Environment.UserName == "root") return;
+        using var temp = new TempDirectory();
+        var client = temp.Combine("client");
+        var other = temp.Combine("other");
+        Directory.CreateDirectory(client);
+        Directory.CreateDirectory(other);
+        var proc = new FakeProc(temp, "Z");
+        proc.AddTask(101, "S", cwd: other);
+        File.SetUnixFileMode(Path.Combine(proc.Root, "task", "101", "stat"), UnixFileMode.None);
+
+        // EACCES on a thread's stat: its state is unknown, so it blocks even though its cwd is elsewhere.
+        Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, client));
+    }
+
+    [Fact]
+    public void ReadTaskState_IoErrorMeansGoneOnlyWhenTheFolderIsGone()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var temp = new TempDirectory();
+        var task = temp.Combine("task-101");
+        // ESRCH surfaces as a plain IOException; it cannot be produced with ordinary files, so the reader is injected.
+        Func<string, string> esrch = _ => throw new IOException("No such process");
+
+        Assert.Equal(GameProcessProbe.TaskState.Gone, GameProcessProbe.ReadTaskState(task, esrch));
+        Directory.CreateDirectory(task);
+        Assert.Equal(GameProcessProbe.TaskState.Unreadable, GameProcessProbe.ReadTaskState(task, esrch));
     }
 
     [Fact]
@@ -220,11 +279,10 @@ public sealed class GameProcessProbeTests
     {
         if (!OperatingSystem.IsLinux()) return;
         var compiler = new[] { "/usr/bin/cc", "/usr/bin/gcc" }.FirstOrDefault(File.Exists);
+        // CI must run this test for real; elsewhere, without a compiler, the fake /proc tests cover the same decision.
+        Assert.True(compiler is not null || Environment.GetEnvironmentVariable("CI") != "true", "cc required on CI");
         if (compiler is null)
-        {
-            // No C compiler on this machine; the fake /proc tests above cover the same decision.
             return;
-        }
 
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
