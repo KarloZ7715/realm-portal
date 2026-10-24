@@ -42,32 +42,9 @@ tag that does not match `Directory.Build.props` fails the release run. Bump `<Ve
 
 ## Command line
 
-`realm-portal` manages servers without the UI. Exit codes: 0 ok, 1 usage, 2 failure.
-Run it from source with `dotnet run --project src/RealmPortal.Cli -- <command>`.
-
-```bash
-realm-portal add Wotlk wotlk.example.org --build 12340 --line "set patchlist patch.example.org"
-realm-portal list --client-dir /path/to/client     # only servers this client can play on (--all shows every one)
-realm-portal switch Wotlk --client-dir /path/to/client   # --force switches even if the client is incompatible
-realm-portal undo
-realm-portal status --client-dir /path/to/client
-realm-portal launch --client-dir /path/to/client --dry-run
-realm-portal launch Wotlk --client-dir /path/to/client --wrapper wine   # switch first, then start through a wrapper command
-```
-
-Options: `--force` (on `switch` and `launch`) skips the compatibility check; `--wrapper <command>` (on `launch`) runs the game
-through a command such as `wine` or `gamemoderun` (it becomes the prefix of the launch command); `--dry-run` (on `launch`) prints the
-launch command and does not start the client, but if you pass a server name it still switches to that server first.
-`--build` must be a positive integer (anything else is a usage error, exit 1).
-
-What the commands write: `add`, `remove`, `switch`, `undo`, and `launch <server>` (including with `--dry-run`) only change Realm Portal's own files (`servers.json`, `state.json`,
-`activo.json`). **They do not edit the game client yet**: `ClientFilesApplier` (backup, write `realmlist.wtf`/`Config.wtf`, byte-identical undo,
-see [docs/client-files-backup.md](docs/client-files-backup.md)) exists in `RealmPortal.Core` but the CLI does not call it, so `launch` starts
-the client with whatever realm configuration it already has. Connecting both is planned in the application service for the desktop app.
-
-Where files go: `--config-dir` / `REALM_PORTAL_CONFIG_DIR` (default `<app data>/realm-portal`: `servers.json`, `state.json`),
-`--projection-dir` / `REALM_PORTAL_PROJECTION_DIR` (default `~/.config/wow-servidores`: `activo.json`) and
-`--client-dir` / `REALM_PORTAL_CLIENT_DIR`. Always point them at temporary folders when testing.
+`src/RealmPortal.Cli` builds the `realm-portal` command-line tool. Run it from source with
+`dotnet run --project src/RealmPortal.Cli -- <command>`. Commands, options, environment variables and exit codes are documented in
+[docs/cli.md](docs/cli.md). When testing, point `--config-dir`, `--projection-dir` and `--client-dir` at temporary folders, and set `REALM_PORTAL_BACKUP_DIR` to a temporary folder too.
 
 ## Component gallery
 
