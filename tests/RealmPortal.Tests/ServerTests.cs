@@ -13,12 +13,12 @@ public class ServerTests
             realm: "Realm One",
             extraRealmlistLines: ["set patchlist patch.example.org", "  "],
             requiredClientBuild: 12340,
-            account: "  carlos ");
+            account: "  player ");
 
         Assert.Equal("My Server", server.Name);
         Assert.Equal("logon.example.org", server.Host);
         Assert.Equal("Realm One", server.Realm);
-        Assert.Equal("carlos", server.Account);
+        Assert.Equal("player", server.Account);
         Assert.Equal(12340, server.RequiredClientBuild);
         Assert.Equal(
             "set realmlist logon.example.org\r\nset patchlist patch.example.org\r\n",
