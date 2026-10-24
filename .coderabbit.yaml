@@ -1,0 +1,144 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit config for Realm Portal. Goal: few, well-evidenced comments.
+language: en-US
+early_access: false
+tone_instructions: >-
+  Be brief and concrete. Only comment when you can point at the line that breaks
+  and say why. Do not comment on formatting or naming style. Do not ask for XML
+  doc comments.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+
+  # Walkthrough: keep the short summary, drop the decoration.
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true   # don't rewrite the PR description
+  collapse_walkthrough: true
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  poem: false
+  in_progress_fortune: false
+  assess_linked_issues: true
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  review_status: true
+  review_details: false
+
+  # The "Docstring Coverage" warning is noise for this codebase.
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    description:
+      mode: "off"          # the PR template already covers this
+    title:
+      mode: "off"
+    issue_assessment:
+      mode: warning
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    ignore_title_keywords:
+      - "WIP"
+      - "[skip review]"
+    ignore_usernames:
+      - "dependabot[bot]"
+
+  path_filters:
+    - "!assets/**"
+    - "!figma-exports/**"
+    - "!licenses/**"
+    - "!docs/screenshots/**"
+    - "!**/*.{png,jpg,jpeg,gif,ico,svg,ttf,otf,woff,woff2,zip,AppImage,deb}"
+    - "!**/packages.lock.json"
+
+  path_instructions:
+    - path: "src/RealmPortal.Core/**/*.cs"
+      instructions: |
+        Core touches the user's real WoW client folder and config files. Focus on:
+        - File-system safety: no writes outside the client folder or app data dir,
+          backups before overwrite, atomic replace, undo must stay possible.
+        - Paths and names from the user or the file system (folder names, realmlist
+          values, server names) are untrusted: they may contain newlines, ANSI/ESC
+          or other control characters. They must not be split, joined or formatted
+          in a way that lets them inject extra lines into output or logs.
+        - Cross-platform: Linux and Windows. Watch case sensitivity, path separators,
+          Path.Combine vs string concat, line endings, file locking, permissions.
+        - No personal data (real names, emails, home paths, server credentials) in
+          code, logs, test data or error messages. The app must never store passwords.
+        Skip style nits.
+    - path: "src/RealmPortal.Cli/**/*.cs"
+      instructions: |
+        All terminal output must go through the escaping helper (SafeWriteLine or
+        equivalent). Flag any direct Console/TextWriter write of a value that can
+        come from user input or the file system. Exit codes are part of the CLI
+        contract documented in docs/cli.md; flag changes to them. Errors go to
+        stderr, normal output to stdout.
+    - path: "src/RealmPortal.App/**"
+      instructions: |
+        Avalonia MVVM app. Flag UI-thread violations, blocking I/O on the UI thread,
+        and logic that belongs in Core. User-visible strings must come from
+        src/RealmPortal.App/Localization/Strings/en.json and es.json, with the key
+        present in both. Ignore pure layout/styling tweaks.
+    - path: "tests/**/*.cs"
+      instructions: |
+        Tests must use synthetic clients in temp directories, never a real game
+        install or the user's home. Prefer exact assertions over loose Contains
+        checks when the order or line boundaries matter. Platform-specific tests
+        must be guarded so the suite passes on both Linux and Windows CI.
+        Do not ask for more tests unless a changed code path has none.
+    - path: ".github/workflows/**"
+      instructions: |
+        Least privilege: top-level permissions should be read-only; grant write
+        only to the job that needs it. Third-party actions must be pinned to a full
+        commit SHA. Flag pull_request_target, untrusted input used in run: scripts,
+        and secrets exposed to PRs from forks.
+    - path: "{README.md,README.es.md}"
+      instructions: |
+        README.md (English) and README.es.md (Spanish) must stay in sync. If one
+        changes content (links, versions, install steps, sections) and the other
+        doesn't, flag it. Ignore wording that is a natural translation.
+    - path: "docs/**/*.md"
+      instructions: |
+        Check that documented behavior, commands and file paths match the code in
+        this PR. Ignore prose style.
+
+  tools:
+    # Keep the linters that apply here; turn off ones that only add noise.
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    zizmor:
+      enabled: true
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+
+chat:
+  auto_reply: true
+  art: false
+
+knowledge_base:
+  learnings:
+    scope: local
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CONTRIBUTING.md"
