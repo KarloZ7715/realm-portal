@@ -11,7 +11,7 @@ status bar and `realm-portal --version` all agree.
 
 | Trigger | Version used |
 | --- | --- |
-| `pull_request` (path-filtered) | `<props version>-pr.<PR number>` (artifacts only; no release) |
+| `pull_request` (path-filtered) | `0.0.0-pr.<PR number>` (artifacts only; no release; the props version is still read and validated). It stays below every real release so an installed PR `.deb` never blocks an upgrade |
 | `workflow_dispatch` | `<props version>` when the `version` input is empty; otherwise the input, which must be `<props version>` or a prerelease of it (`<props version>-rc.1`) |
 | Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix; it **must equal** `<props version>` (e.g. `v1.0.0` with `<Version>1.0.0</Version>`), otherwise the run fails before building |
 

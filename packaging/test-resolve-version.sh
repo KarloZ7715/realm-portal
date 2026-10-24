@@ -35,7 +35,7 @@ expect_ok 2.3.4 EVENT_NAME=push REF_NAME=v2.3.4
 expect_fail EVENT_NAME=push REF_NAME=v2.3.5
 expect_fail EVENT_NAME=push REF_NAME=v2.3.4-rc.1
 expect_fail EVENT_NAME=push REF_NAME=main
-expect_ok 2.3.4-pr.17 EVENT_NAME=pull_request PR_NUMBER=17
+expect_ok 0.0.0-pr.17 EVENT_NAME=pull_request PR_NUMBER=17
 expect_fail EVENT_NAME=pull_request PR_NUMBER=
 expect_ok 2.3.4 EVENT_NAME=workflow_dispatch
 expect_ok 2.3.4 EVENT_NAME=workflow_dispatch INPUT_VERSION=2.3.4

@@ -2,7 +2,8 @@
 # Resolve the package version for a release workflow run.
 #
 # Directory.Build.props <Version> is the single source of the product version. This script reads it and:
-#   - pull_request:      <props>-pr.<PR number>  (test artifacts only)
+#   - pull_request:      0.0.0-pr.<PR number>  (test artifacts only; sorts below every real release in dpkg, so an
+#                        installed PR .deb never blocks the upgrade to a release)
 #   - push (tag vX.Y.Z): the tag without "v"; it MUST equal <props>, otherwise the run fails
 #   - workflow_dispatch: <props>, or the "version" input if it is <props> or a prerelease of it (<props>-<suffix>)
 #
@@ -28,7 +29,7 @@ props_version="$(sed -n -E 's/.*<Version>[[:space:]]*([^<[:space:]]+)[[:space:]]
 case "${EVENT_NAME:-}" in
   pull_request)
     [[ "${PR_NUMBER:-}" =~ ^[0-9]+$ ]] || fail "missing or invalid pull request number"
-    version="${props_version}-pr.${PR_NUMBER}"
+    version="0.0.0-pr.${PR_NUMBER}"
     ;;
   push)
     tag="${REF_NAME:-}"
