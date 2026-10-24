@@ -49,18 +49,26 @@ is_allowed_email() {
   fi
   local exact
   for exact in $EXACT_ALLOWED_EMAILS; do
-    [[ "$lower" == "$exact" ]] && return 0
+    # Entries are compared case-insensitively too.
+    [[ "$lower" == "${exact,,}" ]] && return 0
   done
   return 1
 }
 
 # Prints why an address that is_allowed_email rejected fails (completes "which is ...").
-# A single-@ address on the GitHub noreply domain fails only because of its username part.
+# For a single-@ address on the GitHub noreply domain it names the part that is wrong:
+# the optional "<id>+" prefix (digits only) or the username; anything else gets the
+# generic reason.
 rejection_reason() {
   local lower="${1,,}"
   local rest="${lower#*@}"
   if [[ "$lower" == *@* && "$rest" != *@* && "$rest" == "users.noreply.github.com" ]]; then
-    printf 'a noreply address with an invalid GitHub username (1-39 letters, digits or single inner hyphens)'
+    local local_part="${lower%@*}"
+    if [[ "$local_part" == *+* && ! "${local_part%%+*}" =~ ^[0-9]+$ ]]; then
+      printf 'a noreply address with an invalid numeric ID prefix (only digits before the +)'
+    else
+      printf 'a noreply address with an invalid GitHub username (1-39 letters, digits or single inner hyphens)'
+    fi
   else
     printf 'not an allowed GitHub noreply address'
   fi
