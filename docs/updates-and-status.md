@@ -39,11 +39,14 @@ both the asset and `SHA256SUMS`. Until [#116](https://github.com/KarloZ7715/real
 with a key embedded in the app, the real authenticity control), the protections are:
 
 - The user always confirms **Update**; nothing updates silently.
-- Releases are immutable (GitHub "immutable releases" enabled), so assets cannot be swapped after publication.
+- Releases are immutable once GitHub "immutable releases" is enabled for the repository (pending, see the release gate
+  below), so assets cannot be swapped after publication.
 - The maintainer account uses 2FA.
 
 **Release gate:** in-place AppImage replacement ships in 1.1.0 only if immutable releases are enabled for the repository.
-Otherwise the `AppImage` kind behaves like `Deb` (verified download, no replacement).
+Otherwise the `AppImage` kind downloads and verifies the new AppImage to the XDG Downloads folder (same rules as `Deb`: never
+overwrite an existing file), with no replacement. The dialog then shows instructions with the real quoted file name:
+`chmod +x '<file name>'`, then start the new file and delete the old one. No `apt` command is shown.
 
 ### HTTP client
 
@@ -104,7 +107,8 @@ downloading the app checks it:
 - The target must be an absolute path to a regular file owned by the current user, starting with the ELF magic and the
   AppImage type 2 magic, in a directory the user can write.
 - Record the target's `(device, inode)` and file mode.
-- If any check fails, the kind is treated as `Deb`-like (verified download only).
+- If any check fails, the kind is treated as `AppImage` without replacement (verified download to the XDG Downloads folder
+  plus the instructions above).
 
 ### Assets and checksums
 
