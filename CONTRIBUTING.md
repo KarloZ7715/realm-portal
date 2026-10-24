@@ -35,7 +35,7 @@ CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan and a per-
 
 `src/RealmPortal.Cli` builds the `realm-portal` command-line tool. Run it from source with
 `dotnet run --project src/RealmPortal.Cli -- <command>`. Commands, options, environment variables and exit codes are documented in
-[docs/cli.md](docs/cli.md). Always point `--config-dir`, `--projection-dir` and `--client-dir` at temporary folders when testing.
+[docs/cli.md](docs/cli.md). When testing, point `--config-dir`, `--projection-dir` and `--client-dir` at temporary folders, and set `REALM_PORTAL_BACKUP_DIR` to a temporary folder too.
 
 ## Component gallery
 

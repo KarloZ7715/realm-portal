@@ -43,16 +43,16 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | --- | --- |
 | `--version` (`-v`) | Prints the version. |
 | `client-version <dir>` | Prints the game version and build of the client in `<dir>`. |
-| `add` | Adds a server. `<host>` is `host` or `host:port`. `--line` adds an extra `realmlist.wtf` line (repeatable, e.g. `--line "set patchlist patch.example.org"`). `--build` is the required client build (a positive integer). |
+| `add` | Adds a server. `<host>` is `host` or `host:port`. `--line` adds an extra `realmlist.wtf` line (repeatable, e.g. `--line "set patchlist patch.example.org"`). `--build` is optional: the client build the server requires (a positive integer). Without it, the server works with any client. |
 | `remove` | Removes a server. |
 | `edit` | Changes a server. Only the options you pass change. `--client none` unlinks the server from its client. |
 | `list` | Lists servers. The active one is marked with `*`. With `--client-dir`, only servers compatible with that client are shown, unless you add `--all`; incompatible ones are marked `[incompatible]`. |
 | `switch` | Makes a server the active one. With `--client-dir`, it also backs up and rewrites that client's realm files (`realmlist.wtf` where the client uses it, and `WTF/Config.wtf`). Without `--client-dir`, it only updates Realm Portal's own state and `activo.json`. `--force` skips the compatibility check. |
-| `undo` | Restores the server (and client files) that were active before the last switch. It remembers one step. |
+| `undo` | Restores the server that was active before the last switch. It remembers one step. If that switch used `--client-dir`, it also restores the client's realm files from the backup; otherwise client files are left as they are. |
 | `status` | Shows the active server, whether `activo.json` is in sync, clients whose files do not match the active server, and whether undo is available. With `--client-dir`, also shows that client's version and whether it is compatible. |
-| `launch` | Needs `--client-dir` (or `REALM_PORTAL_CLIENT_DIR`). With `<server>`, switches to it and starts the game; without it, starts the game for the active server. `--force` skips the compatibility check. `--dry-run` prints what would be launched and changes nothing. `--wrapper <command>` runs the game through a command such as `wine` and saves it as the launcher prefix in Realm Portal's settings. |
+| `launch` | Needs `--client-dir` (or `REALM_PORTAL_CLIENT_DIR`). With `<server>`, switches to it and starts the game; without it, starts the game for the active server. `--force` skips the compatibility check. `--dry-run` prints what would be launched and changes nothing. `--wrapper <command>` runs the game through a command such as `wine` and saves it as the launcher prefix in Realm Portal's settings (with `--dry-run` it is only printed, not saved). |
 | `client list` / `add` / `edit` / `remove` | Manages registered game clients. Removing a client leaves the game folder and its backups on disk. |
-| `scan` | Searches the standard locations (Wine, Lutris, Steam and common game folders under your home folder) for game clients, plus any `--root` folders, and imports the servers found in their realm files. |
+| `scan` | Searches the standard locations (Wine, Lutris, Steam and common game folders under your home folder) for game clients, plus `/opt/games` on Linux or the Program Files folders on Windows, plus any `--root` folders, and imports the servers found in their realm files. |
 
 ## Options
 
@@ -60,7 +60,7 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | --- | --- |
 | `--config-dir <dir>` | Realm Portal's config folder (`servers.json`, `state.json`, `clients.json`). Overrides `REALM_PORTAL_CONFIG_DIR`. |
 | `--projection-dir <dir>` | Folder where `activo.json` is written. Overrides `REALM_PORTAL_PROJECTION_DIR`. |
-| `--client-dir <dir>` | Game client folder. Overrides `REALM_PORTAL_CLIENT_DIR`. Registers the client if needed and enables the compatibility filter (used by `list`, `switch`, `status` and `launch`). |
+| `--client-dir <dir>` | Game client folder. Overrides `REALM_PORTAL_CLIENT_DIR`. Only used by `list`, `switch`, `status` and `launch`: registers the client if needed and enables the compatibility filter. |
 | `--verbose` | Prints detailed error messages (paths, parse errors). Works before or after the command. |
 
 ## Environment variables

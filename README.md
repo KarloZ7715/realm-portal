@@ -30,7 +30,7 @@ When you switch, Realm Portal writes the connection settings into the client's m
 
 ## Install
 
-Download the file for your system from the [latest release](https://github.com/KarloZ7715/realm-portal/releases/latest). The steps below use version 1.0.0; if the release page shows a newer version, use that file name instead.
+The steps below install version 1.0.0. If the [releases page](https://github.com/KarloZ7715/realm-portal/releases/latest) lists a newer version, download that one and replace `1.0.0` with its version number in every command.
 
 ### Linux: Debian, Ubuntu, Linux Mint and similar (`.deb`)
 
