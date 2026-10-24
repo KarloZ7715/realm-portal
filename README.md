@@ -30,16 +30,16 @@ When you switch, Realm Portal writes the connection settings into the client's m
 
 ## Install
 
-The steps below install version 1.0.0. If the [releases page](https://github.com/KarloZ7715/realm-portal/releases/latest) lists a newer version, download that one and replace `1.0.0` with its version number in every command.
+The steps below install version 1.0.1. If the [releases page](https://github.com/KarloZ7715/realm-portal/releases/latest) lists a newer version, download that one and replace `1.0.1` with its version number in every command.
 
 ### Linux: Debian, Ubuntu, Linux Mint and similar (`.deb`)
 
-1. Download [`realm-portal_1.0.0_amd64.deb`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.0/realm-portal_1.0.0_amd64.deb).
+1. Download [`realm-portal_1.0.1_amd64.deb`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.1/realm-portal_1.0.1_amd64.deb).
 2. Open a terminal and run (this assumes the file is in your `Downloads` folder):
 
    ```bash
    cd ~/Downloads
-   sudo apt install ./realm-portal_1.0.0_amd64.deb
+   sudo apt install ./realm-portal_1.0.1_amd64.deb
    ```
 
 3. Open **Realm Portal** from your applications menu, or run `realm-portal` in a terminal.
@@ -48,17 +48,17 @@ To uninstall it, run `sudo apt remove realm-portal`. Your servers, settings and 
 
 ### Linux: any distribution (AppImage)
 
-Download [`RealmPortal-1.0.0-x86_64.AppImage`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.0/RealmPortal-1.0.0-x86_64.AppImage), then make it executable and run it from the folder where you saved it:
+Download [`RealmPortal-1.0.1-x86_64.AppImage`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.1/RealmPortal-1.0.1-x86_64.AppImage), then make it executable and run it from the folder where you saved it:
 
 ```bash
 cd ~/Downloads
-chmod +x RealmPortal-1.0.0-x86_64.AppImage
-./RealmPortal-1.0.0-x86_64.AppImage
+chmod +x RealmPortal-1.0.1-x86_64.AppImage
+./RealmPortal-1.0.1-x86_64.AppImage
 ```
 
 ### Windows
 
-Download [`RealmPortal-1.0.0-win-x64.zip`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.0/RealmPortal-1.0.0-win-x64.zip), unzip it and run `RealmPortal.App.exe`.
+Download [`RealmPortal-1.0.1-win-x64.zip`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.1/RealmPortal-1.0.1-win-x64.zip), unzip it and run `RealmPortal.App.exe`.
 
 ## Using the desktop app
 
