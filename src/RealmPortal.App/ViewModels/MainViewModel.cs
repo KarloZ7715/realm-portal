@@ -33,7 +33,6 @@ public sealed partial class MainViewModel : ObservableObject
             settings ?? new DemoSettingsStore(),
             () => Task.FromResult<string?>("/home/demo/.local/share/RealmPortal/backups-2"));
         settingsScreen.ApplySavedLanguage();
-        settingsScreen.BackRequested += () => SectionIndex = 0;
         settingsScreen.CanManageBackups = false;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
         Settings = settingsScreen;
@@ -52,7 +51,6 @@ public sealed partial class MainViewModel : ObservableObject
         Clients = new ClientsViewModel(session, pickFolder, startFirstScan: false);
         var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder);
         settingsScreen.ApplySavedLanguage();
-        settingsScreen.BackRequested += () => SectionIndex = 0;
         settingsScreen.CanManageBackups = true;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
         Settings = settingsScreen;
@@ -74,10 +72,59 @@ public sealed partial class MainViewModel : ObservableObject
 
     public SettingsViewModel Settings { get; }
 
-    /// <summary>Index in the sidebar: 0 servers, 1 clients, 2 settings.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Content), nameof(StatusText))]
     private int _sectionIndex;
+
+    /// <summary>
+    /// Index in the sidebar: 0 servers, 1 clients, 2 settings. Leaving Settings with unsaved changes asks first
+    /// (Cancel by default); until the user confirms, the sidebar stays on Settings and nothing is discarded.
+    /// </summary>
+    public int SectionIndex
+    {
+        get => _sectionIndex;
+        set
+        {
+            if (_sectionIndex == value)
+            {
+                return;
+            }
+
+            if (_sectionIndex == 2 && Settings is { IsDirty: true })
+            {
+                // The sidebar has already moved its selection; the window puts it back while the question is open.
+                SectionChangeHeld?.Invoke();
+                _ = ConfirmLeaveSettingsAsync(value);
+                return;
+            }
+
+            SetSection(value);
+        }
+    }
+
+    /// <summary>Raised when a section change waits for the unsaved-changes question, so the sidebar can re-select Settings.</summary>
+    public event Action? SectionChangeHeld;
+
+    private void SetSection(int value)
+    {
+        if (!SetProperty(ref _sectionIndex, value, nameof(SectionIndex)))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+        OnSectionIndexChanged(value);
+    }
+
+    private async Task ConfirmLeaveSettingsAsync(int target)
+    {
+        if (!await ConfirmAsync(ConfirmDialogViewModel.DiscardSettingsChanges()).ConfigureAwait(true))
+        {
+            return;
+        }
+
+        Settings.CancelCommand.Execute(null);
+        SetSection(target);
+    }
 
     /// <summary>The form being filled in, or null. It belongs to the servers section: leaving the section drops it.</summary>
     public AddServerViewModel? Adding => _adding;
@@ -142,7 +189,7 @@ public sealed partial class MainViewModel : ObservableObject
         _session?.UiPreferences.SetLanguage(Loc.Instance.Current);
     }
 
-    partial void OnSectionIndexChanged(int value)
+    private void OnSectionIndexChanged(int value)
     {
         if (value != 2)
             CloseBackupsManager();

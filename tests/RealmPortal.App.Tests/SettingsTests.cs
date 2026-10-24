@@ -147,14 +147,77 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
-    public async Task BrowseFillsTheBackupFolderAndBackReturnsToServers()
+    public async Task BrowseFillsTheBackupFolder()
     {
-        var (shell, settings) = Open();
+        var (_, settings) = Open();
         await settings.BrowseCommand.ExecuteAsync(null);
         Assert.EndsWith("backups-2", settings.BackupFolder);
         Assert.True(settings.IsDirty);
-        settings.BackCommand.Execute(null);
+    }
+
+    [AvaloniaFact]
+    public void HasNoTopBackButton()
+    {
+        // The sidebar and the Cancel/Save footer already leave the screen (#100).
+        var (shell, _) = Open();
+        var view = shell.Window.GetVisualDescendants().OfType<RealmPortal.App.Views.SettingsView>().Single();
+        Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), b => b.Name == "BackButton");
+    }
+
+    [AvaloniaFact]
+    public void LeavingWithoutChangesDoesNotAsk()
+    {
+        var (shell, _) = Open();
+        shell.Model.SectionIndex = 0;
         Assert.Equal(0, shell.Model.SectionIndex);
+        Assert.Null(shell.Model.Dialog);
+    }
+
+    [AvaloniaFact]
+    public void LeavingWithUnsavedChanges_AsksAndCancelKeepsTheEdits()
+    {
+        var (shell, settings) = Open();
+        settings.Prefix = "mangohud";
+        var nav = shell.Window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "Nav");
+
+        nav.SelectedIndex = 0;
+        Screenshots.Settle();
+
+        var dialog = Assert.IsType<ConfirmDialogViewModel>(shell.Model.Dialog);
+        Assert.Equal("¿Descartar los cambios sin guardar?", dialog.Title);
+        Assert.Equal("Seguir editando", dialog.CancelText);
+        Assert.Equal("Descartar cambios", dialog.ConfirmText);
+        Assert.Equal(2, shell.Model.SectionIndex);
+        Assert.Equal(2, nav.SelectedIndex);
+        Assert.Same(settings, shell.Model.Content);
+        shell.Snap("settings-leave-confirm", 1.0, 2.0);
+
+        dialog.CancelCommand.Execute(null);
+        Screenshots.Settle();
+        Assert.Null(shell.Model.Dialog);
+        Assert.Equal(2, shell.Model.SectionIndex);
+        Assert.Equal("mangohud", settings.Prefix);
+        Assert.True(settings.IsDirty);
+    }
+
+    [AvaloniaFact]
+    public void LeavingWithUnsavedChanges_DiscardRevertsAndLeaves()
+    {
+        var (shell, settings) = Open();
+        settings.Prefix = "mangohud";
+        settings.IsEnglish = true;
+        Assert.Equal(Language.En, Loc.Instance.Current);
+
+        shell.Model.SectionIndex = 1;
+        Screenshots.Settle();
+        var dialog = Assert.IsType<ConfirmDialogViewModel>(shell.Model.Dialog);
+        dialog.ConfirmCommand.Execute(null);
+        Screenshots.Settle();
+
+        Assert.Equal(1, shell.Model.SectionIndex);
+        Assert.False(settings.IsDirty);
+        Assert.Equal("gamemoderun", settings.Prefix);
+        Assert.Equal(Language.Es, Loc.Instance.Current);
     }
 
     [AvaloniaFact]

@@ -122,7 +122,6 @@
   "status.add": "Add server · not saved",
   "status.testing": "Testing connection…",
   "status.folderadded.real": "Folder added",
-  "settings.back": "Back",
   "settings.language": "Language",
   "settings.lang.es": "Español",
   "settings.lang.en": "English",
@@ -287,5 +286,9 @@
   "confirm.backupchanged.title": "Client files have changed",
   "confirm.backupchanged.body": "The client files have changed since this backup ({0}). Restoring it will replace the current files. A safety backup of the current files will be saved first.",
   "confirm.backupchanged.restore": "Restore backup",
+  "confirm.discardsettings.title": "Discard unsaved changes?",
+  "confirm.discardsettings.body": "Your changes in Settings have not been saved. If you leave now, they will be lost.",
+  "confirm.discardsettings.accept": "Discard changes",
+  "confirm.discardsettings.keep": "Keep editing",
   "confirm.cancel": "Cancel"
 }

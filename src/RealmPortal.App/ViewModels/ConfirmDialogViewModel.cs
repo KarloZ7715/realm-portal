@@ -59,6 +59,10 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
     /// <summary>The "Discard" confirmation for a backup that conflicts with newer client files (decided by the architect).</summary>
     public static ConfirmDialogViewModel DiscardBackup() => new("discard.title", "discard.body", "discard.confirm");
 
+    /// <summary>Asked when leaving Settings with unsaved changes; Cancel (the default) keeps editing.</summary>
+    public static ConfirmDialogViewModel DiscardSettingsChanges() =>
+        new("confirm.discardsettings.title", "confirm.discardsettings.body", "confirm.discardsettings.accept", "confirm.discardsettings.keep");
+
     public static ConfirmDialogViewModel BackupConflict(string serverName, string switchedAt, string backupLabel) =>
         new("confirm.backupconflict.title", "confirm.backupconflict.body", "confirm.backupconflict.restoreanyway",
             "confirm.cancel", [serverName, switchedAt, backupLabel], "confirm.backupconflict.discard");

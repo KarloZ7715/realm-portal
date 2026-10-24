@@ -7,14 +7,8 @@
              x:DataType="vm:SettingsViewModel">
   <!-- compact-07 settings: fixed header and footer, the cards scroll. No cache-cleanup card (architect: not in 0.1). -->
   <Grid RowDefinitions="Auto,*,Auto" Margin="20,10,20,0">
-    <Grid ColumnDefinitions="*,Auto" Height="44">
+    <Grid Height="44">
       <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T nav.settings}"/>
-      <Button Grid.Column="1" Name="BackButton" Classes="link caps" VerticalAlignment="Center" Command="{Binding BackCommand}">
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <c:Icon Data="{DynamicResource IconChevronLeft}" Width="12" Height="12" StrokeThickness="2.6"/>
-          <TextBlock Text="{loc:T settings.back}"/>
-        </StackPanel>
-      </Button>
     </Grid>
 
     <ScrollViewer Grid.Row="1" Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,6,14,12">

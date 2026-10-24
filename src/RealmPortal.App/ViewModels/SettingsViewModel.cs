@@ -32,9 +32,6 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Changed();
     }
 
-    /// <summary>Raised by "Back" (the shell returns to the servers list).</summary>
-    public event Action? BackRequested;
-
     public event Action? OpenBackupsManagerRequested;
 
     [ObservableProperty]
@@ -165,13 +162,6 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Reset();
         Loc.Instance.SetLanguage(_saved.Language);
         Changed();
-    }
-
-    [RelayCommand]
-    private void Back()
-    {
-        Cancel();
-        BackRequested?.Invoke();
     }
 
     [RelayCommand(CanExecute = nameof(CanOpenBackupsManager))]

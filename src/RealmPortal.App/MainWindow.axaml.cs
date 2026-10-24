@@ -27,6 +27,9 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         viewModel.DialogOpening += CaptureFocusBeforeDialog;
         viewModel.DialogClosed += RestoreFocusAfterDialog;
+        // A binding does not push an unchanged source value back, so re-select the held section by hand
+        // after the ListBox finishes its own selection change.
+        viewModel.SectionChangeHeld += () => Dispatcher.UIThread.Post(() => Nav.SelectedIndex = viewModel.SectionIndex);
         Opened += (_, _) => Platform.X11WindowIcon.TrySet(this);
         SizeChanged += (_, e) => UpdateSidebar(e.NewSize.Width);
     }
