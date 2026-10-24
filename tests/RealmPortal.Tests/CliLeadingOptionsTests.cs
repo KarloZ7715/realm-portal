@@ -31,7 +31,7 @@ public sealed class CliLeadingOptionsTests
         {
             var o = new StringWriter();
             var e = new StringWriter();
-            var code = Program.Run(args, o, e, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(_dir));
+            var code = Program.Run(args, o, e, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(_dir), new NeverRunningGameProbe());
             return (code, o.ToString(), e.ToString());
         }
 

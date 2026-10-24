@@ -129,7 +129,7 @@ public class UiPreferencesLoadTests
         Directory.CreateDirectory(backups);
         Seed(config, kind);
 
-        var session = PortalSession.CreateForPaths(config, projection, backups, new NoLaunch());
+        var session = PortalSession.CreateForPaths(config, projection, backups, new NoLaunch(), new NeverRunningGameProbe());
         var main = new MainViewModel(session, () => Task.FromResult<string?>(null), autoTick: false);
         var loaded = session.UiPreferences.Load();
 

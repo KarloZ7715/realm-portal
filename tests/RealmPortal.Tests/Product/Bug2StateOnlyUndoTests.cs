@@ -19,7 +19,7 @@ public class Bug2StateOnlyUndoTests
         Directory.CreateDirectory(config);
         Directory.CreateDirectory(projection);
 
-        var service = new PortalService(config, projection, new PeClientVersionReader(), new NoLaunch(), getVariable: _ => dir.Combine("backups"));
+        var service = new PortalService(config, projection, new PeClientVersionReader(), new NoLaunch(), probe: new NeverRunningGameProbe(), getVariable: _ => dir.Combine("backups"));
         service.AddServer(new NewServer("Wotlk", "wotlk.example.org"));
         var wotlk = service.ListServers().Value!.Single();
 
@@ -42,7 +42,7 @@ public class Bug2StateOnlyUndoTests
         Directory.CreateDirectory(config);
         Directory.CreateDirectory(projection);
 
-        var service = new PortalService(config, projection, new PeClientVersionReader(), new NoLaunch(), getVariable: _ => dir.Combine("backups"));
+        var service = new PortalService(config, projection, new PeClientVersionReader(), new NoLaunch(), probe: new NeverRunningGameProbe(), getVariable: _ => dir.Combine("backups"));
         var alpha = service.AddServer(new NewServer("Alpha", "alpha.example.org")).Value!;
         var beta = service.AddServer(new NewServer("Beta", "beta.example.org")).Value!;
 
@@ -65,7 +65,7 @@ public class Bug2StateOnlyUndoTests
         Directory.CreateDirectory(config);
         Directory.CreateDirectory(projection);
 
-        var service = new PortalService(config, projection, new PeClientVersionReader(), new NoLaunch(), getVariable: _ => dir.Combine("backups"));
+        var service = new PortalService(config, projection, new PeClientVersionReader(), new NoLaunch(), probe: new NeverRunningGameProbe(), getVariable: _ => dir.Combine("backups"));
         var wotlk = service.AddServer(new NewServer("Wotlk", "wotlk.example.org")).Value!;
         var second = service.AddServer(new NewServer("Second", "second.example.org")).Value!;
 
@@ -97,7 +97,7 @@ public class Bug2StateOnlyUndoTests
             projection,
             new PeClientVersionReader(),
             new NoLaunch(),
-            getVariable: _ => dir.Combine("backups"),
+            probe: new NeverRunningGameProbe(), getVariable: _ => dir.Combine("backups"),
             writer: writer);
         service.AddClient(client);
         var first = service.AddServer(new NewServer("First", "first.example.org")).Value!;

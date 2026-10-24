@@ -3,6 +3,7 @@ using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
+using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests.Product;
 
@@ -15,7 +16,7 @@ public class Bug8ServiceCliDescribeAllCodesTests
         Directory.CreateDirectory(dir.Combine("config"));
         Directory.CreateDirectory(dir.Combine("projection"));
         var stderr = new StringWriter();
-        var app = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), Support.TestBackupDir.Variables(dir));
+        var app = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), Support.TestBackupDir.Variables(dir), probe: new NeverRunningGameProbe());
         Assert.Equal(1, app.Run("add", ["Bad", "a.example.org", "--build", "0", "--config-dir", dir.Combine("config"), "--projection-dir", dir.Combine("projection")]));
         Assert.Contains("positive integer", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Usage:", stderr.ToString());

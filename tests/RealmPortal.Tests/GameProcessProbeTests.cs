@@ -108,28 +108,175 @@ public sealed class GameProcessProbeTests
     }
 
     [Fact]
-    public void ProcDirectory_VanishedOrZombie_IsExited_ButUnreadableStatKeepsTheGuard()
+    public void ReadTaskState_VanishedZombieLiveAndUnreadable()
     {
         if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var proc = temp.Combine("proc-123");
 
         // Vanished: /proc/<pid> no longer exists (ENOENT).
-        Assert.True(GameProcessProbe.HasExitedOnLinux(proc));
+        Assert.Equal(GameProcessProbe.TaskState.Gone, GameProcessProbe.ReadTaskState(proc));
 
         Directory.CreateDirectory(proc);
         var stat = Path.Combine(proc, "stat");
         File.WriteAllText(stat, "123 (wine) Z 1 123 123 0");
-        Assert.True(GameProcessProbe.HasExitedOnLinux(proc));
+        Assert.Equal(GameProcessProbe.TaskState.Exited, GameProcessProbe.ReadTaskState(proc));
 
         File.WriteAllText(stat, "123 (wine) S 1 123 123 0");
-        Assert.False(GameProcessProbe.HasExitedOnLinux(proc));
+        Assert.Equal(GameProcessProbe.TaskState.Live, GameProcessProbe.ReadTaskState(proc));
 
         // Permission denied (EACCES) is not "exited": the conservative guard must stay.
         if (Environment.UserName != "root")
         {
             File.SetUnixFileMode(stat, UnixFileMode.None);
-            Assert.False(GameProcessProbe.HasExitedOnLinux(proc));
+            Assert.Equal(GameProcessProbe.TaskState.Unreadable, GameProcessProbe.ReadTaskState(proc));
+            Assert.True(GameProcessProbe.LinuxProcessBlocks(proc, temp.Combine("client")));
+        }
+    }
+
+    /// <summary>Builds a fake <c>/proc/&lt;pid&gt;</c> tree: the leader's stat plus <c>task/&lt;tid&gt;</c> entries.</summary>
+    private sealed class FakeProc
+    {
+        public FakeProc(TempDirectory temp, string leaderState)
+        {
+            Root = temp.Combine("proc-100");
+            Directory.CreateDirectory(Path.Combine(Root, "task"));
+            File.WriteAllText(Path.Combine(Root, "stat"), $"100 (wine) {leaderState} 1 100 100 0");
+            File.WriteAllText(Path.Combine(Root, "cmdline"), "");
+            AddTask(100, leaderState, cwd: null);
+        }
+
+        public string Root { get; }
+
+        /// <summary>Adds a thread; <paramref name="cwd"/> null leaves its cwd unreadable, as for a zombie or a denied task.</summary>
+        public void AddTask(int tid, string state, string? cwd)
+        {
+            var task = Path.Combine(Root, "task", tid.ToString());
+            Directory.CreateDirectory(task);
+            File.WriteAllText(Path.Combine(task, "stat"), $"{tid} (wine) {state} 1 100 100 0");
+            File.WriteAllText(Path.Combine(task, "cmdline"), "");
+            if (cwd is not null)
+                Directory.CreateSymbolicLink(Path.Combine(task, "cwd"), cwd);
+        }
+    }
+
+    [Fact]
+    public void ExitedLeaderWithLiveThreadInClient_IsRunning_ByFolderMatch()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var temp = new TempDirectory();
+        var client = temp.Combine("client");
+        var other = temp.Combine("other");
+        Directory.CreateDirectory(client);
+        Directory.CreateDirectory(other);
+        var proc = new FakeProc(temp, "Z");
+        proc.AddTask(101, "S", cwd: client);
+
+        Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, client));
+        // Not blind blocking: the live thread's cwd is compared with the client folder.
+        Assert.False(GameProcessProbe.LinuxProcessBlocks(proc.Root, other));
+    }
+
+    [Fact]
+    public void ExitedLeaderWithOnlyZombieOrDeadThreads_IsNotRunning()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var temp = new TempDirectory();
+        var client = temp.Combine("client");
+        Directory.CreateDirectory(client);
+        var proc = new FakeProc(temp, "Z");
+        proc.AddTask(101, "Z", cwd: null);
+        proc.AddTask(102, "X", cwd: null);
+
+        Assert.False(GameProcessProbe.LinuxProcessBlocks(proc.Root, client));
+    }
+
+    [Fact]
+    public void ExitedLeaderWithLiveThreadWhoseCwdIsUnreadable_IsRunning()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var temp = new TempDirectory();
+        var client = temp.Combine("client");
+        Directory.CreateDirectory(client);
+        var proc = new FakeProc(temp, "Z");
+        proc.AddTask(101, "S", cwd: null);
+
+        Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, client));
+    }
+
+    [Fact]
+    public void ExitedLeaderWithoutTaskDirectory_IsNotRunning()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var temp = new TempDirectory();
+        var proc = new FakeProc(temp, "Z");
+        Directory.Delete(Path.Combine(proc.Root, "task"), recursive: true);
+
+        Assert.False(GameProcessProbe.LinuxProcessBlocks(proc.Root, temp.Combine("client")));
+    }
+
+    [Fact]
+    public void RealProcessWhoseMainThreadExited_IsRunningOnlyForItsClient()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        var compiler = new[] { "/usr/bin/cc", "/usr/bin/gcc" }.FirstOrDefault(File.Exists);
+        if (compiler is null)
+        {
+            // No C compiler on this machine; the fake /proc tests above cover the same decision.
+            return;
+        }
+
+        using var temp = new TempDirectory();
+        var client = temp.Combine("client");
+        var other = temp.Combine("other");
+        Directory.CreateDirectory(client);
+        Directory.CreateDirectory(other);
+        var source = temp.Combine("helper.c");
+        // Like Wine's ExitThread on the main thread: the leader exits (state Z), a worker keeps running in the client.
+        File.WriteAllText(source, """
+            #include <pthread.h>
+            #include <unistd.h>
+            static void *worker(void *arg) { (void)arg; sleep(30); return 0; }
+            int main(int argc, char **argv) {
+                pthread_t t;
+                if (argc < 2 || chdir(argv[1]) != 0) return 2;
+                if (pthread_create(&t, 0, worker, 0) != 0) return 3;
+                pthread_exit(0);
+            }
+            """);
+        var wine = temp.Combine("wine");
+        using (var cc = Process.Start(new ProcessStartInfo(compiler)
+        {
+            ArgumentList = { "-pthread", "-o", wine, source },
+            UseShellExecute = false,
+            RedirectStandardError = true,
+        })!)
+        {
+            var stderr = cc.StandardError.ReadToEnd();
+            cc.WaitForExit();
+            Assert.True(cc.ExitCode == 0, $"cc failed: {stderr}");
+        }
+
+        using var process = Process.Start(new ProcessStartInfo(wine) { ArgumentList = { client }, UseShellExecute = false })!;
+        try
+        {
+            var proc = $"/proc/{process.Id}";
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (GameProcessProbe.ReadTaskState(proc) != GameProcessProbe.TaskState.Exited
+                   || Directory.GetDirectories(Path.Combine(proc, "task")).Length < 2)
+            {
+                Assert.True(DateTime.UtcNow < deadline, "the helper's main thread did not exit");
+                Thread.Sleep(10);
+            }
+
+            var probe = new GameProcessProbe();
+            Assert.True(probe.IsGameRunning(client));
+            Assert.False(probe.IsGameRunning(other));
+        }
+        finally
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit();
         }
     }
 
