@@ -128,6 +128,7 @@ Whenever a client is discovered by `Scan()` (with `ImportServers == true`) **or*
 2. Validates the extracted host and patchlist with `RealmlistAddress.ValidateRealmlistHost` and `RealmlistAddress.ValidatePatchlistValue`, and validates metadata (`Realm`, `Account`) with `ServerValidator`. Unparseable, missing, or stock official placeholder hosts (`*.battle.net`, `*.worldofwarcraft.com`) are skipped silently without failing `Scan()` or `AddClient()`.
 3. **Deduplication key:**
    - Normalized tuple **`(NormalizedHost, NormalizedRealm, RequiredClientBuild)`**, compared case-insensitively (`StringComparison.OrdinalIgnoreCase`) on `NormalizedHost` (trimmed, lowercase `host` or `host:port`) and `NormalizedRealm` (trimmed `Realm ?? ""`), with `RequiredClientBuild == client.Version.Build`.
+   - A stored server with `RequiredClientBuild == null` (client-independent) and the same host and realm also matches any build (an exact build match wins), so editing a server or adding it by hand never leads to a re-import (#93).
    - If a matching server already exists in `ServerStore`, no duplicate server is created; if that existing server has `ClientId == null`, its `ClientId` is linked to `client.Id`.
    - Otherwise, a new `Server` is added to `ServerStore` with `RequiredClientBuild = client.Version.Build`, `ClientId = client.Id`, and an auto-generated unique `Name` (`PortalService.CreateImportedServerName`): `"{Realm} ({Host})"` when `Realm` is non-empty; otherwise `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` (e.g., `"logon.warmane.example.org (3.3.5)"`) when `ClientVersion` is known, or `"{Host}"` when `ClientVersion` is `null`; capped at `<= 64` characters (`Server.MaxNameLength`) and disambiguated case-insensitively with `" #2"`, `" #3"`, ... (truncating the base prefix so `base + suffix <= 64` characters; see **Approved decisions #1**).
    - If `state.json` has no active server recorded for `client.Id` (`active_by_client[client.Id]` is unset), the extracted (or matched) server is marked active for `client.Id` in `state.json` (and if global `active_id` is `null`, sets `active_id` and writes `activo.json`).
@@ -189,11 +190,11 @@ public sealed record UpdateClientRequest(
 /// <param name="Name">Display name (unique case-insensitively across all other servers).</param>
 /// <param name="Host">Realmlist host, e.g. <c>logon.example.org</c> or <c>10.0.0.5:3724</c>.</param>
 /// <param name="Realm">Realm name to preselect in the login screen; <c>null</c> for none.</param>
-/// <param name="PatchlistHost">Value of an optional <c>set patchlist</c> line; <c>null</c> for none.</param>
-/// <param name="RequiredClientBuild">Client build the server needs (e.g. 12340); <c>null</c> for any.</param>
+/// <param name="PatchlistHost">Value of a <c>set patchlist</c> line replacing the stored extra lines; <c>null</c> keeps them (unless <paramref name="ExtraRealmlistLines"/> is set).</param>
+/// <param name="RequiredClientBuild">Client build the server needs (e.g. 12340); <c>null</c> keeps the stored build.</param>
 /// <param name="Account">Remembered account name (never a password); <c>null</c> for none.</param>
 /// <param name="ClientId">Preferred client for this server (<see cref="ClientEntry.Id"/>); <c>null</c> for none. Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
-/// <param name="ExtraRealmlistLines">Extra realmlist lines after <c>set realmlist</c>.</param>
+/// <param name="ExtraRealmlistLines">Extra realmlist lines after <c>set realmlist</c>; <c>null</c> keeps the stored ones, an empty list clears them.</param>
 public sealed record UpdateServerRequest(
     string ServerId,
     string Name,
@@ -242,6 +243,7 @@ public sealed record UpdateServerRequest(
 ### 2.3 Server CRUD semantics (`AddServer`, `UpdateServer`, `RemoveServer`)
 
 - **`UpdateServer(UpdateServerRequest request)`:**
+  - **Null keeps the stored value (#93)** for the file fields the edit form may not show: `RequiredClientBuild == null` keeps the stored build; `ExtraRealmlistLines == null` and `PatchlistHost == null` keep the stored extra realmlist lines (`set patchlist …`). An empty `ExtraRealmlistLines` list clears them. `Name`, `Host`, `Realm`, `Account` and `ClientId` are always taken from the request (`null` clears `Realm`, `Account` and `ClientId`). A stored build cannot be cleared through `UpdateServer`.
   - Validates all fields via `Server.Create(..., id: request.ServerId)` and `ServerValidator.Validate` (identical host, port, realmlist, length, and forbidden-character checks as `AddServer` and `ServerStore` load).
   - Fails with `ServerNotFound` if `request.ServerId` does not exist; fails with `ClientNotFound` if `request.ClientId` is non-null and not in `ClientStore`; fails with `ServerNameTaken` (`ServerName = request.Name`) if another server (`Id != request.ServerId`) already uses `request.Name` case-insensitively.
   - **Running check:** If `request.ServerId` is currently active on any client `C` where `IsGameRunning(C) == true` and any connection/file field changed (`Host`, `Realm`, `PatchlistHost`, `ExtraRealmlistLines`, `RequiredClientBuild`), refuses with `ServiceErrorCode.GameRunning` (`ServerName = existing.Name`, `Path = C.Path`).

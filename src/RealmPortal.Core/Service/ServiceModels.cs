@@ -72,6 +72,11 @@ public sealed record NewServer(
     IReadOnlyList<string>? ExtraRealmlistLines = null);
 
 /// <summary>Request to update an existing server.</summary>
+/// <remarks>
+/// <see cref="RequiredClientBuild"/> <c>null</c> keeps the stored build. <see cref="ExtraRealmlistLines"/> and
+/// <see cref="PatchlistHost"/> both <c>null</c> keep the stored extra realmlist lines; an empty
+/// <see cref="ExtraRealmlistLines"/> clears them. The other fields are always taken from the request.
+/// </remarks>
 public sealed record UpdateServerRequest(
     string ServerId,
     string Name,
