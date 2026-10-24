@@ -52,6 +52,19 @@ public class ClientsScreenTests
     }
 
     [AvaloniaFact]
+    public async Task ClientsFooterHasNoSettingsHint()
+    {
+        // Clients are managed on this screen, so a "change them later in Settings" hint would be wrong (#95).
+        var shell = new Shell();
+        shell.Model.SectionIndex = 1;
+        await Pump();
+        var view = shell.Window.GetVisualDescendants().OfType<RealmPortal.App.Views.ClientsView>().Single();
+        var texts = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text ?? "").ToList();
+        Assert.Contains("Buscar de nuevo", texts);
+        Assert.DoesNotContain(texts, t => t.Contains("Ajustes", StringComparison.Ordinal));
+    }
+
+    [AvaloniaFact]
     public async Task TickingARowUpdatesTheSummary()
     {
         var shell = new Shell();
