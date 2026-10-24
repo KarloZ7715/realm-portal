@@ -512,12 +512,7 @@ public sealed class CliApp(
             if (FindServer(service, parsed.Positionals[0], out server) != 0)
                 return 2;
             if (dryRun)
-            {
-                var executable = GameExecutable.Find(clientDir)
-                                 ?? throw new UsageException($"{GameExecutable.FileName} not found in '{clientDir}'.");
-                SafeWriteLine(output, $"Dry run: would launch {(wrapper is null ? "" : wrapper + " ")}{executable} for '{server.Name}'.");
-                return 0;
-            }
+                return DryRun(service, clientDir, wrapper, server.Name);
 
             var play = service.Play(new SwitchRequest(clientId, server.Id, force));
             if (!play.Succeeded)
@@ -537,12 +532,7 @@ public sealed class CliApp(
         }
 
         if (dryRun)
-        {
-            var executable = GameExecutable.Find(clientDir)
-                             ?? throw new UsageException($"{GameExecutable.FileName} not found in '{clientDir}'.");
-            SafeWriteLine(output, $"Dry run: would launch {(wrapper is null ? "" : wrapper + " ")}{executable} for '{server.Name}'.");
-            return 0;
-        }
+            return DryRun(service, clientDir, wrapper, server.Name);
 
         var launch = service.Play(new SwitchRequest(clientId, server.Id, force));
         if (!launch.Succeeded)
@@ -550,6 +540,47 @@ public sealed class CliApp(
         SafeWriteLine(output, $"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
         return 0;
     }
+
+    /// <summary>
+    /// <c>launch --dry-run</c> (#130): resolves the same <see cref="GameLaunchSpec"/> a real launch would start (saved launcher
+    /// settings, with <paramref name="wrapper"/> as the prefix when given, without saving it) and prints the resulting command,
+    /// one quoted token per argument, plus any environment changes. A setting the CLI launcher cannot apply fails the same way a
+    /// real launch would. Nothing is switched, saved or started.
+    /// </summary>
+    private int DryRun(PortalService service, string clientDir, string? wrapper, string serverName)
+    {
+        var executable = GameExecutable.Find(clientDir)
+                         ?? throw new UsageException($"{GameExecutable.FileName} not found in '{clientDir}'.");
+        var settings = service.GetLauncherSettings();
+        if (!settings.Succeeded)
+            return Fail(settings.Error!);
+        var effective = wrapper is null ? settings.Value! : settings.Value! with { Prefix = [wrapper] };
+        var spec = effective.ToSpec(executable, clientDir);
+        if (GameLauncherAdapter.UnsupportedSetting(spec) is { } unsupported)
+            return Fail(new ServiceError(ServiceErrorCode.InvalidLauncherSettings, Diagnostic: $"Unsupported launcher setting '{unsupported}'."));
+
+        ProcessLaunch process;
+        try
+        {
+            process = spec.Resolve();
+        }
+        catch (ArgumentException ex)
+        {
+            return Fail(new ServiceError(ServiceErrorCode.InvalidLauncherSettings, Diagnostic: ex.Message));
+        }
+
+        var command = string.Join(' ', new[] { process.FileName }.Concat(process.Arguments).Select(QuoteForDisplay));
+        SafeWriteLine(output, $"Dry run: would launch {command} for '{serverName}'.");
+        foreach (var (name, value) in process.Environment.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            SafeWriteLine(output, value is null ? $"  unset {name}" : $"  env {name}={value}");
+        return 0;
+    }
+
+    /// <summary>Shows a token as one word: unchanged when it has no whitespace or quotes, otherwise in double quotes.</summary>
+    internal static string QuoteForDisplay(string token) =>
+        token.Length > 0 && !token.Any(c => char.IsWhiteSpace(c) || c is '"' or '\'')
+            ? token
+            : "\"" + token.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
 
     /// <summary>Resolves a server selector. Returns 0 on success, or 2 after writing an error.</summary>
     private int FindServer(PortalService service, string selector, out ServerEntry server)
