@@ -10,7 +10,8 @@
 #   - a GitHub noreply address matching the whole string
 #     ^([0-9]+\+)?[a-z0-9]([a-z0-9]|-[a-z0-9]){0,38}(\[bot\])?@users\.noreply\.github\.com$
 #     i.e. an optional numeric ID and a valid GitHub username (1-39 characters, letters,
-#     digits and single inner hyphens; no leading, trailing or double hyphen), optionally
+#     digits and single inner hyphens; no leading, trailing or double hyphen; the length
+#     is checked separately because the regex alone allows longer names), optionally
 #     with the [bot] suffix (e.g. 188834590+KarloZ7715@..., KarloZ7715@...,
 #     49699333+dependabot[bot]@...), or
 #   - exactly one of EXACT_ALLOWED_EMAILS: noreply@github.com (committer of commits
@@ -33,7 +34,15 @@ EXACT_ALLOWED_EMAILS="noreply@github.com cursoragent@cursor.com"
 is_allowed_email() {
   local lower="${1,,}"
   [[ -n "$lower" ]] || return 1
-  [[ "$lower" =~ $NOREPLY_REGEX ]] && return 0
+  if [[ "$lower" =~ $NOREPLY_REGEX ]]; then
+    # Each "-x" repetition consumes two characters, so the regex alone allows longer
+    # usernames; enforce GitHub's 39-character maximum on the username itself.
+    local user="${lower%@users.noreply.github.com}"
+    user="${user#*+}"
+    user="${user%\[bot\]}"
+    [[ "${#user}" -le 39 ]] && return 0
+    return 1
+  fi
   local exact
   for exact in $EXACT_ALLOWED_EMAILS; do
     [[ "$lower" == "$exact" ]] && return 0
@@ -61,11 +70,13 @@ domain_of() {
 coauthor_email() {
   local value="$1" token candidate="" found=0
   local -a tokens=()
-  if [[ "$value" =~ \<([^\<\>]*)\> ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
-    return
+  if [[ "$value" == *[\<\>]* ]]; then
+    # Exactly one <...> pair, with nothing bracket-like after it; anything else is malformed.
+    if [[ "$value" =~ ^[^\<\>]*\<([^\<\>]*)\>[^\<\>]*$ ]]; then
+      printf '%s' "${BASH_REMATCH[1]}"
+    fi
+    return 0
   fi
-  [[ "$value" != *[\<\>]* ]] || return 0
   # read -a splits on whitespace without glob expansion.
   read -r -a tokens <<< "$value" || true
   for token in "${tokens[@]}"; do

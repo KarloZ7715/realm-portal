@@ -28,6 +28,7 @@ expect allowed 'a-b-c@users.noreply.github.com'
 expect allowed 'a@users.noreply.github.com'
 expect allowed "$(printf 'a%.0s' {1..39})@users.noreply.github.com"            # 39 chars: GitHub maximum
 expect allowed "1+$(printf 'a%.0s' {1..39})[bot]@users.noreply.github.com"
+expect allowed "1+a$(printf -- '-b%.0s' {1..19})@users.noreply.github.com"         # 39 chars with hyphens
 expect allowed 'noreply@github.com'
 expect allowed 'NoReply@GitHub.com'
 expect allowed 'cursoragent@cursor.com'
@@ -60,6 +61,8 @@ expect rejected '1+-ab@users.noreply.github.com'
 expect rejected 'bot-[bot]@users.noreply.github.com'
 expect rejected "$(printf 'a%.0s' {1..40})@users.noreply.github.com"           # 40 chars
 expect rejected "1+$(printf 'a%.0s' {1..45})@users.noreply.github.com"
+expect rejected "a$(printf -- '-b%.0s' {1..20})@users.noreply.github.com"            # 41 chars with hyphens
+expect rejected "1+a$(printf -- '-b%.0s' {1..20})[bot]@users.noreply.github.com"
 
 # Reported domain (never the full address)
 expect_out() { # expect_out <want> <flag> <input>
@@ -84,6 +87,9 @@ expect_out '' --coauthor-email 'Some Name'
 expect_out '' --coauthor-email 'a@x.com b@y.com'
 expect_out '' --coauthor-email 'Me <me@gmail.com'
 expect_out '' --coauthor-email '*'
+expect_out '' --coauthor-email 'Me <me@gmail.com> <other@x.com>'
+expect_out '' --coauthor-email 'Me <me@gmail.com> trailing>'
+expect_out '' --coauthor-email 'Me <<me@gmail.com>'
 
 # Range checks on a throwaway repository
 tmp="$(mktemp -d)"

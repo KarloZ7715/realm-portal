@@ -124,7 +124,8 @@ On pull requests the `commit-email` CI job (`.github/workflows/commit-email.yml`
 `.github/scripts/check-commit-emails.sh`) checks the author (`%ae`) and committer (`%ce`) email of every new
 commit. An email passes when, ignoring case, the whole address matches
 `^([0-9]+\+)?[a-z0-9]([a-z0-9]|-[a-z0-9]){0,38}(\[bot\])?@users\.noreply\.github\.com$`, that is, an
-optional numeric ID and a valid GitHub username (1 to 39 letters, digits or single inner hyphens), optionally
+optional numeric ID and a valid GitHub username (1 to 39 letters, digits or single inner hyphens; the script
+checks the length separately), optionally
 followed by `[bot]` (for example
 `188834590+KarloZ7715@users.noreply.github.com`, `KarloZ7715@users.noreply.github.com` or
 `49699333+dependabot[bot]@users.noreply.github.com`), or is exactly one of:
