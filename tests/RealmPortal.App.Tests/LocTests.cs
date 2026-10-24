@@ -43,6 +43,17 @@ public partial class LocTests
     }
 
     [AvaloniaFact]
+    public void BackLabelsDoNotEmbedArrows()
+    {
+        // Back buttons draw the IconChevronLeft icon; an arrow in the text would show twice (#97).
+        foreach (var language in new[] { Language.Es, Language.En })
+        {
+            Assert.All(Loc.Load(language).Where(p => p.Key.EndsWith(".back", StringComparison.Ordinal)),
+                pair => Assert.DoesNotContain("←", pair.Value));
+        }
+    }
+
+    [AvaloniaFact]
     public void MissingKeyShowsAMarker()
     {
         Assert.Equal("!missing.key!", Loc.Get("missing.key"));

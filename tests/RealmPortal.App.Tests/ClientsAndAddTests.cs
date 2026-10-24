@@ -39,6 +39,19 @@ public class ClientsScreenTests
     }
 
     [AvaloniaFact]
+    public async Task EditClientBackButtonShowsASingleChevron()
+    {
+        var shell = new Shell();
+        shell.Model.SectionIndex = 1;
+        shell.Model.Clients.Items[0].EditCommand.Execute(null);
+        await Pump();
+        var back = shell.Window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "BackButton");
+        Assert.Single(back.GetVisualDescendants().OfType<Icon>());
+        Assert.Equal(["Volver"], back.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+        shell.Snap("edit-client", 1.0);
+    }
+
+    [AvaloniaFact]
     public async Task TickingARowUpdatesTheSummary()
     {
         var shell = new Shell();

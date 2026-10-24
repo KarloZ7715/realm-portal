@@ -12,8 +12,8 @@
   <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="20,10,20,0">
     <Grid ColumnDefinitions="Auto,*" Height="44">
       <Button Name="BackButton" Classes="link caps" Command="{Binding BackCommand}">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="←" FontSize="18"/>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <c:Icon Data="{DynamicResource IconChevronLeft}" Width="12" Height="12" StrokeThickness="2.6"/>
           <TextBlock Text="{loc:T backups.back}"/>
         </StackPanel>
       </Button>

@@ -1,4 +1,7 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
+using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.App.ViewModels;
@@ -188,5 +191,34 @@ public sealed class BackupsViewModelTests
         main.Dialog.ConfirmCommand.Execute(null);
         await restoreTask;
         Assert.Equal("set realmlist original.example\r\n", File.ReadAllText(env.Realmlist));
+    }
+    [AvaloniaFact]
+    public async Task BackButton_ShowsASingleChevronAndPlainText()
+    {
+        using var env = new Env();
+        var main = new MainViewModel(env.Session, autoTick: false);
+        var window = new MainWindow(main) { Width = 720, Height = 440 };
+        window.Show();
+        main.SectionIndex = 2;
+        main.Settings.OpenBackupsManagerCommand.Execute(null);
+        var vm = Assert.IsType<BackupsViewModel>(main.Content);
+        await vm.RefreshCommand.ExecuteAsync(null);
+        await vm.CreateBackupCommand.ExecuteAsync(null);
+        Screenshots.Settle();
+
+        foreach (var (language, label) in new[] { (Language.En, "Back"), (Language.Es, "Volver") })
+        {
+            Loc.Instance.SetLanguage(language);
+            Screenshots.Settle();
+            var back = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "BackButton");
+            Assert.Single(back.GetVisualDescendants().OfType<Icon>());
+            var texts = back.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+            Assert.Equal([label], texts);
+            foreach (var scale in new[] { 1.0, 2.0 })
+                Screenshots.Save(window, scale, $"backups-{language.ToString().ToLowerInvariant()}-{scale:0.0}x.png");
+            Screenshots.SetRenderScaling(window, 1.0);
+        }
+
+        Loc.Instance.SetLanguage(Language.En);
     }
 }
