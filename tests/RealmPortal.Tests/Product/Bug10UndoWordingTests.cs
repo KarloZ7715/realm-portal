@@ -34,8 +34,8 @@ public class Bug10UndoWordingTests
 
         var undo = service.Undo();
         Assert.True(undo.Succeeded, undo.Error is null ? "undo failed" : $"{undo.Error.Code}: {undo.Error.Diagnostic}");
-        Assert.Contains($"Client files: restored '{client}' to its state before the switch.", undo.Value!.ClientFilesNotice);
-        Assert.DoesNotContain("Client files: updated", undo.Value!.ClientFilesNotice ?? "");
+        Assert.Contains($"Client files: restored '{client}' to its state before the switch.", undo.Value!.ClientFilesNoticeLines!);
+        Assert.DoesNotContain(undo.Value!.ClientFilesNoticeLines!, line => line.Contains("Client files: updated"));
     }
 
     [Fact]
