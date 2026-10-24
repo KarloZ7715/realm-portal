@@ -7,7 +7,8 @@ Realm Portal's own code is MIT (see `LICENSE`). This file lists third-party soft
 The list is every `package` entry in `RealmPortal.App.deps.json` of the linux-x64 and win-x64 release publishes (same set on
 both; trimming may drop some assemblies, but the packages are listed as published). Versions match `Directory.Packages.props`
 and `src/RealmPortal.App/packages.lock.json` (checked 2026-10-24). The full license and notice texts are committed under
-`licenses/nuget/<folder>/` (index: `licenses/nuget/packages.tsv`, with the source of each file) and shipped in every package
+`licenses/nuget/<folder>/`, one folder per license source shared by packages of the same family (index:
+`licenses/nuget/packages.tsv`, with the expected files and the source of each row) and shipped in every package
 under `licenses/nuget/`.
 
 | Package | Version | License | License files | Use |
