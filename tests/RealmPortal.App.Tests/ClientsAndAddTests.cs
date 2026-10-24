@@ -344,7 +344,7 @@ public class AddServerScreenTests
         var form = Open(shell);
         await Pump();
         Assert.Equal(4, form.Clients.Items.Count);
-        var box = shell.Window.GetVisualDescendants().OfType<ComboBox>().Single();
+        var box = shell.Window.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "ClientBox");
         Assert.Equal(4, box.ItemCount);
         Assert.Equal("Cliente 3.3.5a (12340) · Lutris", form.SelectedClient!.Label);
     }
