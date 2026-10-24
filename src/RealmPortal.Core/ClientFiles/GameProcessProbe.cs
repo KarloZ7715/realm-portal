@@ -29,6 +29,8 @@ public sealed class GameProcessProbe : IGameProcessProbe
                     if (OperatingSystem.IsLinux())
                     {
                         var proc = $"/proc/{process.Id}";
+                        if (HasExitedOnLinux(proc))
+                            continue;
                         try
                         {
                             var cwd = NormalizePath(new DirectoryInfo(Path.Combine(proc, "cwd")).ResolveLinkTarget(true)?.FullName
@@ -38,7 +40,9 @@ public sealed class GameProcessProbe : IGameProcessProbe
                         }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
                         {
-                            // If process metadata cannot be read, keep the conservative guard.
+                            // A process that exited meanwhile is not running; otherwise keep the conservative guard.
+                            if (HasExitedOnLinux(proc))
+                                continue;
                             return true;
                         }
 
@@ -50,6 +54,8 @@ public sealed class GameProcessProbe : IGameProcessProbe
                         }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                         {
+                            if (HasExitedOnLinux(proc))
+                                continue;
                             return true;
                         }
                     }
@@ -63,6 +69,8 @@ public sealed class GameProcessProbe : IGameProcessProbe
                         }
                         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or UnauthorizedAccessException)
                         {
+                            if (HasExited(process))
+                                continue;
                             return true;
                         }
                     }
@@ -75,6 +83,48 @@ public sealed class GameProcessProbe : IGameProcessProbe
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// True when <paramref name="procDirectory"/> (<c>/proc/&lt;pid&gt;</c>) is gone or the process is a zombie
+    /// (<c>Z</c>) or dead (<c>X</c>). Such a process has no readable cwd but is not running, so it must not
+    /// trip the conservative guard.
+    /// </summary>
+    private static bool HasExitedOnLinux(string procDirectory)
+    {
+        try
+        {
+            return StatShowsExited(File.ReadAllText(Path.Combine(procDirectory, "stat")));
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Reads the state field of <c>/proc/&lt;pid&gt;/stat</c>; the name in parentheses may contain spaces or ')'.</summary>
+    internal static bool StatShowsExited(string stat)
+    {
+        var end = stat.LastIndexOf(')');
+        if (end < 0 || end + 2 >= stat.Length)
+            return false;
+        return stat[end + 2] is 'Z' or 'X' or 'x';
+    }
+
+    private static bool HasExited(Process process)
+    {
+        try
+        {
+            return process.HasExited;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+            return false;
+        }
     }
 
     internal static bool CommandLineMatches(string commandLine, string normalizedRoot)
