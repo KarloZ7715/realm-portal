@@ -38,7 +38,22 @@ Checked against the restored packages' `.nuspec` files (Phase 1, 2026-10-17).
 | xunit.core / .assert / .extensibility.* / .analyzers / .abstractions | 2.9.3 / 1.18.0 / 2.0.3 | Apache-2.0 (.abstractions: see its upstream license) (tests only) |
 | System.Reflection.Metadata | 1.6.0 | MIT (tests only) |
 
-The .NET SDK/runtime (MIT) is not redistributed in this repository.
+## .NET runtime (bundled in release builds)
+
+This source repository does not vendor the .NET SDK or runtime, but the release binaries are self-contained: the
+`.deb`, the AppImage and the Windows ZIP built by `.github/workflows/release-linux.yml` bundle the .NET runtime.
+
+| Component | Version | License | Use |
+|---|---|---|---|
+| .NET runtime (`Microsoft.NETCore.App`, runtime pack `Microsoft.NETCore.App.Runtime.linux-x64` / `.win-x64`) | the 9.0 runtime bundled at build time (latest 9.0.x patch of the SDK installed by the workflow, `dotnet-version: 9.0.x`; SDK band per `global.json`) | MIT (© .NET Foundation and Contributors), plus the third-party notices in its `THIRD-PARTY-NOTICES.TXT` | runtime of the self-contained app (release builds only) |
+
+ASP.NET Core and the Windows Desktop runtime (`Microsoft.WindowsDesktop.App`) are not used and not bundled.
+
+Every release package ships the runtime's `LICENSE.TXT` and `THIRD-PARTY-NOTICES.TXT`, copied by
+`packaging/collect-licenses.sh` from the exact runtime pack that `dotnet publish` bundled, together with
+`licenses/dotnet-runtime/VERSION.txt` (exact runtime version and source commit), this file, `LICENSE` and the fonts'
+`OFL.txt`. They are installed under `/usr/share/doc/realm-portal/` (`.deb` and AppImage) and next to `RealmPortal.App.exe`
+(Windows ZIP).
 
 Keep this table in sync with `Directory.Packages.props`.
 

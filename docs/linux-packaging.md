@@ -44,6 +44,23 @@ Both packages install the self-contained publish output under `/opt/realm-portal
 
 Desktop entry, AppStream metainfo, and hicolor icons come from `packaging/linux/`. The source metainfo carries no version; `build-packages.sh` adds the `<releases>` entry for the package version (dated from `SOURCE_DATE_EPOCH` when set) and refuses a metainfo with a hardcoded `<releases>`.
 
+### License and notice files
+
+Release builds are self-contained, so they redistribute the .NET runtime. `packaging/collect-licenses.sh <publish-dir> <rid> <dest>`
+reads the runtime pack version from `RealmPortal.App.deps.json` in the publish output and copies, from that exact pack in the NuGet
+global packages folder, `LICENSE.TXT` and `THIRD-PARTY-NOTICES.TXT` into `licenses/dotnet-runtime/` (plus a `VERSION.txt` with the
+runtime version and source commit). It also copies `LICENSE`, `THIRD_PARTY_LICENSES.md` and the fonts' `OFL.txt` (`licenses/fonts/`).
+Nothing is committed for the runtime, so the notices always match the bundled patch release.
+
+| Package | Location |
+| --- | --- |
+| `.deb` | `/usr/share/doc/realm-portal/` |
+| AppImage | `usr/share/doc/realm-portal/` inside the image |
+| Windows ZIP | next to `RealmPortal.App.exe` |
+
+`build-packages.sh` fails if the `.deb` or the AppDir lacks `LICENSE`, `THIRD_PARTY_LICENSES.md` or the two runtime files, and the
+Windows job checks the publish folder before zipping.
+
 ### `.deb` dependencies
 
 The control file declares runtime libraries expected on typical Debian/Ubuntu desktops (Avalonia/Skia/X11):
