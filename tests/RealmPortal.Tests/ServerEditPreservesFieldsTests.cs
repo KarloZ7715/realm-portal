@@ -154,4 +154,62 @@ public sealed class ServerEditPreservesFieldsTests
         Assert.Null(PortalService.FindImportMatch([other], identity));
         Assert.Null(PortalService.FindImportMatch([any], RealmlistIdentity.Create(Host, "Other Realm", build.Get)));
     }
+
+    [Fact]
+    public void Edit_ClearRequiredClientBuild_RemovesBuild_AndKeepsOtherFields()
+    {
+        using var env = new Env();
+        var added = env.Service.AddServer(new NewServer("Example", Host, "Example Realm", RequiredClientBuild: 12340,
+            ExtraRealmlistLines: [PatchLine])).Value!;
+        var before = env.Stored(added.Id);
+
+        var cleared = env.Service.UpdateServer(FormEdit(before, "Example") with { ClearRequiredClientBuild = true });
+
+        Assert.True(cleared.Succeeded, cleared.Error?.ToString());
+        Assert.Null(cleared.Value!.RequiredClientBuild);
+        Assert.Equal(before with { RequiredClientBuild = null }, env.Stored(added.Id));
+    }
+
+    [Fact]
+    public void Edit_SettingAndClearingBuildTogether_IsInvalidBuildInput_AndWritesNothing()
+    {
+        using var env = new Env();
+        var added = env.Service.AddServer(new NewServer("Example", Host, RequiredClientBuild: 12340)).Value!;
+
+        var result = env.Service.UpdateServer(new UpdateServerRequest(added.Id, "Example", Host, RequiredClientBuild: 8606,
+            ClearRequiredClientBuild: true));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ServiceErrorCode.InvalidServerInput, result.Error!.Code);
+        Assert.Equal("build", result.Error.Field);
+        Assert.Equal(12340, env.Stored(added.Id).RequiredClientBuild);
+    }
+
+    [Fact]
+    public void ImportedServer_HiddenForOtherBuildClient_UntilBuildIsCleared_AndStaysVisibleForItsClient()
+    {
+        using var env = new Env();
+        var imported = Assert.Single(env.Scan().ImportedServers);
+        var ownClient = imported.ClientId!;
+        var other = Path.Combine(env.Root, "..", "classic");
+        Directory.CreateDirectory(other);
+        File.WriteAllBytes(Path.Combine(other, "Wow.exe"), SyntheticPe.WithVersion(new Version(1, 12, 1, 5875)));
+        var otherClient = env.Service.AddClient(other).Value!.Id;
+
+        // A plain edit (the App's request shape) keeps the import's build: visible for its own client only.
+        Assert.True(env.Service.UpdateServer(FormEdit(env.Stored(imported.Id), "My realm")).Succeeded);
+        Assert.Single(env.Service.ListServers(ownClient, compatibleOnly: true).Value!);
+        Assert.Empty(env.Service.ListServers(otherClient, compatibleOnly: true).Value!);
+
+        // "Any client": clearing the build makes it visible and compatible for every client.
+        Assert.True(env.Service.UpdateServer(FormEdit(env.Stored(imported.Id), "My realm") with { ClearRequiredClientBuild = true }).Succeeded);
+        Assert.True(Assert.Single(env.Service.ListServers(ownClient, compatibleOnly: true).Value!).IsCompatible);
+        Assert.True(Assert.Single(env.Service.ListServers(otherClient, compatibleOnly: true).Value!).IsCompatible);
+
+        // A rescan still recognizes it (no "#2") now that the build is cleared.
+        Assert.True(env.Service.RemoveClient(ownClient).Succeeded);
+        Assert.Empty(env.Scan().ImportedServers);
+        Assert.Single(env.Service.ListServers().Value!);
+    }
 }
+

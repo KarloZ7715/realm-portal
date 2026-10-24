@@ -386,17 +386,20 @@ public sealed class PortalService : IPortalService
 
             // Fields the request leaves null keep their stored values (#93): the extra realmlist lines (patchlist, ...)
             // when both ExtraRealmlistLines and PatchlistHost are null (an empty list clears them), and the required
-            // client build when RequiredClientBuild is null.
+            // client build when RequiredClientBuild is null (ClearRequiredClientBuild removes it).
             IEnumerable<string>? extra = request.ExtraRealmlistLines;
             if (extra is null && request.PatchlistHost is not null)
                 extra = [$"set patchlist {request.PatchlistHost}"];
             extra ??= StoredExtraRealmlistLines(existing);
+            if (request.ClearRequiredClientBuild && request.RequiredClientBuild is not null)
+                throw new ArgumentException("Set either a client build or clear it, not both.", "requiredClientBuild");
+            var build = request.ClearRequiredClientBuild ? null : request.RequiredClientBuild ?? existing.RequiredClientBuild;
             var updated = Server.Create(
                 request.Name,
                 request.Host,
                 request.Realm,
                 extra,
-                request.RequiredClientBuild ?? existing.RequiredClientBuild,
+                build,
                 request.Account,
                 request.ServerId,
                 request.ClientId);

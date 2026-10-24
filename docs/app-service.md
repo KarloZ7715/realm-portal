@@ -195,6 +195,7 @@ public sealed record UpdateClientRequest(
 /// <param name="Account">Remembered account name (never a password); <c>null</c> for none.</param>
 /// <param name="ClientId">Preferred client for this server (<see cref="ClientEntry.Id"/>); <c>null</c> for none. Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
 /// <param name="ExtraRealmlistLines">Extra realmlist lines after <c>set realmlist</c>; <c>null</c> keeps the stored ones, an empty list clears them.</param>
+/// <param name="ClearRequiredClientBuild"><c>true</c> removes the stored build so the server accepts any client; requires <paramref name="RequiredClientBuild"/> <c>null</c>.</param>
 public sealed record UpdateServerRequest(
     string ServerId,
     string Name,
@@ -204,7 +205,8 @@ public sealed record UpdateServerRequest(
     int? RequiredClientBuild = null,
     string? Account = null,
     string? ClientId = null,
-    IReadOnlyList<string>? ExtraRealmlistLines = null);
+    IReadOnlyList<string>? ExtraRealmlistLines = null,
+    bool ClearRequiredClientBuild = false);
 ```
 
 ### 2.2 Client CRUD semantics (`AddClient`, `UpdateClient`, `RemoveClient`)
@@ -243,7 +245,7 @@ public sealed record UpdateServerRequest(
 ### 2.3 Server CRUD semantics (`AddServer`, `UpdateServer`, `RemoveServer`)
 
 - **`UpdateServer(UpdateServerRequest request)`:**
-  - **Null keeps the stored value (#93)** for the file fields the edit form may not show: `RequiredClientBuild == null` keeps the stored build; `ExtraRealmlistLines == null` and `PatchlistHost == null` keep the stored extra realmlist lines (`set patchlist …`). An empty `ExtraRealmlistLines` list clears them. `Name`, `Host`, `Realm`, `Account` and `ClientId` are always taken from the request (`null` clears `Realm`, `Account` and `ClientId`). A stored build cannot be cleared through `UpdateServer`.
+  - **Null keeps the stored value (#93)** for the file fields the edit form may not show: `RequiredClientBuild == null` keeps the stored build; `ExtraRealmlistLines == null` and `PatchlistHost == null` keep the stored extra realmlist lines (`set patchlist …`). An empty `ExtraRealmlistLines` list clears them. `Name`, `Host`, `Realm`, `Account` and `ClientId` are always taken from the request (`null` clears `Realm`, `Account` and `ClientId`). `ClearRequiredClientBuild == true` removes the stored build ("Any client"; CLI `edit --build any`); combining it with a non-null `RequiredClientBuild` fails with `InvalidServerInput` (`Field = "build"`) and writes nothing.
   - Validates all fields via `Server.Create(..., id: request.ServerId)` and `ServerValidator.Validate` (identical host, port, realmlist, length, and forbidden-character checks as `AddServer` and `ServerStore` load).
   - Fails with `ServerNotFound` if `request.ServerId` does not exist; fails with `ClientNotFound` if `request.ClientId` is non-null and not in `ClientStore`; fails with `ServerNameTaken` (`ServerName = request.Name`) if another server (`Id != request.ServerId`) already uses `request.Name` case-insensitively.
   - **Running check:** If `request.ServerId` is currently active on any client `C` where `IsGameRunning(C) == true` and any connection/file field changed (`Host`, `Realm`, `PatchlistHost`, `ExtraRealmlistLines`, `RequiredClientBuild`), refuses with `ServiceErrorCode.GameRunning` (`ServerName = existing.Name`, `Path = C.Path`).
