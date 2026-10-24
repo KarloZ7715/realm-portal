@@ -129,7 +129,7 @@ public sealed class PortalService : IPortalService
                         var matching = FindImportMatch(servers, identity);
                         if (matching is null)
                         {
-                            var name = CreateImportedServerName(extracted, client.Version, servers);
+                            var name = CreateImportedServerName(extracted, servers);
                             var created = Server.Create(name, extracted.Host, extracted.Realm, extracted.ExtraRealmlistLines,
                                 requiredBuild, extracted.Account, clientId: client.Id);
                             _servers.Add(created);
@@ -1168,17 +1168,17 @@ public sealed class PortalService : IPortalService
     private static string[] StoredExtraRealmlistLines(Server server) =>
         server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
 
-    private static string CreateImportedServerName(ExtractedServer extracted, ClientVersion? version, IReadOnlyList<Server> existing)
+    /// <summary>
+    /// Name of a server imported from a client (#98): the realm (control characters stripped, trimmed) when there is one,
+    /// otherwise the host. The card already shows the host under the name, so it is not repeated. Capped at
+    /// <see cref="Server.MaxNameLength"/> and made unique case-insensitively with <c>" #2"</c>, <c>" #3"</c>, ...
+    /// </summary>
+    internal static string CreateImportedServerName(ExtractedServer extracted, IReadOnlyList<Server> existing)
     {
         var realm = new string((extracted.Realm ?? string.Empty).Where(c => !char.IsControl(c)).ToArray()).Trim();
-        var basis = realm.Length > 0
-            ? $"{realm} ({extracted.Host})"
-            : version is null
-                ? extracted.Host
-                : $"{extracted.Host} ({version.FileVersion.Major}.{version.FileVersion.Minor}.{version.FileVersion.Build})";
+        var basis = realm.Length > 0 ? realm : extracted.Host;
         basis = basis.Trim();
-        if (basis.Length > Server.MaxNameLength)
-            basis = basis[..Server.MaxNameLength].TrimEnd();
+        basis = TruncateToTextElements(basis, Server.MaxNameLength).TrimEnd();
         if (basis.Length == 0)
             basis = "Imported server";
 
@@ -1187,9 +1187,32 @@ public sealed class PortalService : IPortalService
         while (existing.Any(server => string.Equals(server.Name, candidate, StringComparison.OrdinalIgnoreCase)))
         {
             var tail = $" #{suffix++}";
-            candidate = basis[..Math.Min(basis.Length, Server.MaxNameLength - tail.Length)].TrimEnd() + tail;
+            var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
+            candidate = (prefix.Length > 0 ? prefix : "Imported server") + tail;
         }
         return candidate;
+    }
+
+    /// <summary>
+    /// The longest prefix of <paramref name="value"/> made of whole text elements (grapheme clusters, see
+    /// <see cref="System.Globalization.StringInfo"/>) whose length is at most <paramref name="maxLength"/> UTF-16 chars,
+    /// the unit <see cref="Server.MaxNameLength"/> is measured in. A surrogate pair, a base character with its combining
+    /// marks, or a joined emoji sequence is never split.
+    /// </summary>
+    internal static string TruncateToTextElements(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+            return value;
+        var end = 0;
+        var elements = System.Globalization.StringInfo.GetTextElementEnumerator(value);
+        while (elements.MoveNext())
+        {
+            var next = elements.ElementIndex + ((string)elements.Current).Length;
+            if (next > maxLength)
+                break;
+            end = next;
+        }
+        return value[..end];
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>

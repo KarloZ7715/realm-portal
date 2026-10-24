@@ -25,7 +25,7 @@ realm-portal --version
 realm-portal client-version <client-directory>
 realm-portal add <name> <host> [--realm <realm>] [--line <realmlist line>]... [--build <n>] [--account <name>]
 realm-portal remove <server>
-realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n>] [--account <name>] [--client <client|none>]
+realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
 realm-portal list [--all]
 realm-portal switch <server> [--force]
 realm-portal undo
@@ -49,7 +49,7 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | `client-version <dir>` | Prints the game version and build of the client in `<dir>`. |
 | `add` | Adds a server. `<host>` is `host` or `host:port`. `--line` adds an extra `realmlist.wtf` line (repeatable, e.g. `--line "set patchlist patch.example.org"`). `--build` is optional: the client build the server requires (a positive integer). Without it, the server works with any client. |
 | `remove` | Removes a server. |
-| `edit` | Changes a server. Only the options you pass change. `--client none` unlinks the server from its client. |
+| `edit` | Changes a server. Only the options you pass change; everything else (including the required build and extra realmlist lines such as `patchlist`) is kept. `--build <n>` sets the required client build; `--build any` clears it, so the server works with any client. `--client none` unlinks the server from its client. |
 | `list` | Lists servers. The active one is marked with `*`. With `--client-dir`, only servers compatible with that client are shown, unless you add `--all`; incompatible ones are marked `[incompatible]`. |
 | `switch` | Makes a server the active one. With `--client-dir`, it also backs up and rewrites that client's realm files (`realmlist.wtf` where the client uses it, and `WTF/Config.wtf`). Without `--client-dir`, it only updates Realm Portal's own state and `activo.json`. `--force` skips the compatibility check. |
 | `undo` | Restores the server that was active before the last switch. It remembers one step. If that switch used `--client-dir`, it also restores the client's realm files from the backup; otherwise client files are left as they are. |
@@ -102,7 +102,7 @@ The config, projection and backup variables are also read by the desktop app. Wh
 | Code | Meaning |
 | --- | --- |
 | `0` | Success. |
-| `1` | Usage error (unknown command or option, wrong arguments, `--build` not a positive integer). |
+| `1` | Usage error (unknown command or option, wrong arguments, a `--build` value that is neither a positive integer nor, on `edit`, `any`). |
 | `2` | The operation failed (for example, no matching server, an incompatible client, or a file error). |
 
 ## Examples
