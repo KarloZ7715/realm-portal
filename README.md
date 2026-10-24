@@ -48,7 +48,7 @@ To uninstall it, run `sudo apt remove realm-portal`. Your servers, settings and 
 
 ### Linux: any distribution (AppImage)
 
-Download [`RealmPortal-1.0.0-x86_64.AppImage`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.0/RealmPortal-1.0.0-x86_64.AppImage), then make it executable and run it:
+Download [`RealmPortal-1.0.0-x86_64.AppImage`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.0/RealmPortal-1.0.0-x86_64.AppImage), then make it executable and run it from the folder where you saved it:
 
 ```bash
 cd ~/Downloads
