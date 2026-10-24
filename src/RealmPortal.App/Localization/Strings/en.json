@@ -75,7 +75,6 @@
   "clients.origin.discovered": "Discovered",
   "clients.pick": "Pick a folder by hand",
   "clients.rescan": "Search again",
-  "clients.later": "You can change them later in Settings.",
   "clients.inuse": "In use",
   "clients.action.edit": "Edit client",
   "clients.action.remove": "Remove client",
