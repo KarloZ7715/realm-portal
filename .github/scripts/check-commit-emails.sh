@@ -33,7 +33,9 @@ set -euo pipefail
 
 # Matched against the lowercased address, so it is case-insensitive.
 NOREPLY_REGEX='^([0-9]+\+)?[a-z0-9]([a-z0-9]|-[a-z0-9]){0,38}(\[bot\])?@users\.noreply\.github\.com$'
-EXACT_ALLOWED_EMAILS="noreply@github.com cursoragent@cursor.com"
+# A bash array, always expanded quoted, so an entry is compared literally and is never
+# subject to word splitting or glob expansion (e.g. an entry containing [1] or *).
+EXACT_ALLOWED_EMAILS=(noreply@github.com cursoragent@cursor.com)
 
 is_allowed_email() {
   local lower="${1,,}"
@@ -48,12 +50,14 @@ is_allowed_email() {
     return 1
   fi
   local exact
-  for exact in $EXACT_ALLOWED_EMAILS; do
-    # Entries are compared case-insensitively too.
+  for exact in "${EXACT_ALLOWED_EMAILS[@]}"; do
+    # Entries are compared case-insensitively too, and literally (quoted right-hand side).
     [[ "$lower" == "${exact,,}" ]] && return 0
   done
   return 1
 }
+
+INVALID_USERNAME_REASON='a noreply address with an invalid GitHub username (1-39 letters, digits or single inner hyphens)'
 
 # Prints why an address that is_allowed_email rejected fails (completes "which is ...").
 # For a single-@ address on the GitHub noreply domain it names the part that is wrong:
@@ -67,7 +71,7 @@ rejection_reason() {
     if [[ "$local_part" == *+* && ! "${local_part%%+*}" =~ ^[0-9]+$ ]]; then
       printf 'a noreply address with an invalid numeric ID prefix (only digits before the +)'
     else
-      printf 'a noreply address with an invalid GitHub username (1-39 letters, digits or single inner hyphens)'
+      printf '%s' "$INVALID_USERNAME_REASON"
     fi
   else
     printf 'not an allowed GitHub noreply address'
@@ -161,16 +165,21 @@ done
 commits=$(git log --format='%H%x1f%ae%x1f%ce' "$base..$head")
 
 failed=0
+invalid_username=0
 count=0
 while IFS=$'\x1f' read -r sha author committer; do
   [[ -n "$sha" ]] || continue
   count=$((count + 1))
   if ! is_allowed_email "$author"; then
-    echo "::error::Commit ${sha:0:12} has an author email at $(domain_of "$author"), which is $(rejection_reason "$author")."
+    reason="$(rejection_reason "$author")"
+    echo "::error::Commit ${sha:0:12} has an author email at $(domain_of "$author"), which is ${reason}."
+    [[ "$reason" == "$INVALID_USERNAME_REASON" ]] && invalid_username=1
     failed=1
   fi
   if ! is_allowed_email "$committer"; then
-    echo "::error::Commit ${sha:0:12} has a committer email at $(domain_of "$committer"), which is $(rejection_reason "$committer")."
+    reason="$(rejection_reason "$committer")"
+    echo "::error::Commit ${sha:0:12} has a committer email at $(domain_of "$committer"), which is ${reason}."
+    [[ "$reason" == "$INVALID_USERNAME_REASON" ]] && invalid_username=1
     failed=1
   fi
   # Co-authors: same rule, warning only.
@@ -203,6 +212,9 @@ agents) are also accepted. To fix it on your PR branch:
 
 When merging or editing on github.com, pick your noreply address in the commit dialog.
 MSG
+  if [[ "$invalid_username" -ne 0 ]]; then
+    echo "If this is your real EMU or legacy-account noreply address, ask a maintainer to add it to EXACT_ALLOWED_EMAILS."
+  fi
   exit 1
 fi
 echo "All $count commit(s) in this range use allowed author and committer emails."
