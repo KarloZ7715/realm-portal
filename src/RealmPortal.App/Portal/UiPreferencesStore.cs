@@ -71,6 +71,10 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
         return code.Equals("en", StringComparison.OrdinalIgnoreCase) ? Language.En : Language.Es;
     }
 
+    /// <summary>Saves the main window's last normal bounds and maximized state; other preferences are kept.</summary>
+    public void SetWindowPlacement(WindowPlacement placement) =>
+        Save(Load() with { Window = placement });
+
     public void SetLanguage(Language language) =>
         Save(Load() with { LanguageCode = language == Language.En ? "en" : "es" });
 }
@@ -78,7 +82,8 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
 public sealed record UiPreferences(
     string? LanguageCode = null,
     IReadOnlyList<string>? ClientsInUse = null,
-    bool FirstScanCompleted = false)
+    bool FirstScanCompleted = false,
+    WindowPlacement? Window = null)
 {
     public HashSet<string> InUseSet => ClientsInUse?.ToHashSet(StringComparer.Ordinal) ?? [];
 }
