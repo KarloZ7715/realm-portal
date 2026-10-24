@@ -11,6 +11,7 @@ on:
     paths:
       - .github/workflows/release-linux.yml
       - packaging/**
+      - licenses/**
       - LICENSE
       - THIRD_PARTY_LICENSES.md
       - assets/fonts/**
@@ -59,6 +60,9 @@ jobs:
 
       - name: Test version resolution
         run: packaging/test-resolve-version.sh
+
+      - name: Test license collection
+        run: packaging/test-collect-licenses.sh
 
       - name: Resolve package version
         id: version
@@ -194,7 +198,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $publishDir = $env:PUBLISH_DIR
-          foreach ($doc in 'LICENSE', 'THIRD_PARTY_LICENSES.md', 'licenses/dotnet-runtime/LICENSE.TXT', 'licenses/dotnet-runtime/THIRD-PARTY-NOTICES.TXT') {
+          foreach ($doc in 'LICENSE', 'THIRD_PARTY_LICENSES.md', 'licenses/dotnet-runtime/LICENSE.TXT', 'licenses/dotnet-runtime/THIRD-PARTY-NOTICES.TXT', 'licenses/nuget/PACKAGES.txt') {
             if (-not (Test-Path -LiteralPath (Join-Path $publishDir $doc))) { throw "Missing $doc in the Windows publish output" }
           }
           $packageDir = Join-Path $env:RUNNER_TEMP 'packages-win-x64'

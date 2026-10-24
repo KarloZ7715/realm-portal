@@ -109,6 +109,7 @@ REQUIRED_DOCS=(
   THIRD_PARTY_LICENSES.md
   licenses/dotnet-runtime/LICENSE.TXT
   licenses/dotnet-runtime/THIRD-PARTY-NOTICES.TXT
+  licenses/nuget/PACKAGES.txt
 )
 deb_contents="$(dpkg-deb -c "${DEB_FILE}")"
 for doc in "${REQUIRED_DOCS[@]}"; do
