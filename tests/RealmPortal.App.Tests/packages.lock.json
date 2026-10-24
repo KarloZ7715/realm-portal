@@ -263,7 +263,7 @@
       "realm-portal": {
         "type": "Project",
         "dependencies": {
-          "RealmPortal.Core": "[1.0.0, )"
+          "RealmPortal.Core": "[1.0.1, )"
         }
       },
       "realmportal.app": {
@@ -273,7 +273,7 @@
           "Avalonia.Desktop": "[11.3.22, )",
           "Avalonia.Themes.Simple": "[11.3.22, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "RealmPortal.Core": "[1.0.0, )"
+          "RealmPortal.Core": "[1.0.1, )"
         }
       },
       "realmportal.core": {
@@ -287,8 +287,8 @@
         "dependencies": {
           "FsCheck.Xunit": "[3.5.0, )",
           "Microsoft.NET.Test.Sdk": "[18.11.0, )",
-          "RealmPortal.Core": "[1.0.0, )",
-          "realm-portal": "[1.0.0, )",
+          "RealmPortal.Core": "[1.0.1, )",
+          "realm-portal": "[1.0.1, )",
           "xunit": "[2.9.3, )",
           "xunit.runner.visualstudio": "[4.0.1, )"
         }
