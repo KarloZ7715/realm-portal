@@ -15,16 +15,19 @@ under `ConfigDirectoryLock`, same pattern as `storage-settings.json`, see [app-s
 | `updates.last_attempt_utc` | none | Time of the last automatic check **attempt**, successful or failed. A value in the future is treated as "now". |
 | `updates.etag` | none | ETag of the last `200` response from `releases/latest`, stored with that response body (see below). |
 | `updates.skipped_version` | none | Version the user chose to skip. |
+| `updates.later_version`, `updates.later_until_utc` | none | Version postponed with **Later** and the time before which it is not offered again (3 days). |
 | `status.probe_enabled` | `true` | Server status dot. `false` hides the dot and schedules no probes. |
 
-Both defaults are `true` by the maintainer's decision: the features are announced in the 1.1.0 release notes and each can be
-switched off in Settings. Settings shows next to each toggle:
+Both defaults are `true` by the maintainer's product decision: at most one automatic check a day, announced in the 1.1.0
+release notes, with a manual button, and each feature can be switched off in Settings. Considered and rejected: making
+`updates.auto_check` opt-in or asking on first run (recommended by the security review); the maintainer chose on by default
+with the controls above. Settings shows next to each toggle:
 
 - "Checks GitHub once a day for a new version (sends your IP address and the app version to GitHub)."
 - "Shows whether each server's login port answers (your IP address is visible to that server every 5 minutes while the list
   is open)."
 
-The README privacy section says the same.
+The 1.1.0 implementation PR adds a **Privacy** section to the README with the same text (it does not exist yet).
 
 The **Check for updates** button works even when `updates.auto_check` is `false`, because it is an explicit user action. It
 is debounced to one request per minute.
@@ -44,9 +47,11 @@ with a key embedded in the app, the real authenticity control), the protections 
 - The maintainer account uses 2FA.
 
 **Release gate:** in-place AppImage replacement ships in 1.1.0 only if immutable releases are enabled for the repository.
-Otherwise the `AppImage` kind downloads and verifies the new AppImage to the XDG Downloads folder (same rules as `Deb`: never
+This is decided **at packaging time**, not at runtime: the release workflow sets the build-time flag
+`AppImageSelfReplace=true` only when the maintainer has enabled immutable releases; the app never queries the repository
+settings. With the flag off, the `AppImage` kind downloads and verifies the new AppImage to the XDG Downloads folder (same rules as `Deb`: never
 overwrite an existing file), with no replacement. The dialog then shows instructions with the real quoted file name:
-`chmod +x '<file name>'`, then start the new file and delete the old one. No `apt` command is shown.
+`chmod u+x '<absolute path>'` (the file is saved `0600`), then start the new file and delete the old one. No `apt` command is shown.
 
 ### HTTP client
 
@@ -90,7 +95,9 @@ overwrite an existing file), with no replacement. The dialog then shows instruct
 
 The app shows **its own dialog** (never a desktop notification) with the version, the release notes as plain text (no HTML,
 no remote images, no clickable links, truncated to 20 000 characters) and three buttons: **Update**, **Later** (wait for the
-next daily check) and **Skip this version** (stores `skipped_version`).
+next check) and **Skip this version** (stores `skipped_version`). After **Later**, the same version is offered again no
+sooner than **3 days** later (`updates.later_version` and `updates.later_until_utc`); a newer version is offered at the next
+daily check as usual.
 
 "Open release page" uses `html_url` only if it starts with `https://github.com/KarloZ7715/realm-portal/releases/tag/`;
 otherwise it uses `https://github.com/KarloZ7715/realm-portal/releases/tag/v{v}`.
@@ -137,19 +144,21 @@ downloading the app checks it:
 4. The `.part` file is created with `FileMode.CreateNew`, a random suffix (`.RealmPortal-{v}.{random}.part`) and mode
    `0600`, in the destination directory (same filesystem). SHA256 is computed while streaming. The file is flushed to disk
    (`fsync`) before verification and rename. Stale `.RealmPortal-*.part` files from a crash are deleted on the next update
-   attempt.
+   attempt, only in the destination directory, only if `lstat` shows a regular file owned by the user; symlinks and
+   anything else are left alone.
 5. On mismatch, timeout, cancellation or any other failure, delete the `.part` file, show an error and offer to open the
    release page.
 6. Nothing downloaded is executed automatically or before verification. The only time a downloaded file runs is when the
-   user presses **Restart now** after a verified AppImage replacement. `.deb` and zip files are never opened or run by the
+   user presses **Restart now** after a verified AppImage replacement. That starts the replaced target path directly with
+   `Process.Start` (`UseShellExecute = false`, no shell, the current arguments only), then the running app exits. `.deb` and zip files are never opened or run by the
    app.
 
 ### What "Update" does
 
 | Kind | Action |
 |---|---|
-| `AppImage` (release gate met) | Download into the target's directory. After verification, check that the target still has the recorded `(device, inode)` (otherwise abort without writing), apply the target's **original file mode** to the `.part`, keep the old file as a hard link `.RealmPortal-{old}.AppImage.bak`, then `rename(2)` the `.part` over the target in the same directory. The dialog offers **Restart now**. The `.bak` is deleted after the new version starts successfully. |
-| `Deb` | **No in-app install**: it needs root, and the app never calls `pkexec` or `sudo` or writes to a root-owned path. Download the verified file to the XDG Downloads folder, open that folder, and show the command `sudo apt install ./<file name>`, built from the parsed version and the real saved file name, quoted. |
+| `AppImage` (release gate met) | Download into the target's directory. After verification, check that the target still has the recorded `(device, inode)` (otherwise abort without writing), apply the target's **original file mode masked with `0755`** to the `.part` (setuid, setgid, sticky and group/other write are dropped), keep the old file as a hard link `.RealmPortal-{old}.AppImage.bak`, then `rename(2)` the `.part` over the target in the same directory. The dialog offers **Restart now**. **`.bak` rules:** if a `.bak` with that name already exists, it is removed first only if `lstat` shows a regular file owned by the user (never a symlink is followed); otherwise the update aborts. There is **no automatic rollback**. The new version deletes the `.bak` (same `lstat` checks) at its first successful start; if it never starts, the `.bak` stays and the error dialog shows its name so the user can restore it by hand. |
+| `Deb` | **No in-app install**: it needs root, and the app never calls `pkexec` or `sudo` or writes to a root-owned path. Download the verified file to the XDG Downloads folder (mode `0600`), open that folder, and show the command `sudo apt install '<absolute path>'`, built from the real XDG Downloads path and the real saved file name, quoted, so the copied command works from any directory. The UI may show the path `~`-relative only if the copied command uses the absolute one. |
 | `WindowsZip` | Download the verified zip to the user's Downloads folder, open it in Explorer, and show "extract over your current folder" instructions. No self-replacement in 1.1.0. Optional: write a `Zone.Identifier` (Mark of the Web) on the zip. |
 | `Unknown` or any failure | Open the release page (validated as above) in the browser. |
 
@@ -160,7 +169,9 @@ The final name is set only after verification.
 
 Logs record the error code, the HTTP status and the **host only**. Full URLs are never logged, because the
 `*.githubusercontent.com` redirect targets carry signed, short-lived tokens. Paths are logged as a file name or
-`~`-relative, never the full `$APPIMAGE` or home directory path. Logs live in the app's existing bounded log file.
+`~`-relative, never the full `$APPIMAGE` or home directory path. There is no log file in the app today, so 1.1.0 adds one: `$XDG_STATE_HOME/realm-portal/logs/realm-portal.log`
+(default `~/.local/state/...`; `%LOCALAPPDATA%\RealmPortal\logs\` on Windows), directory `0700`, file `0600`, capped at
+1 MiB with a single rotated `.1` file.
 
 ## 2. Server status dot (#104)
 
@@ -172,8 +183,11 @@ Logs record the error code, the HTTP status and the **host only**. Full URLs are
   3724 is used when none is given. `patchlist`, launch-template hosts and anything from client files that has not been
   validated are never probed.
 - **No data is sent**: the socket is closed right after the connection succeeds.
-- States: `online` (connected), `offline` (refused, timed out, or DNS failure; the tooltip gives the reason), `checking`,
-  `unknown` (not probed yet).
+- States: `online` (connected), `offline` (refused or timed out; the tooltip gives the reason), `checking`, and `unknown`
+  (not probed yet, or the host name could not be resolved). A DNS failure (`SocketError.HostNotFound` or `NoData`) is
+  `unknown` with the reason "name not found (DNS)", so a typo in the realmlist host does not look like a server that is
+  down. The add or edit server form shows the same warning after a probe.
+- The tooltip also says when the result was taken ("checked 3 min ago"), because results are reused for up to 5 minutes.
 - The tooltip says **"Login server reachable"**, not "server online": only the login port is checked, not the world server.
 - Private, loopback and LAN addresses are allowed, because local servers are legitimate. A shared realmlist can therefore
   make the app connect to an internal `host:port` every 5 minutes; this is accepted because it is connect-only, the server
@@ -214,8 +228,13 @@ name may also query the DNS resolver configured on the system (on a cache miss).
   failed one). The **Check for updates** button makes one request even when it is `false`, and is debounced.
 - No `Authorization` header and no environment tokens are ever sent.
 - AppImage replacement in a temporary directory: symlinked `$APPIMAGE`, non-regular file, wrong magic, changed inode before
-  rename, mode preserved, `.bak` created; `.deb` and zip paths never execute anything and never overwrite an existing file.
-- Logs contain no full URLs or full home paths.
+  rename, mode masked to `0755` (setuid and group/other write dropped), `.bak` created, an existing `.bak` that is a
+  symlink or not owned by the user aborts the update, stale `.part` cleanup skips symlinks and non-regular files;
+  `AppImageSelfReplace=false` builds never replace and show no `apt` command; `.deb` and zip paths never execute anything,
+  never overwrite an existing file, and the `.deb` command uses the absolute path.
+- **Later** postpones the same version for 3 days; a newer version is still offered at the next daily check.
+- Logs contain no full URLs or full home paths; the log file is `0600` and rotates at 1 MiB.
+- DNS failure gives `unknown` with the DNS reason, not `offline`; the tooltip shows the age of the result.
 - Probe against a loopback `TcpListener` (online), a closed port (offline), and an injected connect delegate for timeouts
   and slow DNS. No test touches the real internet.
 - Concurrency cap counting unfinished operations, per-server single flight, the 5-minute minimum per server (including on
