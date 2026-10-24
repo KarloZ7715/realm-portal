@@ -67,7 +67,7 @@ public sealed class CliDryRunTests
         var dryActive = box.Run("launch", "--dry-run");
 
         Assert.Equal(0, dry.Code);
-        Assert.Equal($"Dry run: would launch {real.Wrapper} {real.Exe} for 'Example'.{Environment.NewLine}", dry.Out);
+        Assert.Equal($"Dry run: would launch {real.Wrapper} {CliApp.QuoteForDisplay(real.Exe)} for 'Example'.{Environment.NewLine}", dry.Out);
         Assert.Equal(dry.Out, dryActive.Out);
         Assert.Equal("gamemoderun", real.Wrapper);
         Assert.Single(box.Launcher.Calls);
@@ -81,7 +81,7 @@ public sealed class CliDryRunTests
         var dry = box.Run("launch", "Example", "--dry-run");
 
         Assert.Equal(0, dry.Code);
-        Assert.Equal($"Dry run: would launch {box.Exe} for 'Example'.{Environment.NewLine}", dry.Out);
+        Assert.Equal($"Dry run: would launch {CliApp.QuoteForDisplay(box.Exe)} for 'Example'.{Environment.NewLine}", dry.Out);
         Assert.Empty(box.Launcher.Calls);
     }
 
@@ -96,8 +96,8 @@ public sealed class CliDryRunTests
         var dry = box.Run("launch", "Example", "--dry-run", "--wrapper", "wine");
         var again = box.Run("launch", "Example", "--dry-run");
 
-        Assert.Equal($"Dry run: would launch wine {box.Exe} for 'Example'.{Environment.NewLine}", dry.Out);
-        Assert.Equal($"Dry run: would launch gamemoderun {box.Exe} for 'Example'.{Environment.NewLine}", again.Out);
+        Assert.Equal($"Dry run: would launch wine {CliApp.QuoteForDisplay(box.Exe)} for 'Example'.{Environment.NewLine}", dry.Out);
+        Assert.Equal($"Dry run: would launch gamemoderun {CliApp.QuoteForDisplay(box.Exe)} for 'Example'.{Environment.NewLine}", again.Out);
         Assert.False(File.Exists(Path.Combine(box.Client, realmlist)));
         Assert.Empty(box.Launcher.Calls);
     }
