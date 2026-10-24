@@ -50,7 +50,7 @@ trap 'rm -rf "$tmp"' EXIT
 git -C "$tmp" init -q
 commit() { # commit <author-email> <committer-email> [message]
   GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL="$1" GIT_COMMITTER_NAME=c GIT_COMMITTER_EMAIL="$2" \
-    git -C "$tmp" commit -q --allow-empty -m "${3:-test}"
+    git -C "$tmp" commit -q --no-gpg-sign --allow-empty -m "${3:-test}"
   git -C "$tmp" rev-parse HEAD
 }
 run_range() { # run_range <want-exit> <base> <head> <label>
