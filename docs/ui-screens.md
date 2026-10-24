@@ -214,7 +214,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 #### 4.1 Settings Screen (`SettingsView.axaml` — `compact-07`)
 - **Figma reference:** `compact-07-settings-no-cleanup@2x.png` (`48:5882`) and `compact-07-settings-no-cleanup-scrolled@2x.png` (`48:6144`).
--Reached from the sidebar gear. The three `ParchmentPanel` (`Variant="Tile"`) cards (`LANGUAGE`, `LAUNCHER`, `BACKUP`) sit in one column and scroll; the header (title only) and the footer (`Cancel`, `Save`) stay fixed. There is no header `Back` button: the sidebar and the footer leave the screen. Leaving through the sidebar with unsaved changes asks `Discard unsaved changes?` (`Keep editing` is the default, `Discard changes` reverts the fields and the language preview).
+-Reached from the sidebar gear. The three `ParchmentPanel` (`Variant="Tile"`) cards (`LANGUAGE`, `LAUNCHER`, `BACKUP`) sit in one column and scroll; the header (title only) and the footer (`Cancel`, `Save`) stay fixed. There is no header `Back` button: the sidebar is the way out. `Cancel` resets the fields (and the language preview) and `Save` stores them; neither leaves the screen. Leaving through the sidebar with unsaved changes asks `Discard unsaved changes?` (`Keep editing` is the default, `Discard changes` reverts the fields and the language preview).
 - **`BACKUP` (`COPIA DE SEGURIDAD`) Card Extensions for `1.0.0`:**
   1. **Row 1 — `Folder` (`Carpeta`):** `TextBox.parchment` (`FontMono`, bound to `BackupFolder`) + `Browse…` (`Examinar…`, `Button.secondary.compact`, `c:ButtonSurface.Surface="Parchment"`).
   2. **Row 2 — Retention & Sub-Sheet Trigger (`Margin="0,8,0,0"`):**

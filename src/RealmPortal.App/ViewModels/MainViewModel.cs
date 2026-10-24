@@ -123,6 +123,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         Settings.CancelCommand.Execute(null);
+        // The status-bar language toggle writes the preference right away; discarding must put the saved one back.
+        _session?.UiPreferences.SetLanguage(Loc.Instance.Current);
         SetSection(target);
     }
 

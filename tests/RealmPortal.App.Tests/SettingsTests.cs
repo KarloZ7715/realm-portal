@@ -201,6 +201,37 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
+    public void DiscardAfterStatusBarToggle_RestoresTheSavedLanguagePreference()
+    {
+        using var temp = new RealmPortal.Tests.Support.TempDirectory();
+        var config = temp.Combine("config");
+        Directory.CreateDirectory(config);
+        var session = RealmPortal.App.Portal.PortalSession.CreateForPaths(config, temp.Combine("projection"), temp.Combine("backups"));
+        session.UiPreferences.SetLanguage(Language.Es);
+        var main = new MainViewModel(session, autoTick: false);
+        try
+        {
+            main.SectionIndex = 2;
+            main.ToggleLanguageCommand.Execute(null);
+            Assert.Equal("en", session.UiPreferences.Load().LanguageCode);
+            Assert.True(main.Settings.IsDirty);
+
+            main.SectionIndex = 0;
+            main.Dialog!.ConfirmCommand.Execute(null);
+            Screenshots.Settle();
+
+            Assert.Null(main.Dialog);
+            Assert.False(main.Settings.IsDirty);
+            Assert.Equal(Language.Es, Loc.Instance.Current);
+            Assert.Equal("es", session.UiPreferences.Load().LanguageCode);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(Language.Es);
+        }
+    }
+
+    [AvaloniaFact]
     public void LeavingWithUnsavedChanges_DiscardRevertsAndLeaves()
     {
         var (shell, settings) = Open();
