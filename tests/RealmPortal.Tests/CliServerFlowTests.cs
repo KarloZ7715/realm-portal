@@ -99,7 +99,7 @@ public class CliServerFlowTests
         Assert.Equal(0, status.Code);
         Assert.Contains("Active server: Wotlk", status.Out);
         Assert.Contains("activo.json: in sync", status.Out);
-        Assert.Contains("Client: 12340 (3.3.5.12340) (compatible)", status.Out);
+        Assert.Contains("Client: 3.3.5a (12340) (compatible)", status.Out);
 
         // launch: dry run launches nothing, the real path goes through the fake launcher only
         var dry = box.Run("launch", "--dry-run");
@@ -301,7 +301,7 @@ public class CliServerFlowTests
             Assert.Equal(0, Program.Run(args, o, e, new PeClientVersionReader(), box.Launcher, box.Variables(n => env.GetValueOrDefault(n))));
 
         Assert.True(File.Exists(box.ActivoPath));
-        Assert.Contains("Client: 12340", o.ToString());
+        Assert.Contains("Client: 3.3.5a (12340)", o.ToString());
     }
 
     [Theory]
@@ -386,5 +386,28 @@ public class CliServerFlowTests
 
         Assert.Equal(0, box.RunWithoutClient("remove", "Beta").Code);
         Assert.Contains("No servers.", box.RunWithoutClient("list").Out);
+    }
+
+    [Fact]
+    public void ServerEdit_BuildAny_ClearsStoredBuild_AndOtherEditsKeepIt()
+    {
+        using var box = new Sandbox(clientBuild: null);
+        Assert.Equal(0, box.RunWithoutClient("add", "Alpha", "alpha.example.org", "--build", "12340").Code);
+        ServerStore Store() => new(box.Config, new RealmPortal.Core.IO.AtomicFileWriter());
+
+        Assert.Equal(0, box.RunWithoutClient("edit", "Alpha", "--name", "Beta").Code);
+        Assert.Equal(12340, Store().Find("Beta")!.RequiredClientBuild);
+
+        var cleared = box.RunWithoutClient("edit", "Beta", "--build", "any");
+        Assert.Equal(0, cleared.Code);
+        Assert.Null(Store().Find("Beta")!.RequiredClientBuild);
+
+        Assert.Equal(0, box.RunWithoutClient("edit", "Beta", "--build", "8606").Code);
+        Assert.Equal(8606, Store().Find("Beta")!.RequiredClientBuild);
+
+        var bad = box.RunWithoutClient("edit", "Beta", "--build", "anything");
+        Assert.NotEqual(0, bad.Code);
+        Assert.Contains("--build must be a positive integer or 'any'", bad.Err);
+        Assert.Equal(8606, Store().Find("Beta")!.RequiredClientBuild);
     }
 }
