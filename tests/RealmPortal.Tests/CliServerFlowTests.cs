@@ -84,9 +84,9 @@ public class CliServerFlowTests
         Assert.Equal(0, undo.Code);
         Assert.DoesNotContain("\\u000A", undo.Out);
         Assert.DoesNotContain("\\u000D", undo.Out);
-        Assert.Contains($"Client files: restored '{box.Client}' to its state before the switch.", undo.Out);
-        Assert.Contains("Client files:", undo.Out);
-        Assert.Contains("Client folder out of sync:", undo.Out);
+        Assert.Contains(
+            $"Client files: restored '{box.Client}' to its state before the switch.{Environment.NewLine}Client folder out of sync:",
+            undo.Out);
     }
 
     [Fact]
