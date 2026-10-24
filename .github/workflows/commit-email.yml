@@ -30,9 +30,10 @@ jobs:
       - name: Test the email check
         run: .github/scripts/test-check-commit-emails.sh
 
-      # Author and committer must be a GitHub noreply address
-      # (^([0-9]+\+)?[A-Za-z0-9-]+(\[bot\])?@users\.noreply\.github\.com$, case-insensitive)
-      # or exactly noreply@github.com / cursoragent@cursor.com. Co-authored-by: trailers
-      # only warn. The rule and its allowlist live in .github/scripts/check-commit-emails.sh.
+      # Author and committer must be a GitHub noreply address (optional numeric ID + a valid
+      # GitHub username, optional [bot] suffix, case-insensitive) or exactly
+      # noreply@github.com / cursoragent@cursor.com. Co-authored-by: trailers only warn.
+      # Privacy check only, not identity verification. The rule and its allowlist live in
+      # .github/scripts/check-commit-emails.sh.
       - name: Check author and committer emails of the PR commits
         run: .github/scripts/check-commit-emails.sh "$BASE_SHA" "$HEAD_SHA"
