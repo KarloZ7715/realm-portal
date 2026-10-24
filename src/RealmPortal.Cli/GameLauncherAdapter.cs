@@ -16,7 +16,8 @@ internal sealed class GameLauncherAdapter(IGameLauncher inner) : IGameLaunchServ
         inner.Launch(spec.ExecutablePath, spec.WorkingDirectory, wrapper);
     }
 
-    private static string? UnsupportedSetting(GameLaunchSpec spec)
+    /// <summary>The first setting this launcher cannot apply, or <c>null</c>. Also used by <c>launch --dry-run</c>.</summary>
+    internal static string? UnsupportedSetting(GameLaunchSpec spec)
     {
         if (!string.IsNullOrWhiteSpace(spec.CommandTemplate))
             return nameof(GameLaunchSpec.CommandTemplate);
