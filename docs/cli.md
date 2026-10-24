@@ -73,7 +73,7 @@ Running `realm-portal` with no arguments prints the version and this usage text.
   - a `Games` folder at the root of every fixed drive (for example `C:\Games`, `D:\Games`);
   - the `InstallPath` and `GamePath` values of the registry key `SOFTWARE\Blizzard Entertainment\World of Warcraft`, read from `HKEY_LOCAL_MACHINE` (32-bit and 64-bit views) and `HKEY_CURRENT_USER`.
 
-On Windows, `~` means your user profile folder (for example `C:\Users\<you>`).
+In this list, `~` is your home folder (on Windows, your user profile folder, for example `C:\Users\<you>`). Realm Portal does not expand `~` in `--root` values itself: on Linux an unquoted `~` is expanded by the shell, but on Windows pass the full path (for example `--root "C:\Users\<you>\Games"`).
 
 ## Options
 
