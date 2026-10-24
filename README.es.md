@@ -17,7 +17,7 @@
 
 Realm Portal es una aplicación de escritorio para servidores privados de World of Warcraft. Registra los servidores en los que juegas (nombre, dirección, reino, cuenta y build de cliente requerida), busca clientes del juego en tu equipo y apunta el cliente que elijas al servidor que selecciones.
 
-Al cambiar de servidor, Realm Portal escribe la configuración de conexión en los archivos de reino gestionados del cliente (`realmlist.wtf` cuando la versión del cliente lo usa, y `WTF/Config.wtf`), y antes guarda una copia de esos archivos. La aplicación de escritorio hace el cambio y abre el juego; la línea de comandos expone las mismas operaciones de servidor para scripts y uso sin interfaz. La interfaz está disponible en español e inglés.
+Al cambiar de servidor, Realm Portal escribe la configuración de conexión en los archivos de reino gestionados del cliente (`realmlist.wtf` cuando la versión del cliente lo usa, y `WTF/Config.wtf`), y antes guarda una copia de esos archivos. Después puede abrir el juego por ti. La interfaz está disponible en español e inglés.
 
 ## Compatibilidad y requisitos
 
@@ -28,17 +28,35 @@ Al cambiar de servidor, Realm Portal escribe la configuración de conexión en l
 
 ## Instalación
 
-Descarga la compilación de tu plataforma desde [Releases](https://github.com/KarloZ7715/realm-portal/releases):
+Descarga el archivo para tu sistema desde la [última versión](https://github.com/KarloZ7715/realm-portal/releases/latest). Los pasos usan la versión 1.0.0; si la página muestra una versión más nueva, usa ese nombre de archivo.
 
-- **Linux — `.deb`**: instala el paquete con el gestor de paquetes de tu distribución.
-- **Linux — `.AppImage`**: dale permiso de ejecución y ejecútalo.
+### Linux: Debian, Ubuntu, Linux Mint y similares (`.deb`)
+
+1. Descarga [`realm-portal_1.0.0_amd64.deb`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.0/realm-portal_1.0.0_amd64.deb).
+2. Abre una terminal y ejecuta (suponiendo que el archivo está en tu carpeta de descargas, `Downloads` o `Descargas`):
+
+   ```bash
+   cd ~/Downloads
+   sudo apt install ./realm-portal_1.0.0_amd64.deb
+   ```
+
+3. Abre **Realm Portal** desde el menú de aplicaciones, o ejecuta `realm-portal` en una terminal.
+
+Para desinstalarlo, ejecuta `sudo apt remove realm-portal`. Tus servidores, ajustes y copias de seguridad se quedan en tu carpeta personal.
+
+### Linux: cualquier distribución (AppImage)
+
+Descarga [`RealmPortal-1.0.0-x86_64.AppImage`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.0/RealmPortal-1.0.0-x86_64.AppImage), dale permiso de ejecución y ejecútalo:
 
 ```bash
-chmod +x RealmPortal-*-x86_64.AppImage
-./RealmPortal-*-x86_64.AppImage
+cd ~/Downloads
+chmod +x RealmPortal-1.0.0-x86_64.AppImage
+./RealmPortal-1.0.0-x86_64.AppImage
 ```
 
-- **Windows — `.zip`**: descomprímelo y ejecuta `RealmPortal.App.exe`.
+### Windows
+
+Descarga [`RealmPortal-1.0.0-win-x64.zip`](https://github.com/KarloZ7715/realm-portal/releases/download/v1.0.0/RealmPortal-1.0.0-win-x64.zip), descomprímelo y ejecuta `RealmPortal.App.exe`.
 
 ## Uso de la aplicación de escritorio
 
@@ -48,32 +66,13 @@ chmod +x RealmPortal-*-x86_64.AppImage
 4. Selecciona un servidor y pulsa **Jugar** para cambiar los archivos del cliente y abrir el juego, o **Solo cambiar** para modificar los archivos sin lanzarlo. Los servidores incompatibles con el cliente seleccionado quedan deshabilitados.
 5. Tras un cambio, el aviso de Deshacer permite volver al servidor anterior en el cliente. Los archivos del cliente se respaldan antes de cada cambio (ver [Copias de seguridad y recuperación](#copias-de-seguridad-y-recuperación)).
 
-## Uso de la línea de comandos
-
-`realm-portal` gestiona los servidores sin la aplicación. Los comandos son `add`, `remove`, `edit`, `list`, `switch`, `undo`, `status`, `launch`, `client` (`list`, `add`, `edit`, `remove`), `scan` y `client-version <carpeta>`; `--version` imprime la versión.
-
-```bash
-realm-portal add "Warmane" logon.warmane.example.org --realm Icecrown --build 12340
-realm-portal list --client-dir "/path/to/client"
-realm-portal switch "Warmane" --client-dir "/path/to/client"
-realm-portal launch "Warmane" --client-dir "/path/to/client"
-realm-portal undo
-realm-portal status --client-dir "/path/to/client"
-realm-portal client list
-realm-portal scan --root /games
-```
-
-Opciones comunes: `--config-dir`, `--projection-dir` y `--client-dir` apuntan la herramienta a su carpeta de configuración, a la carpeta de `activo.json` y al cliente del juego. `--all` lista todos los servidores, `--force` omite la comprobación de compatibilidad, `--dry-run` imprime el comando de lanzamiento en lugar de abrir el juego, y `--wrapper <comando>` ejecuta el juego a través de un comando como `wine`. Con `--client-dir`, `switch` también edita los archivos del cliente; sin él, solo actualiza el estado propio de Realm Portal. `--verbose` imprime mensajes de error detallados; los códigos de salida son `0` (éxito), `1` (uso incorrecto) y `2` (fallo).
-
 ## Copias de seguridad y recuperación
 
 Realm Portal escribe una copia de seguridad antes de cambiar cualquier archivo del cliente, de modo que cada cambio se puede deshacer byte a byte.
 
 - **Automática**: cada cambio guarda el contenido anterior de los archivos de reino gestionados en la carpeta de respaldos (`~/.local/share/realm-portal/backups` por defecto) y conserva los 10 respaldos más recientes por cliente.
-- **Deshacer**: `realm-portal undo`, o el aviso de Deshacer en la aplicación, restaura el servidor que estaba activo antes del último cambio. Recuerda un solo paso. Si los archivos del cliente cambiaron a mano desde el cambio, Realm Portal pregunta antes de sobrescribirlos.
+- **Deshacer**: el aviso de Deshacer en la aplicación restaura el servidor que estaba activo antes del último cambio. Recuerda un solo paso. Si los archivos del cliente cambiaron a mano desde el cambio, Realm Portal pregunta antes de sobrescribirlos.
 - **Manual**: en **Ajustes → Copia de respaldo**, usa **Gestionar respaldos…** para crear un respaldo, ver los guardados, restaurar uno anterior o eliminarlo. Los respaldos se guardan en la carpeta indicada en **Carpeta de respaldo**.
-
-La carpeta de respaldos y las demás ubicaciones se pueden sobrescribir con `REALM_PORTAL_BACKUP_DIR`, `REALM_PORTAL_CONFIG_DIR` y `REALM_PORTAL_PROJECTION_DIR`.
 
 ## Alcance y avisos legales
 
@@ -85,7 +84,7 @@ La carpeta de respaldos y las demás ubicaciones se pueden sobrescribir con `REA
 
 ## Compilación y desarrollo
 
-Las instrucciones de compilación, las pruebas, la referencia de la línea de comandos y la estructura del proyecto están en [CONTRIBUTING.md](CONTRIBUTING.md).
+¿Prefieres la terminal? La herramienta de línea de comandos está documentada (en inglés) en [docs/cli.md](docs/cli.md). Las instrucciones de compilación, las pruebas y la estructura del proyecto están en [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licencia y créditos
 
