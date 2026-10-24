@@ -1187,7 +1187,8 @@ public sealed class PortalService : IPortalService
         while (existing.Any(server => string.Equals(server.Name, candidate, StringComparison.OrdinalIgnoreCase)))
         {
             var tail = $" #{suffix++}";
-            candidate = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd() + tail;
+            var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
+            candidate = (prefix.Length > 0 ? prefix : "Imported server") + tail;
         }
         return candidate;
     }

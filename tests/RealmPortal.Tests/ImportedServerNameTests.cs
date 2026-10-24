@@ -99,6 +99,17 @@ public sealed class ImportedServerNameTests
         Assert.Equal(new string('r', Server.MaxNameLength - 4) + " #2", second);
     }
 
+    [Fact]
+    public void Suffix_KeepsANonEmptyPrefix_WhenTheOnlyTextElementNoLongerFits()
+    {
+        // One text element of 63 chars: 'e' + 62 combining marks. It fits alone, but not next to " #2".
+        var realm = "e" + new string('\u0301', Server.MaxNameLength - 1);
+        var first = PortalService.CreateImportedServerName(Extracted(realm), []);
+        Assert.Equal(realm, first);
+
+        Assert.Equal("Imported server #2", PortalService.CreateImportedServerName(Extracted(realm), Existing(first)));
+    }
+
     [Theory]
     [InlineData("abc", 2, "ab")]
     [InlineData("a" + Emoji, 2, "a")]
