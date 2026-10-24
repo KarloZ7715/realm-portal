@@ -44,7 +44,7 @@ public sealed class CliApp(
           realm-portal client add <path> [--name <name>]
           realm-portal client edit <client> [--name <name>] [--path <path>]
           realm-portal client remove <client>
-          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n>] [--account <name>] [--client <client|none>]
+          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
           realm-portal scan [--root <folder>]...
 
         Global options (before or after the command):
@@ -251,12 +251,16 @@ public sealed class CliApp(
         if (FindServer(service, parsed.Positionals[0], out var server) != 0)
             return 2;
 
-        int? build = server.RequiredClientBuild;
+        int? build = null; // null keeps the stored build
+        var clearBuild = false;
         if (parsed.Get("--build") is { } text)
         {
-            if (!int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsedBuild) || parsedBuild <= 0)
-                throw new UsageException($"--build must be a positive integer, got '{text}'");
-            build = parsedBuild;
+            if (text.Equals("any", StringComparison.OrdinalIgnoreCase))
+                clearBuild = true;
+            else if (!int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsedBuild) || parsedBuild <= 0)
+                throw new UsageException($"--build must be a positive integer or 'any', got '{text}'");
+            else
+                build = parsedBuild;
         }
 
         var clientId = server.ClientId;
@@ -279,7 +283,8 @@ public sealed class CliApp(
             RequiredClientBuild: build,
             Account: parsed.Options.ContainsKey("--account") ? parsed.Get("--account") : server.Account,
             ClientId: clientId,
-            ExtraRealmlistLines: extraLines));
+            ExtraRealmlistLines: extraLines,
+            ClearRequiredClientBuild: clearBuild));
         if (!result.Succeeded)
             return Fail(result.Error!);
         SafeWriteLine(output, $"Updated '{server.Name}' to '{result.Value!.Name}' ({result.Value.Id})");

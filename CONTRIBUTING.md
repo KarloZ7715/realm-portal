@@ -29,7 +29,7 @@ dotnet run --project src/RealmPortal.App
 
 On Linux the app needs an X11 server (or XWayland) and `libfontconfig1`, `libfreetype6`, `libx11-6`, `libice6`, `libsm6`.
 
-CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan and a per-file size check.
+CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan, a per-file size check and (on pull requests) a commit author email check.
 
 ## Version
 
@@ -113,6 +113,28 @@ reduced), list its exact repository-relative path in
 why, and mention it in the PR description. Prefer Git LFS or an external download for
 anything bigger than a few MiB. Large raw design sources and build outputs do not belong
 in the repository.
+
+## Commit author email
+
+Commits must use your GitHub noreply address, preferably `<id>+<username>@users.noreply.github.com`
+(see <https://github.com/settings/emails>), for both the author and the committer, never a personal or
+institutional email.
+
+On pull requests the `commit-email` CI job (`.github/workflows/commit-email.yml`, logic in
+`.github/scripts/check-commit-emails.sh`) checks the author (`%ae`) and committer (`%ce`) email of every new
+commit. An email passes when, ignoring case, the whole address matches
+`^([0-9]+\+)?[A-Za-z0-9-]+(\[bot\])?@users\.noreply\.github\.com$` (for example
+`188834590+KarloZ7715@users.noreply.github.com`, `KarloZ7715@users.noreply.github.com` or
+`49699333+dependabot[bot]@users.noreply.github.com`), or is exactly one of:
+
+- `noreply@github.com`: committer of commits created on github.com (web merges and edits) and by GitHub apps;
+- `cursoragent@cursor.com`: Cursor cloud agents.
+
+Any other author or committer email fails the job. `Co-authored-by:` trailers are checked with the same rule
+but only produce a warning. Fix a failing branch with `git config user.email ...` and
+`git commit --amend --no-edit --reset-author` (or a rebase with `--exec`) on the PR branch. When you merge or
+edit on github.com, pick your noreply address in the commit dialog. Run
+`.github/scripts/test-check-commit-emails.sh` after changing the check.
 
 ## Reporting vulnerabilities
 

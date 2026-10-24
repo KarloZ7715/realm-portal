@@ -30,7 +30,7 @@ public static class ServerGen
         Gen.OneOf(Gen.Constant<int?>(null), Gen.Elements<int?>(5875, 8606, 12340, 15595));
 
     private static readonly Gen<string?> AccountGen =
-        Gen.OneOf(Gen.Constant<string?>(null), Gen.Elements<string?>("carlos", "Ünï", "a b").Where(a => a is null || (a.Length <= Core.Servers.Server.MaxAccountLength && IsValidMetadata(a))));
+        Gen.OneOf(Gen.Constant<string?>(null), Gen.Elements<string?>("player", "Ünï", "a b").Where(a => a is null || (a.Length <= Core.Servers.Server.MaxAccountLength && IsValidMetadata(a))));
 
     public static Gen<Server> Server() =>
         from name in NameGen
