@@ -249,7 +249,7 @@ public class ClientScannerTests
         using var home = new TempDirectory();
         var client = CreateClient(home.Combine("Games", "One"));
         Directory.CreateDirectory(Path.Combine(client, "WTF"));
-        File.WriteAllText(Path.Combine(client, "WTF", "Config.wtf"), "SET realmName \"Icecrown\"\r\n");
+        File.WriteAllText(Path.Combine(client, "WTF", "Config.wtf"), "SET realmName \"Example Realm\"\r\n");
         var before = Snapshot(home.Path);
 
         _ = Scan(home);

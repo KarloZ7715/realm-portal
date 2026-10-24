@@ -92,7 +92,7 @@ public sealed class PortalServiceScanTests
         Directory.CreateDirectory(Path.Combine(client, "WTF"));
         File.WriteAllBytes(Path.Combine(client, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
         File.WriteAllText(Path.Combine(client, "Data", "enUS", "realmlist.wtf"), "set realmlist logon.example.org\r\n", Encoding.Latin1);
-        File.WriteAllText(Path.Combine(client, "WTF", "Config.wtf"), "SET realmName \"Icecrown\"\nSET accountName \"player1\"\n");
+        File.WriteAllText(Path.Combine(client, "WTF", "Config.wtf"), "SET realmName \"Example Realm\"\nSET accountName \"player1\"\n");
         return client;
     }
 

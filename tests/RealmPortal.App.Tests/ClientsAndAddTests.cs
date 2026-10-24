@@ -266,7 +266,7 @@ public class AddServerScreenTests
         var shell = new Shell();
         var form = Open(shell);
         form.Name = "  Reino Nuevo ";
-        form.Address = "play.nuevo.net:8085";
+        form.Address = "play.example.test:8085";
         form.Account = "";
         form.SaveCommand.Execute(null);
         await Pump();
@@ -274,7 +274,7 @@ public class AddServerScreenTests
         Assert.Same(shell.Servers, shell.Model.Content);
         var added = shell.Servers.All.Last();
         Assert.Equal("Reino Nuevo", added.Name);
-        Assert.Equal("play.nuevo.net:8085", added.Address);
+        Assert.Equal("play.example.test:8085", added.Address);
         Assert.Null(added.Account);
         Assert.False(added.IsActive);
         Assert.Contains(added, shell.Servers.Visible);

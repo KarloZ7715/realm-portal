@@ -182,7 +182,7 @@ public sealed class Step13ServerUiTests
     {
         using var env = new Env();
         var a = env.AddClient(env.CreateClient("alpha", Build335), "Alpha");
-        var server = env.AddServer("Original", "orig.example.org", realm: "Icecrown", clientId: a);
+        var server = env.AddServer("Original", "orig.example.org", realm: "Example Realm", clientId: a);
         env.Start(a);
 
         var entry = env.Session.Service.ListServers(compatibleOnly: false).Value!.Single(s => s.Id == server.Id);
@@ -192,7 +192,7 @@ public sealed class Step13ServerUiTests
         Assert.Equal(Loc.Get("edit.server.save"), form.SaveLabel);
         Assert.Equal("Original", form.Name);
         Assert.Equal("orig.example.org", form.Address);
-        Assert.Equal("Icecrown", form.Realm);
+        Assert.Equal("Example Realm", form.Realm);
 
         form.Name = "Renamed";
         form.Realm = "Stormscale";
@@ -209,13 +209,13 @@ public sealed class Step13ServerUiTests
     {
         using var env = new Env();
         var a = env.AddClient(env.CreateClient("alpha", Build335), "Alpha");
-        env.AddServer("Existing", "dup.example.org", realm: "Icecrown", clientId: a);
+        env.AddServer("Existing", "dup.example.org", realm: "Example Realm", clientId: a);
         env.Start(a);
 
         var form = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
         form.Name = "Copy";
         form.Address = "dup.example.org";
-        form.Realm = "Icecrown";
+        form.Realm = "Example Realm";
         form.Submitted = true;
         form.SaveCommand.Execute(null);
 
