@@ -50,7 +50,7 @@ with a key embedded in the app, the real authenticity control), the protections 
 This is decided **at packaging time**, not at runtime: the release workflow sets the build-time flag
 `AppImageSelfReplace=true` only when the maintainer has enabled immutable releases; the app never queries the repository
 settings. With the flag off, the `AppImage` kind downloads and verifies the new AppImage to the XDG Downloads folder (same rules as `Deb`: never
-overwrite an existing file), with no replacement. The dialog then shows instructions with the real quoted file name:
+overwrite an existing file), with no replacement. The dialog then shows instructions with the absolute path, quoted as described under "Copyable commands":
 `chmod u+x '<absolute path>'` (the file is saved `0600`), then start the new file and delete the old one. No `apt` command is shown.
 
 ### HTTP client
@@ -157,13 +157,17 @@ downloading the app checks it:
 
 | Kind | Action |
 |---|---|
-| `AppImage` (release gate met) | Download into the target's directory. After verification, check that the target still has the recorded `(device, inode)` (otherwise abort without writing), apply the target's **original file mode masked with `0755`** to the `.part` (setuid, setgid, sticky and group/other write are dropped), keep the old file as a hard link `.RealmPortal-{old}.AppImage.bak`, then `rename(2)` the `.part` over the target in the same directory. The dialog offers **Restart now**. **`.bak` rules:** if a `.bak` with that name already exists, it is removed first only if `lstat` shows a regular file owned by the user (never a symlink is followed); otherwise the update aborts. There is **no automatic rollback**. The new version deletes the `.bak` (same `lstat` checks) at its first successful start; if it never starts, the `.bak` stays and the error dialog shows its name so the user can restore it by hand. |
+| `AppImage` (release gate met) | Download into the target's directory. After verification, re-check that the target still has the recorded `(device, inode)` (otherwise abort without writing). This is a best-effort guard, not an atomic compare-and-replace: a concurrent writer could still replace the target between the check and the path-based `rename(2)`, which is accepted because the target is in a directory owned by the user. Then apply the target's **original file mode masked with `0755`** to the `.part` (setuid, setgid, sticky and group/other write are dropped), keep the old file as a hard link `.RealmPortal-{old}.AppImage.bak`, then `rename(2)` the `.part` over the target in the same directory. The dialog offers **Restart now**. **`.bak` rules:** if a `.bak` with that name already exists, it is removed first only if `lstat` shows a regular file owned by the user (never a symlink is followed); otherwise the update aborts. There is **no automatic rollback**. The new version deletes the `.bak` (same `lstat` checks) at its first successful start; if it never starts, the `.bak` stays and the error dialog shows its name so the user can restore it by hand. |
 | `Deb` | **No in-app install**: it needs root, and the app never calls `pkexec` or `sudo` or writes to a root-owned path. Download the verified file to the XDG Downloads folder (mode `0600`), open that folder, and show the command `sudo apt install '<absolute path>'`, built from the real XDG Downloads path and the real saved file name, quoted, so the copied command works from any directory. The UI may show the path `~`-relative only if the copied command uses the absolute one. |
 | `WindowsZip` | Download the verified zip to the user's Downloads folder, open it in Explorer, and show "extract over your current folder" instructions. No self-replacement in 1.1.0. Optional: write a `Zone.Identifier` (Mark of the Web) on the zip. |
 | `Unknown` or any failure | Open the release page (validated as above) in the browser. |
 
 In the Downloads folder an existing file is never overwritten: if the name is taken, a ` (1)`, ` (2)`… suffix is added.
 The final name is set only after verification.
+
+**Copyable commands** (`chmod u+x …`, `sudo apt install …`) quote the absolute path with POSIX single quotes, escaping each
+`'` in the path as `'\''`, so any path works when pasted into a shell. If the path contains a control character (including
+a newline), no command is shown, only the folder and the file name. Tests cover paths with spaces, quotes and `$`.
 
 ### Logging
 
@@ -183,10 +187,14 @@ Logs record the error code, the HTTP status and the **host only**. Full URLs are
   3724 is used when none is given. `patchlist`, launch-template hosts and anything from client files that has not been
   validated are never probed.
 - **No data is sent**: the socket is closed right after the connection succeeds.
-- States: `online` (connected), `offline` (refused or timed out; the tooltip gives the reason), `checking`, and `unknown`
+- States: `online` (connected), `offline` (refused, timed out, or any other connection error such as network or host
+  unreachable; the tooltip gives the reason, for example "connection refused", "timed out" or "network error
+  (`NetworkUnreachable`)"), `checking`, and `unknown`
   (not probed yet, or the host name could not be resolved). A DNS failure (`SocketError.HostNotFound` or `NoData`) is
   `unknown` with the reason "name not found (DNS)", so a typo in the realmlist host does not look like a server that is
-  down. The add or edit server form shows the same warning after a probe.
+  down. The add or edit server form shows the same warning after a probe. Today `TcpConnectionProbe` folds every
+  non-timeout `SocketException` into `ProbeResult.Failed`; the implementation PR extends the result with the `SocketError`
+  code so the scheduler can apply this mapping and show the reason.
 - The tooltip also says when the result was taken ("checked 3 min ago"), because results are reused for up to 5 minutes.
 - The tooltip says **"Login server reachable"**, not "server online": only the login port is checked, not the world server.
 - Private, loopback and LAN addresses are allowed, because local servers are legitimate. A shared realmlist can therefore
