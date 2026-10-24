@@ -32,6 +32,16 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Changed();
     }
 
+    /// <summary>
+    /// Records <paramref name="language"/> as the saved language. The status-bar toggle saves the language right away,
+    /// so it is not an unsaved Settings change; the other fields keep their pending edits.
+    /// </summary>
+    public void AcceptSavedLanguage(Language language)
+    {
+        _saved = _saved with { Language = language };
+        Changed();
+    }
+
     public event Action? OpenBackupsManagerRequested;
 
     [ObservableProperty]

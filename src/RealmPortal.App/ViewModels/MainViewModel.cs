@@ -59,7 +59,7 @@ public sealed partial class MainViewModel : ObservableObject
         Clients.ClientsChanged += () => Servers.ReloadFromService();
         Clients.ClientEditRequested += ShowEditClient;
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
-        Clients.FirstScanFoundNoClients += () => SectionIndex = 1;
+        Clients.FirstScanFoundNoClients += ShowClientsAfterEmptyScan;
         Servers.ConfirmDiscardAsync = () => ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
         Clients.StartFirstScanIfNeeded();
     }
@@ -98,6 +98,20 @@ public sealed partial class MainViewModel : ObservableObject
 
             SetSection(value);
         }
+    }
+
+    /// <summary>
+    /// A scan that found no clients opens the Clients screen, unless the user is editing Settings: a background scan
+    /// must not interrupt them with the unsaved-changes question (only navigation and closing ask).
+    /// </summary>
+    private void ShowClientsAfterEmptyScan()
+    {
+        if (_sectionIndex == 2 && Settings.IsDirty)
+        {
+            return;
+        }
+
+        SectionIndex = 1;
     }
 
     /// <summary>Raised when a section change waits for the unsaved-changes question, so the sidebar can re-select Settings.</summary>
@@ -206,6 +220,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         Loc.Instance.Toggle();
         _session?.UiPreferences.SetLanguage(Loc.Instance.Current);
+        Settings.AcceptSavedLanguage(Loc.Instance.Current);
     }
 
     private void OnSectionIndexChanged(int value)

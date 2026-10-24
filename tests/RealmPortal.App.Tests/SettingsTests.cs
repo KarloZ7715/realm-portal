@@ -201,7 +201,7 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
-    public void DiscardAfterStatusBarToggle_RestoresTheSavedLanguagePreference()
+    public void StatusBarToggle_IsSavedRightAwayAndIsNotAnUnsavedSettingsChange()
     {
         using var temp = new RealmPortal.Tests.Support.TempDirectory();
         var config = temp.Combine("config");
@@ -211,9 +211,15 @@ public class SettingsScreenTests
         var main = new MainViewModel(session, autoTick: false);
         try
         {
-            main.SectionIndex = 2;
+            // Without entering Settings: the toggle must not make Settings dirty (closing would ask otherwise).
             main.ToggleLanguageCommand.Execute(null);
             Assert.Equal("en", session.UiPreferences.Load().LanguageCode);
+            Assert.False(main.Settings.IsDirty);
+
+            // Inside Settings with a pending edit: the edit stays pending, the language does not become one.
+            main.SectionIndex = 2;
+            main.Settings.Prefix = "mangohud";
+            main.ToggleLanguageCommand.Execute(null);
             Assert.True(main.Settings.IsDirty);
 
             main.SectionIndex = 0;
@@ -221,9 +227,31 @@ public class SettingsScreenTests
             Screenshots.Settle();
 
             Assert.Null(main.Dialog);
+            Assert.Equal(0, main.SectionIndex);
             Assert.False(main.Settings.IsDirty);
             Assert.Equal(Language.Es, Loc.Instance.Current);
             Assert.Equal("es", session.UiPreferences.Load().LanguageCode);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(Language.Es);
+        }
+    }
+
+    [AvaloniaFact]
+    public void ClosingAfterStatusBarToggleDoesNotAsk()
+    {
+        var shell = new Shell();
+        try
+        {
+            shell.Model.ToggleLanguageCommand.Execute(null);
+            Screenshots.Settle();
+            var closed = false;
+            shell.Window.Closed += (_, _) => closed = true;
+            shell.Window.Close();
+            Screenshots.Settle();
+            Assert.Null(shell.Model.Dialog);
+            Assert.True(closed);
         }
         finally
         {

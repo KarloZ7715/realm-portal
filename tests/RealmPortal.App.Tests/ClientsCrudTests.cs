@@ -116,6 +116,33 @@ public sealed class ClientsCrudTests
     }
 
     [AvaloniaFact]
+    public async Task EmptyFirstScan_OpensClients()
+    {
+        using var env = new Env(firstScanCompleted: false);
+
+        await WaitUntil(() => !env.Main.Clients.IsScanning);
+
+        Assert.Equal(1, env.Main.SectionIndex);
+        Assert.Null(env.Main.Dialog);
+    }
+
+    [AvaloniaFact]
+    public async Task EmptyFirstScan_DoesNotInterruptUnsavedSettings()
+    {
+        using var env = new Env(firstScanCompleted: false);
+        env.Main.SectionIndex = 2;
+        env.Main.Settings.Prefix = "mangohud";
+
+        await WaitUntil(() => !env.Main.Clients.IsScanning);
+        await Task.Delay(50);
+
+        Assert.Null(env.Main.Dialog);
+        Assert.Equal(2, env.Main.SectionIndex);
+        Assert.Equal("mangohud", env.Main.Settings.Prefix);
+        Assert.True(env.Main.Settings.IsDirty);
+    }
+
+    [AvaloniaFact]
     public async Task RescanReportsKnownClientsAndRefreshesServerProjectionOnNoChange()
     {
         using var env = new Env();
