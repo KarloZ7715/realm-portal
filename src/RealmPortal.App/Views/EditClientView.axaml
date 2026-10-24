@@ -8,8 +8,11 @@
   <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
     <StackPanel Margin="20,10,20,0">
       <Grid ColumnDefinitions="Auto,*" Height="44" ColumnSpacing="12">
-        <Button Name="BackButton" Classes="link caps" VerticalAlignment="Center" Command="{Binding CancelCommand}">
-          <TextBlock Text="{loc:T clients.edit.back}"/>
+        <Button Name="BackButton" Classes="link caps" VerticalAlignment="Center" AutomationProperties.Name="{loc:T clients.edit.back}" Command="{Binding CancelCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <c:Icon Data="{DynamicResource IconChevronLeft}" Width="12" Height="12" StrokeThickness="2.6"/>
+            <TextBlock Text="{loc:T clients.edit.back}"/>
+          </StackPanel>
         </Button>
         <TextBlock Grid.Column="1" Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T clients.edit.title}"/>
       </Grid>

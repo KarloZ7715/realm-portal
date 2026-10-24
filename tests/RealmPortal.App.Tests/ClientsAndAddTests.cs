@@ -39,6 +39,20 @@ public class ClientsScreenTests
     }
 
     [AvaloniaFact]
+    public async Task EditClientBackButtonShowsASingleChevron()
+    {
+        var shell = new Shell();
+        shell.Model.SectionIndex = 1;
+        shell.Model.Clients.Items[0].EditCommand.Execute(null);
+        await Pump();
+        var back = shell.Window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "BackButton");
+        Assert.Single(back.GetVisualDescendants().OfType<Icon>());
+        Assert.Equal(["Volver"], back.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+        Assert.Equal("Volver", Avalonia.Automation.AutomationProperties.GetName(back));
+        shell.Snap("edit-client", 1.0);
+    }
+
+    [AvaloniaFact]
     public async Task ClientsFooterHasNoSettingsHint()
     {
         // Clients are managed on this screen, so a "change them later in Settings" hint would be wrong (#95).
