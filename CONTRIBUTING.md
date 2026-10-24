@@ -29,7 +29,7 @@ dotnet run --project src/RealmPortal.App
 
 On Linux the app needs an X11 server (or XWayland) and `libfontconfig1`, `libfreetype6`, `libx11-6`, `libice6`, `libsm6`.
 
-CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan, a per-file size check and (on pull requests) a commit author email check.
+CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan and a per-file size check.
 
 ## Version
 
@@ -114,44 +114,10 @@ why, and mention it in the PR description. Prefer Git LFS or an external downloa
 anything bigger than a few MiB. Large raw design sources and build outputs do not belong
 in the repository.
 
-## Commit author email
+## Use of AI tools
 
-Commits must use your GitHub noreply address, preferably `<id>+<username>@users.noreply.github.com`
-(see <https://github.com/settings/emails>), for both the author and the committer, never a personal or
-institutional email.
-
-On pull requests the `commit-email` CI job (`.github/workflows/commit-email.yml`, logic in
-`.github/scripts/check-commit-emails.sh`) checks the author (`%ae`) and committer (`%ce`) email of every new
-commit. An email passes when, ignoring case, the whole address matches
-`^([0-9]+\+)?[a-z0-9]([a-z0-9]|-[a-z0-9]){0,38}(\[bot\])?@users\.noreply\.github\.com$`, that is, an
-optional numeric ID and a valid GitHub username (1 to 39 letters, digits or single inner hyphens; the script
-checks the length separately), optionally
-followed by `[bot]` (for example
-`188834590+KarloZ7715@users.noreply.github.com`, `KarloZ7715@users.noreply.github.com` or
-`49699333+dependabot[bot]@users.noreply.github.com`), or is exactly one of:
-
-- `noreply@github.com`: committer of commits created on github.com (web merges and edits) and by GitHub apps;
-- `cursoragent@cursor.com`: Cursor cloud agents.
-
-Addresses the regex cannot express, such as Enterprise Managed User (EMU) accounts
-(`<id>+<username>_<shortcode>@users.noreply.github.com`) or older accounts whose usernames do not follow the
-current rules, can be added as exact addresses to `EXACT_ALLOWED_EMAILS` in
-`.github/scripts/check-commit-emails.sh` (explain why in the PR; entries are compared case-insensitively).
-
-Any other author or committer email fails the job. A noreply-domain address whose username is not valid is
-reported as such (invalid numeric ID prefix or invalid username), so the error tells you which part to fix. `Co-authored-by:` trailers are checked with the same rule
-but only produce a warning (a trailer without `<email>` is parsed from its bare address, or reported as
-malformed). Fix a failing branch with `git config user.email ...` and
-`git commit --amend --no-edit --reset-author` (or a rebase with `--exec`) on the PR branch. When you merge or
-edit on github.com, pick your noreply address in the commit dialog. Run
-`.github/scripts/test-check-commit-emails.sh` after changing the check.
-
-**This check protects privacy; it does not verify identity.** Author, committer and `Co-authored-by` emails are
-free text: anyone can set any allowed address, including someone else's noreply address or
-`cursoragent@cursor.com`, and the job will pass. Its only purpose is to stop personal or institutional addresses
-from being published by mistake. To prove who made a commit, sign your commits (GPG, SSH or S/MIME, see
-<https://docs.github.com/en/authentication/managing-commit-signature-verification>) and enable vigilant mode
-in your GitHub settings so that unsigned commits attributed to you are flagged as "Unverified".
+AI tools are welcome, but you are the author: review every line and be able to explain what your change does and how it
+interacts with the rest of the app. State in the pull request whether and how you used AI; the PR template asks for it.
 
 ## Reporting vulnerabilities
 
