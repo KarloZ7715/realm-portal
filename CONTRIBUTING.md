@@ -29,7 +29,7 @@ dotnet run --project src/RealmPortal.App
 
 On Linux the app needs an X11 server (or XWayland) and `libfontconfig1`, `libfreetype6`, `libx11-6`, `libice6`, `libsm6`.
 
-CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan and a per-file size check.
+CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan, a per-file size check and (on pull requests) a commit author email check.
 
 ## Version
 
@@ -136,6 +136,14 @@ reduced), list its exact repository-relative path in
 why, and mention it in the PR description. Prefer Git LFS or an external download for
 anything bigger than a few MiB. Large raw design sources and build outputs do not belong
 in the repository.
+
+## Commit author email
+
+Commits must be authored with your GitHub noreply address (`<id>+<username>@users.noreply.github.com`,
+see <https://github.com/settings/emails>), never a personal or institutional email. On pull requests the `commit-email`
+CI job (`.github/workflows/commit-email.yml`) fails if any new commit has another author email (a small, documented
+allowlist covers bots such as Cursor agents); fix it with `git config user.email ...` and `git commit --amend --reset-author`
+or a rebase on the PR branch.
 
 ## Reporting vulnerabilities
 
