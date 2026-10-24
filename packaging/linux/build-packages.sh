@@ -76,10 +76,13 @@ mkdir -p "${DEB_STAGING}/DEBIAN" \
   "${DEB_STAGING}/usr/bin" \
   "${DEB_STAGING}/usr/share/applications" \
   "${DEB_STAGING}/usr/share/metainfo" \
-  "${DEB_STAGING}/usr/share/icons"
+  "${DEB_STAGING}/usr/share/icons" \
+  "${DEB_STAGING}/usr/share/doc/realm-portal"
 
 install_tree "${DEB_STAGING}${DEB_INSTALL_LIB}"
 write_deb_launcher "${DEB_STAGING}/usr/bin/realm-portal"
+# The self-contained build bundles the .NET runtime: ship its license and notices with ours.
+"${ROOT_DIR}/packaging/collect-licenses.sh" "${PUBLISH_DIR}" linux-x64 "${DEB_STAGING}/usr/share/doc/realm-portal"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${DEB_STAGING}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
@@ -101,6 +104,18 @@ EOF
 DEB_FILE="${OUT_DIR}/realm-portal_${VERSION}_amd64.deb"
 dpkg-deb --build --root-owner-group "${DEB_STAGING}" "${DEB_FILE}"
 
+REQUIRED_DOCS=(
+  LICENSE
+  THIRD_PARTY_LICENSES.md
+  licenses/dotnet-runtime/LICENSE.TXT
+  licenses/dotnet-runtime/THIRD-PARTY-NOTICES.TXT
+  licenses/nuget/PACKAGES.txt
+)
+deb_contents="$(dpkg-deb -c "${DEB_FILE}")"
+for doc in "${REQUIRED_DOCS[@]}"; do
+  grep -q -F "./usr/share/doc/realm-portal/${doc}" <<<"${deb_contents}" || { echo "error: ${doc} missing from ${DEB_FILE}" >&2; exit 1; }
+done
+
 # --- AppImage ---
 APPDIR="${OUT_DIR}/RealmPortal.AppDir"
 APPIMAGE_INSTALL_LIB="${APPDIR}/usr/lib/realm-portal"
@@ -112,6 +127,7 @@ mkdir -p "${APPIMAGE_INSTALL_LIB}" \
 
 install_tree "${APPIMAGE_INSTALL_LIB}"
 write_appimage_launcher "${APPDIR}/usr/bin/realm-portal"
+"${ROOT_DIR}/packaging/collect-licenses.sh" "${PUBLISH_DIR}" linux-x64 "${APPDIR}/usr/share/doc/realm-portal"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${APPDIR}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
@@ -129,6 +145,9 @@ HERE="$(dirname "$(readlink -f "$0")")"
 exec "${HERE}/usr/bin/realm-portal" "$@"
 EOF
 chmod 755 "${APPDIR}/AppRun"
+for doc in "${REQUIRED_DOCS[@]}"; do
+  [[ -s "${APPDIR}/usr/share/doc/realm-portal/${doc}" ]] || { echo "error: ${doc} missing from the AppDir" >&2; exit 1; }
+done
 
 if [[ -z "${APPIMAGETOOL}" ]]; then
   echo "error: set APPIMAGETOOL to the appimagetool AppImage path" >&2
