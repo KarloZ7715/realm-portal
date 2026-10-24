@@ -387,4 +387,27 @@ public class CliServerFlowTests
         Assert.Equal(0, box.RunWithoutClient("remove", "Beta").Code);
         Assert.Contains("No servers.", box.RunWithoutClient("list").Out);
     }
+
+    [Fact]
+    public void ServerEdit_BuildAny_ClearsStoredBuild_AndOtherEditsKeepIt()
+    {
+        using var box = new Sandbox(clientBuild: null);
+        Assert.Equal(0, box.RunWithoutClient("add", "Alpha", "alpha.example.org", "--build", "12340").Code);
+        ServerStore Store() => new(box.Config, new RealmPortal.Core.IO.AtomicFileWriter());
+
+        Assert.Equal(0, box.RunWithoutClient("edit", "Alpha", "--name", "Beta").Code);
+        Assert.Equal(12340, Store().Find("Beta")!.RequiredClientBuild);
+
+        var cleared = box.RunWithoutClient("edit", "Beta", "--build", "any");
+        Assert.Equal(0, cleared.Code);
+        Assert.Null(Store().Find("Beta")!.RequiredClientBuild);
+
+        Assert.Equal(0, box.RunWithoutClient("edit", "Beta", "--build", "8606").Code);
+        Assert.Equal(8606, Store().Find("Beta")!.RequiredClientBuild);
+
+        var bad = box.RunWithoutClient("edit", "Beta", "--build", "anything");
+        Assert.NotEqual(0, bad.Code);
+        Assert.Contains("--build must be a positive integer or 'any'", bad.Err);
+        Assert.Equal(8606, Store().Find("Beta")!.RequiredClientBuild);
+    }
 }
