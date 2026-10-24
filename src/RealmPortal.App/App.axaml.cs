@@ -25,10 +25,18 @@ public partial class App : Application
                 ? new Dev.GalleryWindow()
                 : desktop.Args?.Contains("--demo") == true
                     ? new MainWindow(MainViewModel.ForDemo())
-                    : new MainWindow(new MainViewModel(PortalSession.Create(), PickClientFolderAsync));
+                    : CreatePortalWindow();
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static MainWindow CreatePortalWindow()
+    {
+        var session = PortalSession.Create();
+        var window = new MainWindow(new MainViewModel(session, PickClientFolderAsync));
+        WindowPlacementPersistence.Attach(window, session.UiPreferences);
+        return window;
     }
 
     private static async Task<string?> PickClientFolderAsync()

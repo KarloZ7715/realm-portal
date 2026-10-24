@@ -122,7 +122,7 @@ public class SettingsViewModelTests
     [AvaloniaFact]
     public void TemplateWatermarkKey_IsDefinedInBothLanguages()
     {
-        Assert.Equal("wine {exe}", Loc.Load(Language.En)["settings.template.watermark"]);
-        Assert.Equal("wine {exe}", Loc.Load(Language.Es)["settings.template.watermark"]);
+        Assert.Equal("e.g. wine {exe}", Loc.Load(Language.En)["settings.template.watermark"]);
+        Assert.Equal("ej.: wine {exe}", Loc.Load(Language.Es)["settings.template.watermark"]);
     }
 }

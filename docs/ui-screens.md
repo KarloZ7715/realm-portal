@@ -369,3 +369,14 @@ All keys below are specified for `src/RealmPortal.App/Localization/Strings/en.js
 ## Art used without a Figma reference
 
 See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
+
+## Window size and position
+
+The main window remembers its last normal size and position and whether it was maximized (`ui-preferences.json` in the app's own config directory, key `Window`; `WindowPlacementPersistence`). It is saved on close and restored at start, before the window is shown:
+
+- No saved value: the default 720×440, centred.
+- The saved bounds are fitted to the screens present now (`WindowPlacementFit`): never below 720×440, never larger than the working area (on a screen smaller than 720×440 the minimum wins and the window sits at the top-left corner), moved fully inside the screen that holds most of the window, or centred on the first screen if that monitor is gone.
+- A maximized window restores maximized and keeps the size it returns to; a minimized window is never restored minimized.
+- Demo (`--demo`), gallery and tests do not read or write it.
+
+Known platform gap (plain Avalonia, X11): the window manager decides the final position and may offset it by its frame (`_NET_FRAME_EXTENTS`), so on some window managers the window can shift by the title-bar height between runs. Native Wayland ignores client positions (size and maximized still apply).

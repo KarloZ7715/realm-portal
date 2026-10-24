@@ -41,19 +41,19 @@
               </StackPanel>
               <StackPanel Grid.Column="1" Spacing="6">
                 <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T settings.prefix}"/>
-                <TextBox Name="PrefixBox" Classes="parchment mono" Text="{Binding Prefix, Mode=TwoWay}" Watermark="gamemoderun"/>
+                <TextBox Name="PrefixBox" Classes="parchment mono" Text="{Binding Prefix, Mode=TwoWay}" Watermark="{loc:T settings.prefix.watermark}"/>
                 <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.prefix.hint}"/>
               </StackPanel>
             </Grid>
             <StackPanel Spacing="6" Margin="0,4,0,0">
               <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T settings.args}"/>
-              <TextBox Name="ArgumentsBox" Classes="parchment mono" Text="{Binding Arguments, Mode=TwoWay}" Watermark="-windowed"/>
+              <TextBox Name="ArgumentsBox" Classes="parchment mono" Text="{Binding Arguments, Mode=TwoWay}" Watermark="{loc:T settings.args.watermark}"/>
             </StackPanel>
             <StackPanel Spacing="6" Margin="0,4,0,0">
               <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T settings.env}"/>
               <TextBox Name="EnvironmentBox" Classes="parchment mono" Classes.error="{Binding EnvironmentError, Converter={x:Static ObjectConverters.IsNotNull}}"
                        AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="76" Height="76" Padding="12,8" VerticalContentAlignment="Top"
-                       Text="{Binding Environment, Mode=TwoWay}" Watermark="WINEPREFIX=/home/user/.wine"/>
+                       Text="{Binding Environment, Mode=TwoWay}" Watermark="{loc:T settings.env.watermark}"/>
               <TextBlock Name="EnvironmentError" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
                          IsVisible="{Binding EnvironmentError, Converter={x:Static ObjectConverters.IsNotNull}}" Text="{Binding EnvironmentError}"/>
             </StackPanel>
