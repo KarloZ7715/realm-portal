@@ -77,7 +77,7 @@ back to opening the release page.
 
 `SHA256SUMS` is published in the same release, so the check proves the download was not corrupted, not who published it.
 Signing `SHA256SUMS` (for example with minisign and a public key embedded in the app) or verifying GitHub artifact
-attestations is tracked as a follow-up after 1.1.0.
+attestations is tracked as a follow-up after 1.1.0 in [#116](https://github.com/KarloZ7715/realm-portal/issues/116).
 
 ## 2. Server status dot (#104)
 
