@@ -12,11 +12,13 @@ public sealed partial class ClientItemViewModel : ObservableObject
 {
     private readonly Action<ClientItemViewModel>? _edit;
     private readonly Action<ClientItemViewModel>? _remove;
+    private readonly Func<string> _version;
+    private Func<string> _title;
 
     private ClientItemViewModel(
         string? id,
         string? name,
-        string version,
+        Func<string> version,
         string path,
         CoreClientOrigin origin,
         bool inUse,
@@ -27,7 +29,8 @@ public sealed partial class ClientItemViewModel : ObservableObject
     {
         Id = id;
         Name = name ?? string.Empty;
-        Version = version;
+        _version = version;
+        _title = () => Loc.Format("clients.client", version());
         Path = path;
         CoreOrigin = origin;
         Origin = Enum.TryParse<ClientOrigin>(origin.ToString(), true, out var demoOrigin)
@@ -40,7 +43,7 @@ public sealed partial class ClientItemViewModel : ObservableObject
     }
 
     public ClientItemViewModel(ClientSeed seed, Action<ClientItemViewModel>? edit = null, Action<ClientItemViewModel>? remove = null)
-        : this(null, null, seed.Version, seed.Path, Enum.Parse<CoreClientOrigin>(seed.Origin.ToString()), seed.InUse, false, false, edit, remove)
+        : this(null, null, () => seed.Version, seed.Path, Enum.Parse<CoreClientOrigin>(seed.Origin.ToString()), seed.InUse, false, false, edit, remove)
     {
     }
 
@@ -52,16 +55,18 @@ public sealed partial class ClientItemViewModel : ObservableObject
         Action<ClientItemViewModel>? edit = null,
         Action<ClientItemViewModel>? remove = null)
     {
-        var version = entry.Version?.ToString() ?? entry.Error?.Code.ToString() ?? "?";
-        return new ClientItemViewModel(entry.Id, entry.Name, version, entry.Path, entry.Origin, inUse,
+        var item = new ClientItemViewModel(entry.Id, entry.Name, () => VersionText.Of(entry), entry.Path, entry.Origin, inUse,
             isRunning, isStateUnknown, edit, remove);
+        item._title = () => VersionText.ClientTitle(entry.Version);
+        return item;
     }
 
     public string? Id { get; }
 
     public string Name { get; private set; }
 
-    public string Version { get; }
+    /// <summary>The version text; re-read on language changes because an unreadable version is localized.</summary>
+    public string Version => _version();
 
     public string Path { get; private set; }
 
@@ -73,7 +78,7 @@ public sealed partial class ClientItemViewModel : ObservableObject
 
     public string OriginText => Loc.Get($"clients.origin.{CoreOrigin.ToString().ToLowerInvariant()}");
 
-    public string Title => string.IsNullOrWhiteSpace(Name) ? Loc.Format("clients.client", Version) : Name;
+    public string Title => string.IsNullOrWhiteSpace(Name) ? _title() : Name;
 
     public bool ShowNamedVersion => !string.IsNullOrWhiteSpace(Name);
 
@@ -115,6 +120,7 @@ public sealed partial class ClientItemViewModel : ObservableObject
     {
         Name = name ?? string.Empty;
         OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(Version));
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(ShowNamedVersion));
         Path = path;
@@ -124,6 +130,7 @@ public sealed partial class ClientItemViewModel : ObservableObject
 
     public void RefreshText()
     {
+        OnPropertyChanged(nameof(Version));
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(ShowNamedVersion));
         OnPropertyChanged(nameof(OriginText));
