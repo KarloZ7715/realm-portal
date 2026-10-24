@@ -71,7 +71,6 @@
             <TextBlock Text="{loc:T clients.rescan}"/>
           </StackPanel>
         </Button>
-        <TextBlock Classes="footnote" VerticalAlignment="Center" Foreground="{DynamicResource BoneSoftBrush}" Text="{loc:T clients.later}"/>
       </StackPanel>
     </StackPanel>
   </ScrollViewer>
