@@ -155,7 +155,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
     - **`Remove client` (`Quitar cliente`):** `Button.ghost.surface-parchment` (`Width="28"`, `Height="28"`, `Padding="6"`, `Margin="4,0,0,0"`, `c:ButtonSurface.Surface="Parchment"`), icon `IconClose` (`14×14`, `#7A1F19`), tooltip `clients.action.remove`. Disabled while this client is running.
 
 #### 2.3 Edit Client & Per-Client Launcher Overrides Sheet (`EditClientView.axaml` / `EditClientViewModel.cs`)
-- **Placement (Approved):** Clicking `✎` on a client row opens the `EditClientView` sheet in the main content area (with `← Back` / `← Volver` header navigation returning to `ClientsView`).
+- **Placement (Approved):** Clicking `✎` on a client row opens the `EditClientView` sheet in the main content area (with a chevron + `Back` / `Volver` header button returning to `ClientsView`).
 - **Backend contract:** `IPortalService.UpdateClient(UpdateClientRequest)` (`ClientId`, `Name`, `Path`, `IsInUse`, and optional per-client `LauncherOverrides`: `CommandTemplate`, `Prefix`, `Arguments`, `Environment`).
 - **Sheet sections (inside a `ParchmentPanel` `Variant="Tile"`, all buttons with `c:ButtonSurface.Surface="Parchment"`):**
   1. **Client identity & folder:**
@@ -222,13 +222,13 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
      - Right (`Auto`): **`Manage backups…`** (`Gestionar respaldos…`, `settings.backup.manage`) `Button.secondary.compact` (`c:ButtonSurface.Surface="Parchment"`, `MinWidth="172"`, `Command="{Binding OpenBackupsManagerCommand}"`).
 
 #### 4.2 Client Backups Manager Sub-Sheet (`BackupsView.axaml` / `BackupsViewModel.cs`)
-- **Placement (Approved):** Dedicated sub-sheet opened from the **`Manage backups…`** (`Gestionar respaldos…`) button inside the `BACKUP` card in `SettingsView`. Clicking `← Back` (`← Volver`) in the sub-sheet header returns to `SettingsView`.
+- **Placement (Approved):** Dedicated sub-sheet opened from the **`Manage backups…`** (`Gestionar respaldos…`) button inside the `BACKUP` card in `SettingsView`. Clicking the chevron + `Back` (`Volver`) button in the sub-sheet header returns to `SettingsView`.
 - **Backend contract:** `ListBackups(clientId)`, `CreateBackup(clientId)`, `RestoreBackup(clientId, backupId, force)`, `DeleteBackup(clientId, backupId)`.
 - **Sub-sheet layout:**
 
 ```
 +--------------------------------------------------------------------------+
-| [← Back]  Client backups                                                 |
+| [‹ Back]  Client backups                                                 |
 |           Snapshots of realmlist.wtf and WTF/Config.wtf                  |
 +--------------------------------------------------------------------------+
 |  PARCHMENT SHEET (panel-tile)                                            |

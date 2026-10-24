@@ -216,6 +216,7 @@ public sealed class BackupsViewModelTests
                 Assert.Single(back.GetVisualDescendants().OfType<Icon>());
                 var texts = back.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
                 Assert.Equal([label], texts);
+                Assert.Equal(label, Avalonia.Automation.AutomationProperties.GetName(back));
                 foreach (var scale in new[] { 1.0, 2.0 })
                     Screenshots.Save(window, scale, $"backups-{language.ToString().ToLowerInvariant()}-{scale:0.0}x.png");
                 Screenshots.SetRenderScaling(window, 1.0);
