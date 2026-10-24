@@ -197,12 +197,12 @@ public sealed class Step13ServerUiTests
         Assert.Equal("Example Realm", form.Realm);
 
         form.Name = "Renamed";
-        form.Realm = "Stormscale";
+        form.Realm = "Renamed Realm";
         form.SaveCommand.Execute(null);
 
         var updated = env.Session.Service.ListServers(compatibleOnly: false).Value!.Single(s => s.Id == server.Id);
         Assert.Equal("Renamed", updated.Name);
-        Assert.Equal("Stormscale", updated.Realm);
+        Assert.Equal("Renamed Realm", updated.Realm);
         Assert.False(form.HasSaveError);
     }
 
