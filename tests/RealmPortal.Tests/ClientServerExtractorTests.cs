@@ -294,7 +294,7 @@ public class ClientServerExtractorTests
         var baseline = RealmlistIdentity.Create("logon.example.org", "Example Realm", 12340);
 
         Assert.NotEqual(baseline, RealmlistIdentity.Create("logon.example.org", "Example Realm", 5875));
-        Assert.NotEqual(baseline, RealmlistIdentity.Create("logon.example.org", "Deathwing", 12340));
+        Assert.NotEqual(baseline, RealmlistIdentity.Create("logon.example.org", "Other Realm", 12340));
         Assert.NotEqual(baseline, RealmlistIdentity.Create("other.example.org", "Example Realm", 12340));
         Assert.NotEqual(baseline, RealmlistIdentity.Create("logon.example.org", "Example Realm", null));
     }
