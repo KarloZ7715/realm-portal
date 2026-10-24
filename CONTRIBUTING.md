@@ -133,7 +133,13 @@ followed by `[bot]` (for example
 - `noreply@github.com`: committer of commits created on github.com (web merges and edits) and by GitHub apps;
 - `cursoragent@cursor.com`: Cursor cloud agents.
 
-Any other author or committer email fails the job. `Co-authored-by:` trailers are checked with the same rule
+Addresses the regex cannot express, such as Enterprise Managed User (EMU) accounts
+(`<id>+<username>_<shortcode>@users.noreply.github.com`) or older accounts whose usernames do not follow the
+current rules, can be added as exact addresses to `EXACT_ALLOWED_EMAILS` in
+`.github/scripts/check-commit-emails.sh` (explain why in the PR; entries are compared case-insensitively).
+
+Any other author or committer email fails the job. A noreply-domain address whose username is not valid is
+reported as such (invalid numeric ID prefix or invalid username), so the error tells you which part to fix. `Co-authored-by:` trailers are checked with the same rule
 but only produce a warning (a trailer without `<email>` is parsed from its bare address, or reported as
 malformed). Fix a failing branch with `git config user.email ...` and
 `git commit --amend --no-edit --reset-author` (or a rebase with `--exec`) on the PR branch. When you merge or
