@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     public const double WideFrom = 960;
 
     private IInputElement? _focusBeforeDialog;
+    private bool _closeConfirmed;
 
     /// <summary>
     /// The previewer calls this constructor. Design mode uses the demo backend so it does not open the developer's portal config.
@@ -32,6 +33,34 @@ public partial class MainWindow : Window
         viewModel.SectionChangeHeld += () => Dispatcher.UIThread.Post(() => Nav.SelectedIndex = viewModel.SectionIndex);
         Opened += (_, _) => Platform.X11WindowIcon.TrySet(this);
         SizeChanged += (_, e) => UpdateSidebar(e.NewSize.Width);
+        Closing += (_, e) => OnClosingWithUnsavedSettings(viewModel, e);
+    }
+
+    /// <summary>
+    /// Closing with unsaved Settings asks the same "Discard unsaved changes?" question as leaving the screen.
+    /// The close is cancelled while the dialog is open and repeated only after "Discard changes". A system shutdown is never held.
+    /// </summary>
+    private void OnClosingWithUnsavedSettings(MainViewModel viewModel, WindowClosingEventArgs e)
+    {
+        if (_closeConfirmed || !viewModel.Settings.IsDirty || e.CloseReason == WindowCloseReason.OSShutdown)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        if (viewModel.Dialog is not null)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(async () =>
+        {
+            if (await viewModel.ConfirmDiscardSettingsAsync())
+            {
+                _closeConfirmed = true;
+                Close();
+            }
+        });
     }
 
     private void CaptureFocusBeforeDialog() =>

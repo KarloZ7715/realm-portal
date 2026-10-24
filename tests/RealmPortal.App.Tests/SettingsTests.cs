@@ -232,6 +232,46 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
+    public void ClosingWithoutChangesClosesRightAway()
+    {
+        var (shell, _) = Open();
+        var closed = false;
+        shell.Window.Closed += (_, _) => closed = true;
+        shell.Window.Close();
+        Screenshots.Settle();
+        Assert.True(closed);
+        Assert.Null(shell.Model.Dialog);
+    }
+
+    [AvaloniaFact]
+    public void ClosingWithUnsavedChanges_AsksKeepEditingStaysOpenDiscardCloses()
+    {
+        var (shell, settings) = Open();
+        var closed = false;
+        shell.Window.Closed += (_, _) => closed = true;
+        settings.Prefix = "mangohud";
+
+        shell.Window.Close();
+        Screenshots.Settle();
+        var dialog = Assert.IsType<ConfirmDialogViewModel>(shell.Model.Dialog);
+        Assert.Equal("Seguir editando", dialog.CancelText);
+        Assert.False(closed);
+        shell.Snap("settings-close-confirm", 1.0);
+
+        dialog.CancelCommand.Execute(null);
+        Screenshots.Settle();
+        Assert.False(closed);
+        Assert.Equal("mangohud", settings.Prefix);
+
+        shell.Window.Close();
+        Screenshots.Settle();
+        shell.Model.Dialog!.ConfirmCommand.Execute(null);
+        Screenshots.Settle();
+        Assert.True(closed);
+        Assert.False(settings.IsDirty);
+    }
+
+    [AvaloniaFact]
     public void LeavingWithUnsavedChanges_DiscardRevertsAndLeaves()
     {
         var (shell, settings) = Open();

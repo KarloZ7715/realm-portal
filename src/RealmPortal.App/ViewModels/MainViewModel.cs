@@ -117,15 +117,32 @@ public sealed partial class MainViewModel : ObservableObject
 
     private async Task ConfirmLeaveSettingsAsync(int target)
     {
+        if (await ConfirmDiscardSettingsAsync().ConfigureAwait(true))
+        {
+            SetSection(target);
+        }
+    }
+
+    /// <summary>
+    /// True when nothing in Settings is unsaved, or when the user chose "Discard changes" (the edits are then reverted).
+    /// "Keep editing" (the default) answers false and keeps every edit.
+    /// </summary>
+    public async Task<bool> ConfirmDiscardSettingsAsync()
+    {
+        if (!Settings.IsDirty)
+        {
+            return true;
+        }
+
         if (!await ConfirmAsync(ConfirmDialogViewModel.DiscardSettingsChanges()).ConfigureAwait(true))
         {
-            return;
+            return false;
         }
 
         Settings.CancelCommand.Execute(null);
         // The status-bar language toggle writes the preference right away; discarding must put the saved one back.
         _session?.UiPreferences.SetLanguage(Loc.Instance.Current);
-        SetSection(target);
+        return true;
     }
 
     /// <summary>The form being filled in, or null. It belongs to the servers section: leaving the section drops it.</summary>
