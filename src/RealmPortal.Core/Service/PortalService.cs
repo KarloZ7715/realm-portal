@@ -129,7 +129,7 @@ public sealed class PortalService : IPortalService
                         var matching = servers.FirstOrDefault(server => RealmlistIdentity.FromServer(server).Equals(identity));
                         if (matching is null)
                         {
-                            var name = CreateImportedServerName(extracted, client.Version, servers);
+                            var name = CreateImportedServerName(extracted, servers);
                             var created = Server.Create(name, extracted.Host, extracted.Realm, extracted.ExtraRealmlistLines,
                                 requiredBuild, extracted.Account, clientId: client.Id);
                             _servers.Add(created);
@@ -1148,14 +1148,15 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    private static string CreateImportedServerName(ExtractedServer extracted, ClientVersion? version, IReadOnlyList<Server> existing)
+    /// <summary>
+    /// Name of a server imported from a client (#98): the realm (control characters stripped, trimmed) when there is one,
+    /// otherwise the host. The card already shows the host under the name, so it is not repeated. Capped at
+    /// <see cref="Server.MaxNameLength"/> and made unique case-insensitively with <c>" #2"</c>, <c>" #3"</c>, ...
+    /// </summary>
+    internal static string CreateImportedServerName(ExtractedServer extracted, IReadOnlyList<Server> existing)
     {
         var realm = new string((extracted.Realm ?? string.Empty).Where(c => !char.IsControl(c)).ToArray()).Trim();
-        var basis = realm.Length > 0
-            ? $"{realm} ({extracted.Host})"
-            : version is null
-                ? extracted.Host
-                : $"{extracted.Host} ({version.FileVersion.Major}.{version.FileVersion.Minor}.{version.FileVersion.Build})";
+        var basis = realm.Length > 0 ? realm : extracted.Host;
         basis = basis.Trim();
         if (basis.Length > Server.MaxNameLength)
             basis = basis[..Server.MaxNameLength].TrimEnd();
