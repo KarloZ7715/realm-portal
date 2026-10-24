@@ -52,7 +52,7 @@ public sealed partial class ClientItemViewModel : ObservableObject
         Action<ClientItemViewModel>? edit = null,
         Action<ClientItemViewModel>? remove = null)
     {
-        var version = entry.Version?.ToString() ?? entry.Error?.Code.ToString() ?? "?";
+        var version = entry.Version?.DisplayVersion ?? entry.Error?.Code.ToString() ?? "?";
         return new ClientItemViewModel(entry.Id, entry.Name, version, entry.Path, entry.Origin, inUse,
             isRunning, isStateUnknown, edit, remove);
     }

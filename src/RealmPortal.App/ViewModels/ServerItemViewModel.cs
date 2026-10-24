@@ -113,7 +113,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
         Action<ServerItemViewModel>? edit = null,
         Action<ServerItemViewModel>? delete = null)
     {
-        var versionLabel = clientVersion?.ToString() ?? "?";
+        var versionLabel = clientVersion?.DisplayVersion ?? "?";
         var needsRepair = entry.IsActive && !projectionInSync;
         // An unreadable or missing client matches the service: every server stays compatible.
         // A known version uses the same build rule as the client RunPortalAsync will switch with.

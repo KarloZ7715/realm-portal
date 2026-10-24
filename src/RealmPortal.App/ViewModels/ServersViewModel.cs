@@ -498,7 +498,13 @@ public sealed partial class ServersViewModel : ViewModelBase
     }
 
     private static string ClientDisplayName(ClientEntry client) =>
-        string.IsNullOrWhiteSpace(client.Name) ? client.Version?.ToString() ?? "?" : client.Name!;
+        string.IsNullOrWhiteSpace(client.Name) ? client.Version?.DisplayVersion ?? "?" : client.Name!;
+
+    /// <summary>"Name (3.3.5a (12340))", or just the version when the client has no name, so it never shows twice.</summary>
+    private static string ClientFilterLabel(ClientEntry client) =>
+        string.IsNullOrWhiteSpace(client.Name)
+            ? ClientDisplayName(client)
+            : $"{client.Name} ({client.Version?.DisplayVersion ?? "?"})";
 
     /// <summary>Rebuilds the header filter: "All clients in use" followed by the clients marked in use.</summary>
     private void RebuildClientFilter(IReadOnlyList<ClientEntry> inUseClients)
@@ -508,7 +514,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         ClientFilterOptions.Add(new ServerClientFilterOption(null, Loc.Get("servers.clientfilter.all")));
         foreach (var client in inUseClients)
         {
-            ClientFilterOptions.Add(new ServerClientFilterOption(client.Id, $"{ClientDisplayName(client)} ({client.Version?.ToString() ?? "?"})"));
+            ClientFilterOptions.Add(new ServerClientFilterOption(client.Id, ClientFilterLabel(client)));
         }
 
         SelectedClientFilter = ClientFilterOptions.FirstOrDefault(o => o.ClientId == keepId) ?? ClientFilterOptions[0];

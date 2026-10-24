@@ -8,8 +8,9 @@ namespace RealmPortal.App.Demo;
 /// </summary>
 public static class DemoData
 {
-    public const string Wotlk = "3.3.5a (12340)";
-    public const string Classic = "1.12.1 (5875)";
+    // Same formatter as real clients (Core's ClientVersion.DisplayVersion): "3.3.5a (12340)", "1.12.1 (5875)".
+    public static readonly string Wotlk = new RealmPortal.Core.Clients.ClientVersion(new Version(3, 3, 5, 12340)).DisplayVersion;
+    public static readonly string Classic = new RealmPortal.Core.Clients.ClientVersion(new Version(1, 12, 1, 5875)).DisplayVersion;
 
     public static IReadOnlyList<ServerSeed> Servers { get; } =
     [
@@ -21,16 +22,16 @@ public static class DemoData
 
     public static IReadOnlyList<ClientSeed> Clients { get; } =
     [
-        new("3.3.5a (12340)", "/home/demo/Games/Client-335", ClientOrigin.Lutris, InUse: true),
-        new("1.12.1 (5875)", "/home/demo/.wine/drive_c/WoW-Classic", ClientOrigin.Wine, InUse: true),
-        new("3.3.5a (12340)", "/home/demo/.steam/steamapps/common/WoW", ClientOrigin.Steam, InUse: false),
+        new(Wotlk, "/home/demo/Games/Client-335", ClientOrigin.Lutris, InUse: true),
+        new(Classic, "/home/demo/.wine/drive_c/WoW-Classic", ClientOrigin.Wine, InUse: true),
+        new(Wotlk, "/home/demo/.steam/steamapps/common/WoW", ClientOrigin.Steam, InUse: false),
     ];
 
     /// <summary>Folders the simulated "pick a folder by hand" button adds, one per press.</summary>
     public static IReadOnlyList<ClientSeed> PickableClients { get; } =
     [
-        new("3.3.5a (12340)", "/home/demo/Games/Client-335-copy", ClientOrigin.Manual, InUse: false),
-        new("1.12.1 (5875)", "/home/demo/Games/Vanilla", ClientOrigin.Manual, InUse: false),
+        new(Wotlk, "/home/demo/Games/Client-335-copy", ClientOrigin.Manual, InUse: false),
+        new(Classic, "/home/demo/Games/Vanilla", ClientOrigin.Manual, InUse: false),
     ];
 }
 
