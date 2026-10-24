@@ -129,7 +129,7 @@ Whenever a client is discovered by `Scan()` (with `ImportServers == true`) **or*
 3. **Deduplication key:**
    - Normalized tuple **`(NormalizedHost, NormalizedRealm, RequiredClientBuild)`**, compared case-insensitively (`StringComparison.OrdinalIgnoreCase`) on `NormalizedHost` (trimmed, lowercase `host` or `host:port`) and `NormalizedRealm` (trimmed `Realm ?? ""`), with `RequiredClientBuild == client.Version.Build`.
    - If a matching server already exists in `ServerStore`, no duplicate server is created; if that existing server has `ClientId == null`, its `ClientId` is linked to `client.Id`.
-   - Otherwise, a new `Server` is added to `ServerStore` with `RequiredClientBuild = client.Version.Build`, `ClientId = client.Id`, and an auto-generated unique `Name` (`PortalService.CreateImportedServerName`): `"{Realm} ({Host})"` when `Realm` is non-empty; otherwise `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` (e.g., `"logon.warmane.example.org (3.3.5)"`) when `ClientVersion` is known, or `"{Host}"` when `ClientVersion` is `null`; capped at `<= 64` characters (`Server.MaxNameLength`) and disambiguated case-insensitively with `" #2"`, `" #3"`, ... (truncating the base prefix so `base + suffix <= 64` characters; see **Approved decisions #1**).
+   - Otherwise, a new `Server` is added to `ServerStore` with `RequiredClientBuild = client.Version.Build`, `ClientId = client.Id`, and an auto-generated unique `Name` (`PortalService.CreateImportedServerName`): `"{Realm} ({Host})"` when `Realm` is non-empty; otherwise `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` (e.g., `"logon.example.org (3.3.5)"`) when `ClientVersion` is known, or `"{Host}"` when `ClientVersion` is `null`; capped at `<= 64` characters (`Server.MaxNameLength`) and disambiguated case-insensitively with `" #2"`, `" #3"`, ... (truncating the base prefix so `base + suffix <= 64` characters; see **Approved decisions #1**).
    - If `state.json` has no active server recorded for `client.Id` (`active_by_client[client.Id]` is unset), the extracted (or matched) server is marked active for `client.Id` in `state.json` (and if global `active_id` is `null`, sets `active_id` and writes `activo.json`).
 
 ### 1.4 First-launch flag (`FirstScanCompleted`)
@@ -215,7 +215,7 @@ public sealed record UpdateServerRequest(
     "clients": [
       {
         "id": "c0123456789abcdef",
-        "path": "/home/carlos/Games/WoW-335a",
+        "path": "/home/user/Games/WoW-335a",
         "name": "Wrath 3.3.5a",
         "origin": "lutris"
       }
@@ -433,7 +433,7 @@ public sealed record StorageSettings(
 ```json
 {
   "version": 1,
-  "backup_folder": "/home/carlos/.local/share/realm-portal/backups",
+  "backup_folder": "/home/user/.local/share/realm-portal/backups",
   "keep_backups": 10
 }
 ```
@@ -530,12 +530,12 @@ manifest hash, and those journals keep working as before. A value that is presen
 
 ---
 
-## Approved decisions (Approval Gate — Carlos)
+## Approved decisions (maintainer approval gate)
 
 1. **Auto-naming rule for servers imported during client scan (`ClientServerExtractor` / `PortalService.CreateImportedServerName`) — Approved: Option A.**
    - **Decision:** When `Scan()` or `AddClient()` imports a server from a client's `realmlist.wtf` / `WTF/Config.wtf`:
-     - If `Realm` (stripped of control characters and trimmed) is non-empty, use `"{Realm} ({Host})"` (e.g., `"Icecrown (logon.warmane.example.org)"`).
-     - If `Realm` is empty, use `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` when `ClientVersion` is available (`System.Version`'s third component `Build`, e.g., `"logon.warmane.example.org (3.3.5)"`), or `"{Host}"` when `ClientVersion` is `null`.
+     - If `Realm` (stripped of control characters and trimmed) is non-empty, use `"{Realm} ({Host})"` (e.g., `"Icecrown (logon.example.org)"`).
+     - If `Realm` is empty, use `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` when `ClientVersion` is available (`System.Version`'s third component `Build`, e.g., `"logon.example.org (3.3.5)"`), or `"{Host}"` when `ClientVersion` is `null`.
      - Trim and cap the base name at `<= 64` characters (`Server.MaxNameLength`, falling back to `"Imported server"` if empty).
      - On case-insensitive name collision in `ServerStore`, append `" #2"`, `" #3"`, ..., truncating the base prefix to `Math.Min(basis.Length, 64 - tail.Length)` before appending so the final name never exceeds `64` characters.
    - **Rationale:** Players often have multiple private servers that share generic realm names like `"Realm 1"`, `"Highrate"`, or `"Test Realm"`, or connect multiple clients (e.g., `3.3.5a` and `1.12.1`) to the same host domain. Including both `Realm` and `Host` (or `Host` and `Version` when `Realm` is absent) makes imported cards immediately distinguishable on the Servers screen without requiring manual renaming, while matching `PortalService.CreateImportedServerName` in `main`.
