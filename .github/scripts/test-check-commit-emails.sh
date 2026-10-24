@@ -79,6 +79,20 @@ expect_out '(no domain)' --domain ''
 expect_out '(malformed address)' --domain 'me@gmail.com@users.noreply.github.com'
 expect_out '(malformed address)' --domain 'a@b@c'
 
+# Reason reported for a rejected address
+invalid_user='a noreply address with an invalid GitHub username (1-39 letters, digits or single inner hyphens)'
+not_allowed='not an allowed GitHub noreply address'
+expect_out "$invalid_user" --reason 'karloz-@users.noreply.github.com'
+expect_out "$invalid_user" --reason '1+KarloZ-@Users.Noreply.GitHub.com'
+expect_out "$invalid_user" --reason "$(printf 'a%.0s' {1..40})@users.noreply.github.com"
+expect_out "$invalid_user" --reason '123+@users.noreply.github.com'
+expect_out "$invalid_user" --reason 'a.b@users.noreply.github.com'
+expect_out "$not_allowed" --reason 'me@gmail.com'
+expect_out "$not_allowed" --reason 'me@gmail.com@users.noreply.github.com'
+expect_out "$not_allowed" --reason 'x@users.noreply.github.com.evil.com'
+expect_out "$not_allowed" --reason 'nobody'
+expect_out "$not_allowed" --reason ''
+
 # Co-authored-by value parsing
 expect_out 'me@gmail.com' --coauthor-email 'Me <me@gmail.com>'
 expect_out 'me@gmail.com' --coauthor-email 'me@gmail.com'
@@ -139,6 +153,13 @@ out=$(run_range 0 "$co_bad" "$co_odd" 'co-author without brackets or malformed')
 [[ "$out" == *"malformed Co-authored-by trailer"* ]] || { echo "FAIL: missing malformed trailer warning"; fail=1; }
 [[ "$out" == *"Co-authored-by email at (malformed address)"* ]] || { echo "FAIL: missing malformed address warning"; fail=1; }
 [[ "$out" != *"someone@"* && "$out" != *"a@b.com"* ]] || { echo "FAIL: full address leaked in output"; fail=1; }
+
+bad_user=$(commit 'karloz-@users.noreply.github.com' "$(printf 'a%.0s' {1..40})@users.noreply.github.com")
+out=$(run_range 1 "$co_odd" "$bad_user" 'noreply domain with an invalid username')
+[[ "$out" == *"author email at @users.noreply.github.com, which is $invalid_user."* ]] || { echo "FAIL: missing invalid-username author error"; fail=1; }
+[[ "$out" == *"committer email at @users.noreply.github.com, which is $invalid_user."* ]] || { echo "FAIL: missing invalid-username committer error"; fail=1; }
+[[ "$out" != *"$not_allowed"* ]] || { echo "FAIL: invalid username reported as not allowed"; fail=1; }
+[[ "$out" != *"karloz-@"* ]] || { echo "FAIL: full address leaked in output"; fail=1; }
 
 run_range 1 "$base" "deadbeef" 'malformed SHA' >/dev/null
 

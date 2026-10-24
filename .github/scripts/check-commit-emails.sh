@@ -5,6 +5,7 @@
 #        check-commit-emails.sh --email <address>   (exit 0 if allowed, 1 if not)
 #        check-commit-emails.sh --domain <address>  (print the reported domain; for tests)
 #        check-commit-emails.sh --coauthor-email <trailer value>  (print the parsed email; for tests)
+#        check-commit-emails.sh --reason <address>  (print why a rejected address fails; for tests)
 #
 # An email is allowed when, compared case-insensitively, it is either
 #   - a GitHub noreply address matching the whole string
@@ -16,6 +17,9 @@
 #     49699333+dependabot[bot]@...), or
 #   - exactly one of EXACT_ALLOWED_EMAILS: noreply@github.com (committer of commits
 #     made on github.com and by GitHub apps) and cursoragent@cursor.com (Cursor agents).
+#     Addresses the regex cannot express (e.g. Enterprise Managed User accounts such as
+#     <id>+<username>_<shortcode>@users.noreply.github.com, or legacy usernames that do
+#     not follow the current rules) can be added there, as exact addresses.
 # Author (%ae) or committer (%ce) outside that set fails the check.
 # Co-authored-by: trailers are checked with the same rule but only produce warnings.
 # Only the commit SHA and the email domain are printed, never the full address.
@@ -48,6 +52,18 @@ is_allowed_email() {
     [[ "$lower" == "$exact" ]] && return 0
   done
   return 1
+}
+
+# Prints why an address that is_allowed_email rejected fails (completes "which is ...").
+# A single-@ address on the GitHub noreply domain fails only because of its username part.
+rejection_reason() {
+  local lower="${1,,}"
+  local rest="${lower#*@}"
+  if [[ "$lower" == *@* && "$rest" != *@* && "$rest" == "users.noreply.github.com" ]]; then
+    printf 'a noreply address with an invalid GitHub username (1-39 letters, digits or single inner hyphens)'
+  else
+    printf 'not an allowed GitHub noreply address'
+  fi
 }
 
 # Prints "@domain" for reporting, "(no domain)" without an @, and "(malformed address)"
@@ -104,6 +120,13 @@ if [[ "${1:-}" == "--coauthor-email" ]]; then
   exit
 fi
 
+if [[ "${1:-}" == "--reason" ]]; then
+  [[ $# -eq 2 ]] || { echo "usage: $0 --reason <address>" >&2; exit 2; }
+  rejection_reason "$2"
+  echo
+  exit
+fi
+
 if [[ "${1:-}" == "--email" ]]; then
   [[ $# -eq 2 ]] || { echo "usage: $0 --email <address>" >&2; exit 2; }
   is_allowed_email "$2"
@@ -135,11 +158,11 @@ while IFS=$'\x1f' read -r sha author committer; do
   [[ -n "$sha" ]] || continue
   count=$((count + 1))
   if ! is_allowed_email "$author"; then
-    echo "::error::Commit ${sha:0:12} has an author email at $(domain_of "$author"), which is not an allowed GitHub noreply address."
+    echo "::error::Commit ${sha:0:12} has an author email at $(domain_of "$author"), which is $(rejection_reason "$author")."
     failed=1
   fi
   if ! is_allowed_email "$committer"; then
-    echo "::error::Commit ${sha:0:12} has a committer email at $(domain_of "$committer"), which is not an allowed GitHub noreply address."
+    echo "::error::Commit ${sha:0:12} has a committer email at $(domain_of "$committer"), which is $(rejection_reason "$committer")."
     failed=1
   fi
   # Co-authors: same rule, warning only.
@@ -150,7 +173,7 @@ while IFS=$'\x1f' read -r sha author committer; do
     if [[ -z "$coemail" ]]; then
       echo "::warning::Commit ${sha:0:12} has a malformed Co-authored-by trailer (expected 'Name <email>')."
     elif ! is_allowed_email "$coemail"; then
-      echo "::warning::Commit ${sha:0:12} has a Co-authored-by email at $(domain_of "$coemail"), which is not an allowed GitHub noreply address."
+      echo "::warning::Commit ${sha:0:12} has a Co-authored-by email at $(domain_of "$coemail"), which is $(rejection_reason "$coemail")."
     fi
   done <<< "$coauthors"
 done <<< "$commits"
