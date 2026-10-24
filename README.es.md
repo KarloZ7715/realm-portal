@@ -13,6 +13,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licencia: MIT"></a>
 </p>
 
+<p align="center"><img src="docs/screenshots/servers.png" alt="Pantalla de servidores de Realm Portal (interfaz en inglés) con cuatro servidores de ejemplo, cada uno con su botón Play" width="800"></p>
+
 ## Qué hace
 
 Realm Portal es una aplicación de escritorio para servidores privados de World of Warcraft. Registra los servidores en los que juegas (nombre, dirección, reino, cuenta y build de cliente requerida), busca clientes del juego en tu equipo y apunta el cliente que elijas al servidor que selecciones.

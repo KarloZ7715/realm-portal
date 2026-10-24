@@ -13,6 +13,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
+<p align="center"><img src="docs/screenshots/servers.png" alt="Realm Portal Servers screen with four example servers (My Server, Another Server, Classic Server and Roleplay Realm), each with a Play button" width="800"></p>
+
 ## What it does
 
 Realm Portal is a desktop application for World of Warcraft private servers. It registers the servers you play on (name, address, realm, account and required client build), scans your computer for game clients, and points the selected client at the server you choose.
