@@ -1,4 +1,5 @@
 using RealmPortal.Core;
+using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 
@@ -18,7 +19,8 @@ public static class Program
         TextWriter error,
         IClientVersionReader versionReader,
         IGameLauncher? launcher = null,
-        Func<string, string?>? getVariable = null)
+        Func<string, string?>? getVariable = null,
+        IGameProcessProbe? probe = null)
     {
         args = StripGlobalOptions(args, out var verbose);
 
@@ -42,7 +44,7 @@ public static class Program
             }
         }
 
-        var app = new CliApp(output, error, versionReader, launcher ?? new ProcessGameLauncher(), getVariable ?? Environment.GetEnvironmentVariable);
+        var app = new CliApp(output, error, versionReader, launcher ?? new ProcessGameLauncher(), getVariable ?? Environment.GetEnvironmentVariable, probe: probe);
         if (args.Length >= 1 && app.IsCommand(args[0]))
             return app.Run(args[0], args[1..], verbose);
 

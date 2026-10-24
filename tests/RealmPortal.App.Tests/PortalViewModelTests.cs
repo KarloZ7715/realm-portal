@@ -149,17 +149,7 @@ public class PortalViewModelTests
             Directory.CreateDirectory(Backups);
             Launch = new FakeLaunch();
             IGameLaunchService launch = throwOnLaunch ? new ThrowingLaunch() : Launch;
-            if (probe is null)
-            {
-                Session = PortalSession.CreateForPaths(Config, Projection, Backups, launch);
-            }
-            else
-            {
-                var getVariable = (string name) =>
-                    name == ClientFilesApplier.BackupDirectoryVariable ? Backups : null;
-                var service = new PortalService(Config, Projection, new PeClientVersionReader(), launch, probe, getVariable);
-                Session = new PortalSession(service, new UiPreferencesStore(Config), getVariable);
-            }
+            Session = PortalSession.CreateForPaths(Config, Projection, Backups, launch, probe ?? new NeverRunningGameProbe());
             var clientId = Session.Service.AddClient(Client).Value!.Id;
             Session.UiPreferences.Save(new UiPreferences("en", [clientId], FirstScanCompleted: true));
             Loc.Instance.SetLanguage(Language.En);
@@ -938,7 +928,7 @@ public class PortalViewModelTests
         Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(clientId, b.Id)).Succeeded);
 
         var restarted = new MainViewModel(
-            PortalSession.CreateForPaths(env.Config, env.Projection, env.Backups, env.Launch),
+            PortalSession.CreateForPaths(env.Config, env.Projection, env.Backups, env.Launch, new NeverRunningGameProbe()),
             () => Task.FromResult<string?>(env.Client),
             autoTick: false);
         Assert.True(restarted.Servers.CanUndoPending);

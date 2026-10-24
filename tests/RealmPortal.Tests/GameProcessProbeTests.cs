@@ -4,6 +4,11 @@ using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
 
+/// <summary>Starts real wow/wine-named processes, which every real probe on the machine sees; never run it in parallel.</summary>
+[CollectionDefinition(nameof(GameProcessProbeTests), DisableParallelization = true)]
+public sealed class GameProcessProbeCollection;
+
+[Collection(nameof(GameProcessProbeTests))]
 public sealed class GameProcessProbeTests
 {
     [Fact]
@@ -70,13 +75,14 @@ public sealed class GameProcessProbeTests
         Directory.CreateDirectory(elsewhere);
         Directory.CreateDirectory(client);
         File.Copy("/bin/sleep", Path.Combine(elsewhere, "wine"));
-        // The parent execs into sleep and never reaps the child, so "wine" stays a zombie:
+        // The parent shell waits on stdin before reaping, so "wine" stays a zombie meanwhile:
         // listed by name, but /proc/<pid>/cwd is unreadable.
         using var parent = Process.Start(new ProcessStartInfo("/bin/sh")
         {
-            ArgumentList = { "-c", "./wine 0 & echo $!; exec /bin/sleep 30" },
+            ArgumentList = { "-c", "./wine 0 & echo $!; read _; wait" },
             WorkingDirectory = elsewhere,
             UseShellExecute = false,
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
         })!;
         try
@@ -93,8 +99,37 @@ public sealed class GameProcessProbeTests
         }
         finally
         {
-            parent.Kill(entireProcessTree: true);
+            // Let the shell reap the zombie, so it doesn't outlive the test.
+            parent.StandardInput.Close();
+            if (!parent.WaitForExit(5000))
+                parent.Kill(entireProcessTree: true);
             parent.WaitForExit();
+        }
+    }
+
+    [Fact]
+    public void ProcDirectory_VanishedOrZombie_IsExited_ButUnreadableStatKeepsTheGuard()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var temp = new TempDirectory();
+        var proc = temp.Combine("proc-123");
+
+        // Vanished: /proc/<pid> no longer exists (ENOENT).
+        Assert.True(GameProcessProbe.HasExitedOnLinux(proc));
+
+        Directory.CreateDirectory(proc);
+        var stat = Path.Combine(proc, "stat");
+        File.WriteAllText(stat, "123 (wine) Z 1 123 123 0");
+        Assert.True(GameProcessProbe.HasExitedOnLinux(proc));
+
+        File.WriteAllText(stat, "123 (wine) S 1 123 123 0");
+        Assert.False(GameProcessProbe.HasExitedOnLinux(proc));
+
+        // Permission denied (EACCES) is not "exited": the conservative guard must stay.
+        if (Environment.UserName != "root")
+        {
+            File.SetUnixFileMode(stat, UnixFileMode.None);
+            Assert.False(GameProcessProbe.HasExitedOnLinux(proc));
         }
     }
 

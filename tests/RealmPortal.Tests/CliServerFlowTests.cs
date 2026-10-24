@@ -49,7 +49,7 @@ public class CliServerFlowTests
             string[] common = ["--config-dir", Config, "--projection-dir", Projection];
             if (withClient)
                 common = [.. common, "--client-dir", Client];
-            var code = Program.Run([command, .. args, .. common], o, e, new PeClientVersionReader(), Launcher, Variables());
+            var code = Program.Run([command, .. args, .. common], o, e, new PeClientVersionReader(), Launcher, Variables(), new NeverRunningGameProbe());
             return (code, o.ToString(), e.ToString());
         }
 
@@ -147,7 +147,7 @@ public class CliServerFlowTests
     public void Add_WithClientDir_DoesNotRegisterTheClient()
     {
         using var box = new Sandbox();
-        var app = new CliApp(new StringWriter(), new StringWriter(), new PeClientVersionReader(), box.Launcher, box.Variables());
+        var app = new CliApp(new StringWriter(), new StringWriter(), new PeClientVersionReader(), box.Launcher, box.Variables(), probe: new NeverRunningGameProbe());
 
         var code = app.Run("add",
         [
@@ -298,7 +298,7 @@ public class CliServerFlowTests
         var e = new StringWriter();
         string[][] commands = [["add", "Open", "o.example.org"], ["switch", "Open"], ["status"]];
         foreach (var args in commands)
-            Assert.Equal(0, Program.Run(args, o, e, new PeClientVersionReader(), box.Launcher, box.Variables(n => env.GetValueOrDefault(n))));
+            Assert.Equal(0, Program.Run(args, o, e, new PeClientVersionReader(), box.Launcher, box.Variables(n => env.GetValueOrDefault(n)), new NeverRunningGameProbe()));
 
         Assert.True(File.Exists(box.ActivoPath));
         Assert.Contains("Client: 3.3.5a (12340)", o.ToString());

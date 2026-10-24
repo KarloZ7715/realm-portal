@@ -43,7 +43,7 @@ public sealed class CliDryRunTests
             var o = new StringWriter();
             var e = new StringWriter();
             string[] common = ["--config-dir", Config, "--projection-dir", Projection, "--client-dir", Client];
-            var code = Program.Run([.. args, .. common], o, e, new PeClientVersionReader(), Launcher, TestBackupDir.Variables(_dir));
+            var code = Program.Run([.. args, .. common], o, e, new PeClientVersionReader(), Launcher, TestBackupDir.Variables(_dir), new NeverRunningGameProbe());
             return (code, o.ToString(), e.ToString());
         }
 

@@ -25,9 +25,9 @@ public class Finding8CliDryRunWrapperTests
         var variables = TestBackupDir.Variables(dir);
         string[] common = ["--config-dir", config, "--projection-dir", projection, "--client-dir", client];
 
-        Assert.Equal(0, Program.Run(["add", "Open", "open.example.org", .. common], o, e, new PeClientVersionReader(), launcher, variables));
-        Assert.Equal(0, Program.Run(["switch", "Open", .. common], o, e, new PeClientVersionReader(), launcher, variables));
-        Assert.Equal(0, Program.Run(["launch", "--dry-run", "--wrapper", "wine", .. common], o, e, new PeClientVersionReader(), launcher, variables));
+        Assert.Equal(0, Program.Run(["add", "Open", "open.example.org", .. common], o, e, new PeClientVersionReader(), launcher, variables, new NeverRunningGameProbe()));
+        Assert.Equal(0, Program.Run(["switch", "Open", .. common], o, e, new PeClientVersionReader(), launcher, variables, new NeverRunningGameProbe()));
+        Assert.Equal(0, Program.Run(["launch", "--dry-run", "--wrapper", "wine", .. common], o, e, new PeClientVersionReader(), launcher, variables, new NeverRunningGameProbe()));
 
         Assert.False(File.Exists(Path.Combine(config, "launcher-settings.json")));
         Assert.Empty(launcher.Calls);

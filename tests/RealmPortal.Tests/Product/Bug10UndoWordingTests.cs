@@ -61,7 +61,7 @@ public class Bug10UndoWordingTests
         service.ActivateWithoutClientFiles(b.Id);
 
         var stdout = new StringWriter();
-        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
+        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir), probe: new NeverRunningGameProbe());
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
         var text = stdout.ToString();
         Assert.Contains("Client files: not changed.", text);
@@ -84,7 +84,7 @@ public class Bug10UndoWordingTests
         Assert.True(service.ActivateWithoutClientFiles(server.Id).Succeeded);
 
         var stdout = new StringWriter();
-        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
+        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir), probe: new NeverRunningGameProbe());
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
         var text = stdout.ToString();
         Assert.Contains("Undone: no active server.", text);
@@ -114,7 +114,7 @@ public class Bug10UndoWordingTests
         Assert.True(service.SwitchServer(new SwitchRequest(clientId, a.Id)).Succeeded);
 
         var stdout = new StringWriter();
-        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), name => name == ClientFilesApplier.BackupDirectoryVariable ? backups : null);
+        var app = new CliApp(stdout, new StringWriter(), new PeClientVersionReader(), new FakeLauncher(), name => name == ClientFilesApplier.BackupDirectoryVariable ? backups : null, probe: new NeverRunningGameProbe());
         Assert.Equal(0, app.Run("undo", ["--config-dir", config, "--projection-dir", projection]));
 
         var text = stdout.ToString();

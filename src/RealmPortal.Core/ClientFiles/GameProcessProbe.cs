@@ -90,7 +90,7 @@ public sealed class GameProcessProbe : IGameProcessProbe
     /// (<c>Z</c>) or dead (<c>X</c>). Such a process has no readable cwd but is not running, so it must not
     /// trip the conservative guard.
     /// </summary>
-    private static bool HasExitedOnLinux(string procDirectory)
+    internal static bool HasExitedOnLinux(string procDirectory)
     {
         try
         {
