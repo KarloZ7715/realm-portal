@@ -163,7 +163,7 @@ namespace RealmPortal.Core.Service;
 /// <param name="Path">The client folder (the one with <c>Wow.exe</c>).</param>
 /// <param name="Version">The client version; <c>null</c> when it could not be read (then <see cref="Error"/> says why).</param>
 /// <param name="Error">Why the version could not be read (<c>PathNotFound</c>, <c>ClientExecutableNotFound</c>, <c>ClientNotAPortableExecutable</c>, ...). An unreadable client is a normal list entry, not a failure of the call.</param>
-/// <param name="Name">User-facing display name (defaults to <c>WoW {Version}</c> or folder name when <c>null</c>; max 64 chars, no control/format chars).</param>
+/// <param name="Name">User-facing display name (defaults to the client folder name when <c>null</c>, never the version; max 64 chars, no control/format chars).</param>
 /// <param name="Origin">How the client was added (<see cref="ClientOrigin"/>).</param>
 /// <param name="IsRunning">True when <see cref="IPortalService.IsGameRunning"/> detects a live process for this client folder.</param>
 public sealed record ClientEntry(
@@ -174,6 +174,16 @@ public sealed record ClientEntry(
     string? Name = null,
     ClientOrigin Origin = ClientOrigin.Manual,
     bool IsRunning = false);
+
+// Version display (Core owns the format; the App and the CLI never compose it):
+//   ClientVersion.Build          int     last file-version part, e.g. 12340
+//   ClientVersion.HasBuild       bool    Build > 0
+//   ClientVersion.IsKnownBuild   bool    Build is in KnownClientBuilds
+//   ClientVersion.PatchLabel     string  "3.3.5a" for a known build; "Major.Minor.Build" of the file version otherwise ("3.3.5")
+//   ClientVersion.DisplayVersion string  "3.3.5a (12340)"; unknown build "3.3.5 (12345)"; no build: PatchLabel alone
+//   ClientVersion.ToString()             same as DisplayVersion
+//   KnownClientBuilds            5875 1.12.1, 8606 2.4.3, 12340 3.3.5a, 15595 4.3.4, 18414 5.4.8
+// The backup manifest's client_build keeps its original "12340 (3.3.5.12340)" format.
 
 /// <summary>Request to edit an existing registered client.</summary>
 /// <param name="ClientId">Existing client id to update (<see cref="ClientEntry.Id"/>). Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
