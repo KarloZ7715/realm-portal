@@ -21,7 +21,8 @@ public static class WindowPlacementFit
     /// <summary>
     /// Returns the placement to restore: on the screen that holds most of the saved window (or the first screen when
     /// none does, e.g. the monitor was unplugged), no smaller than <paramref name="minWidth"/>×<paramref name="minHeight"/>,
-    /// no larger than that screen's working area, and moved so it lies fully inside it. Null means "use the defaults"
+    /// no larger than that screen's working area, and moved so it lies fully inside it. The minimum wins over the
+    /// working area: on a screen smaller than the minimum the window keeps the minimum size at the screen's top-left corner. Null means "use the defaults"
     /// (no screens, or a saved size that is not a finite positive number).
     /// </summary>
     public static WindowPlacement? Fit(WindowPlacement saved, IReadOnlyList<ScreenArea> screens, double minWidth, double minHeight)

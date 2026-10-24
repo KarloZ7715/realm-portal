@@ -73,6 +73,15 @@ public class WindowPlacementFitTests
         Assert.Equal((1440.0, 810.0), (capped.Width, capped.Height));
     }
 
+    [Fact]
+    public void OnAScreenSmallerThanTheMinimumTheMinimumWinsAtTheTopLeft()
+    {
+        var small = new ScreenArea(100, 50, 640, 400, 1.0);
+        var fit = WindowPlacementFit.Fit(new WindowPlacement(300, 200, 1000, 600, false), [small], 720, 440)!;
+        Assert.Equal((720.0, 440.0), (fit.Width, fit.Height));
+        Assert.Equal((100, 50), (fit.X, fit.Y));
+    }
+
     [Theory]
     [InlineData(double.NaN, 600)]
     [InlineData(0, 600)]
@@ -158,6 +167,28 @@ public class WindowPlacementPersistenceTests
 
         var saved = store.Load().Window!;
         Assert.True(saved.Maximized);
+        Assert.Equal((900.0, 560.0), (saved.Width, saved.Height));
+    }
+
+    [AvaloniaFact]
+    public void AMoveRightBeforeMaximizingIsNotLost()
+    {
+        using var temp = new TempDirectory();
+        var store = new UiPreferencesStore(temp.Path);
+        store.SetWindowPlacement(new WindowPlacement(40, 30, 900, 560, Maximized: false));
+        var window = new MainWindow(MainViewModel.ForDemo(autoTick: false));
+        WindowPlacementPersistence.Attach(window, store);
+        window.Show();
+        Screenshots.Settle();
+
+        // Move, then maximize before the deferred capture has run.
+        window.Position = new PixelPoint(120, 90);
+        window.WindowState = WindowState.Maximized;
+        window.Close();
+
+        var saved = store.Load().Window!;
+        Assert.True(saved.Maximized);
+        Assert.Equal((120, 90), (saved.X, saved.Y));
         Assert.Equal((900.0, 560.0), (saved.Width, saved.Height));
     }
 

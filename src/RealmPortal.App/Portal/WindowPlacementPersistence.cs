@@ -16,6 +16,7 @@ public sealed class WindowPlacementPersistence
     private readonly UiPreferencesStore _store;
     private PixelPoint _normalPosition;
     private Size _normalSize;
+    private (PixelPoint Position, Size Size)? _pending;
     private bool _maximizedBeforeMinimize;
 
     private WindowPlacementPersistence(Window window, UiPreferencesStore store)
@@ -89,14 +90,49 @@ public sealed class WindowPlacementPersistence
 
     private void OnWindowStateChanged(WindowState oldState, WindowState newState)
     {
+        if (oldState == WindowState.Normal && newState != WindowState.Normal)
+        {
+            // Keep a move or resize that happened just before maximizing, unless what was seen is already the
+            // maximized size (the size notification can arrive before the state change).
+            if (_pending is { } pending && !LooksMaximized(pending.Size))
+            {
+                (_normalPosition, _normalSize) = pending;
+            }
+
+            _pending = null;
+        }
+
         if (newState == WindowState.Minimized)
         {
             _maximizedBeforeMinimize = oldState is WindowState.Maximized or WindowState.FullScreen;
         }
     }
 
-    // Size and state change notifications can arrive in either order when maximizing, so the capture waits for both.
-    private void CaptureNormalLater() => Dispatcher.UIThread.Post(CaptureNormal, DispatcherPriority.Background);
+    // Size and state change notifications can arrive in either order when maximizing, so the capture is kept as
+    // pending and confirmed once both have been processed (or when the state leaves Normal, see above).
+    private void CaptureNormalLater()
+    {
+        if (_window.WindowState != WindowState.Normal)
+        {
+            return;
+        }
+
+        var size = _window.ClientSize;
+        _pending = (_window.Position, size.Width > 0 && size.Height > 0 ? size : _normalSize);
+        Dispatcher.UIThread.Post(CaptureNormal, DispatcherPriority.Background);
+    }
+
+    private bool LooksMaximized(Size size)
+    {
+        var screen = _window.Screens.ScreenFromWindow(_window) ?? _window.Screens.Primary;
+        if (screen is null)
+        {
+            return false;
+        }
+
+        var scaling = screen.Scaling > 0 ? screen.Scaling : 1;
+        return size.Width >= screen.WorkingArea.Width / scaling - 2 && size.Height >= screen.WorkingArea.Height / scaling - 64;
+    }
 
     private void CaptureNormal()
     {
@@ -105,6 +141,7 @@ public sealed class WindowPlacementPersistence
             return;
         }
 
+        _pending = null;
         _normalPosition = _window.Position;
         var size = _window.ClientSize;
         if (size.Width > 0 && size.Height > 0)
