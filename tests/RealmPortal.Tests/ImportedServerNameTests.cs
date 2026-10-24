@@ -1,4 +1,8 @@
+using System.Globalization;
 using System.Text;
+using FsCheck;
+using FsCheck.Fluent;
+using FsCheck.Xunit;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.ClientFiles;
@@ -56,6 +60,90 @@ public sealed class ImportedServerNameTests
         var second = PortalService.CreateImportedServerName(Extracted(realm), Existing(first));
         Assert.Equal(new string('r', Server.MaxNameLength - 3) + " #2", second);
         Assert.Equal(Server.MaxNameLength, second.Length);
+    }
+
+    private const string Emoji = "\U0001F409";          // dragon, one surrogate pair
+    private const string Combining = "e\u0301";        // e + combining acute
+    private const string ZwjFamily = "\U0001F468\u200D\U0001F469\u200D\U0001F467"; // 8 chars, one text element
+    private const string Flag = "\U0001F1EA\U0001F1F8"; // regional indicators, one text element
+
+    [Theory]
+    [InlineData(Emoji)]
+    [InlineData(Combining)]
+    [InlineData(Flag)]
+    public void LongRealm_IsCutAtTextElementBoundary_NeverSplittingIt(string element)
+    {
+        // 63 'r' then a 2- or 4-char element: char-based cutting at 64 would split it.
+        var realm = new string('r', Server.MaxNameLength - 1) + element + "tail";
+
+        var first = PortalService.CreateImportedServerName(Extracted(realm), []);
+        Assert.Equal(new string('r', Server.MaxNameLength - 1), first);
+
+        var withElementInside = new string('r', Server.MaxNameLength - 4) + element + "tail";
+        var second = PortalService.CreateImportedServerName(Extracted(withElementInside), Existing(PortalService.CreateImportedServerName(Extracted(withElementInside), [])));
+        Assert.EndsWith(" #2", second);
+        Assert.True(second.Length <= Server.MaxNameLength);
+        AssertWholeTextElements(second);
+    }
+
+    [Fact]
+    public void Suffix_DropsWholeEmojiInsteadOfHalfOfIt()
+    {
+        var realm = new string('r', Server.MaxNameLength - 4) + Emoji + Emoji; // exactly 64 chars
+        var first = PortalService.CreateImportedServerName(Extracted(realm), []);
+        Assert.Equal(realm, first);
+
+        // " #2" leaves room for 61 chars: 60 'r' + the 2-char emoji would be 62, so the emoji goes whole.
+        var second = PortalService.CreateImportedServerName(Extracted(realm), Existing(first));
+
+        Assert.Equal(new string('r', Server.MaxNameLength - 4) + " #2", second);
+    }
+
+    [Theory]
+    [InlineData("abc", 2, "ab")]
+    [InlineData("a" + Emoji, 2, "a")]
+    [InlineData("a" + Emoji, 3, "a" + Emoji)]
+    [InlineData(Combining + "x", 1, "")]
+    [InlineData("a" + ZwjFamily, 8, "a")]
+    [InlineData("a" + ZwjFamily, 9, "a" + ZwjFamily)]
+    [InlineData("short", 64, "short")]
+    public void TruncateToTextElements_KeepsWholeElements(string value, int max, string expected) =>
+        Assert.Equal(expected, PortalService.TruncateToTextElements(value, max));
+
+    [Property(MaxTest = 300)]
+    public Property ImportedName_NeverHasLoneSurrogates_AndFitsTheCap(NonNegativeInt fill, NonNegativeInt pick, bool collide)
+    {
+        string[] pieces = ["r", Emoji, Combining, Flag, "\u00F1", "\U0001F44D\U0001F3FD"];
+        var builder = new StringBuilder();
+        for (var i = 0; i < 40 + fill.Get % 40; i++)
+            builder.Append(pieces[(pick.Get + i * 7) % pieces.Length]);
+        var realm = builder.ToString();
+        var first = PortalService.CreateImportedServerName(Extracted(realm), []);
+        var name = collide ? PortalService.CreateImportedServerName(Extracted(realm), Existing(first)) : first;
+
+        return (name.Length <= Server.MaxNameLength
+                && !HasLoneSurrogate(name)
+                && realm.StartsWith(collide ? name[..^3] : name, StringComparison.Ordinal)
+                && (!collide || name.EndsWith(" #2", StringComparison.Ordinal)))
+            .Label($"realm={realm} name={name}");
+    }
+
+    private static bool HasLoneSurrogate(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (char.IsHighSurrogate(value[i]) && i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
+                i++;
+            else if (char.IsSurrogate(value[i]))
+                return true;
+        }
+        return false;
+    }
+
+    private static void AssertWholeTextElements(string value)
+    {
+        Assert.False(HasLoneSurrogate(value));
+        Assert.False(value.Length > 0 && CharUnicodeInfo.GetUnicodeCategory(value[0]) == UnicodeCategory.NonSpacingMark);
     }
 
     [Fact]

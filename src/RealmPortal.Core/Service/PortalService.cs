@@ -1158,8 +1158,7 @@ public sealed class PortalService : IPortalService
         var realm = new string((extracted.Realm ?? string.Empty).Where(c => !char.IsControl(c)).ToArray()).Trim();
         var basis = realm.Length > 0 ? realm : extracted.Host;
         basis = basis.Trim();
-        if (basis.Length > Server.MaxNameLength)
-            basis = basis[..Server.MaxNameLength].TrimEnd();
+        basis = TruncateToTextElements(basis, Server.MaxNameLength).TrimEnd();
         if (basis.Length == 0)
             basis = "Imported server";
 
@@ -1168,9 +1167,31 @@ public sealed class PortalService : IPortalService
         while (existing.Any(server => string.Equals(server.Name, candidate, StringComparison.OrdinalIgnoreCase)))
         {
             var tail = $" #{suffix++}";
-            candidate = basis[..Math.Min(basis.Length, Server.MaxNameLength - tail.Length)].TrimEnd() + tail;
+            candidate = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd() + tail;
         }
         return candidate;
+    }
+
+    /// <summary>
+    /// The longest prefix of <paramref name="value"/> made of whole text elements (grapheme clusters, see
+    /// <see cref="System.Globalization.StringInfo"/>) whose length is at most <paramref name="maxLength"/> UTF-16 chars,
+    /// the unit <see cref="Server.MaxNameLength"/> is measured in. A surrogate pair, a base character with its combining
+    /// marks, or a joined emoji sequence is never split.
+    /// </summary>
+    internal static string TruncateToTextElements(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+            return value;
+        var end = 0;
+        var elements = System.Globalization.StringInfo.GetTextElementEnumerator(value);
+        while (elements.MoveNext())
+        {
+            var next = elements.ElementIndex + ((string)elements.Current).Length;
+            if (next > maxLength)
+                break;
+            end = next;
+        }
+        return value[..end];
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
