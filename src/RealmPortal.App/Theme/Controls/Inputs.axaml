@@ -159,6 +159,8 @@
   <Style Selector="TextBox"><Setter Property="Theme" Value="{StaticResource RpTextBox}"/></Style>
   <!-- Commands, paths and variables are typed in mono. -->
   <Style Selector="TextBox.mono"><Setter Property="FontFamily" Value="{DynamicResource FontMono}"/><Setter Property="FontSize" Value="14"/></Style>
+  <!-- Hints in mono fields use the body face, so an "e.g." example never reads like a value already entered. -->
+  <Style Selector="TextBox.mono /template/ TextBlock#PART_Watermark"><Setter Property="FontFamily" Value="{DynamicResource FontBody}"/><Setter Property="FontSize" Value="15"/></Style>
   <Style Selector="CheckBox"><Setter Property="Theme" Value="{StaticResource RpCheckBox}"/></Style>
   <Style Selector="RadioButton"><Setter Property="Theme" Value="{StaticResource RpRadioButton}"/></Style>
   <Style Selector="ToggleButton.switch"><Setter Property="Theme" Value="{StaticResource RpSwitch}"/></Style>
