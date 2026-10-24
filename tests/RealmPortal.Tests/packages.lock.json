@@ -119,7 +119,7 @@
       "realm-portal": {
         "type": "Project",
         "dependencies": {
-          "RealmPortal.Core": "[0.1.0, )"
+          "RealmPortal.Core": "[1.0.0, )"
         }
       },
       "realmportal.core": {

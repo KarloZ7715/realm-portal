@@ -141,7 +141,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public string StatusText => Content.StatusText;
 
-    /// <summary>"ES · v0.1.0": the language toggle of the status bar.</summary>
+    /// <summary>"ES · v1.0.0": the language toggle of the status bar (version from <see cref="AppInfo.Version"/>).</summary>
     public string LanguageLabel => $"{Loc.Instance.Code} · v{AppInfo.Version}";
 
     /// <summary>The non-affiliation note shown at the foot of the wide sidebar.</summary>

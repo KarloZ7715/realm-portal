@@ -242,6 +242,24 @@ public class PortalServiceTests
     }
 
     [Fact]
+    public void UnnamedClient_DefaultNameIsFolderName_WithoutVersion()
+    {
+        using var env = new Env();
+        var added = env.Service.AddClient(env.Client).Value!;
+
+        Assert.Equal("client", added.Name);
+        Assert.Equal("3.3.5a (12340)", added.Version!.DisplayVersion);
+        Assert.Equal("client", Assert.Single(env.Service.ListClients().Value!).Name);
+    }
+
+    [Theory]
+    [InlineData("/games/WotLK 3.3.5a", "WotLK 3.3.5a")]
+    [InlineData("/games/WotLK/", "WotLK")]
+    [InlineData("/", "/")]
+    public void DefaultClientName_UsesLastFolderSegment(string path, string expected) =>
+        Assert.Equal(expected, PortalService.DefaultClientName(path));
+
+    [Fact]
     public void ClientIds_AreStable()
     {
         using var env = new Env();

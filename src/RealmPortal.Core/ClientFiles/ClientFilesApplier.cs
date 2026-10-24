@@ -553,7 +553,7 @@ public sealed class ClientFilesApplier : IClientFilesApplier
             plan.InstallationId,
             plan.ProfileId,
             clientRoot,
-            plan.Version.ToString(),
+            ManifestClientBuild(plan.Version),
             _clock(),
             null,
             files);
@@ -562,6 +562,12 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         Guard(() => _writer.WriteAllBytes(manifestPath, manifestBytes, PrivateStorage.PrivateFilePermissions), manifestPath, "write manifest");
         return ClientFilesIo.Sha256Hex(manifestBytes);
     }
+
+    /// <summary>
+    /// The <c>client_build</c> manifest field keeps its original <c>12340 (3.3.5.12340)</c> format, independent of
+    /// <see cref="Clients.ClientVersion.DisplayVersion"/>, so the on-disk backup format does not change.
+    /// </summary>
+    private static string ManifestClientBuild(Clients.ClientVersion version) => $"{version.Build} ({version.FileVersion})";
 
     private List<ManualTarget> CaptureManagedTargets(string root)
     {
