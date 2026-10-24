@@ -73,14 +73,14 @@ public class SettingsViewModelTests
     }
 
     [AvaloniaFact]
-    public void Back_DiscardsDirtyFieldsAndLanguagePreviewLikeCancel()
+    public void Cancel_DiscardsDirtyFieldsAndLanguagePreview()
     {
         var vm = new SettingsViewModel(new MemoryStore());
         vm.Template = "wine {exe} -windowed";
         vm.IsEnglish = false;
         Assert.True(vm.IsDirty);
 
-        vm.BackCommand.Execute(null);
+        vm.CancelCommand.Execute(null);
         Assert.False(vm.IsDirty);
         Assert.Equal(Language.En, Loc.Instance.Current);
         Assert.Equal("wine {exe}", vm.Template);

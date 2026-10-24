@@ -121,7 +121,6 @@
   "status.add": "Añadir servidor · sin guardar",
   "status.testing": "Probando conexión…",
   "status.folderadded.real": "Carpeta añadida",
-  "settings.back": "Volver",
   "settings.language": "Idioma",
   "settings.lang.es": "Español",
   "settings.lang.en": "English",
@@ -289,5 +288,9 @@
   "confirm.backupchanged.title": "Los archivos del cliente cambiaron",
   "confirm.backupchanged.body": "Los archivos del cliente cambiaron desde este respaldo ({0}). Al restaurarlo se reemplazarán los archivos actuales. Antes se guardará una copia de seguridad del estado actual.",
   "confirm.backupchanged.restore": "Restaurar respaldo",
+  "confirm.discardsettings.title": "¿Descartar los cambios sin guardar?",
+  "confirm.discardsettings.body": "Los cambios en Ajustes no se han guardado. Si sales ahora, se perderán.",
+  "confirm.discardsettings.accept": "Descartar cambios",
+  "confirm.discardsettings.keep": "Seguir editando",
   "confirm.cancel": "Cancelar"
 }
