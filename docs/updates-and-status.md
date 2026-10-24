@@ -12,8 +12,8 @@ Persisted in `network-settings.json` in `configDirectory` (`version: 1`, written
 | Key | Default | Meaning |
 |---|---|---|
 | `updates.auto_check` | `true` | Daily automatic check for a new release. `false` means **zero automatic network requests**. |
-| `updates.last_check_utc` | none | Time of the last completed automatic check. |
-| `updates.etag` | none | ETag of the last `releases/latest` response. |
+| `updates.last_attempt_utc` | none | Time of the last automatic check **attempt**, successful or failed. |
+| `updates.etag` | none | ETag of the last `200` response from `releases/latest`, stored together with that response body (see below). |
 | `updates.skipped_version` | none | Version the user chose to skip. |
 | `status.probe_enabled` | `true` | Server status dot. `false` hides the dot and schedules no probes. |
 
@@ -27,8 +27,12 @@ user action.
 - Request: `GET https://api.github.com/repos/KarloZ7715/realm-portal/releases/latest` (this endpoint excludes drafts and
   pre-releases). HTTPS only, unauthenticated, `User-Agent: RealmPortal/<version>`, `If-None-Match: <etag>`, timeout 10 s.
   No other headers, no identifiers.
-- The automatic check runs in the background after startup, and only if `now - last_check_utc >= 24 h`. It never blocks the
-  UI. Failures are silent (logged locally) and retried on the next day.
+- The automatic check runs in the background after startup, and only if `now - last_attempt_utc >= 24 h`.
+  `last_attempt_utc` is written when the attempt starts, so a failed check also waits 24 h. It never blocks the UI.
+  Failures are silent (logged locally) and retried on the next day.
+- ETag: the app sends `If-None-Match` only when it has both the ETag and the cached body of that `200` response
+  (`update-cache.json` in `configDirectory`). A `304` reuses the cached body. If the cache is missing or unreadable, the
+  app drops the ETag and makes an unconditional request before any version comparison, notice or download.
 - Versions: `tag_name` is parsed as SemVer `vX.Y.Z`. The user is notified only if it is greater than the running version and
   not equal to `skipped_version`. An unparseable tag means no notification.
 - When a newer version exists, the app shows **its own dialog** (never a desktop notification) with the version, the
@@ -57,11 +61,14 @@ back to opening the release page.
 
 ### Download rules (all kinds)
 
-1. Download `SHA256SUMS` and the asset from its `browser_download_url`.
+1. Download `SHA256SUMS` and the asset from its `browser_download_url`. Each download has a 10 s connect timeout, a 30 s
+   read timeout (no bytes received) and an overall deadline (1 min for `SHA256SUMS`, 10 min for the asset). These are
+   separate from the 10 s timeout of the `releases/latest` request.
 2. Follow redirects only to `github.com` or `*.githubusercontent.com`, over HTTPS.
 3. Refuse anything larger than 300 MB.
 4. Write to a `.part` file and compute SHA256 while streaming; compare it to the `SHA256SUMS` line.
-5. On mismatch, delete the file, show an error and offer to open the release page.
+5. On mismatch, timeout, cancellation or any other failure, delete the `.part` file, show an error and offer to open the
+   release page.
 6. Never execute anything that was downloaded.
 
 ### What "Update" does
@@ -93,17 +100,18 @@ attestations is tracked as a follow-up after 1.1.0 in [#116](https://github.com/
 
 ### Scheduling
 
-- Probe every listed server when the list opens, then every **5 min ± 10 % jitter** while the window is open and not
-  minimized.
+- Each server is probed **at most once every 5 minutes**. When the list opens, servers whose last probe is older than 5 min
+  are probed; the others keep their last result. While the window is open and not minimized, each server is probed again
+  5 min after its previous probe plus a random 0 to 30 s delay. Jitter only adds delay; nothing bypasses the 5-minute
+  minimum.
 - At most **4 concurrent** probes, and never two probes at once for the same server.
-- A result younger than 60 s is reused when the list is reopened.
 - Probing stops when the app closes. Nothing is probed at startup unless the list is shown.
 - Turning `status.probe_enabled` off cancels in-flight probes and hides the dot.
 
 ### Privacy
 
-Probing reveals the user's IP address only to servers the user added, at most once every 5 minutes. Nothing else is
-contacted. The README's privacy section should state this and the update check.
+Probing reveals the user's IP address to servers the user added, at most once every 5 minutes per server. Resolving a host
+name may also query the DNS resolver configured on the system (on a cache miss). Nothing else is contacted. The README's privacy section should state this and the update check.
 
 ## 3. Placement
 
@@ -115,8 +123,12 @@ contacted. The README's privacy section should state this and the update check.
 
 - A fake `HttpMessageHandler` with release JSON fixtures: newer, same, skipped, unparseable tag, `304` with ETag, missing
   asset, missing `SHA256SUMS` line, checksum mismatch, redirect to an untrusted host, oversized download.
-- No request is made when `updates.auto_check` is `false`, or within 24 h of the last check.
+- No automatic request is made when `updates.auto_check` is `false`, or within 24 h of the last attempt (including a
+  failed one).
+- The **Check for updates** button makes one request even when `updates.auto_check` is `false`.
+- A `304` without a cached body triggers an unconditional request; download timeouts delete the `.part` file.
 - AppImage replacement in a temporary directory; the `.deb` and zip paths never execute anything.
 - Probe against a loopback `TcpListener` (online), a closed port (offline), and an injected connect delegate for timeouts.
   No test touches the real internet.
-- Concurrency cap; disabling the probe cancels in-flight probes and hides the dot.
+- Concurrency cap, per-server single flight, and the 5-minute minimum per server (including on list reopen); disabling the
+  probe cancels in-flight probes and hides the dot.
