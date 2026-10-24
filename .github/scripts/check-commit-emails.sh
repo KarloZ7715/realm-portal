@@ -72,7 +72,8 @@ coauthor_email() {
   local -a tokens=()
   if [[ "$value" == *[\<\>]* ]]; then
     # Exactly one <...> pair and no other address (@) outside it; anything else is malformed.
-    if [[ "$value" =~ ^[^\<\>@]*\<([^\<\>]*)\>[^\<\>@]*$ ]]; then
+    # The bracketed text must itself contain an @.
+    if [[ "$value" =~ ^[^\<\>@]*\<([^\<\>]*@[^\<\>]*)\>[^\<\>@]*$ ]]; then
       printf '%s' "${BASH_REMATCH[1]}"
     fi
     return 0
