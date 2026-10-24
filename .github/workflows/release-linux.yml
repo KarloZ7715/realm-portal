@@ -4,13 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version (defaults to the project Version in Directory.Build.props)
+        description: Package version; empty uses Directory.Build.props <Version>, otherwise it must be that version or a prerelease of it (e.g. 1.0.0-rc.1)
         required: false
         type: string
   pull_request:
     paths:
       - .github/workflows/release-linux.yml
-      - packaging/linux/**
+      - packaging/**
+      - licenses/**
+      - LICENSE
+      - THIRD_PARTY_LICENSES.md
+      - assets/fonts/**
       - src/RealmPortal.App/**
       - src/RealmPortal.Core/**
       - Directory.Build.props
@@ -54,30 +58,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Test version resolution
+        run: packaging/test-resolve-version.sh
+
+      - name: Test license collection
+        run: packaging/test-collect-licenses.sh
+
       - name: Resolve package version
         id: version
-        env:
-          VALIDATE_VERSION: packaging/linux/validate-version.sh
+        # Directory.Build.props is the single source of the version; a tag that does not match it fails here.
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            if [ -z "${PR_NUMBER:-}" ]; then
-              echo "::error::Missing pull request number"
-              exit 1
-            fi
-            ver="0.0.0-pr.${PR_NUMBER}"
-          elif [ "$EVENT_NAME" = "push" ]; then
-            ver="${REF_NAME#v}"
-          elif [ -n "$INPUT_VERSION" ]; then
-            ver="$INPUT_VERSION"
-          else
-            ver="$(grep -E '<Version>' Directory.Build.props | head -1 | sed -E 's/.*<Version>([^<]+)<\/Version>.*/\1/')"
-          fi
-          if [ -z "$ver" ]; then
-            echo "::error::Could not determine package version"
-            exit 1
-          fi
-          "$VALIDATE_VERSION" "$ver"
+          ver="$(packaging/resolve-version.sh)"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           echo "PACKAGE_VERSION=$ver" >> "$GITHUB_ENV"
           echo "Package version: $ver"
@@ -162,24 +154,14 @@ jobs:
 
       - name: Resolve package version
         id: version
-        shell: pwsh
+        # Same script as the Linux job (Git Bash on the Windows runner).
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          if ($env:EVENT_NAME -eq 'pull_request') {
-            if (-not $env:PR_NUMBER) { throw 'Missing pull request number' }
-            $version = "0.0.0-pr.$($env:PR_NUMBER)"
-          } elseif ($env:EVENT_NAME -eq 'push') {
-            $version = $env:REF_NAME -replace '^v', ''
-          } elseif ($env:INPUT_VERSION) {
-            $version = $env:INPUT_VERSION
-          } else {
-            $match = Select-String -Path Directory.Build.props -Pattern '<Version>([^<]+)</Version>' | Select-Object -First 1
-            if (-not $match) { throw 'Could not determine project version' }
-            $version = $match.Matches[0].Groups[1].Value
-          }
-          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "Invalid package version: $version" }
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
+          set -euo pipefail
+          ver="$(packaging/resolve-version.sh)"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "PACKAGE_VERSION=$ver" >> "$GITHUB_ENV"
+          echo "Package version: $ver"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -205,6 +187,20 @@ jobs:
             -p:PublishReadyToRun=true `
             -o $publishDir
           if ($LASTEXITCODE -ne 0) { throw 'Windows publish failed' }
+          "PUBLISH_DIR=$publishDir" >> $env:GITHUB_ENV
+
+      - name: Add license and notice files (incl. bundled .NET runtime)
+        shell: bash
+        run: packaging/collect-licenses.sh "$PUBLISH_DIR" win-x64 "$PUBLISH_DIR"
+
+      - name: Package Windows archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $publishDir = $env:PUBLISH_DIR
+          foreach ($doc in 'LICENSE', 'THIRD_PARTY_LICENSES.md', 'licenses/dotnet-runtime/LICENSE.TXT', 'licenses/dotnet-runtime/THIRD-PARTY-NOTICES.TXT', 'licenses/nuget/PACKAGES.txt') {
+            if (-not (Test-Path -LiteralPath (Join-Path $publishDir $doc))) { throw "Missing $doc in the Windows publish output" }
+          }
           $packageDir = Join-Path $env:RUNNER_TEMP 'packages-win-x64'
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
           $zipName = "RealmPortal-$($env:PACKAGE_VERSION)-win-x64.zip"

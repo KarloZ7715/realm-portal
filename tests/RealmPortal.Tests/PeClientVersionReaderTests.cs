@@ -21,7 +21,7 @@ public class PeClientVersionReaderTests
 
         Assert.Equal(Version.Parse(version), result.FileVersion);
         Assert.Equal(build, result.Build);
-        Assert.Equal($"{build} ({version})", result.ToString());
+        Assert.Equal(new ClientVersion(Version.Parse(version)).DisplayVersion, result.ToString());
     }
 
     [Fact]

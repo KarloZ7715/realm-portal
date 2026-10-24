@@ -126,7 +126,7 @@ public sealed class PortalService : IPortalService
                         var requiredBuild = client.Build is > 0 ? client.Build : null;
                         var identity = extracted.Identity(requiredBuild);
                         var servers = _servers.List();
-                        var matching = servers.FirstOrDefault(server => RealmlistIdentity.FromServer(server).Equals(identity));
+                        var matching = FindImportMatch(servers, identity);
                         if (matching is null)
                         {
                             var name = CreateImportedServerName(extracted, client.Version, servers);
@@ -384,15 +384,22 @@ public sealed class PortalService : IPortalService
             if (request.ClientId is not null && _clients.FindById(request.ClientId) is null)
                 return ServiceResult<ServerEntry>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
 
+            // Fields the request leaves null keep their stored values (#93): the extra realmlist lines (patchlist, ...)
+            // when both ExtraRealmlistLines and PatchlistHost are null (an empty list clears them), and the required
+            // client build when RequiredClientBuild is null (ClearRequiredClientBuild removes it).
             IEnumerable<string>? extra = request.ExtraRealmlistLines;
             if (extra is null && request.PatchlistHost is not null)
                 extra = [$"set patchlist {request.PatchlistHost}"];
+            extra ??= StoredExtraRealmlistLines(existing);
+            if (request.ClearRequiredClientBuild && request.RequiredClientBuild is not null)
+                throw new ArgumentException("Set either a client build or clear it, not both.", "requiredClientBuild");
+            var build = request.ClearRequiredClientBuild ? null : request.RequiredClientBuild ?? existing.RequiredClientBuild;
             var updated = Server.Create(
                 request.Name,
                 request.Host,
                 request.Realm,
                 extra,
-                request.RequiredClientBuild,
+                build,
                 request.Account,
                 request.ServerId,
                 request.ClientId);
@@ -1148,6 +1155,19 @@ public sealed class PortalService : IPortalService
         }
     }
 
+    /// <summary>
+    /// The stored server an extracted one is the same as: an exact <see cref="RealmlistIdentity"/> match first, otherwise
+    /// a server with the same host and realm and no required build (a client-independent entry matches any build, #93).
+    /// </summary>
+    internal static Server? FindImportMatch(IReadOnlyList<Server> servers, RealmlistIdentity extracted) =>
+        servers.FirstOrDefault(server => RealmlistIdentity.FromServer(server).Equals(extracted))
+        ?? servers.FirstOrDefault(server => server.RequiredClientBuild is null
+            && RealmlistIdentity.Create(server.Host, server.Realm, extracted.RequiredClientBuild).Equals(extracted));
+
+    /// <summary>The stored realmlist lines after the first <c>set realmlist</c> line (e.g. <c>set patchlist …</c>).</summary>
+    private static string[] StoredExtraRealmlistLines(Server server) =>
+        server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+
     private static string CreateImportedServerName(ExtractedServer extracted, ClientVersion? version, IReadOnlyList<Server> existing)
     {
         var realm = new string((extracted.Realm ?? string.Empty).Where(c => !char.IsControl(c)).ToArray()).Trim();
@@ -1177,22 +1197,33 @@ public sealed class PortalService : IPortalService
         public void Report(T value) => report(value);
     }
 
+    /// <summary>
+    /// Name shown for a client the user has not named: its folder name. It never embeds the version, which the UI
+    /// shows next to it from <see cref="ClientVersion.DisplayVersion"/>.
+    /// </summary>
+    internal static string DefaultClientName(string clientPath)
+    {
+        var trimmed = Path.TrimEndingDirectorySeparator(clientPath);
+        var name = Path.GetFileName(trimmed);
+        return string.IsNullOrWhiteSpace(name) ? trimmed : name;
+    }
+
     private ClientEntry ToClientEntry(StoredClient stored, ClientVersion? knownVersion = null)
     {
         try
         {
             var version = knownVersion ?? ReadStoredClientVersion(stored.Path);
-            var displayName = stored.Name ?? (version is null ? Path.GetFileName(stored.Path) : $"WoW {version}");
+            var displayName = stored.Name ?? DefaultClientName(stored.Path);
             return new ClientEntry(stored.Id, stored.Path, version, null, displayName, stored.Origin);
         }
         catch (ClientVersionException ex)
         {
-            var displayName = stored.Name ?? Path.GetFileName(stored.Path);
+            var displayName = stored.Name ?? DefaultClientName(stored.Path);
             return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromClientVersion(ex), displayName, stored.Origin);
         }
         catch (StoreException ex)
         {
-            var displayName = stored.Name ?? Path.GetFileName(stored.Path);
+            var displayName = stored.Name ?? DefaultClientName(stored.Path);
             return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromException(ex), displayName, stored.Origin);
         }
     }

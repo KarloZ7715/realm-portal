@@ -128,8 +128,9 @@ Whenever a client is discovered by `Scan()` (with `ImportServers == true`) **or*
 2. Validates the extracted host and patchlist with `RealmlistAddress.ValidateRealmlistHost` and `RealmlistAddress.ValidatePatchlistValue`, and validates metadata (`Realm`, `Account`) with `ServerValidator`. Unparseable, missing, or stock official placeholder hosts (`*.battle.net`, `*.worldofwarcraft.com`) are skipped silently without failing `Scan()` or `AddClient()`.
 3. **Deduplication key:**
    - Normalized tuple **`(NormalizedHost, NormalizedRealm, RequiredClientBuild)`**, compared case-insensitively (`StringComparison.OrdinalIgnoreCase`) on `NormalizedHost` (trimmed, lowercase `host` or `host:port`) and `NormalizedRealm` (trimmed `Realm ?? ""`), with `RequiredClientBuild == client.Version.Build`.
+   - A stored server with `RequiredClientBuild == null` (client-independent) and the same host and realm also matches any build (an exact build match wins), so editing a server or adding it by hand never leads to a re-import (#93).
    - If a matching server already exists in `ServerStore`, no duplicate server is created; if that existing server has `ClientId == null`, its `ClientId` is linked to `client.Id`.
-   - Otherwise, a new `Server` is added to `ServerStore` with `RequiredClientBuild = client.Version.Build`, `ClientId = client.Id`, and an auto-generated unique `Name` (`PortalService.CreateImportedServerName`): `"{Realm} ({Host})"` when `Realm` is non-empty; otherwise `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` (e.g., `"logon.warmane.example.org (3.3.5)"`) when `ClientVersion` is known, or `"{Host}"` when `ClientVersion` is `null`; capped at `<= 64` characters (`Server.MaxNameLength`) and disambiguated case-insensitively with `" #2"`, `" #3"`, ... (truncating the base prefix so `base + suffix <= 64` characters; see **Approved decisions #1**).
+   - Otherwise, a new `Server` is added to `ServerStore` with `RequiredClientBuild = client.Version.Build`, `ClientId = client.Id`, and an auto-generated unique `Name` (`PortalService.CreateImportedServerName`): `"{Realm} ({Host})"` when `Realm` is non-empty; otherwise `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` (e.g., `"logon.example.org (3.3.5)"`) when `ClientVersion` is known, or `"{Host}"` when `ClientVersion` is `null`; capped at `<= 64` characters (`Server.MaxNameLength`) and disambiguated case-insensitively with `" #2"`, `" #3"`, ... (truncating the base prefix so `base + suffix <= 64` characters; see **Approved decisions #1**).
    - If `state.json` has no active server recorded for `client.Id` (`active_by_client[client.Id]` is unset), the extracted (or matched) server is marked active for `client.Id` in `state.json` (and if global `active_id` is `null`, sets `active_id` and writes `activo.json`).
 
 ### 1.4 First-launch flag (`FirstScanCompleted`)
@@ -163,7 +164,7 @@ namespace RealmPortal.Core.Service;
 /// <param name="Path">The client folder (the one with <c>Wow.exe</c>).</param>
 /// <param name="Version">The client version; <c>null</c> when it could not be read (then <see cref="Error"/> says why).</param>
 /// <param name="Error">Why the version could not be read (<c>PathNotFound</c>, <c>ClientExecutableNotFound</c>, <c>ClientNotAPortableExecutable</c>, ...). An unreadable client is a normal list entry, not a failure of the call.</param>
-/// <param name="Name">User-facing display name (defaults to <c>WoW {Version}</c> or folder name when <c>null</c>; max 64 chars, no control/format chars).</param>
+/// <param name="Name">User-facing display name (defaults to the client folder name when <c>null</c>, never the version; max 64 chars, no control/format chars).</param>
 /// <param name="Origin">How the client was added (<see cref="ClientOrigin"/>).</param>
 /// <param name="IsRunning">True when <see cref="IPortalService.IsGameRunning"/> detects a live process for this client folder.</param>
 public sealed record ClientEntry(
@@ -174,6 +175,16 @@ public sealed record ClientEntry(
     string? Name = null,
     ClientOrigin Origin = ClientOrigin.Manual,
     bool IsRunning = false);
+
+// Version display (Core owns the format; the App and the CLI never compose it):
+//   ClientVersion.Build          int     last file-version part, e.g. 12340
+//   ClientVersion.HasBuild       bool    Build > 0
+//   ClientVersion.IsKnownBuild   bool    Build is in KnownClientBuilds
+//   ClientVersion.PatchLabel     string  "3.3.5a" for a known build; "Major.Minor.Build" of the file version otherwise ("3.3.5")
+//   ClientVersion.DisplayVersion string  "3.3.5a (12340)"; unknown build "3.3.5 (12345)"; no build: PatchLabel alone
+//   ClientVersion.ToString()             same as DisplayVersion
+//   KnownClientBuilds            5875 1.12.1, 8606 2.4.3, 12340 3.3.5a, 15595 4.3.4, 18414 5.4.8
+// The backup manifest's client_build keeps its original "12340 (3.3.5.12340)" format.
 
 /// <summary>Request to edit an existing registered client.</summary>
 /// <param name="ClientId">Existing client id to update (<see cref="ClientEntry.Id"/>). Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
@@ -189,11 +200,12 @@ public sealed record UpdateClientRequest(
 /// <param name="Name">Display name (unique case-insensitively across all other servers).</param>
 /// <param name="Host">Realmlist host, e.g. <c>logon.example.org</c> or <c>10.0.0.5:3724</c>.</param>
 /// <param name="Realm">Realm name to preselect in the login screen; <c>null</c> for none.</param>
-/// <param name="PatchlistHost">Value of an optional <c>set patchlist</c> line; <c>null</c> for none.</param>
-/// <param name="RequiredClientBuild">Client build the server needs (e.g. 12340); <c>null</c> for any.</param>
+/// <param name="PatchlistHost">Value of a <c>set patchlist</c> line replacing the stored extra lines; <c>null</c> keeps them (unless <paramref name="ExtraRealmlistLines"/> is set).</param>
+/// <param name="RequiredClientBuild">Client build the server needs (e.g. 12340); <c>null</c> keeps the stored build.</param>
 /// <param name="Account">Remembered account name (never a password); <c>null</c> for none.</param>
 /// <param name="ClientId">Preferred client for this server (<see cref="ClientEntry.Id"/>); <c>null</c> for none. Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
-/// <param name="ExtraRealmlistLines">Extra realmlist lines after <c>set realmlist</c>.</param>
+/// <param name="ExtraRealmlistLines">Extra realmlist lines after <c>set realmlist</c>; <c>null</c> keeps the stored ones, an empty list clears them.</param>
+/// <param name="ClearRequiredClientBuild"><c>true</c> removes the stored build so the server accepts any client; requires <paramref name="RequiredClientBuild"/> <c>null</c>.</param>
 public sealed record UpdateServerRequest(
     string ServerId,
     string Name,
@@ -203,7 +215,8 @@ public sealed record UpdateServerRequest(
     int? RequiredClientBuild = null,
     string? Account = null,
     string? ClientId = null,
-    IReadOnlyList<string>? ExtraRealmlistLines = null);
+    IReadOnlyList<string>? ExtraRealmlistLines = null,
+    bool ClearRequiredClientBuild = false);
 ```
 
 ### 2.2 Client CRUD semantics (`AddClient`, `UpdateClient`, `RemoveClient`)
@@ -215,7 +228,7 @@ public sealed record UpdateServerRequest(
     "clients": [
       {
         "id": "c0123456789abcdef",
-        "path": "/home/carlos/Games/WoW-335a",
+        "path": "/home/user/Games/WoW-335a",
         "name": "Wrath 3.3.5a",
         "origin": "lutris"
       }
@@ -242,6 +255,7 @@ public sealed record UpdateServerRequest(
 ### 2.3 Server CRUD semantics (`AddServer`, `UpdateServer`, `RemoveServer`)
 
 - **`UpdateServer(UpdateServerRequest request)`:**
+  - **Null keeps the stored value (#93)** for the file fields the edit form may not show: `RequiredClientBuild == null` keeps the stored build; `ExtraRealmlistLines == null` and `PatchlistHost == null` keep the stored extra realmlist lines (`set patchlist …`). An empty `ExtraRealmlistLines` list clears them. `Name`, `Host`, `Realm`, `Account` and `ClientId` are always taken from the request (`null` clears `Realm`, `Account` and `ClientId`). `ClearRequiredClientBuild == true` removes the stored build ("Any client"; CLI `edit --build any`); combining it with a non-null `RequiredClientBuild` fails with `InvalidServerInput` (`Field = "build"`) and writes nothing.
   - Validates all fields via `Server.Create(..., id: request.ServerId)` and `ServerValidator.Validate` (identical host, port, realmlist, length, and forbidden-character checks as `AddServer` and `ServerStore` load).
   - Fails with `ServerNotFound` if `request.ServerId` does not exist; fails with `ClientNotFound` if `request.ClientId` is non-null and not in `ClientStore`; fails with `ServerNameTaken` (`ServerName = request.Name`) if another server (`Id != request.ServerId`) already uses `request.Name` case-insensitively.
   - **Running check:** If `request.ServerId` is currently active on any client `C` where `IsGameRunning(C) == true` and any connection/file field changed (`Host`, `Realm`, `PatchlistHost`, `ExtraRealmlistLines`, `RequiredClientBuild`), refuses with `ServiceErrorCode.GameRunning` (`ServerName = existing.Name`, `Path = C.Path`).
@@ -433,7 +447,7 @@ public sealed record StorageSettings(
 ```json
 {
   "version": 1,
-  "backup_folder": "/home/carlos/.local/share/realm-portal/backups",
+  "backup_folder": "/home/user/.local/share/realm-portal/backups",
   "keep_backups": 10
 }
 ```
@@ -530,12 +544,12 @@ manifest hash, and those journals keep working as before. A value that is presen
 
 ---
 
-## Approved decisions (Approval Gate — Carlos)
+## Approved decisions (maintainer approval gate)
 
 1. **Auto-naming rule for servers imported during client scan (`ClientServerExtractor` / `PortalService.CreateImportedServerName`) — Approved: Option A.**
    - **Decision:** When `Scan()` or `AddClient()` imports a server from a client's `realmlist.wtf` / `WTF/Config.wtf`:
-     - If `Realm` (stripped of control characters and trimmed) is non-empty, use `"{Realm} ({Host})"` (e.g., `"Icecrown (logon.warmane.example.org)"`).
-     - If `Realm` is empty, use `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` when `ClientVersion` is available (`System.Version`'s third component `Build`, e.g., `"logon.warmane.example.org (3.3.5)"`), or `"{Host}"` when `ClientVersion` is `null`.
+     - If `Realm` (stripped of control characters and trimmed) is non-empty, use `"{Realm} ({Host})"` (e.g., `"Icecrown (logon.example.org)"`).
+     - If `Realm` is empty, use `"{Host} ({FileVersion.Major}.{FileVersion.Minor}.{FileVersion.Build})"` when `ClientVersion` is available (`System.Version`'s third component `Build`, e.g., `"logon.example.org (3.3.5)"`), or `"{Host}"` when `ClientVersion` is `null`.
      - Trim and cap the base name at `<= 64` characters (`Server.MaxNameLength`, falling back to `"Imported server"` if empty).
      - On case-insensitive name collision in `ServerStore`, append `" #2"`, `" #3"`, ..., truncating the base prefix to `Math.Min(basis.Length, 64 - tail.Length)` before appending so the final name never exceeds `64` characters.
    - **Rationale:** Players often have multiple private servers that share generic realm names like `"Realm 1"`, `"Highrate"`, or `"Test Realm"`, or connect multiple clients (e.g., `3.3.5a` and `1.12.1`) to the same host domain. Including both `Realm` and `Host` (or `Host` and `Version` when `Realm` is absent) makes imported cards immediately distinguishable on the Servers screen without requiring manual renaming, while matching `PortalService.CreateImportedServerName` in `main`.
