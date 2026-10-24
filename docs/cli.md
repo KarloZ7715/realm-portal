@@ -16,7 +16,7 @@ In the examples below, `realm-portal` stands for `dotnet run --project src/Realm
 
 ## Commands
 
-Write the command, then its arguments and options: `realm-portal <command> [arguments] [options]`. The common options (`--config-dir`, `--projection-dir`, `--client-dir`) and `--verbose` may also come before the command: `realm-portal --config-dir /tmp/rp list` is the same as `realm-portal list --config-dir /tmp/rp`. When an option is given twice, the last one wins. Any other option before the command is reported as an unknown option (exit code `1`).
+Write the command, then its arguments and options: `realm-portal <command> [arguments] [options]`. The common options (`--config-dir`, `--projection-dir`, `--client-dir`) and `--verbose` may also come before the command: `realm-portal --config-dir /tmp/rp list` is the same as `realm-portal list --config-dir /tmp/rp`. When one of these three directory options is given twice, the last one wins. Any other option before the command is reported as an unknown option (exit code `1`).
 
 There is no `--help` option: `realm-portal --help` reports an unknown option. To see the usage text, run `realm-portal` with no arguments.
 

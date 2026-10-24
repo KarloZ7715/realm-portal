@@ -95,7 +95,8 @@ public sealed class CliLeadingOptionsTests
         Assert.Contains($"error: option {option} needs a value", missing.Err);
         Assert.Equal(1, optionAsValue.Code);
         Assert.Contains($"error: option {option} needs a value", optionAsValue.Err);
-        Assert.NotEqual(0, flagAsValue.Code);
+        Assert.Equal(1, flagAsValue.Code);
+        Assert.Contains($"error: option {option} needs a value", flagAsValue.Err);
     }
 
     [Fact]

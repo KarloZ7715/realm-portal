@@ -82,9 +82,11 @@ public static class Program
     {
         verbose = false;
         var list = new List<string>(args.Length);
-        foreach (var arg in args)
+        for (var i = 0; i < args.Length; i++)
         {
-            if (arg == "--verbose")
+            var arg = args[i];
+            // `--config-dir --verbose list`: keep the token so the missing value is reported (#129).
+            if (arg == "--verbose" && !(i > 0 && CliApp.IsLeadingValueOption(args[i - 1])))
             {
                 verbose = true;
                 continue;
