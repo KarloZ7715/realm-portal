@@ -1,6 +1,6 @@
 # Figma exports
 
-2× PNG screen exports from the [Realm Portal Figma file](https://www.figma.com/design/6kBPmTavrfpbceMSUvvWl3), page **Pantallas** (`node-id=1-4`). Exports are 2× of the design frame: full screens are 1920×1200 (a 960×600 frame) and compact screens are 1440×960 (a 720×480 frame). Re-export by selecting the frames on the page and using Export at 2×, PNG.
+2× PNG screen exports from the project's Figma design, page **Pantallas**. Source design file: private Figma file maintained by the project owner. Exports are 2× of the design frame: full screens are 1920×1200 (a 960×600 frame) and compact screens are 1440×960 (a 720×480 frame). Re-export by selecting the frames on the page and using Export at 2×, PNG.
 
 This page is the visual reference for the whole app. `docs/ui-screens.md` maps each implemented screen to its mockup.
 

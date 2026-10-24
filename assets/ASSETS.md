@@ -1,6 +1,6 @@
 # Realm Portal — Loose assets for design direction B "Parchment and bronze"
 
-Generated on 2026-10-17 for the Avalonia styling spike. Visual source: the project's Figma mockups (https://www.figma.com/design/6kBPmTavrfpbceMSUvvWl3) and the design tokens derived from them. All PNGs in `frames/` and `icons/` are RGBA (real transparency, straight alpha, no halos verified on white, black, magenta and leather backgrounds).
+Generated on 2026-10-17 for the Avalonia styling spike. Visual source: the project's Figma mockups and the design tokens derived from them. Source design file: private Figma file maintained by the project owner. All PNGs in `frames/` and `icons/` are RGBA (real transparency, straight alpha, no halos verified on white, black, magenta and leather backgrounds).
 
 Overview: `preview-composition.png` (9-slice window on magenta, active card, buttons, divider, tab, seals and corners; below, the same elements on white/black/magenta to spot halos).
 
