@@ -1,0 +1,31 @@
+# Package licenses for every NuGet package in the published RealmPortal.App deps.json (linux-x64 and win-x64).
+# Columns (tab-separated): package id, exact version, license (as declared by the package), license folder under licenses/nuget/, source of the files.
+# packaging/collect-licenses.sh fails the build if a published package has no row here; NuGetLicenseManifestTests check it against the lock file.
+Avalonia	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.Desktop	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.FreeDesktop	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.Native	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.Remote.Protocol	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.Skia	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.Themes.Simple	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.Win32	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.X11	11.3.22	MIT	avalonia-11.3.22	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
+Avalonia.BuildServices	11.3.2	MIT	avalonia.buildservices-11.3.2	https://github.com/AvaloniaUI/Avalonia.BuildServices/blob/777f975b0a0cecf0311273711d56697212c558c0/LICENSE
+Avalonia.Angle.Windows.Natives	2.1.25547.20250602	BSD-3-Clause	avalonia.angle.windows.natives-2.1.25547.20250602	nupkg (LICENSE)
+CommunityToolkit.Mvvm	8.4.2	MIT	communitytoolkit.mvvm-8.4.2	nupkg (License.md, ThirdPartyNotices.txt)
+SkiaSharp	2.88.9	MIT	skiasharp-2.88.9	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+SkiaSharp.NativeAssets.Linux	2.88.9	MIT	skiasharp-2.88.9	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+SkiaSharp.NativeAssets.Win32	2.88.9	MIT	skiasharp-2.88.9	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+SkiaSharp.NativeAssets.macOS	2.88.9	MIT	skiasharp-2.88.9	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+SkiaSharp.NativeAssets.WebAssembly	2.88.9	MIT	skiasharp-2.88.9	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+HarfBuzzSharp	8.3.1.1	MIT	harfbuzzsharp-8.3.1.1	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+HarfBuzzSharp.NativeAssets.Linux	8.3.1.1	MIT	harfbuzzsharp-8.3.1.1	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+HarfBuzzSharp.NativeAssets.Win32	8.3.1.1	MIT	harfbuzzsharp-8.3.1.1	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+HarfBuzzSharp.NativeAssets.macOS	8.3.1.1	MIT	harfbuzzsharp-8.3.1.1	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+HarfBuzzSharp.NativeAssets.WebAssembly	8.3.1.1	MIT	harfbuzzsharp-8.3.1.1	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
+MicroCom.Runtime	0.11.0	MIT	microcom.runtime-0.11.0	https://github.com/kekekeks/MicroCom/blob/4b8a38f773c109bad558ee3713d9f16d80776e42/LICENSE (repo has no release tags)
+PeNet	5.1.0	Apache-2.0	penet-5.1.0	https://github.com/secana/PeNet/blob/e6e436158c06c8c35c7e52744ceb7de6cf20b5e6/LICENSE (no NOTICE file upstream)
+PeNet.Asn1	2.0.1	Apache-2.0	penet.asn1-2.0.1	https://github.com/secana/asn1/blob/v2.0.2/LICENCE (MIT, unchanged since 2021) + https://www.apache.org/licenses/LICENSE-2.0.txt (nuspec declares Apache-2.0)
+System.IO.Pipelines	8.0.0	MIT	system.io.pipelines-8.0.0	nupkg (LICENSE.TXT, THIRD-PARTY-NOTICES.TXT)
+System.Security.Cryptography.Pkcs	9.0.21	MIT	system.security.cryptography.pkcs-9.0.21	nupkg (LICENSE.TXT, THIRD-PARTY-NOTICES.TXT)
+Tmds.DBus.Protocol	0.21.3	MIT	tmds.dbus.protocol-0.21.3	https://github.com/tmds/Tmds.DBus/blob/8cb04f66c330b64244e996ff68f685f27f7381a0/COPYING

@@ -19,7 +19,7 @@ public class ActiveProjectionTests
             "Realm One",
             ["set patchlist patch.example.org"],
             12340,
-            "carlos",
+            "player",
             id: "0123456789abcdef0123456789abcdef");
 
         var expected =
