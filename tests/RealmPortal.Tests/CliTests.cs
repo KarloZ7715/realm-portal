@@ -16,7 +16,7 @@ public class CliTests
     }
 
     [Fact]
-    public void ClientVersion_PrintsBuildAndVersion()
+    public void ClientVersion_PrintsDisplayVersion()
     {
         using var dir = new TempDirectory();
         File.WriteAllBytes(dir.Combine("Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
@@ -24,7 +24,7 @@ public class CliTests
         var (code, output, err) = Run("client-version", dir.Path);
 
         Assert.Equal(0, code);
-        Assert.Equal("12340 (3.3.5.12340)", output.Trim());
+        Assert.Equal("3.3.5a (12340)", output.Trim());
         Assert.Equal(string.Empty, err);
     }
 

@@ -1177,22 +1177,33 @@ public sealed class PortalService : IPortalService
         public void Report(T value) => report(value);
     }
 
+    /// <summary>
+    /// Name shown for a client the user has not named: its folder name. It never embeds the version, which the UI
+    /// shows next to it from <see cref="ClientVersion.DisplayVersion"/>.
+    /// </summary>
+    internal static string DefaultClientName(string clientPath)
+    {
+        var trimmed = Path.TrimEndingDirectorySeparator(clientPath);
+        var name = Path.GetFileName(trimmed);
+        return string.IsNullOrWhiteSpace(name) ? trimmed : name;
+    }
+
     private ClientEntry ToClientEntry(StoredClient stored, ClientVersion? knownVersion = null)
     {
         try
         {
             var version = knownVersion ?? ReadStoredClientVersion(stored.Path);
-            var displayName = stored.Name ?? (version is null ? Path.GetFileName(stored.Path) : $"WoW {version}");
+            var displayName = stored.Name ?? DefaultClientName(stored.Path);
             return new ClientEntry(stored.Id, stored.Path, version, null, displayName, stored.Origin);
         }
         catch (ClientVersionException ex)
         {
-            var displayName = stored.Name ?? Path.GetFileName(stored.Path);
+            var displayName = stored.Name ?? DefaultClientName(stored.Path);
             return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromClientVersion(ex), displayName, stored.Origin);
         }
         catch (StoreException ex)
         {
-            var displayName = stored.Name ?? Path.GetFileName(stored.Path);
+            var displayName = stored.Name ?? DefaultClientName(stored.Path);
             return new ClientEntry(stored.Id, stored.Path, null, ServiceErrors.FromException(ex), displayName, stored.Origin);
         }
     }
