@@ -44,6 +44,37 @@ Both packages install the self-contained publish output under `/opt/realm-portal
 
 Desktop entry, AppStream metainfo, and hicolor icons come from `packaging/linux/`. The source metainfo carries no version; `build-packages.sh` adds the `<releases>` entry for the package version (dated from `SOURCE_DATE_EPOCH` when set) and refuses a metainfo with a hardcoded `<releases>`.
 
+### License and notice files
+
+Release builds are self-contained, so they redistribute the .NET runtime. `packaging/collect-licenses.sh <publish-dir> <rid> <dest>`
+reads the runtime pack version from `RealmPortal.App.deps.json` in the publish output and copies, from that exact pack in the NuGet
+global packages folder, `LICENSE.TXT` and `THIRD-PARTY-NOTICES.TXT` into `licenses/dotnet-runtime/` (plus a `VERSION.txt` with the
+runtime version and source commit). It also copies `LICENSE`, `THIRD_PARTY_LICENSES.md` and the fonts' `OFL.txt` (`licenses/fonts/`).
+Nothing is committed for the runtime, so the notices always match the bundled patch release.
+
+NuGet packages: the full license and notice texts of every package in the published `deps.json` are committed under
+`licenses/nuget/<folder>/` and indexed in `licenses/nuget/packages.tsv` (package id, exact version, license, folder, source of
+the files). The script lists the `libraries` of the publish `deps.json` and fails the build when a `package` entry has no exact
+id+version row, its folder is missing or empty, or a required package (Avalonia, Avalonia.Angle.Windows.Natives,
+CommunityToolkit.Mvvm, HarfBuzzSharp, MicroCom.Runtime, PeNet, PeNet.Asn1, SkiaSharp, Tmds.DBus.Protocol) is absent. Only our own
+projects (`RealmPortal.*`) and the `Microsoft.NETCore.App` runtime pack are accepted without a row. It copies the used folders
+to `licenses/nuget/` and writes `licenses/nuget/PACKAGES.txt` (the packages of that build). `packaging/test-collect-licenses.sh`
+tests these rules in the Linux job, and `NuGetLicenseManifestTests` (normal CI) checks the manifest against
+`src/RealmPortal.App/packages.lock.json` and `THIRD_PARTY_LICENSES.md`, so a dependency bump without license files fails on the PR.
+
+When a package is added or bumped: copy its license/notice files (from the `.nupkg` when it has them, otherwise from the upstream
+repository at the matching tag or commit) into a new `licenses/nuget/<id>-<version>/` folder, update `packages.tsv` and
+`THIRD_PARTY_LICENSES.md`, and delete the old folder.
+
+| Package | Location |
+| --- | --- |
+| `.deb` | `/usr/share/doc/realm-portal/` |
+| AppImage | `usr/share/doc/realm-portal/` inside the image |
+| Windows ZIP | next to `RealmPortal.App.exe` |
+
+`build-packages.sh` fails if the `.deb` or the AppDir lacks `LICENSE`, `THIRD_PARTY_LICENSES.md`, the two runtime files or `licenses/nuget/PACKAGES.txt`, and the
+Windows job checks the publish folder before zipping.
+
 ### `.deb` dependencies
 
 The control file declares runtime libraries expected on typical Debian/Ubuntu desktops (Avalonia/Skia/X11):

@@ -11,6 +11,10 @@ on:
     paths:
       - .github/workflows/release-linux.yml
       - packaging/**
+      - licenses/**
+      - LICENSE
+      - THIRD_PARTY_LICENSES.md
+      - assets/fonts/**
       - src/RealmPortal.App/**
       - src/RealmPortal.Core/**
       - Directory.Build.props
@@ -56,6 +60,9 @@ jobs:
 
       - name: Test version resolution
         run: packaging/test-resolve-version.sh
+
+      - name: Test license collection
+        run: packaging/test-collect-licenses.sh
 
       - name: Resolve package version
         id: version
@@ -180,6 +187,20 @@ jobs:
             -p:PublishReadyToRun=true `
             -o $publishDir
           if ($LASTEXITCODE -ne 0) { throw 'Windows publish failed' }
+          "PUBLISH_DIR=$publishDir" >> $env:GITHUB_ENV
+
+      - name: Add license and notice files (incl. bundled .NET runtime)
+        shell: bash
+        run: packaging/collect-licenses.sh "$PUBLISH_DIR" win-x64 "$PUBLISH_DIR"
+
+      - name: Package Windows archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $publishDir = $env:PUBLISH_DIR
+          foreach ($doc in 'LICENSE', 'THIRD_PARTY_LICENSES.md', 'licenses/dotnet-runtime/LICENSE.TXT', 'licenses/dotnet-runtime/THIRD-PARTY-NOTICES.TXT', 'licenses/nuget/PACKAGES.txt') {
+            if (-not (Test-Path -LiteralPath (Join-Path $publishDir $doc))) { throw "Missing $doc in the Windows publish output" }
+          }
           $packageDir = Join-Path $env:RUNNER_TEMP 'packages-win-x64'
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
           $zipName = "RealmPortal-$($env:PACKAGE_VERSION)-win-x64.zip"
