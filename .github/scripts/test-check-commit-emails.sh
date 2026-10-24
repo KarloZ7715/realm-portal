@@ -133,6 +133,7 @@ run_range() { # run_range <want-exit> <base> <head> <label>
 }
 
 ok='188834590+KarloZ7715@users.noreply.github.com'
+allowlist_hint='If this is your real EMU or legacy-account noreply address, ask a maintainer to add it to EXACT_ALLOWED_EMAILS.'
 base=$(commit "$ok" "$ok")
 commit "$ok" 'noreply@github.com' >/dev/null
 good2=$(commit 'cursoragent@cursor.com' 'cursoragent@cursor.com')
@@ -146,6 +147,7 @@ out=$(run_range 1 "$good2" "$bad_author" 'bad author')
 bad_committer=$(commit "$ok" 'someone@university.edu.co')
 out=$(run_range 1 "$bad_author" "$bad_committer" 'bad committer')
 [[ "$out" == *"committer email at @university.edu.co"* ]] || { echo "FAIL: missing committer error"; fail=1; }
+[[ "$out" != *"$allowlist_hint"* ]] || { echo "FAIL: allowlist hint shown for a non-noreply address"; fail=1; }
 
 co_bad=$(commit "$ok" "$ok" $'subject\n\nCo-authored-by: Someone <someone@gmail.com>\nCo-authored-by: Bot <1+bot[bot]@users.noreply.github.com>')
 out=$(run_range 0 "$bad_committer" "$co_bad" 'bad co-author is only a warning')
@@ -165,8 +167,41 @@ out=$(run_range 1 "$co_odd" "$bad_user" 'noreply domain with an invalid username
 [[ "$out" == *"committer email at @users.noreply.github.com, which is $invalid_user."* ]] || { echo "FAIL: missing invalid-username committer error"; fail=1; }
 [[ "$out" != *"$not_allowed"* ]] || { echo "FAIL: invalid username reported as not allowed"; fail=1; }
 [[ "$out" != *"karloz-@"* ]] || { echo "FAIL: full address leaked in output"; fail=1; }
+[[ "$out" == *"$allowlist_hint"* ]] || { echo "FAIL: missing allowlist hint for an invalid noreply username"; fail=1; }
+
+# EMU-style username (underscore): rejected with the allowlist hint.
+emu_user=$(commit '1+jdoe_acme@users.noreply.github.com' "$ok")
+out=$(run_range 1 "$bad_user" "$emu_user" 'EMU-style noreply username')
+[[ "$out" == *"author email at @users.noreply.github.com, which is $invalid_user."* ]] || { echo "FAIL: missing EMU-style author error"; fail=1; }
+[[ "$out" == *"$allowlist_hint"* ]] || { echo "FAIL: missing allowlist hint for an EMU-style username"; fail=1; }
+[[ "$out" != *"jdoe_acme"* ]] || { echo "FAIL: full address leaked in output"; fail=1; }
 
 run_range 1 "$base" "deadbeef" 'malformed SHA' >/dev/null
+
+# EXACT_ALLOWED_EMAILS entries are compared literally, never expanded as globs: run a copy
+# of the script whose allowlist has a bracketed entry, from a directory that contains a
+# file whose name the entry would match as a glob pattern.
+globdir="$tmp/glob"
+mkdir -p "$globdir"
+sed 's/^EXACT_ALLOWED_EMAILS=(.*)$/EXACT_ALLOWED_EMAILS=('"'"'x[1]@example.com'"'"' noreply@github.com)/' \
+  "$SCRIPT" > "$globdir/check.sh"
+chmod +x "$globdir/check.sh"
+grep -qF "EXACT_ALLOWED_EMAILS=('x[1]@example.com' noreply@github.com)" "$globdir/check.sh" \
+  || { echo "FAIL: could not patch EXACT_ALLOWED_EMAILS in the script copy"; fail=1; }
+touch "$globdir/x1@example.com"
+expect_glob() { # expect_glob <allowed|rejected> <email>
+  local want="$1" email="$2" got
+  if (cd "$globdir" && ./check.sh --email "$email"); then got=allowed; else got=rejected; fi
+  if [[ "$got" != "$want" ]]; then
+    echo "FAIL: (bracketed allowlist entry) '$email' expected $want, got $got"
+    fail=1
+  fi
+}
+expect_glob allowed 'x[1]@example.com'
+expect_glob allowed 'X[1]@Example.COM'
+expect_glob rejected 'x1@example.com'
+expect_glob allowed 'noreply@github.com'
+expect_glob rejected 'cursoragent@cursor.com'
 
 if [[ "$fail" -ne 0 ]]; then
   echo "check-commit-emails tests FAILED"
