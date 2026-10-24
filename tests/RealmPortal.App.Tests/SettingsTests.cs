@@ -66,6 +66,45 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
+    public void EmptyLauncherFieldsShowLocalizedExampleHints()
+    {
+        // Tall enough to show the whole launcher card in the screenshots.
+        var shell = new Shell(720, 760);
+        shell.Model.SectionIndex = 2;
+        var settings = shell.Model.Settings;
+        try
+        {
+            settings.Template = "";
+            settings.Prefix = "";
+            settings.Arguments = "";
+            settings.Environment = "";
+            Screenshots.Settle();
+
+            TextBox Box(string name) => shell.Window.GetVisualDescendants().OfType<TextBox>().Single(b => b.Name == name);
+            string[] boxes = ["TemplateBox", "PrefixBox", "ArgumentsBox", "EnvironmentBox"];
+            Assert.All(boxes, name => Assert.StartsWith("ej.: ", Box(name).Watermark));
+            shell.Snap("settings-hints-es", 1.0, 2.0);
+
+            Loc.Instance.SetLanguage(Language.En);
+            Screenshots.Settle();
+            Assert.All(boxes, name => Assert.StartsWith("e.g. ", Box(name).Watermark));
+            Assert.Equal("e.g. gamemoderun", Box("PrefixBox").Watermark);
+
+            // The hint uses the body face, the typed value the mono face, so the two never look alike.
+            var prefix = Box("PrefixBox");
+            var hint = prefix.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "PART_Watermark");
+            Assert.True(hint.IsVisible);
+            Assert.NotEqual(prefix.FontFamily, hint.FontFamily);
+            shell.Snap("settings-hints-en", 1.0);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(Language.Es);
+            shell.Window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void EditingMarksUnsavedAndSaveClearsIt()
     {
         var (shell, settings) = Open();
