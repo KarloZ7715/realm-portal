@@ -498,13 +498,13 @@ public sealed partial class ServersViewModel : ViewModelBase
     }
 
     private static string ClientDisplayName(ClientEntry client) =>
-        string.IsNullOrWhiteSpace(client.Name) ? client.Version?.DisplayVersion ?? "?" : client.Name!;
+        string.IsNullOrWhiteSpace(client.Name) ? VersionText.Of(client.Version) : client.Name!;
 
-    /// <summary>"Name (3.3.5a (12340))", or just the version when the client has no name, so it never shows twice.</summary>
+    /// <summary>"Name · 3.3.5a (12340)", or just the version when the client has no name, so it never shows twice.</summary>
     private static string ClientFilterLabel(ClientEntry client) =>
         string.IsNullOrWhiteSpace(client.Name)
             ? ClientDisplayName(client)
-            : $"{client.Name} ({client.Version?.DisplayVersion ?? "?"})";
+            : VersionText.WithName(client.Name!, VersionText.Of(client.Version));
 
     /// <summary>Rebuilds the header filter: "All clients in use" followed by the clients marked in use.</summary>
     private void RebuildClientFilter(IReadOnlyList<ClientEntry> inUseClients)

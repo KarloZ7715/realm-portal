@@ -29,6 +29,8 @@ public enum ServerCardLock
 /// <summary>One server card.</summary>
 public sealed partial class ServerItemViewModel : ObservableObject
 {
+    private readonly Func<string> _clientVersion;
+    private Func<string> _clientTitle;
     private readonly Action<ServerItemViewModel> _play;
     private readonly Action<ServerItemViewModel> _switchOnly;
     private readonly Action<ServerItemViewModel>? _edit;
@@ -40,7 +42,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
         string name,
         string host,
         string address,
-        string clientVersion,
+        Func<string> clientVersion,
         string? account,
         bool isCompatible,
         bool isActive,
@@ -59,7 +61,8 @@ public sealed partial class ServerItemViewModel : ObservableObject
         Name = name;
         Host = host;
         Address = address;
-        ClientVersion = clientVersion;
+        _clientVersion = clientVersion;
+        _clientTitle = () => Loc.Format("clients.client", clientVersion());
         Account = account;
         IsCompatible = isCompatible;
         IsActive = isActive;
@@ -86,7 +89,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
             seed.Name,
             seed.Host,
             $"{seed.Host}:{seed.Port}",
-            seed.ClientVersion,
+            () => seed.ClientVersion,
             seed.Account,
             seed.IsCompatible,
             seed.IsActive,
@@ -113,18 +116,17 @@ public sealed partial class ServerItemViewModel : ObservableObject
         Action<ServerItemViewModel>? edit = null,
         Action<ServerItemViewModel>? delete = null)
     {
-        var versionLabel = clientVersion?.DisplayVersion ?? "?";
         var needsRepair = entry.IsActive && !projectionInSync;
         // An unreadable or missing client matches the service: every server stays compatible.
         // A known version uses the same build rule as the client RunPortalAsync will switch with.
         var compatible = clientVersion is null || CompatibilityFilter.IsCompatible(entry, clientVersion);
-        return new(
+        var item = new ServerItemViewModel(
             entry.Id,
             entry.ClientId,
             entry.Name,
             entry.Host,
             entry.Host,
-            versionLabel,
+            () => VersionText.Of(clientVersion),
             entry.Account,
             compatible,
             entry.IsActive,
@@ -137,6 +139,8 @@ public sealed partial class ServerItemViewModel : ObservableObject
             clientDisplayName,
             effectiveClientId,
             compatibleClientIds);
+        item._clientTitle = () => VersionText.ClientTitle(clientVersion);
+        return item;
     }
 
     public string? ServerId { get; }
@@ -156,7 +160,8 @@ public sealed partial class ServerItemViewModel : ObservableObject
     /// <summary>host:port or host from the service.</summary>
     public string Address { get; }
 
-    public string ClientVersion { get; }
+    /// <summary>The client version text; re-read on language changes because an unreadable version is localized.</summary>
+    public string ClientVersion => _clientVersion();
 
     public string? Account { get; }
 
@@ -213,10 +218,10 @@ public sealed partial class ServerItemViewModel : ObservableObject
         },
     };
 
-    /// <summary>"Cliente 3.3.5a (12340) · Cuenta: demo".</summary>
+    /// <summary>"Cliente 3.3.5a (12340) · Cuenta: demo", or "Versión de cliente desconocida · Sin cuenta".</summary>
     public string DetailText => Account is null
-        ? Loc.Format("card.detail.noaccount", ClientVersion)
-        : Loc.Format("card.detail.account", ClientVersion, Account);
+        ? Loc.Format("card.detail.noaccount", _clientTitle())
+        : Loc.Format("card.detail.account", _clientTitle(), Account);
 
     /// <summary>Lower-case text the search box matches against.</summary>
     public string SearchText => $"{Name} {Address} {ClientVersion} {Account}";
@@ -314,6 +319,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
     /// <summary>Re-reads every translated text (after a language change).</summary>
     public void RefreshText()
     {
+        OnPropertyChanged(nameof(ClientVersion));
         OnPropertyChanged(nameof(BadgeText));
         OnPropertyChanged(nameof(DetailText));
         OnPropertyChanged(nameof(SwitchMenuText));

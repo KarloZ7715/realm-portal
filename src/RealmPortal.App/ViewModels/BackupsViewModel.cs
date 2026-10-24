@@ -189,8 +189,8 @@ public sealed partial class BackupsViewModel : ViewModelBase
         foreach (var client in result.Value!)
         {
             // The version is shown once: "Client 3.3.5a (12340)" without a name, "Name · 3.3.5a (12340)" with one.
-            var version = client.Version?.DisplayVersion ?? "?";
-            var label = string.IsNullOrWhiteSpace(client.Name) ? Loc.Format("clients.client", version) : $"{client.Name} · {version}";
+            var version = VersionText.Of(client.Version);
+            var label = string.IsNullOrWhiteSpace(client.Name) ? VersionText.ClientTitle(client.Version) : VersionText.WithName(client.Name, version);
             Clients.Add(new BackupClientOption(client, label));
         }
         SelectedClient = Clients.FirstOrDefault();
