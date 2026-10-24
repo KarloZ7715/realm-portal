@@ -50,7 +50,7 @@ public sealed class CliApp(
         Global options (before or after the command):
           --verbose               print detailed error messages (paths, parse errors)
 
-        Common options (they override the environment variables):
+        Common options (before or after the command; they override the environment variables):
           --config-dir <dir>      app config (env REALM_PORTAL_CONFIG_DIR)
           --projection-dir <dir>  where activo.json is written (env REALM_PORTAL_PROJECTION_DIR)
           --client-dir <dir>      game client folder (env REALM_PORTAL_CLIENT_DIR); enables the compatibility filter
@@ -77,7 +77,11 @@ public sealed class CliApp(
 
     /// <summary>Options that may appear before the subcommand in <see cref="Program.Run"/>.</summary>
     public static bool IsKnownLeadingOption(string arg) =>
-        arg is "--config-dir" or "--projection-dir" or "--client-dir" or "--verbose";
+        IsLeadingValueOption(arg) || arg is "--verbose";
+
+    /// <summary>The common options that take a value and may also be written before the command.</summary>
+    public static bool IsLeadingValueOption(string arg) =>
+        arg is "--config-dir" or "--projection-dir" or "--client-dir";
 
     public int Run(string command, string[] args, bool globalVerbose = false)
     {

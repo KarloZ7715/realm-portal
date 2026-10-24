@@ -46,6 +46,21 @@ public static class Program
         if (args.Length >= 1 && app.IsCommand(args[0]))
             return app.Run(args[0], args[1..], verbose);
 
+        // Common options before the command (#129): `--config-dir <dir> list` is the same as `list --config-dir <dir>`.
+        var leading = 0;
+        while (leading < args.Length && CliApp.IsLeadingValueOption(args[leading]))
+        {
+            if (leading + 1 >= args.Length || args[leading + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                error.WriteLine($"error: option {args[leading]} needs a value");
+                error.WriteLine(CliApp.Usage);
+                return 1;
+            }
+            leading += 2;
+        }
+        if (leading > 0 && leading < args.Length && app.IsCommand(args[leading]))
+            return app.Run(args[leading], [.. args[..leading], .. args[(leading + 1)..]], verbose);
+
         var commandIndex = Array.FindIndex(args, static a => CliApp.Commands.Contains(a));
         var optionLimit = commandIndex < 0 ? args.Length : commandIndex;
         for (var i = 0; i < optionLimit; i++)

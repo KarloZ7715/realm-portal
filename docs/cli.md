@@ -16,7 +16,7 @@ In the examples below, `realm-portal` stands for `dotnet run --project src/Realm
 
 ## Commands
 
-Write the command first, then its options: `realm-portal <command> [arguments] [options]`. Options placed before the command (for example `realm-portal --config-dir /tmp/rp list`) are not applied: the tool prints the usage text and exits with code `1`. The only exception is `--verbose`, which works anywhere.
+Write the command, then its arguments and options: `realm-portal <command> [arguments] [options]`. The common options (`--config-dir`, `--projection-dir`, `--client-dir`) and `--verbose` may also come before the command: `realm-portal --config-dir /tmp/rp list` is the same as `realm-portal list --config-dir /tmp/rp`. When an option is given twice, the last one wins. Any other option before the command is reported as an unknown option (exit code `1`).
 
 There is no `--help` option: `realm-portal --help` reports an unknown option. To see the usage text, run `realm-portal` with no arguments.
 
@@ -77,14 +77,14 @@ In this list, `~` is your home folder (on Windows, your user profile folder, for
 
 ## Options
 
-Options go after the command (see [Commands](#commands)).
+These options may go before or after the command (see [Commands](#commands)).
 
 | Option | Meaning |
 | --- | --- |
 | `--config-dir <dir>` | Realm Portal's config folder (`servers.json`, `state.json`, `clients.json`). Overrides `REALM_PORTAL_CONFIG_DIR`. |
 | `--projection-dir <dir>` | Folder where `activo.json` is written. Overrides `REALM_PORTAL_PROJECTION_DIR`. |
 | `--client-dir <dir>` | Game client folder. Overrides `REALM_PORTAL_CLIENT_DIR`. Only used by `list`, `switch`, `status` and `launch`: registers the client if needed and enables the compatibility filter. |
-| `--verbose` | Prints detailed error messages (paths, parse errors). The only option that also works before the command. |
+| `--verbose` | Prints detailed error messages (paths, parse errors). |
 
 ## Environment variables
 
