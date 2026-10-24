@@ -124,10 +124,10 @@ folder_problems() {
   for f in "${expected[@]}"; do
     [[ -s "${dir}/${f}" ]] || echo "licenses/nuget/${folder}/${f} missing or empty"
   done
-  for f in "$dir"/*; do
-    [[ -e "$f" ]] || continue
+  # find (not a glob) so hidden files and subfolders are reported too.
+  while IFS= read -r f; do
     [[ ",${folder_files[$folder]}," == *",$(basename "$f"),"* ]] || echo "licenses/nuget/${folder}/$(basename "$f") is not listed in packages.tsv"
-  done
+  done < <(find "$dir" -mindepth 1 -maxdepth 1 | LC_ALL=C sort)
   return 0
 }
 

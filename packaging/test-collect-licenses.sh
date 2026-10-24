@@ -125,6 +125,10 @@ printf 'x\n' >"${nuget}/penet-5.1.0/EXTRA.txt"
 expect_file_failure "an unlisted file in penet-5.1.0" "penet-5.1.0/EXTRA.txt is not listed"
 rm "${nuget}/penet-5.1.0/EXTRA.txt"
 
+printf 'x\n' >"${nuget}/penet-5.1.0/.hidden"
+expect_file_failure "a hidden unlisted file in penet-5.1.0" "penet-5.1.0/.hidden is not listed"
+rm "${nuget}/penet-5.1.0/.hidden"
+
 write_deps ""
 if run; then
   echo "ok: restored license files are accepted again"
