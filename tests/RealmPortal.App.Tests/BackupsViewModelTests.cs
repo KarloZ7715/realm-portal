@@ -206,19 +206,25 @@ public sealed class BackupsViewModelTests
         await vm.CreateBackupCommand.ExecuteAsync(null);
         Screenshots.Settle();
 
-        foreach (var (language, label) in new[] { (Language.En, "Back"), (Language.Es, "Volver") })
+        try
         {
-            Loc.Instance.SetLanguage(language);
-            Screenshots.Settle();
-            var back = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "BackButton");
-            Assert.Single(back.GetVisualDescendants().OfType<Icon>());
-            var texts = back.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
-            Assert.Equal([label], texts);
-            foreach (var scale in new[] { 1.0, 2.0 })
-                Screenshots.Save(window, scale, $"backups-{language.ToString().ToLowerInvariant()}-{scale:0.0}x.png");
-            Screenshots.SetRenderScaling(window, 1.0);
+            foreach (var (language, label) in new[] { (Language.En, "Back"), (Language.Es, "Volver") })
+            {
+                Loc.Instance.SetLanguage(language);
+                Screenshots.Settle();
+                var back = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "BackButton");
+                Assert.Single(back.GetVisualDescendants().OfType<Icon>());
+                var texts = back.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+                Assert.Equal([label], texts);
+                foreach (var scale in new[] { 1.0, 2.0 })
+                    Screenshots.Save(window, scale, $"backups-{language.ToString().ToLowerInvariant()}-{scale:0.0}x.png");
+                Screenshots.SetRenderScaling(window, 1.0);
+            }
         }
-
-        Loc.Instance.SetLanguage(Language.En);
+        finally
+        {
+            Loc.Instance.SetLanguage(Language.En);
+            window.Close();
+        }
     }
 }
