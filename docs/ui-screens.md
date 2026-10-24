@@ -139,7 +139,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 ```
 +-----------------------------------------------------------------------+
 | [✓]  WotLK 3.3.5a (ES) · 3.3.5a (build 12340)    [LUTRIS]  [✎]  [✕]   |
-|      /home/carlos/Games/wow-wotlk · Custom launcher                   |
+|      /home/user/Games/wow-wotlk · Custom launcher                     |
 +-----------------------------------------------------------------------+
 ```
 
@@ -172,7 +172,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
      - `Save` (`Guardar`, `Button.primary`, `c:ButtonSurface.Surface="Parchment"`, `MinWidth="148"`, `IsDefault="True"`).
 
 #### 2.4 Confirm Remove Client Dialog (`ConfirmDialogView.axaml`)
-- **Behavior (Approved by Carlos):** Removing a client deletes its entry from `clients.json`, leaves the game installation on disk untouched, and **silently preserves `<backupRoot>/<clientId>` on disk** (`deleteBackups: false`). There is **no** `"Also delete backups"` checkbox in this dialog.
+- **Behavior (approved by the maintainer):** Removing a client deletes its entry from `clients.json`, leaves the game installation on disk untouched, and **silently preserves `<backupRoot>/<clientId>` on disk** (`deleteBackups: false`). There is **no** `"Also delete backups"` checkbox in this dialog.
 - **Content:**
   - **Title:** `IconWarning` + `Remove this client?` (`¿Quitar este cliente?`) — `confirm.deleteclient.title`.
   - **Body:**
@@ -236,7 +236,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 |  ......................................................................  |
 |  SAVED BACKUPS (3 of 10 max)                                             |
 |  +--------------------------------------------------------------------+  |
-|  | 2026-10-18 01:42 · Before switching to Warmane    [Pending undo]   |  |
+|  | 2026-10-18 01:42 · Before switching to My Server  [Pending undo]   |  |
 |  | 2 files (realmlist.wtf, Config.wtf) · 1.8 KB      [Restore]  [✕]   |  |
 |  +--------------------------------------------------------------------+  |
 |  | 2026-10-17 19:15 · Manual backup                                   |  |
