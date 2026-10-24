@@ -131,7 +131,7 @@ downloading the app checks it:
   `^[0-9a-f]{64} [ *]?<name>$` (LF or CRLF). The asset name must match **exactly one** line (byte-exact, case-sensitive);
   zero or several matches mean `AssetMissing`. The digest is decoded from hex and compared with the computed SHA256 bytes
   using `CryptographicOperations.FixedTimeEquals`.
-- Release process: the published `SHA256SUMS` must list every asset of the release (v1.0.0 does). The release workflow
+- Release process: the published `SHA256SUMS` must list every asset of the release (v1.0.0 and v1.0.1 do). The release workflow
   should check this automatically; otherwise the affected kinds fall back to the release page.
 
 ### Download rules (all kinds)
