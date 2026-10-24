@@ -20,10 +20,6 @@ jobs:
       # Passed through env (never interpolated into the script) on purpose.
       BASE_SHA: ${{ github.event.pull_request.base.sha }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      # Bot authors that legitimately commit to this repository with an email
-      # outside @users.noreply.github.com (exact, lowercase, space-separated).
-      # - cursoragent@cursor.com: Cursor cloud agents ("Cursor Agent").
-      EXTRA_ALLOWED_EMAILS: "cursoragent@cursor.com"
     steps:
       - name: Checkout (full history)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,51 +27,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Check author emails of the PR commits
-        run: |
-          set -euo pipefail
+      - name: Test the email check
+        run: .github/scripts/test-check-commit-emails.sh
 
-          # Fail closed if either SHA is missing or malformed.
-          for sha in "$BASE_SHA" "$HEAD_SHA"; do
-            if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-              echo "::error::Unexpected base/head SHA in the pull_request event."
-              exit 1
-            fi
-          done
-
-          # Captured first so that a git failure (e.g. a missing SHA) stops the job.
-          commits=$(git log --format='%H %ae' "$BASE_SHA..$HEAD_SHA")
-
-          failed=0
-          count=0
-          while IFS=' ' read -r sha email; do
-            [ -n "$sha" ] || continue
-            count=$((count + 1))
-            lower="${email,,}"
-            case "$lower" in
-              *@users.noreply.github.com) continue ;;
-            esac
-            if [[ " $EXTRA_ALLOWED_EMAILS " == *" $lower "* ]]; then
-              continue
-            fi
-            # Print only the commit and the email domain, never the full address.
-            echo "::error::Commit ${sha:0:12} has an author email at @${lower##*@}, not @users.noreply.github.com."
-            failed=1
-          done <<< "$commits"
-
-          if [ "$failed" -ne 0 ]; then
-            cat <<'MSG'
-          Every commit in a pull request must use your GitHub noreply email
-          (<id>+<username>@users.noreply.github.com, see
-          https://github.com/settings/emails). To fix it on the PR branch:
-
-            git config user.email "<id>+<username>@users.noreply.github.com"
-            # last commit only:
-            git commit --amend --no-edit --reset-author
-            # several commits (replace <base> with the PR base branch, e.g. origin/main):
-            git rebase -r <base> --exec 'git commit --amend --no-edit --reset-author'
-            git push --force-with-lease
-          MSG
-            exit 1
-          fi
-          echo "All $count commit(s) in this PR use an allowed author email."
+      # Author and committer must be a GitHub noreply address
+      # (^([0-9]+\+)?[A-Za-z0-9-]+(\[bot\])?@users\.noreply\.github\.com$, case-insensitive)
+      # or exactly noreply@github.com / cursoragent@cursor.com. Co-authored-by: trailers
+      # only warn. The rule and its allowlist live in .github/scripts/check-commit-emails.sh.
+      - name: Check author and committer emails of the PR commits
+        run: .github/scripts/check-commit-emails.sh "$BASE_SHA" "$HEAD_SHA"
