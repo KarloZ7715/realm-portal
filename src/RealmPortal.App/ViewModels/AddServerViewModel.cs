@@ -4,6 +4,7 @@ using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
+using RealmPortal.Core.Clients;
 using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
 
@@ -36,6 +37,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private int _probeGeneration;
     private bool _formClosed;
     private readonly string? _editingServerId;
+    private readonly ServerBuildOption? _initialBuild;
 
     public AddServerViewModel(ClientsViewModel clients, DemoBackend backend, Action<ServerSeed> save, Action cancel)
     {
@@ -68,7 +70,26 @@ public sealed partial class AddServerViewModel : ViewModelBase
         SelectedClient = clients.Items.FirstOrDefault(c => c.Id == entry.ClientId)
             ?? clients.Items.FirstOrDefault(c => c.IsInUse)
             ?? clients.Items.FirstOrDefault();
+
+        // "Any client" plus the stored build and the builds of the saved clients; a server without a build preselects "Any client".
+        var listed = session.Service.ListClients();
+        var builds = (listed.Succeeded ? listed.Value! : [])
+            .Where(c => c.Version is { HasBuild: true })
+            .Select(c => c.Version!.Build)
+            .Append(entry.RequiredClientBuild ?? 0)
+            .Where(b => b > 0)
+            .Distinct()
+            .Order();
+        BuildOptions = [new ServerBuildOption(null), .. builds.Select(b => new ServerBuildOption(b))];
+        _initialBuild = BuildOptions.First(o => o.Build == entry.RequiredClientBuild);
+        SelectedBuild = _initialBuild;
     }
+
+    /// <summary>Edit mode only: which client builds the server accepts ("Any client" or one build).</summary>
+    public IReadOnlyList<ServerBuildOption> BuildOptions { get; } = [];
+
+    [ObservableProperty]
+    private ServerBuildOption? _selectedBuild;
 
     public ClientsViewModel Clients { get; }
 
@@ -176,8 +197,27 @@ public sealed partial class AddServerViewModel : ViewModelBase
         return host;
     }
 
+    /// <summary>
+    /// What to send for the required build: nothing when the choice is untouched (Core keeps the stored build),
+    /// the build when one is picked, or the clear flag for "Any client". Never a build and the flag together.
+    /// </summary>
+    internal (int? Build, bool Clear) BuildChange()
+    {
+        if (SelectedBuild is null || ReferenceEquals(SelectedBuild, _initialBuild))
+        {
+            return (null, false);
+        }
+
+        return SelectedBuild.Build is { } build ? (build, false) : (null, true);
+    }
+
     public override void RefreshText()
     {
+        foreach (var option in BuildOptions)
+        {
+            option.Refresh();
+        }
+
         OnPropertyChanged(nameof(ResultText));
         OnPropertyChanged(nameof(NameError));
         OnPropertyChanged(nameof(AddressError));
@@ -303,8 +343,10 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
             var realmValue = realm.Length == 0 ? null : realm;
             var accountValue = account.Length == 0 ? null : account;
+            var (build, clearBuild) = BuildChange();
             var result = _editingServerId is { } serverId
-                ? _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId))
+                ? _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue,
+                    RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild))
                 : _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId));
             if (!result.Succeeded)
             {
@@ -425,4 +467,16 @@ public sealed partial class AddServerViewModel : ViewModelBase
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
     }
+}
+
+/// <summary>A choice in the edit form's "Compatible clients" box: <see cref="Build"/> null means any client.</summary>
+public sealed partial class ServerBuildOption(int? build) : ObservableObject
+{
+    public int? Build { get; } = build;
+
+    public string Label => Build is not { } b
+        ? Loc.Get("edit.build.any")
+        : Loc.Format("edit.build.only", KnownClientBuilds.TryGetPatchLabel(b, out var patch) ? $"{patch} ({b})" : b.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    public void Refresh() => OnPropertyChanged(nameof(Label));
 }

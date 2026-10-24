@@ -1,4 +1,6 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
@@ -202,6 +204,107 @@ public sealed class Step13ServerUiTests
         Assert.Equal("Renamed", updated.Name);
         Assert.Equal("Stormscale", updated.Realm);
         Assert.False(form.HasSaveError);
+    }
+
+    private ServerEntry Reload(Env env, string id) =>
+        env.Session.Service.ListServers(compatibleOnly: false).Value!.Single(s => s.Id == id);
+
+    [AvaloniaFact]
+    public void EditForm_AnyClientClearsTheStoredBuildAndKeepsThePatchlist()
+    {
+        using var env = new Env();
+        var a = env.AddClient(env.CreateClient("alpha", Build335), "Alpha");
+        var added = env.Session.Service.AddServer(new NewServer("Imported", "logon.example.org", PatchlistHost: "patch.example.org",
+            RequiredClientBuild: 12340, ClientId: a)).Value!;
+        env.Start(a);
+
+        var form = new AddServerViewModel(env.Main.Clients, env.Session, Reload(env, added.Id), () => { }, () => { });
+        Assert.Equal(12340, form.SelectedBuild!.Build);
+        Assert.Equal(["Any client", "Only clients 3.3.5a (12340)"], form.BuildOptions.Select(o => o.Label));
+
+        form.SelectedBuild = form.BuildOptions.Single(o => o.Build is null);
+        Assert.Equal((null, true), form.BuildChange());
+        form.SaveCommand.Execute(null);
+
+        Assert.False(form.HasSaveError);
+        var updated = Reload(env, added.Id);
+        Assert.Null(updated.RequiredClientBuild);
+        Assert.Contains("patch.example.org", updated.Realmlist, StringComparison.OrdinalIgnoreCase);
+
+        // Reopened, a server without a build preselects "Any client" and an untouched save keeps it so.
+        var again = new AddServerViewModel(env.Main.Clients, env.Session, updated, () => { }, () => { });
+        Assert.Null(again.SelectedBuild!.Build);
+        Assert.Equal((null, false), again.BuildChange());
+    }
+
+    [AvaloniaFact]
+    public void EditForm_PickingABuildSendsIt()
+    {
+        using var env = new Env();
+        var a = env.AddClient(env.CreateClient("alpha", Build335), "Alpha");
+        var b = env.AddClient(env.CreateClient("beta", Build434), "Beta");
+        var server = env.AddServer("Any", "any.example.net", clientId: a);
+        env.Start(a, b);
+
+        var form = new AddServerViewModel(env.Main.Clients, env.Session, Reload(env, server.Id), () => { }, () => { });
+        Assert.Null(form.SelectedBuild!.Build);
+        Assert.Equal([null, 12340, 15595], form.BuildOptions.Select(o => o.Build));
+
+        form.SelectedBuild = form.BuildOptions.Single(o => o.Build == 15595);
+        Assert.Equal((15595, false), form.BuildChange());
+        form.SaveCommand.Execute(null);
+
+        Assert.False(form.HasSaveError);
+        Assert.Equal(15595, Reload(env, server.Id).RequiredClientBuild);
+    }
+
+    [AvaloniaFact]
+    public void EditForm_UntouchedBuildIsKept()
+    {
+        using var env = new Env();
+        var a = env.AddClient(env.CreateClient("alpha", Build335), "Alpha");
+        var server = env.AddServer("Kept", "kept.example.com", requiredBuild: 12340, clientId: a);
+        env.Start(a);
+
+        var form = new AddServerViewModel(env.Main.Clients, env.Session, Reload(env, server.Id), () => { }, () => { });
+        form.Name = "Kept renamed";
+        Assert.Equal((null, false), form.BuildChange());
+        form.SaveCommand.Execute(null);
+
+        var updated = Reload(env, server.Id);
+        Assert.Equal("Kept renamed", updated.Name);
+        Assert.Equal(12340, updated.RequiredClientBuild);
+    }
+
+    [AvaloniaFact]
+    public void EditForm_ShowsTheCompatibleClientsBox()
+    {
+        using var env = new Env();
+        var a = env.AddClient(env.CreateClient("alpha", Build335), "Alpha");
+        var server = env.AddServer("My Server", "logon.example.com", requiredBuild: 12340, clientId: a);
+        env.Start(a);
+        var window = new MainWindow(env.Main) { Width = 720, Height = 680 };
+        window.Show();
+        try
+        {
+            env.Main.Servers.All.Single(s => s.ServerId == server.Id).EditCommand.Execute(null);
+            Screenshots.Settle();
+            var form = Assert.IsType<AddServerViewModel>(env.Main.Content);
+            var box = window.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "BuildBox");
+            Assert.True(box.IsEffectivelyVisible);
+            Screenshots.Save(window, 1.0, "edit-server-build-en-1.0x.png");
+            form.SelectedBuild = form.BuildOptions[0];
+            Loc.Instance.SetLanguage(Language.Es);
+            Screenshots.Settle();
+            Assert.Equal("Cualquier cliente", form.BuildOptions[0].Label);
+            Screenshots.Save(window, 1.0, "edit-server-build-any-es-1.0x.png");
+            Screenshots.Save(window, 2.0, "edit-server-build-any-es-2.0x.png");
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(Language.En);
+            window.Close();
+        }
     }
 
     [AvaloniaFact]
