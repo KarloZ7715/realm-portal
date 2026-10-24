@@ -86,7 +86,7 @@ public class ServerStoreTests
     {
         using var dir = new TempDirectory();
         var store = NewStore(dir.Path);
-        store.Add(Server.Create("Ñandú", "h.example.org", "R&1", ["set patchlist p.example.org"], 12340, "carlos", id: "11111111111111111111111111111111"));
+        store.Add(Server.Create("Ñandú", "h.example.org", "R&1", ["set patchlist p.example.org"], 12340, "player", id: "11111111111111111111111111111111"));
 
         var expected =
             "{\n" +
@@ -99,7 +99,7 @@ public class ServerStoreTests
             "      \"realm\": \"R&1\",\n" +
             "      \"realmlist\": \"set realmlist h.example.org\\r\\nset patchlist p.example.org\\r\\n\",\n" +
             "      \"required_client_build\": 12340,\n" +
-            "      \"account\": \"carlos\"\n" +
+            "      \"account\": \"player\"\n" +
             "    }\n" +
             "  ]\n" +
             "}\n";

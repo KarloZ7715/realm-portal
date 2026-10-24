@@ -53,6 +53,20 @@ EOF
   chmod 755 "${launcher_path}"
 }
 
+# The source metainfo has no version; the <releases> entry is generated from VERSION (Directory.Build.props).
+write_metainfo() {
+  local dest="$1"
+  local release_date
+  release_date="$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%d)"
+  if grep -q '<releases' "${PACKAGING_DIR}/com.karloz7715.RealmPortal.metainfo.xml"; then
+    echo "error: metainfo must not hardcode <releases>; it is generated from the package version" >&2
+    exit 1
+  fi
+  sed "s|^</component>|  <releases>\n    <release version=\"${VERSION}\" date=\"${release_date}\"/>\n  </releases>\n</component>|" \
+    "${PACKAGING_DIR}/com.karloz7715.RealmPortal.metainfo.xml" >"${dest}"
+  grep -q "<release version=\"${VERSION}\"" "${dest}" || { echo "error: failed to write <releases> into metainfo" >&2; exit 1; }
+}
+
 # --- .deb ---
 DEB_STAGING="${ROOT_DIR}/pkg-deb/realm-portal_${VERSION}_amd64"
 DEB_INSTALL_LIB="/opt/realm-portal"
@@ -62,15 +76,17 @@ mkdir -p "${DEB_STAGING}/DEBIAN" \
   "${DEB_STAGING}/usr/bin" \
   "${DEB_STAGING}/usr/share/applications" \
   "${DEB_STAGING}/usr/share/metainfo" \
-  "${DEB_STAGING}/usr/share/icons"
+  "${DEB_STAGING}/usr/share/icons" \
+  "${DEB_STAGING}/usr/share/doc/realm-portal"
 
 install_tree "${DEB_STAGING}${DEB_INSTALL_LIB}"
 write_deb_launcher "${DEB_STAGING}/usr/bin/realm-portal"
+# The self-contained build bundles the .NET runtime: ship its license and notices with ours.
+"${ROOT_DIR}/packaging/collect-licenses.sh" "${PUBLISH_DIR}" linux-x64 "${DEB_STAGING}/usr/share/doc/realm-portal"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${DEB_STAGING}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
-cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.metainfo.xml" \
-  "${DEB_STAGING}/usr/share/metainfo/com.karloz7715.RealmPortal.metainfo.xml"
+write_metainfo "${DEB_STAGING}/usr/share/metainfo/com.karloz7715.RealmPortal.metainfo.xml"
 cp -a "${PACKAGING_DIR}/icons/hicolor/." "${DEB_STAGING}/usr/share/icons/hicolor/"
 
 cat >"${DEB_STAGING}/DEBIAN/control" <<EOF
@@ -88,6 +104,18 @@ EOF
 DEB_FILE="${OUT_DIR}/realm-portal_${VERSION}_amd64.deb"
 dpkg-deb --build --root-owner-group "${DEB_STAGING}" "${DEB_FILE}"
 
+REQUIRED_DOCS=(
+  LICENSE
+  THIRD_PARTY_LICENSES.md
+  licenses/dotnet-runtime/LICENSE.TXT
+  licenses/dotnet-runtime/THIRD-PARTY-NOTICES.TXT
+  licenses/nuget/PACKAGES.txt
+)
+deb_contents="$(dpkg-deb -c "${DEB_FILE}")"
+for doc in "${REQUIRED_DOCS[@]}"; do
+  grep -q -F "./usr/share/doc/realm-portal/${doc}" <<<"${deb_contents}" || { echo "error: ${doc} missing from ${DEB_FILE}" >&2; exit 1; }
+done
+
 # --- AppImage ---
 APPDIR="${OUT_DIR}/RealmPortal.AppDir"
 APPIMAGE_INSTALL_LIB="${APPDIR}/usr/lib/realm-portal"
@@ -99,6 +127,7 @@ mkdir -p "${APPIMAGE_INSTALL_LIB}" \
 
 install_tree "${APPIMAGE_INSTALL_LIB}"
 write_appimage_launcher "${APPDIR}/usr/bin/realm-portal"
+"${ROOT_DIR}/packaging/collect-licenses.sh" "${PUBLISH_DIR}" linux-x64 "${APPDIR}/usr/share/doc/realm-portal"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${APPDIR}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
@@ -116,6 +145,9 @@ HERE="$(dirname "$(readlink -f "$0")")"
 exec "${HERE}/usr/bin/realm-portal" "$@"
 EOF
 chmod 755 "${APPDIR}/AppRun"
+for doc in "${REQUIRED_DOCS[@]}"; do
+  [[ -s "${APPDIR}/usr/share/doc/realm-portal/${doc}" ]] || { echo "error: ${doc} missing from the AppDir" >&2; exit 1; }
+done
 
 if [[ -z "${APPIMAGETOOL}" ]]; then
   echo "error: set APPIMAGETOOL to the appimagetool AppImage path" >&2
