@@ -2,41 +2,69 @@
 
 Realm Portal's own code is MIT (see `LICENSE`). This file lists third-party software and resources.
 
-## NuGet packages (versions pinned in `Directory.Packages.props`)
+## NuGet packages shipped in the app (release packages)
 
-Checked against the restored packages' `.nuspec` files (Phase 1, 2026-10-17).
+The list is every `package` entry in `RealmPortal.App.deps.json` of the linux-x64 and win-x64 release publishes (same set on
+both; trimming may drop some assemblies, but the packages are listed as published). Versions match `Directory.Packages.props`
+and `src/RealmPortal.App/packages.lock.json` (checked 2026-10-24). The full license and notice texts are committed under
+`licenses/nuget/<folder>/` (index: `licenses/nuget/packages.tsv`, with the source of each file) and shipped in every package
+under `licenses/nuget/`.
 
-**Direct dependencies**
+| Package | Version | License | License files | Use |
+|---|---|---|---|---|
+| Avalonia | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | cross-platform UI |
+| Avalonia.Desktop | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
+| Avalonia.FreeDesktop | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
+| Avalonia.Native | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
+| Avalonia.Remote.Protocol | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
+| Avalonia.Skia | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
+| Avalonia.Themes.Simple | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
+| Avalonia.Win32 | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
+| Avalonia.X11 | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
+| Avalonia.BuildServices | 11.3.2 | MIT | `licenses/nuget/avalonia.buildservices-11.3.2/` | Avalonia build-time package (no runtime files) |
+| Avalonia.Angle.Windows.Natives | 2.1.25547.20250602 | BSD-3-Clause | `licenses/nuget/avalonia.angle.windows.natives-2.1.25547.20250602/` | ANGLE OpenGL ES on Direct3D (`av_libglesv2.dll`, win-x64) |
+| CommunityToolkit.Mvvm | 8.4.2 | MIT | `licenses/nuget/communitytoolkit.mvvm-8.4.2/` | view-model helpers |
+| SkiaSharp | 2.88.9 | MIT | `licenses/nuget/skiasharp-2.88.9/` | 2D rendering (Skia, native `libSkiaSharp`) |
+| SkiaSharp.NativeAssets.Linux | 2.88.9 | MIT | `licenses/nuget/skiasharp-2.88.9/` | Skia native binaries |
+| SkiaSharp.NativeAssets.Win32 | 2.88.9 | MIT | `licenses/nuget/skiasharp-2.88.9/` | Skia native binaries |
+| SkiaSharp.NativeAssets.macOS | 2.88.9 | MIT | `licenses/nuget/skiasharp-2.88.9/` | Skia native binaries |
+| SkiaSharp.NativeAssets.WebAssembly | 2.88.9 | MIT | `licenses/nuget/skiasharp-2.88.9/` | Skia native binaries |
+| HarfBuzzSharp | 8.3.1.1 | MIT | `licenses/nuget/harfbuzzsharp-8.3.1.1/` | text shaping (HarfBuzz, native `libHarfBuzzSharp`) |
+| HarfBuzzSharp.NativeAssets.Linux | 8.3.1.1 | MIT | `licenses/nuget/harfbuzzsharp-8.3.1.1/` | HarfBuzz native binaries |
+| HarfBuzzSharp.NativeAssets.Win32 | 8.3.1.1 | MIT | `licenses/nuget/harfbuzzsharp-8.3.1.1/` | HarfBuzz native binaries |
+| HarfBuzzSharp.NativeAssets.macOS | 8.3.1.1 | MIT | `licenses/nuget/harfbuzzsharp-8.3.1.1/` | HarfBuzz native binaries |
+| HarfBuzzSharp.NativeAssets.WebAssembly | 8.3.1.1 | MIT | `licenses/nuget/harfbuzzsharp-8.3.1.1/` | HarfBuzz native binaries |
+| MicroCom.Runtime | 0.11.0 | MIT | `licenses/nuget/microcom.runtime-0.11.0/` | Avalonia COM interop |
+| PeNet | 5.1.0 | Apache-2.0 | `licenses/nuget/penet-5.1.0/` | reads the version resource of `Wow.exe` (`RealmPortal.Core`) |
+| PeNet.Asn1 | 2.0.1 | Apache-2.0 | `licenses/nuget/penet.asn1-2.0.1/` | PeNet dependency (Authenticode parsing) |
+| System.IO.Pipelines | 8.0.0 | MIT | `licenses/nuget/system.io.pipelines-8.0.0/` | Tmds.DBus dependency |
+| System.Security.Cryptography.Pkcs | 9.0.21 | MIT | `licenses/nuget/system.security.cryptography.pkcs-9.0.21/` | PeNet dependency (pinned) |
+| Tmds.DBus.Protocol | 0.21.3 | MIT | `licenses/nuget/tmds.dbus.protocol-0.21.3/` | Avalonia D-Bus (Linux) |
 
-| Package | Version | License | Use |
-|---|---|---|---|
-| Avalonia, Avalonia.Desktop, Avalonia.Themes.Simple | 11.3.22 | MIT (© The AvaloniaUI Project) | cross-platform UI (`RealmPortal.App`) |
-| CommunityToolkit.Mvvm | 8.4.0 | MIT (© .NET Foundation and Contributors) | view-model helpers (`RealmPortal.App`) |
-| PeNet | 5.1.0 | Apache-2.0 | reads the version resource of `Wow.exe` (`RealmPortal.Core`) |
-| Avalonia.Headless, Avalonia.Headless.XUnit, Avalonia.Skia | 11.3.22 | MIT (© The AvaloniaUI Project) | headless UI tests and screenshots (development only) |
-| Microsoft.NET.Test.Sdk | 17.12.0 | MIT | tests (development only) |
-| FsCheck.Xunit | 3.4.0 | BSD-3-Clause | property-based tests (development only) |
-| xunit | 2.9.3 | Apache-2.0 | tests (development only) |
-| xunit.runner.visualstudio | 2.8.2 | Apache-2.0 | tests (development only) |
+Notes:
+- `skiasharp-2.88.9/THIRD-PARTY-NOTICES.txt` and `harfbuzzsharp-8.3.1.1/THIRD-PARTY-NOTICES.txt` (identical upstream files) carry
+  the notices of the native code bundled in `libSkiaSharp` / `libHarfBuzzSharp`: Skia and etc1 (BSD-3-Clause), HarfBuzz ("Old
+  MIT"), FreeType (FTL or GPLv2, as stated there), libpng, zlib, expat, libjpeg-turbo, libwebp, ICU, ANGLE, sfntly, piex, DNG SDK and others.
+- `avalonia-11.3.22/NOTICE.md` lists third-party code included in Avalonia (WPF, SharpDX and others).
+- ANGLE (BSD-3-Clause, © The ANGLE Project Authors) is bundled on win-x64 through `Avalonia.Angle.Windows.Natives`.
+- PeNet.Asn1's nuspec declares Apache-2.0 while its repository's `LICENCE` is MIT; both texts are shipped. PeNet has no NOTICE file.
 
-**Notable transitive dependencies**
+## Development and test only (not shipped)
 
 | Package | Version | License |
 |---|---|---|
-| Avalonia.Skia, Avalonia.X11, Avalonia.Win32, Avalonia.Native, Avalonia.FreeDesktop, Avalonia.Remote.Protocol, Avalonia.BuildServices | 11.3.x | MIT |
-| SkiaSharp (+ NativeAssets) | 2.88.9 | MIT (Skia: BSD-3-Clause) |
-| HarfBuzzSharp (+ NativeAssets) | 8.3.1.1 | MIT (HarfBuzz: MIT) |
-| Avalonia.Angle.Windows.Natives | 2.1.25547.20250602 | BSD-3-Clause (© The ANGLE Project Authors), Windows only |
-| FsCheck (FsCheck.Xunit dependency) | 3.4.0 | BSD-3-Clause (tests only) |
-| FSharp.Core (FsCheck dependency) | 5.0.2 | MIT (tests only) |
-| PeNet.Asn1 | 2.0.1 | Apache-2.0 |
-| System.Security.Cryptography.Pkcs (PeNet dependency) | 8.0.1 | MIT |
-| MicroCom.Runtime | 0.11.0 | MIT |
-| Tmds.DBus.Protocol | 0.21.3 | MIT |
-| System.IO.Pipelines | 8.0.0 | MIT |
-| Microsoft.TestPlatform.*, Microsoft.CodeCoverage, Newtonsoft.Json 13.0.1 | 17.12.0 / 13.0.1 | MIT (tests only) |
-| xunit.core / .assert / .extensibility.* / .analyzers / .abstractions | 2.9.3 / 1.18.0 / 2.0.3 | Apache-2.0 (.abstractions: see its upstream license) (tests only) |
-| System.Reflection.Metadata | 1.6.0 | MIT (tests only) |
+| Avalonia.Headless, Avalonia.Headless.XUnit | 11.3.22 | MIT |
+| Microsoft.NET.Test.Sdk, Microsoft.TestPlatform.ObjectModel, Microsoft.TestPlatform.TestHost, Microsoft.CodeCoverage | 18.11.0 | MIT |
+| FsCheck, FsCheck.Xunit | 3.5.0 | BSD-3-Clause |
+| FSharp.Core | 5.0.2 | MIT |
+| xunit, xunit.core, xunit.assert, xunit.extensibility.core, xunit.extensibility.execution | 2.9.3 | Apache-2.0 |
+| xunit.abstractions | 2.0.3 | Apache-2.0 (license URL) |
+| xunit.analyzers | 1.18.0 | Apache-2.0 |
+| xunit.runner.visualstudio | 4.0.1 | Apache-2.0 |
+
+Keep these tables in sync with `Directory.Packages.props`; `NuGetLicenseManifestTests` fails when a shipped package lacks a row
+in `licenses/nuget/packages.tsv` or here, and `packaging/collect-licenses.sh` fails the release build for any published package
+without license files.
 
 ## .NET runtime (bundled in release builds)
 
@@ -53,9 +81,8 @@ Every release package ships the runtime's `LICENSE.TXT` and `THIRD-PARTY-NOTICES
 `packaging/collect-licenses.sh` from the exact runtime pack that `dotnet publish` bundled, together with
 `licenses/dotnet-runtime/VERSION.txt` (exact runtime version and source commit), this file, `LICENSE` and the fonts'
 `OFL.txt`. Locations: `/usr/share/doc/realm-portal/` once the `.deb` is installed; `usr/share/doc/realm-portal/` inside the
-AppImage (view with `--appimage-extract`); next to `RealmPortal.App.exe` in the Windows ZIP.
-
-Keep this table in sync with `Directory.Packages.props`.
+AppImage (view with `--appimage-extract`); next to `RealmPortal.App.exe` in the Windows ZIP. The NuGet license folders above
+ship in the same place, under `licenses/nuget/`, with a per-build `licenses/nuget/PACKAGES.txt`.
 
 
 Texture, typeface and drawing assets (registered on 2026-10-17, updated with the loose assets in `assets/`). The textures informed the project's "Parchment and bronze" visual direction.
