@@ -23,7 +23,7 @@ public class Bug4ReadOnlyProjectionCliTests
 
         var stdout = new StringWriter();
         var stderr = new StringWriter();
-        var app = new CliApp(stdout, stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
+        var app = new CliApp(stdout, stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir), probe: new NeverRunningGameProbe());
         Assert.Equal(0, app.Run("add", new[] { "Wotlk", "wotlk.example.org", "--config-dir", config, "--projection-dir", projection }));
 
         var mode = File.GetUnixFileMode(projection);

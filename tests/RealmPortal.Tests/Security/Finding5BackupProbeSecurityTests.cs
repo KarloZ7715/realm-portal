@@ -17,7 +17,7 @@ public class Finding5BackupProbeSecurityTests
         Directory.CreateDirectory(config);
         Directory.CreateDirectory(backups);
 
-        var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch(), getVariable: _ => backups);
+        var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch(), probe: new NeverRunningGameProbe(), getVariable: _ => backups);
         Assert.True(service.SetStorageSettings(new StorageSettings(backups)).Succeeded);
         Assert.True(service.SetStorageSettings(new StorageSettings(backups)).Succeeded);
         Assert.DoesNotContain(Directory.GetFiles(backups).Select(Path.GetFileName),
@@ -37,7 +37,7 @@ public class Finding5BackupProbeSecurityTests
         Directory.CreateDirectory(Path.Combine(real, "backups"));
         File.CreateSymbolicLink(link, real);
 
-        var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch(), getVariable: TestBackupDir.Variables(dir));
+        var service = new PortalService(config, dir.Combine("projection"), new PeClientVersionReader(), new NoLaunch(), probe: new NeverRunningGameProbe(), getVariable: TestBackupDir.Variables(dir));
         var result = service.SetStorageSettings(new StorageSettings(Path.Combine(link, "backups")));
         Assert.False(result.Succeeded);
         Assert.Equal(ServiceErrorCode.PathNotFound, result.Error!.Code);

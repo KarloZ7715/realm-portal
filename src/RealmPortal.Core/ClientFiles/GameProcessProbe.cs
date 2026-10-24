@@ -28,30 +28,8 @@ public sealed class GameProcessProbe : IGameProcessProbe
 
                     if (OperatingSystem.IsLinux())
                     {
-                        var proc = $"/proc/{process.Id}";
-                        try
-                        {
-                            var cwd = NormalizePath(new DirectoryInfo(Path.Combine(proc, "cwd")).ResolveLinkTarget(true)?.FullName
-                                ?? throw new IOException("Process working directory is unavailable."));
-                            if (PathEquals(cwd, root))
-                                return true;
-                        }
-                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
-                        {
-                            // If process metadata cannot be read, keep the conservative guard.
+                        if (LinuxProcessBlocks($"/proc/{process.Id}", root))
                             return true;
-                        }
-
-                        try
-                        {
-                            var cmdline = File.ReadAllText(Path.Combine(proc, "cmdline"));
-                            if (CommandLineMatches(cmdline, root))
-                                return true;
-                        }
-                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                        {
-                            return true;
-                        }
                     }
                     else if (OperatingSystem.IsWindows())
                     {
@@ -63,6 +41,8 @@ public sealed class GameProcessProbe : IGameProcessProbe
                         }
                         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or UnauthorizedAccessException)
                         {
+                            if (HasExited(process))
+                                continue;
                             return true;
                         }
                     }
@@ -75,6 +55,154 @@ public sealed class GameProcessProbe : IGameProcessProbe
         }
 
         return false;
+    }
+
+    internal enum TaskState { Gone, Exited, Live, Unreadable }
+
+    private enum TaskMatch { NoMatch, Match, Unreadable }
+
+    /// <summary>
+    /// Decides whether the process at <paramref name="procDirectory"/> (<c>/proc/&lt;pid&gt;</c>) blocks changes to
+    /// <paramref name="normalizedRoot"/>: true when it runs in that folder, or when it is alive but cannot be inspected
+    /// (fail-closed). A process that vanished, or whose threads are all zombie/dead, does not block. When only the
+    /// thread-group leader exited (e.g. Wine's <c>ExitThread</c> on the main thread), the process lives on in its other
+    /// threads, so the folder match uses a live thread's <c>/proc/&lt;pid&gt;/task/&lt;tid&gt;</c> entries.
+    /// </summary>
+    internal static bool LinuxProcessBlocks(string procDirectory, string normalizedRoot)
+    {
+        switch (ReadTaskState(procDirectory))
+        {
+            case TaskState.Gone:
+                return false;
+            case TaskState.Unreadable:
+                return true;
+            case TaskState.Live:
+                var match = MatchTask(procDirectory, normalizedRoot);
+                if (match != TaskMatch.Unreadable)
+                    return match == TaskMatch.Match;
+                // The leader's metadata could not be read: it may have exited meanwhile.
+                switch (ReadTaskState(procDirectory))
+                {
+                    case TaskState.Gone:
+                        return false;
+                    case TaskState.Exited:
+                        break;
+                    default:
+                        return true;
+                }
+                break;
+        }
+
+        // The leader is a zombie or dead; the process is alive while any of its threads is.
+        string[] tasks;
+        try
+        {
+            tasks = Directory.GetDirectories(Path.Combine(procDirectory, "task"));
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // No task/ although /proc/<pid> is still there: cannot tell, so fail closed.
+            return Directory.Exists(procDirectory);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return true;
+        }
+        catch (IOException)
+        {
+            return Directory.Exists(procDirectory);
+        }
+
+        foreach (var task in tasks)
+        {
+            var state = ReadTaskState(task);
+            if (state is TaskState.Gone or TaskState.Exited)
+                continue;
+            if (state == TaskState.Unreadable)
+                return true;
+
+            var match = MatchTask(task, normalizedRoot);
+            if (match == TaskMatch.Match)
+                return true;
+            if (match == TaskMatch.Unreadable && ReadTaskState(task) is not (TaskState.Gone or TaskState.Exited))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Reads <c>stat</c> under a <c>/proc/&lt;pid&gt;</c> or <c>/proc/&lt;pid&gt;/task/&lt;tid&gt;</c> directory. A missing
+    /// file (ENOENT) or an I/O error (e.g. ESRCH) means <see cref="TaskState.Gone"/> only once the directory itself is gone;
+    /// otherwise, and for permission denied (EACCES), it is <see cref="TaskState.Unreadable"/>.
+    /// </summary>
+    internal static TaskState ReadTaskState(string taskDirectory) => ReadTaskState(taskDirectory, File.ReadAllText);
+
+    /// <summary><see cref="ReadTaskState(string)"/> with an injectable file reader, so tests can simulate ESRCH.</summary>
+    internal static TaskState ReadTaskState(string taskDirectory, Func<string, string> readAllText)
+    {
+        try
+        {
+            return StatShowsExited(readAllText(Path.Combine(taskDirectory, "stat"))) ? TaskState.Exited : TaskState.Live;
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return Directory.Exists(taskDirectory) ? TaskState.Unreadable : TaskState.Gone;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return TaskState.Unreadable;
+        }
+        catch (IOException)
+        {
+            return Directory.Exists(taskDirectory) ? TaskState.Unreadable : TaskState.Gone;
+        }
+    }
+
+    private static TaskMatch MatchTask(string taskDirectory, string normalizedRoot)
+    {
+        try
+        {
+            var cwd = NormalizePath(new DirectoryInfo(Path.Combine(taskDirectory, "cwd")).ResolveLinkTarget(true)?.FullName
+                ?? throw new IOException("Process working directory is unavailable."));
+            if (PathEquals(cwd, normalizedRoot))
+                return TaskMatch.Match;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return TaskMatch.Unreadable;
+        }
+
+        try
+        {
+            var cmdline = File.ReadAllText(Path.Combine(taskDirectory, "cmdline"));
+            return CommandLineMatches(cmdline, normalizedRoot) ? TaskMatch.Match : TaskMatch.NoMatch;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return TaskMatch.Unreadable;
+        }
+    }
+
+    /// <summary>Reads the state field of <c>/proc/&lt;pid&gt;/stat</c>; the name in parentheses may contain spaces or ')'.</summary>
+    internal static bool StatShowsExited(string stat)
+    {
+        var end = stat.LastIndexOf(')');
+        if (end < 0 || end + 2 >= stat.Length)
+            return false;
+        return stat[end + 2] is 'Z' or 'X' or 'x';
+    }
+
+    private static bool HasExited(Process process)
+    {
+        try
+        {
+            return process.HasExited;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+            return false;
+        }
     }
 
     internal static bool CommandLineMatches(string commandLine, string normalizedRoot)

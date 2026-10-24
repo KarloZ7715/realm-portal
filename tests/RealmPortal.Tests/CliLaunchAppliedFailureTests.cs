@@ -34,7 +34,8 @@ public class CliLaunchAppliedFailureTests
                 stderr,
                 new PeClientVersionReader(),
                 new ThrowingLauncher(),
-                GetVariable);
+                GetVariable,
+                new NeverRunningGameProbe());
             return (code, stdout.ToString(), stderr.ToString());
         }
 
@@ -93,7 +94,8 @@ public class CliLaunchAppliedFailureTests
                 stderr,
                 new PeClientVersionReader(),
                 new ThrowingLauncher(),
-                GetVariable);
+                GetVariable,
+                new NeverRunningGameProbe());
             return (code, stdout.ToString(), stderr.ToString());
         }
 

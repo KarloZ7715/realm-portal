@@ -11,7 +11,7 @@ public class CliTests
         using var dir = new TempDirectory();
         var o = new StringWriter();
         var e = new StringWriter();
-        var code = Program.Run(args, o, e, new PeClientVersionReader(), getVariable: TestBackupDir.Variables(dir));
+        var code = Program.Run(args, o, e, new PeClientVersionReader(), getVariable: TestBackupDir.Variables(dir), probe: new NeverRunningGameProbe());
         return (code, o.ToString(), e.ToString());
     }
 

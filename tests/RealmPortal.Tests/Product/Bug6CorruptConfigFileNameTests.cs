@@ -22,7 +22,7 @@ public class Bug6CorruptConfigFileNameTests
         File.WriteAllText(Path.Combine(config, "state.json"), "garbage", Encoding.UTF8);
 
         var stderr = new StringWriter();
-        var app2 = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
+        var app2 = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir), probe: new NeverRunningGameProbe());
         Assert.Equal(2, app2.Run("switch", ["Second", "--config-dir", config, "--projection-dir", projection]));
         Assert.Contains("state.json", stderr.ToString());
         Assert.DoesNotContain("Unhandled", stderr.ToString());
@@ -39,7 +39,7 @@ public class Bug6CorruptConfigFileNameTests
         File.WriteAllText(Path.Combine(config, "servers.json"), "not-json", Encoding.UTF8);
 
         var stderr = new StringWriter();
-        var app = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir));
+        var app = new CliApp(new StringWriter(), stderr, new PeClientVersionReader(), new FakeLauncher(), TestBackupDir.Variables(dir), probe: new NeverRunningGameProbe());
         Assert.Equal(2, app.Run("list", ["--config-dir", config, "--projection-dir", projection]));
         Assert.Contains("servers.json", stderr.ToString());
     }

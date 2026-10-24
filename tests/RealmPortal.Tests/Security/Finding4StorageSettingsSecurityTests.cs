@@ -21,7 +21,7 @@ public class Finding4StorageSettingsSecurityTests
             dir.Combine("projection"),
             new RealmPortal.Core.Clients.PeClientVersionReader(),
             new NoLaunch(),
-            getVariable: _ => backups);
+            probe: new NeverRunningGameProbe(), getVariable: _ => backups);
 
         var result = service.SetStorageSettings(new StorageSettings("relative/backups"));
         Assert.False(result.Succeeded);
@@ -41,7 +41,7 @@ public class Finding4StorageSettingsSecurityTests
             dir.Combine("projection"),
             new RealmPortal.Core.Clients.PeClientVersionReader(),
             new NoLaunch(),
-            getVariable: _ => backups);
+            probe: new NeverRunningGameProbe(), getVariable: _ => backups);
 
         var path = Path.Combine(config, "storage-settings.json");
         File.WriteAllText(path, JsonSerializer.Serialize(new { version = 99, backup_folder = backups }) + "\n");

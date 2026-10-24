@@ -1,4 +1,5 @@
 using RealmPortal.Core;
+using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
@@ -16,7 +17,8 @@ public sealed class CliApp(
     IClientVersionReader versionReader,
     IGameLauncher launcher,
     Func<string, string?> getVariable,
-    ClientScanOptions? scanOptions = null)
+    ClientScanOptions? scanOptions = null,
+    IGameProcessProbe? probe = null)
 {
     public const string ClientDirVariable = "REALM_PORTAL_CLIENT_DIR";
 
@@ -93,7 +95,7 @@ public sealed class CliApp(
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
             var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
             var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher),
-                getVariable: getVariable, scanOptions: scanOptions);
+                probe, getVariable: getVariable, scanOptions: scanOptions);
             string? clientId = null;
             if (clientDir is not null && command is "list" or "switch" or "status" or "launch")
             {
