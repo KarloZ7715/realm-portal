@@ -236,7 +236,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 |  ......................................................................  |
 |  SAVED BACKUPS (3 of 10 max)                                             |
 |  +--------------------------------------------------------------------+  |
-|  | 2026-10-18 01:42 · Before switching to Warmane    [Pending undo]   |  |
+|  | 2026-10-18 01:42 · Before switching to Example    [Pending undo]   |  |
 |  | 2 files (realmlist.wtf, Config.wtf) · 1.8 KB      [Restore]  [✕]   |  |
 |  +--------------------------------------------------------------------+  |
 |  | 2026-10-17 19:15 · Manual backup                                   |  |

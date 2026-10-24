@@ -53,10 +53,10 @@ chmod +x RealmPortal-*-x86_64.AppImage
 `realm-portal` manages servers without the app. The commands are `add`, `remove`, `edit`, `list`, `switch`, `undo`, `status`, `launch`, `client` (`list`, `add`, `edit`, `remove`), `scan` and `client-version <dir>`; `--version` prints the version.
 
 ```bash
-realm-portal add "Warmane" logon.warmane.example.org --realm Icecrown --build 12340
+realm-portal add "Example" logon.example.org --realm Icecrown --build 12340
 realm-portal list --client-dir "/path/to/client"
-realm-portal switch "Warmane" --client-dir "/path/to/client"
-realm-portal launch "Warmane" --client-dir "/path/to/client"
+realm-portal switch "Example" --client-dir "/path/to/client"
+realm-portal launch "Example" --client-dir "/path/to/client"
 realm-portal undo
 realm-portal status --client-dir "/path/to/client"
 realm-portal client list

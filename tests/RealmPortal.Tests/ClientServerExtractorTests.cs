@@ -5,7 +5,7 @@ namespace RealmPortal.Tests;
 
 public class ClientServerExtractorTests
 {
-    private const string Warmane = "logon.warmane.example.org";
+    private const string ExampleHost = "logon.example.org";
 
     private readonly ClientServerExtractor _extractor = new();
 
@@ -13,12 +13,12 @@ public class ClientServerExtractorTests
     public void Extract_ReadsLocaleRealmlistAndConfig()
     {
         using var dir = new TempDirectory();
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\n");
         WriteConfig(dir, "SET realmName \"Icecrown\"\r\nSET accountName \"player1\"\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
-        Assert.Equal(Warmane, result.Host);
+        Assert.Equal(ExampleHost, result.Host);
         Assert.Equal("Icecrown", result.Realm);
         Assert.Equal("player1", result.Account);
         Assert.Null(result.PatchlistHost);
@@ -31,11 +31,11 @@ public class ClientServerExtractorTests
     {
         using var dir = new TempDirectory();
         File.WriteAllText(dir.Combine("realmlist.wtf"), "set realmlist root.example.org\r\n");
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
-        Assert.Equal(Warmane, result.Host);
+        Assert.Equal(ExampleHost, result.Host);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class ClientServerExtractorTests
     {
         using var dir = new TempDirectory();
         File.WriteAllText(dir.Combine("realmlist.wtf"), "set realmlist root.example.org\r\n");
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 5875));
 
@@ -54,22 +54,22 @@ public class ClientServerExtractorTests
     public void Extract_ReadsRootRealmlistForAnyBuild()
     {
         using var dir = new TempDirectory();
-        File.WriteAllText(dir.Combine("realmlist.wtf"), $"set realmlist {Warmane}\r\n");
+        File.WriteAllText(dir.Combine("realmlist.wtf"), $"set realmlist {ExampleHost}\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
-        Assert.Equal(Warmane, result.Host);
+        Assert.Equal(ExampleHost, result.Host);
     }
 
     [Fact]
     public void Extract_FallsBackToConfigRealmList()
     {
         using var dir = new TempDirectory();
-        WriteConfig(dir, $"SET locale \"enUS\"\r\nSET realmList \"{Warmane}\"\r\nSET realmName \"Icecrown\"\r\n");
+        WriteConfig(dir, $"SET locale \"enUS\"\r\nSET realmList \"{ExampleHost}\"\r\nSET realmName \"Icecrown\"\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
-        Assert.Equal(Warmane, result.Host);
+        Assert.Equal(ExampleHost, result.Host);
         Assert.Equal("Icecrown", result.Realm);
         Assert.Null(result.RealmlistPath);
     }
@@ -78,7 +78,7 @@ public class ClientServerExtractorTests
     public void Extract_ReadsPatchlistFromRealmlist()
     {
         using var dir = new TempDirectory();
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\nset patchlist patch.example.org\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\nset patchlist patch.example.org\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
@@ -91,7 +91,7 @@ public class ClientServerExtractorTests
     public void Extract_ReadsPatchlistFromConfig()
     {
         using var dir = new TempDirectory();
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\n");
         WriteConfig(dir, "SET patchlist \"http://patch.example.org/files\"\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
@@ -103,11 +103,11 @@ public class ClientServerExtractorTests
     public void Extract_IgnoresAnInvalidPatchlistButKeepsTheHost()
     {
         using var dir = new TempDirectory();
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\nset patchlist http://\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\nset patchlist http://\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
-        Assert.Equal(Warmane, result.Host);
+        Assert.Equal(ExampleHost, result.Host);
         Assert.Null(result.PatchlistHost);
     }
 
@@ -128,11 +128,11 @@ public class ClientServerExtractorTests
     {
         using var dir = new TempDirectory();
         WriteLocaleRealmlist(dir, "enUS", "set realmlist logon.battle.net\r\n");
-        WriteConfig(dir, $"SET realmList \"{Warmane}\"\r\n");
+        WriteConfig(dir, $"SET realmList \"{ExampleHost}\"\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
-        Assert.Equal(Warmane, result.Host);
+        Assert.Equal(ExampleHost, result.Host);
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class ClientServerExtractorTests
     {
         using var dir = new TempDirectory();
         var padding = new string('a', ClientServerExtractor.MaxRealmlistBytes);
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\nset patchlist {padding}.example.org\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\nset patchlist {padding}.example.org\r\n");
 
         Assert.Null(_extractor.Extract(dir.Path, 12340));
     }
@@ -175,13 +175,13 @@ public class ClientServerExtractorTests
     public void Extract_IgnoresAnOversizedConfig()
     {
         using var dir = new TempDirectory();
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\n");
         var padding = new string('a', ClientServerExtractor.MaxConfigBytes);
         WriteConfig(dir, $"SET realmName \"{padding}\"\r\nSET accountName \"player1\"\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
-        Assert.Equal(Warmane, result.Host);
+        Assert.Equal(ExampleHost, result.Host);
         Assert.Null(result.Account);
     }
 
@@ -198,18 +198,18 @@ public class ClientServerExtractorTests
     public void Extract_AcceptsAnAddressPortal()
     {
         using var dir = new TempDirectory();
-        WriteConfig(dir, $"SET portal \"{Warmane}\"\r\n");
+        WriteConfig(dir, $"SET portal \"{ExampleHost}\"\r\n");
 
         var result = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
 
-        Assert.Equal(Warmane, result.Host);
+        Assert.Equal(ExampleHost, result.Host);
     }
 
     [Fact]
     public void Extract_DoesNotModifyTheClientFolder()
     {
         using var dir = new TempDirectory();
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\n");
         WriteConfig(dir, "SET realmName \"Icecrown\"\r\nSET accountName \"player1\"\r\n");
         var before = Snapshot(dir.Path);
 
@@ -226,7 +226,7 @@ public class ClientServerExtractorTests
 
         using var client = new TempDirectory();
         using var outside = new TempDirectory();
-        File.WriteAllText(outside.Combine("Config.wtf"), $"SET realmList \"{Warmane}\"\r\n");
+        File.WriteAllText(outside.Combine("Config.wtf"), $"SET realmList \"{ExampleHost}\"\r\n");
         Directory.CreateSymbolicLink(client.Combine("WTF"), outside.Path);
 
         Assert.Null(_extractor.Extract(client.Path, 12340));
@@ -240,7 +240,7 @@ public class ClientServerExtractorTests
 
         using var client = new TempDirectory();
         using var outside = new TempDirectory();
-        File.WriteAllText(outside.Combine("Config.wtf"), $"SET realmList \"{Warmane}\"\r\n");
+        File.WriteAllText(outside.Combine("Config.wtf"), $"SET realmList \"{ExampleHost}\"\r\n");
         Directory.CreateDirectory(client.Combine("WTF"));
         File.CreateSymbolicLink(client.Combine("WTF", "Config.wtf"), outside.Combine("Config.wtf"));
 
@@ -252,13 +252,13 @@ public class ClientServerExtractorTests
     public void Extract_ProducesValuesServerCreateAccepts()
     {
         using var dir = new TempDirectory();
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\n");
         WriteConfig(dir, "SET realmName \"Icecrown\"\r\nSET accountName \"player1\"\r\n");
 
         var extracted = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
-        var server = Server.Create("Warmane", extracted.Host, extracted.Realm, extracted.ExtraRealmlistLines, 12340, extracted.Account, clientId: "c0123456789abcdef");
+        var server = Server.Create("Example", extracted.Host, extracted.Realm, extracted.ExtraRealmlistLines, 12340, extracted.Account, clientId: "c0123456789abcdef");
 
-        Assert.Equal(Warmane, server.Host);
+        Assert.Equal(ExampleHost, server.Host);
         Assert.Equal("Icecrown", server.Realm);
         Assert.Equal("player1", server.Account);
         Assert.Equal(12340, server.RequiredClientBuild);
@@ -268,11 +268,11 @@ public class ClientServerExtractorTests
     public void Identity_MatchesAnEquivalentStoredServer()
     {
         using var dir = new TempDirectory();
-        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {Warmane}\r\n");
+        WriteLocaleRealmlist(dir, "enUS", $"set realmlist {ExampleHost}\r\n");
         WriteConfig(dir, "SET realmName \"Icecrown\"\r\n");
 
         var extracted = Assert.IsType<ExtractedServer>(_extractor.Extract(dir.Path, 12340));
-        var stored = Server.Create("Warmane", Warmane, "Icecrown", requiredClientBuild: 12340);
+        var stored = Server.Create("Example", ExampleHost, "Icecrown", requiredClientBuild: 12340);
 
         Assert.Equal(RealmlistIdentity.FromServer(stored), extracted.Identity(12340));
         Assert.Equal(RealmlistIdentity.FromServer(stored).GetHashCode(), extracted.Identity(12340).GetHashCode());
