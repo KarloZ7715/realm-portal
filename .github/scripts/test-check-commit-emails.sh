@@ -90,6 +90,8 @@ expect_out '' --coauthor-email '*'
 expect_out '' --coauthor-email 'Me <me@gmail.com> <other@x.com>'
 expect_out '' --coauthor-email 'Me <me@gmail.com> trailing>'
 expect_out '' --coauthor-email 'Me <<me@gmail.com>'
+expect_out '' --coauthor-email 'Me <1+me@users.noreply.github.com> me@gmail.com'
+expect_out '' --coauthor-email 'me@gmail.com <1+me@users.noreply.github.com>'
 
 # Range checks on a throwaway repository
 tmp="$(mktemp -d)"

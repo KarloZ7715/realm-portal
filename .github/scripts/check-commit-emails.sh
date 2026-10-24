@@ -71,8 +71,8 @@ coauthor_email() {
   local value="$1" token candidate="" found=0
   local -a tokens=()
   if [[ "$value" == *[\<\>]* ]]; then
-    # Exactly one <...> pair, with nothing bracket-like after it; anything else is malformed.
-    if [[ "$value" =~ ^[^\<\>]*\<([^\<\>]*)\>[^\<\>]*$ ]]; then
+    # Exactly one <...> pair and no other address (@) outside it; anything else is malformed.
+    if [[ "$value" =~ ^[^\<\>@]*\<([^\<\>]*)\>[^\<\>@]*$ ]]; then
       printf '%s' "${BASH_REMATCH[1]}"
     fi
     return 0
