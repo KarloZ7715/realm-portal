@@ -126,7 +126,7 @@ public sealed class PortalService : IPortalService
                         var requiredBuild = client.Build is > 0 ? client.Build : null;
                         var identity = extracted.Identity(requiredBuild);
                         var servers = _servers.List();
-                        var matching = servers.FirstOrDefault(server => RealmlistIdentity.FromServer(server).Equals(identity));
+                        var matching = FindImportMatch(servers, identity);
                         if (matching is null)
                         {
                             var name = CreateImportedServerName(extracted, client.Version, servers);
@@ -384,15 +384,22 @@ public sealed class PortalService : IPortalService
             if (request.ClientId is not null && _clients.FindById(request.ClientId) is null)
                 return ServiceResult<ServerEntry>.Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
 
+            // Fields the request leaves null keep their stored values (#93): the extra realmlist lines (patchlist, ...)
+            // when both ExtraRealmlistLines and PatchlistHost are null (an empty list clears them), and the required
+            // client build when RequiredClientBuild is null (ClearRequiredClientBuild removes it).
             IEnumerable<string>? extra = request.ExtraRealmlistLines;
             if (extra is null && request.PatchlistHost is not null)
                 extra = [$"set patchlist {request.PatchlistHost}"];
+            extra ??= StoredExtraRealmlistLines(existing);
+            if (request.ClearRequiredClientBuild && request.RequiredClientBuild is not null)
+                throw new ArgumentException("Set either a client build or clear it, not both.", "requiredClientBuild");
+            var build = request.ClearRequiredClientBuild ? null : request.RequiredClientBuild ?? existing.RequiredClientBuild;
             var updated = Server.Create(
                 request.Name,
                 request.Host,
                 request.Realm,
                 extra,
-                request.RequiredClientBuild,
+                build,
                 request.Account,
                 request.ServerId,
                 request.ClientId);
@@ -1147,6 +1154,19 @@ public sealed class PortalService : IPortalService
                 locks[i].Dispose();
         }
     }
+
+    /// <summary>
+    /// The stored server an extracted one is the same as: an exact <see cref="RealmlistIdentity"/> match first, otherwise
+    /// a server with the same host and realm and no required build (a client-independent entry matches any build, #93).
+    /// </summary>
+    internal static Server? FindImportMatch(IReadOnlyList<Server> servers, RealmlistIdentity extracted) =>
+        servers.FirstOrDefault(server => RealmlistIdentity.FromServer(server).Equals(extracted))
+        ?? servers.FirstOrDefault(server => server.RequiredClientBuild is null
+            && RealmlistIdentity.Create(server.Host, server.Realm, extracted.RequiredClientBuild).Equals(extracted));
+
+    /// <summary>The stored realmlist lines after the first <c>set realmlist</c> line (e.g. <c>set patchlist …</c>).</summary>
+    private static string[] StoredExtraRealmlistLines(Server server) =>
+        server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
 
     private static string CreateImportedServerName(ExtractedServer extracted, ClientVersion? version, IReadOnlyList<Server> existing)
     {
