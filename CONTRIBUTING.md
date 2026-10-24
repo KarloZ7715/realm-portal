@@ -31,6 +31,15 @@ On Linux the app needs an X11 server (or XWayland) and `libfontconfig1`, `libfre
 
 CI runs build + tests on Ubuntu 22.04 and Windows, plus a secret scan and a per-file size check.
 
+## Version
+
+The product version lives in one place: `<Version>` in [`Directory.Build.props`](Directory.Build.props). `AppInfo.Version`
+reads the assembly informational version (without the `+<commit>` suffix), so a source build shows it in the status bar and in
+`realm-portal --version`. The release workflow resolves its package version from the same file with
+`packaging/resolve-version.sh` and passes it to `dotnet publish` (`-p:Version`), so release builds use the same value; a `v<version>`
+tag that does not match `Directory.Build.props` fails the release run. Bump `<Version>` in a PR before tagging a release.
+`AppInfoTests` checks that the app and CLI report the props version.
+
 ## Command line
 
 `realm-portal` manages servers without the UI. Exit codes: 0 ok, 1 usage, 2 failure.

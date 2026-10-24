@@ -4,11 +4,18 @@
 
 The [Release (Linux and Windows packages)](https://github.com/KarloZ7715/realm-portal/actions/workflows/release-linux.yml) workflow (`.github/workflows/release-linux.yml`) builds Linux packages and a Windows archive:
 
+The version has a single source: `<Version>` in `Directory.Build.props`. `packaging/resolve-version.sh` reads it (self-tested by
+`packaging/test-resolve-version.sh` in the Linux job) and both jobs pass the result to `dotnet publish` as `-p:Version` /
+`-p:InformationalVersion`, so the package name, the `.deb` `Version:` field, the generated AppStream `<releases>` entry, the
+status bar and `realm-portal --version` all agree.
+
 | Trigger | Version used |
 | --- | --- |
-| `pull_request` (path-filtered) | `0.0.0-pr.<PR number>` (artifacts only; no release) |
-| `workflow_dispatch` | Input `version`, or `Version` from `Directory.Build.props` when empty |
-| Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix (e.g. `v0.1.0` → `0.1.0`); validated against `^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$` |
+| `pull_request` (path-filtered) | `<props version>-pr.<PR number>` (artifacts only; no release) |
+| `workflow_dispatch` | `<props version>` when the `version` input is empty; otherwise the input, which must be `<props version>` or a prerelease of it (`<props version>-rc.1`) |
+| Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix; it **must equal** `<props version>` (e.g. `v1.0.0` with `<Version>1.0.0</Version>`), otherwise the run fails before building |
+
+To release: bump `<Version>` in `Directory.Build.props` in a PR, merge it, then push the matching `v<version>` tag.
 
 It does **not** create a GitHub Release. Linux outputs are uploaded as a workflow artifact named `realm-portal-linux-<version>` containing:
 
@@ -28,14 +35,14 @@ Local reproduction (after publish):
 
 ```bash
 export APPIMAGETOOL=/path/to/obsolete-appimagetool-x86_64.AppImage
-packaging/linux/build-packages.sh /path/to/publish 0.1.0 ./artifacts/linux
+packaging/linux/build-packages.sh /path/to/publish "$(EVENT_NAME=workflow_dispatch packaging/resolve-version.sh)" ./artifacts/linux
 ```
 
 ## Install layout
 
 Both packages install the self-contained publish output under `/opt/realm-portal` (`.deb`) or `usr/lib/realm-portal` inside the AppImage, and expose a `realm-portal` launcher on `PATH` that runs `RealmPortal.App`. This matches `Exec=realm-portal` in the desktop file.
 
-Desktop entry, AppStream metainfo, and hicolor icons come from `packaging/linux/`.
+Desktop entry, AppStream metainfo, and hicolor icons come from `packaging/linux/`. The source metainfo carries no version; `build-packages.sh` adds the `<releases>` entry for the package version (dated from `SOURCE_DATE_EPOCH` when set) and refuses a metainfo with a hardcoded `<releases>`.
 
 ### `.deb` dependencies
 
