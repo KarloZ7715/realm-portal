@@ -447,8 +447,10 @@ public sealed class CliApp(
             return Fail(result.Error!);
         var restored = result.Value!.Active;
         SafeWriteLine(output, restored is null ? "Undone: no active server." : $"Undone: restored '{restored.Name}'.");
-        if (result.Value!.ClientFilesNotice is { } notice)
-            SafeWriteLine(output, notice);
+        // Core hands over one entry per line, so a newline inside a client path stays escaped.
+        if (result.Value!.ClientFilesNoticeLines is { } lines)
+            foreach (var line in lines)
+                SafeWriteLine(output, line);
         return 0;
     }
 
