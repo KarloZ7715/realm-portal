@@ -215,7 +215,7 @@ public sealed record UpdateServerRequest(
     "clients": [
       {
         "id": "c0123456789abcdef",
-        "path": "/home/carlos/Games/WoW-335a",
+        "path": "/home/user/Games/WoW-335a",
         "name": "Wrath 3.3.5a",
         "origin": "lutris"
       }
@@ -433,7 +433,7 @@ public sealed record StorageSettings(
 ```json
 {
   "version": 1,
-  "backup_folder": "/home/carlos/.local/share/realm-portal/backups",
+  "backup_folder": "/home/user/.local/share/realm-portal/backups",
   "keep_backups": 10
 }
 ```
@@ -530,7 +530,7 @@ manifest hash, and those journals keep working as before. A value that is presen
 
 ---
 
-## Approved decisions (Approval Gate — Carlos)
+## Approved decisions (maintainer approval gate)
 
 1. **Auto-naming rule for servers imported during client scan (`ClientServerExtractor` / `PortalService.CreateImportedServerName`) — Approved: Option A.**
    - **Decision:** When `Scan()` or `AddClient()` imports a server from a client's `realmlist.wtf` / `WTF/Config.wtf`:
