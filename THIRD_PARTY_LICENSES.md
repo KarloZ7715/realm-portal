@@ -52,8 +52,8 @@ ASP.NET Core and the Windows Desktop runtime (`Microsoft.WindowsDesktop.App`) ar
 Every release package ships the runtime's `LICENSE.TXT` and `THIRD-PARTY-NOTICES.TXT`, copied by
 `packaging/collect-licenses.sh` from the exact runtime pack that `dotnet publish` bundled, together with
 `licenses/dotnet-runtime/VERSION.txt` (exact runtime version and source commit), this file, `LICENSE` and the fonts'
-`OFL.txt`. They are installed under `/usr/share/doc/realm-portal/` (`.deb` and AppImage) and next to `RealmPortal.App.exe`
-(Windows ZIP).
+`OFL.txt`. Locations: `/usr/share/doc/realm-portal/` once the `.deb` is installed; `usr/share/doc/realm-portal/` inside the
+AppImage (view with `--appimage-extract`); next to `RealmPortal.App.exe` in the Windows ZIP.
 
 Keep this table in sync with `Directory.Packages.props`.
 
