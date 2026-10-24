@@ -1,3 +1,4 @@
+using System.Text;
 using RealmPortal.Cli;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
@@ -54,6 +55,70 @@ public class CliServerFlowTests
         }
 
         public void Dispose() => _dir.Dispose();
+
+        /// <summary>A second registered client folder, so drift lines can name it.</summary>
+        public string ExtraClient(string name, string realmlist)
+        {
+            var path = _dir.Combine(name);
+            Directory.CreateDirectory(Path.Combine(path, "Data", "enUS"));
+            File.WriteAllBytes(Path.Combine(path, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+            File.WriteAllBytes(Path.Combine(path, "Data", "enUS", "realmlist.wtf"), Encoding.Latin1.GetBytes($"set realmlist {realmlist}\r\n"));
+            return path;
+        }
+    }
+
+    [Fact]
+    public void Undo_MultiLineNotice_PrintsEachLineWithoutControlEscapes()
+    {
+        using var box = new Sandbox(clientBuild: 12340);
+
+        Assert.Equal(0, box.Run("add", "A", "a.example.org").Code);
+        Assert.Equal(0, box.Run("add", "B", "b.example.org").Code);
+        Assert.Equal(0, box.Run("switch", "A").Code);
+        Assert.Equal(0, box.Run("switch", "B").Code);
+        // A second client that never matched A: undo's notice gains a drift line beside the restored line.
+        var second = box.ExtraClient("client-two", "old.example.org");
+        Assert.Equal(0, box.Run("client", "add", second, "--name", "two").Code);
+
+        var undo = box.Run("undo");
+        Assert.Equal(0, undo.Code);
+        Assert.DoesNotContain("\\u000A", undo.Out);
+        Assert.DoesNotContain("\\u000D", undo.Out);
+        var nl = Environment.NewLine;
+        Assert.Equal(
+            $"Undone: restored 'A'.{nl}" +
+            $"Client files: restored '{box.Client}' to its state before the switch.{nl}" +
+            $"Client folder out of sync: {second} (run 'switch A --client-dir <folder>'){nl}",
+            undo.Out);
+        Assert.Equal("", undo.Err);
+    }
+
+    [Fact]
+    public void Undo_NewlineInClientFolderName_StaysEscapedAndCannotInjectALine()
+    {
+        // Windows does not allow control characters in folder names.
+        if (OperatingSystem.IsWindows())
+            return;
+
+        using var box = new Sandbox(clientBuild: 12340);
+
+        Assert.Equal(0, box.Run("add", "A", "a.example.org").Code);
+        Assert.Equal(0, box.Run("add", "B", "b.example.org").Code);
+        Assert.Equal(0, box.Run("switch", "A").Code);
+        Assert.Equal(0, box.Run("switch", "B").Code);
+        // A registered folder whose name tries to start a fake "Undone:" line in the drift notice.
+        var hostile = box.ExtraClient("ev\u001B[31mil\nUndone: restored 'FAKE'.", "old.example.org");
+        Assert.Equal(0, box.Run("client", "add", hostile, "--name", "hostile").Code);
+
+        var undo = box.Run("undo");
+        Assert.Equal(0, undo.Code);
+        Assert.Equal("", undo.Err);
+        Assert.Contains("ev\\u001B[31mil\\u000AUndone: restored 'FAKE'.", undo.Out);
+        Assert.DoesNotContain("\u001B", undo.Out);
+        var lines = undo.Out.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(3, lines.Length);
+        Assert.DoesNotContain(lines, line => line.StartsWith("Undone: restored 'FAKE'", StringComparison.Ordinal));
+        Assert.All(lines, line => Assert.DoesNotContain('\n', line));
     }
 
     [Fact]

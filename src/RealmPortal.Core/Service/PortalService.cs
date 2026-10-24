@@ -1292,7 +1292,7 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    private string BuildUndoClientFilesNotice(
+    private IReadOnlyList<string> BuildUndoClientFilesNotice(
         Server? restoredActive,
         IReadOnlyList<UndoFileResult> fileResults,
         StoredClient? switchedClient)
@@ -1308,12 +1308,12 @@ public sealed class PortalService : IPortalService
 
         // No active server means there is nothing for registered clients to drift from.
         if (restoredActive is null)
-            return string.Join(Environment.NewLine, lines);
+            return lines;
 
         foreach (var entry in ListClientsNotMatchingActive(restoredActive))
             lines.Add(ClientSyncMessages.DriftLine(restoredActive, entry.Path));
 
-        return string.Join(Environment.NewLine, lines);
+        return lines;
     }
 
     private bool ClientFilesMatchFileUndoSnapshot(LastSwitchEntry journal)

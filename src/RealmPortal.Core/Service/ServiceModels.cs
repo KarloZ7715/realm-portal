@@ -142,11 +142,11 @@ public sealed record SwitchOutcome(
 /// </summary>
 /// <param name="Active">The server that is active after the undo; <c>null</c> when none is.</param>
 /// <param name="Files">What happened to each client file.</param>
-/// <param name="ClientFilesNotice">English line for the CLI when undo touched (or skipped) registered client folders.</param>
+/// <param name="ClientFilesNoticeLines">English lines for the CLI when undo touched (or skipped) registered client folders, one entry per output line.</param>
 public sealed record UndoOutcome(
     ServerEntry? Active,
     IReadOnlyList<UndoFileResult> Files,
-    string? ClientFilesNotice = null);
+    IReadOnlyList<string>? ClientFilesNoticeLines = null);
 
 // ---------------------------------------------------------------- status and settings
 
