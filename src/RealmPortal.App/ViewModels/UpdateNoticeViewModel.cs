@@ -40,7 +40,10 @@ public sealed partial class UpdateNoticeViewModel : ObservableObject
 
     public string OpenGitHubText => Loc.Get("update.action.github");
 
-    public bool CanOpenGitHub => !string.IsNullOrWhiteSpace(_offer.HtmlUrl);
+    public bool CanOpenGitHub => ReleasePageUrl.TryGetTrusted(ResolvedGitHubUrl, out _);
+
+    /// <summary>Validated release-page URL, or the constructed tag URL when HtmlUrl is missing/untrusted.</summary>
+    public string ResolvedGitHubUrl => ReleasePageUrl.Resolve(_offer);
 
     public Task<ConfirmDialogChoice> Choice => _choice.Task;
 
@@ -58,8 +61,8 @@ public sealed partial class UpdateNoticeViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanOpenGitHub))]
     private void OpenGitHub()
     {
-        if (_offer.HtmlUrl is { Length: > 0 } url)
-            OpenUrlRequested?.Invoke(url);
+        if (ReleasePageUrl.TryGetTrusted(ResolvedGitHubUrl, out _))
+            OpenUrlRequested?.Invoke(ResolvedGitHubUrl);
     }
 
     public void Reject()

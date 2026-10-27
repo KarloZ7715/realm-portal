@@ -72,10 +72,10 @@ public sealed partial class MainViewModel : ObservableObject
         _network = network ?? new PortalNetworkSettingsStore(session.Service);
         var connectionProbe = _probe ?? new TcpConnectionProbe();
         _probes = probes ?? new ProbeScheduler(connectionProbe);
-        var innerUpdates = updates ?? new NullUpdateChecker();
-        _updates = innerUpdates is PersistingUpdateChecker
-            ? innerUpdates
-            : new PersistingUpdateChecker(innerUpdates, _network);
+        // Production: Core UpdateChecker (already uses NetworkSettingsStore.Update).
+        // Injected doubles / PersistingUpdateChecker are used as-is (tests / demo).
+        _updates = updates
+            ?? new CoreUpdateCheckerAdapter(session.UpdateChecker);
         Servers = new ServersViewModel(session, autoTick, delay);
         Clients = new ClientsViewModel(session, pickFolder, startFirstScan: false);
         var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder, _network, _updates);
@@ -315,7 +315,7 @@ public sealed partial class MainViewModel : ObservableObject
         var dialog = new UpdateNoticeViewModel(offer);
         dialog.OpenUrlRequested += url =>
         {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            if (!ReleasePageUrl.TryGetTrusted(url, out var uri))
                 return;
             ExceptionLog.Observe(_uriOpener.OpenAsync(uri));
         };

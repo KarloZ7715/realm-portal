@@ -179,4 +179,24 @@ public class NetworkSettingsStoreTests
     {
         public void Launch(RealmPortal.Core.Launch.GameLaunchSpec spec) { }
     }
+
+    [Fact]
+    public void PortalService_UpdateNetworkSettings_PreservesProbeWhenTweakingAutoCheck()
+    {
+        using var env = new ServiceEnv();
+        var initial = env.Service.GetNetworkSettings();
+        Assert.True(initial.Succeeded);
+        _ = env.Service.SetNetworkSettings(initial.Value! with
+        {
+            StatusProbeEnabled = true,
+            UpdatesEtag = "etag-x",
+            UpdatesAutoCheck = true,
+        });
+
+        var updated = env.Service.UpdateNetworkSettings(s => s with { UpdatesAutoCheck = false });
+        Assert.True(updated.Succeeded);
+        Assert.False(updated.Value!.UpdatesAutoCheck);
+        Assert.True(updated.Value.StatusProbeEnabled);
+        Assert.Equal("etag-x", updated.Value.UpdatesEtag);
+    }
 }

@@ -395,22 +395,19 @@ public sealed partial class SettingsViewModel : ViewModelBase
             {
                 // Read generated properties inside the lock so a later toggle cannot be
                 // overwritten by an older queued Task.Run snapshot.
+                // Update(mutate) under lock — never Load + Save of a stale full snapshot
+                // (that would clobber StatusProbeEnabled / ETag / last_attempt).
                 var auto = AutoCheckUpdates;
                 var probe = StatusProbeEnabled;
-                var loaded = _network.Load();
-                if (!loaded.Succeeded)
+                var updated = _network.Update(s => s with
+                {
+                    UpdatesAutoCheck = auto,
+                    StatusProbeEnabled = probe,
+                });
+                if (!updated.Succeeded)
                 {
                     ExceptionLog.Default.WriteMessage(
-                        $"PersistNetwork load failed: {loaded.Error}",
-                        "Settings.PersistNetwork");
-                    return;
-                }
-
-                var saved = _network.Save(loaded.Value! with { UpdatesAutoCheck = auto, StatusProbeEnabled = probe });
-                if (!saved.Succeeded)
-                {
-                    ExceptionLog.Default.WriteMessage(
-                        $"PersistNetwork save failed: {saved.Error}",
+                        $"PersistNetwork update failed: {updated.Error}",
                         "Settings.PersistNetwork");
                 }
             }

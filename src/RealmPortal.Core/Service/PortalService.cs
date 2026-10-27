@@ -911,9 +911,8 @@ public sealed class PortalService : IPortalService
 
         try
         {
-            // Full snapshot write (App PersistNetwork / PersistingUpdateChecker LastAttempt).
-            // Field tweaks that must not clobber concurrent ETag/LastAttempt should use
-            // NetworkSettingsStore.Update(mutate) instead (UpdateChecker already does).
+            // Full snapshot write. Field tweaks that must not clobber concurrent ETag/LastAttempt
+            // must use UpdateNetworkSettings / NetworkSettingsStore.Update instead.
             _networkSettings.Set(settings);
             return ServiceResult<Unit>.Ok(default);
         }
@@ -933,6 +932,19 @@ public sealed class PortalService : IPortalService
         catch (Exception ex)
         {
             return ServiceResult<Unit>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<NetworkSettings> UpdateNetworkSettings(Func<NetworkSettings, NetworkSettings> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+        try
+        {
+            return ServiceResult<NetworkSettings>.Ok(_networkSettings.Update(mutate));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(ex));
         }
     }
 
