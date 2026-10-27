@@ -68,20 +68,27 @@ public static class AboutDocuments
             // Fall through to a file next to the assembly (packaged installs).
         }
 
-        var beside = Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_LICENSES.md");
-        if (File.Exists(beside))
+        try
         {
-            return File.ReadAllText(beside, Encoding.UTF8);
-        }
-
-        var assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-        if (!string.IsNullOrEmpty(assemblyDir))
-        {
-            var candidate = Path.Combine(assemblyDir, "THIRD_PARTY_LICENSES.md");
-            if (File.Exists(candidate))
+            var beside = Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_LICENSES.md");
+            if (File.Exists(beside))
             {
-                return File.ReadAllText(candidate, Encoding.UTF8);
+                return File.ReadAllText(beside, Encoding.UTF8);
             }
+
+            var assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (!string.IsNullOrEmpty(assemblyDir))
+            {
+                var candidate = Path.Combine(assemblyDir, "THIRD_PARTY_LICENSES.md");
+                if (File.Exists(candidate))
+                {
+                    return File.ReadAllText(candidate, Encoding.UTF8);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Packaged file present but unreadable: About still opens without the license text.
         }
 
         return string.Empty;

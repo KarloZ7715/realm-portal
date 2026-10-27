@@ -22,6 +22,7 @@ public sealed partial class MainViewModel : ObservableObject
     private EditClientViewModel? _editingClient;
     private BackupsViewModel? _backups;
     private AboutViewModel? _about;
+    private int _aboutRequest;
     private readonly IUriOpener _uriOpener;
 
     public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null, IUriOpener? uriOpener = null) =>
@@ -388,14 +389,26 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         CloseBackupsManager();
-        _ = ShowAboutAsync();
+        var request = ++_aboutRequest;
+        _ = ShowAboutAsync(request);
     }
 
-    private async Task ShowAboutAsync()
+    private async Task ShowAboutAsync(int request)
     {
         // License file/asset I/O stays off the UI thread; the result is cached for later opens.
-        var licenses = await AboutDocuments.LoadThirdPartyLicensesAsync().ConfigureAwait(true);
-        if (_about is not null || SectionIndex != 2)
+        string licenses;
+        try
+        {
+            licenses = await AboutDocuments.LoadThirdPartyLicensesAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            // Still open About; third-party text stays empty.
+            licenses = string.Empty;
+        }
+
+        // Drop the result if the user left Settings, opened backups, or closed a prior About.
+        if (request != _aboutRequest || _about is not null || SectionIndex != 2)
         {
             return;
         }
@@ -408,8 +421,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void CloseAbout()
     {
+        _aboutRequest++;
         if (_about is null)
+        {
             return;
+        }
+
         _about.PropertyChanged -= OnSectionChanged;
         _about = null;
         OnPropertyChanged(nameof(Content));
