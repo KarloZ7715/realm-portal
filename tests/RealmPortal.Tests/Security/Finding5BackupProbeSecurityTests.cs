@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
@@ -24,12 +23,9 @@ public class Finding5BackupProbeSecurityTests
             name => name!.StartsWith(".realm-portal-probe-", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [LinuxFact]
     public void SetStorageSettings_RejectsBackupFolderUnderSymlinkAncestor()
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            return;
-
         using var dir = new TempDirectory();
         var config = dir.Combine("config");
         var real = dir.Combine("real");

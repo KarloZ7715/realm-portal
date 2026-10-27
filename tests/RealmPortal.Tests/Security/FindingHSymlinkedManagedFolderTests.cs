@@ -19,8 +19,6 @@ public class FindingHSymlinkedManagedFolderTests
     private const string OldRealmlist = "set realmlist old.example.org\r\n";
     private static readonly ClientVersion V3 = new(new Version(3, 3, 5, 12340));
 
-    private static bool LinksSupported => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
-
     private sealed class Env : IDisposable
     {
         private readonly TempDirectory _temp = new();
@@ -55,11 +53,9 @@ public class FindingHSymlinkedManagedFolderTests
                 p => Path.GetRelativePath(root, p),
                 p => File.Exists(p) ? ClientFilesIo.Sha256Hex(File.ReadAllBytes(p)) : "<dir>");
 
-    [Fact]
+    [UnixFact]
     public void Apply_WithDataLocaleFolderLinkedOutside_RefusesAndWritesNothingOutside()
     {
-        if (!LinksSupported)
-            return;
         using var env = new Env();
         Directory.CreateDirectory(env.InClient("Data"));
         Directory.CreateDirectory(env.InOutside("enUS"));
@@ -74,11 +70,9 @@ public class FindingHSymlinkedManagedFolderTests
         Assert.Equal(outsideBefore, Snapshot(env.Outside));
     }
 
-    [Fact]
+    [UnixFact]
     public void Apply_WithWtfFolderLinkedOutside_RefusesAndWritesNothingOutside()
     {
-        if (!LinksSupported)
-            return;
         using var env = new Env();
         Directory.CreateDirectory(env.InClient("Data", "enUS"));
         File.WriteAllText(env.InClient("Data", "enUS", "realmlist.wtf"), OldRealmlist);
@@ -97,11 +91,9 @@ public class FindingHSymlinkedManagedFolderTests
         Assert.Equal(realmlistBefore, File.ReadAllText(env.InClient("Data", "enUS", "realmlist.wtf")));
     }
 
-    [Fact]
+    [UnixFact]
     public void Apply_WithLinkedDataFolderLinkedThroughTwoHops_RefusesWhenTheLastHopLeavesTheClient()
     {
-        if (!LinksSupported)
-            return;
         using var env = new Env();
         Directory.CreateDirectory(env.InClient("Data"));
         Directory.CreateDirectory(env.InOutside("enUS"));
@@ -117,11 +109,9 @@ public class FindingHSymlinkedManagedFolderTests
         Assert.Equal(outsideBefore, Snapshot(env.Outside));
     }
 
-    [Fact]
+    [UnixFact]
     public void Apply_WithManagedFolderLinkedInsideTheClient_StillWorks()
     {
-        if (!LinksSupported)
-            return;
         using var env = new Env();
         Directory.CreateDirectory(env.InClient("Data"));
         Directory.CreateDirectory(env.InClient("locales", "enUS"));
@@ -134,11 +124,9 @@ public class FindingHSymlinkedManagedFolderTests
         Assert.Contains("logon-a.example.org", File.ReadAllText(env.InClient("locales", "enUS", "realmlist.wtf")));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_WithDataLocaleFolderRelinkedOutside_RefusesAndWritesNothing()
     {
-        if (!LinksSupported)
-            return;
         using var env = new Env();
         Directory.CreateDirectory(env.InClient("Data", "enUS"));
         File.WriteAllText(env.InClient("Data", "enUS", "realmlist.wtf"), OldRealmlist);
@@ -159,11 +147,9 @@ public class FindingHSymlinkedManagedFolderTests
         Assert.Equal(applied, File.ReadAllBytes(env.InClient("Data", "enUS.real", "realmlist.wtf")));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_WithWtfFolderRelinkedOutside_DoesNotDeleteOutsideConfig()
     {
-        if (!LinksSupported)
-            return;
         using var env = new Env();
         Directory.CreateDirectory(env.InClient("Data", "enUS"));
         File.WriteAllText(env.InClient("Data", "enUS", "realmlist.wtf"), OldRealmlist);
@@ -189,11 +175,9 @@ public class FindingHSymlinkedManagedFolderTests
         Assert.Equal(appliedRealmlist, File.ReadAllBytes(env.InClient("Data", "enUS", "realmlist.wtf")));
     }
 
-    [Fact]
+    [UnixFact]
     public void PortalSwitch_WithDataLocaleFolderLinkedOutside_ReturnsPathEscapesClient()
     {
-        if (!LinksSupported)
-            return;
         using var dir = new TempDirectory();
         var config = dir.Combine("config");
         var projection = dir.Combine("projection");

@@ -35,12 +35,9 @@ public class FileReplacementPermissionsTests
         Assert.Equal(mode, FileReplacementPermissions.FromUnixAndWindows(mode, null)!.UnixMode);
     }
 
-    [Fact]
+    [UnixFact]
     public void AtomicWriter_WithOutOfRangeMode_ThrowsAndLeavesTheFileAndNoTempBehind()
     {
-        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
-            return;
-
         using var temp = new TempDirectory();
         var path = temp.Combine("realmlist.wtf");
         File.WriteAllText(path, "old\r\n");
@@ -54,12 +51,9 @@ public class FileReplacementPermissionsTests
         Assert.Equal(0, (int)(File.GetUnixFileMode(path) & UnixFileMode.SetUser));
     }
 
-    [Fact]
+    [LinuxFact]
     public void AtomicWriter_OnLinux_AppliesUnixModeToTempBeforeReplace()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var temp = new TempDirectory();
         var path = temp.Combine("realmlist.wtf");
         File.WriteAllText(path, "old\r\n");
@@ -71,12 +65,9 @@ public class FileReplacementPermissionsTests
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.GroupRead | UnixFileMode.OtherRead, File.GetUnixFileMode(path));
     }
 
-    [Fact]
+    [LinuxFact]
     public void Apply_OnSetuidFile_DoesNotCopySetuidBit()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         Directory.CreateDirectory(Path.Combine(client, "Data", "enUS"));
@@ -92,12 +83,9 @@ public class FileReplacementPermissionsTests
         Assert.Contains("\"unix_mode\": 493", manifest);
     }
 
-    [Fact]
+    [LinuxFact]
     public void Undo_WithTamperedOutOfRangeUnixMode_IsRejectedBeforeRestoring()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");

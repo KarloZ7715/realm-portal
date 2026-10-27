@@ -161,12 +161,9 @@ public class ClientFilesApplierTests
         Assert.Equal(before, env.Files());
     }
 
-    [Fact]
+    [NonWindowsFact]
     public void Apply_CreatesPrivateBackupDirectoriesAndFilesOnUnix()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
         using var env = new Env();
         env.Put("Data/enUS/realmlist.wtf", "set realmlist old.example.org\r\n");
         var result = env.Applier.Apply(env.Plan());

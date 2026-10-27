@@ -188,12 +188,9 @@ public class GameLaunchSpecTests : IDisposable
         Assert.All(runner.Started, s => Assert.Equal(Dir, s.WorkingDirectory));
     }
 
-    [Fact]
+    [LinuxFact]
     public void SystemProcessRunner_AppliesArgumentsAndEnvironment_ToARealHarmlessProcess()
     {
-        if (!OperatingSystem.IsLinux())
-            return; // uses /bin/sh, which only exists on Linux
-
         using var dir = new TempDirectory();
         var output = dir.Combine("out.txt");
         var launch = new GameLaunchSpec(

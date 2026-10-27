@@ -199,12 +199,9 @@ public class ServerStoreTests
         Assert.Throws<StoreException>(() => store.List());
     }
 
-    [Fact]
+    [NonWindowsFact]
     public void AppOwnedConfigFilesAndDirectory_ArePrivateOnUnix()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
         using var dir = new TempDirectory();
         var config = dir.Combine("private-config");
         var writer = new AtomicFileWriter();

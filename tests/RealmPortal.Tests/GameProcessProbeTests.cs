@@ -11,10 +11,9 @@ public sealed class GameProcessProbeCollection;
 [Collection(nameof(GameProcessProbeTests))]
 public sealed class GameProcessProbeTests
 {
-    [Fact]
+    [LinuxFact]
     public void ProcessNamedWowExe_IsMatchedOnlyForItsClientDirectory()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var clientA = temp.Combine("client-a");
         var clientB = temp.Combine("client-b");
@@ -40,10 +39,9 @@ public sealed class GameProcessProbeTests
         }
     }
 
-    [Fact]
+    [LinuxFact]
     public void WineLauncherInClientDirectory_IsMatchedDuringStartup()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         Directory.CreateDirectory(client);
@@ -65,10 +63,9 @@ public sealed class GameProcessProbeTests
         }
     }
 
-    [Fact]
+    [LinuxFact]
     public void ZombieWineProcessElsewhere_DoesNotBlockOtherClients()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var elsewhere = temp.Combine("elsewhere");
         var client = temp.Combine("client");
@@ -107,10 +104,9 @@ public sealed class GameProcessProbeTests
         }
     }
 
-    [Fact]
+    [LinuxFact]
     public void ReadTaskState_VanishedZombieLiveAndUnreadable()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var proc = temp.Combine("proc-123");
 
@@ -163,10 +159,9 @@ public sealed class GameProcessProbeTests
         }
     }
 
-    [Fact]
+    [LinuxFact]
     public void ExitedLeaderWithLiveThreadInClient_IsRunning_ByFolderMatch()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var other = temp.Combine("other");
@@ -180,10 +175,9 @@ public sealed class GameProcessProbeTests
         Assert.False(GameProcessProbe.LinuxProcessBlocks(proc.Root, other));
     }
 
-    [Fact]
+    [LinuxFact]
     public void ExitedLeaderWithOnlyZombieOrDeadThreads_IsNotRunning()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         Directory.CreateDirectory(client);
@@ -194,10 +188,9 @@ public sealed class GameProcessProbeTests
         Assert.False(GameProcessProbe.LinuxProcessBlocks(proc.Root, client));
     }
 
-    [Fact]
+    [LinuxFact]
     public void ExitedLeaderWithLiveThreadWhoseCwdIsUnreadable_IsRunning()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         Directory.CreateDirectory(client);
@@ -207,10 +200,9 @@ public sealed class GameProcessProbeTests
         Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, client));
     }
 
-    [Fact]
+    [LinuxFact]
     public void ExitedLeaderWithoutTaskDirectory_IsRunningWhileThePidFolderExists()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var proc = new FakeProc(temp, "Z");
         Directory.Delete(Path.Combine(proc.Root, "task"), recursive: true);
@@ -218,10 +210,9 @@ public sealed class GameProcessProbeTests
         Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, temp.Combine("client")));
     }
 
-    [Fact]
+    [LinuxFact]
     public void ProcessWhosePidFolderIsGone_IsNotRunning()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var proc = new FakeProc(temp, "Z");
         Directory.Delete(proc.Root, recursive: true);
@@ -229,10 +220,9 @@ public sealed class GameProcessProbeTests
         Assert.False(GameProcessProbe.LinuxProcessBlocks(proc.Root, temp.Combine("client")));
     }
 
-    [Fact]
+    [LinuxFact]
     public void ExitedLeaderWhoseTaskListingFailsWithAnIoError_IsRunning()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var proc = new FakeProc(temp, "Z");
         // Listing task/ fails with an I/O error (ELOOP) while /proc/<pid> still exists: fail closed.
@@ -243,10 +233,9 @@ public sealed class GameProcessProbeTests
         Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, temp.Combine("client")));
     }
 
-    [Fact]
+    [NonRootLinuxFact]
     public void ExitedLeaderWithAThreadWhoseStatIsUnreadable_IsRunning()
     {
-        if (!OperatingSystem.IsLinux() || Environment.UserName == "root") return;
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var other = temp.Combine("other");
@@ -260,10 +249,9 @@ public sealed class GameProcessProbeTests
         Assert.True(GameProcessProbe.LinuxProcessBlocks(proc.Root, client));
     }
 
-    [Fact]
+    [LinuxFact]
     public void ReadTaskState_IoErrorMeansGoneOnlyWhenTheFolderIsGone()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var temp = new TempDirectory();
         var task = temp.Combine("task-101");
         // ESRCH surfaces as a plain IOException; it cannot be produced with ordinary files, so the reader is injected.
@@ -274,10 +262,9 @@ public sealed class GameProcessProbeTests
         Assert.Equal(GameProcessProbe.TaskState.Unreadable, GameProcessProbe.ReadTaskState(task, esrch));
     }
 
-    [Fact]
+    [LinuxFact]
     public void RealProcessWhoseMainThreadExited_IsRunningOnlyForItsClient()
     {
-        if (!OperatingSystem.IsLinux()) return;
         var compiler = new[] { "/usr/bin/cc", "/usr/bin/gcc" }.FirstOrDefault(File.Exists);
         // CI must run this test for real; elsewhere, without a compiler, the fake /proc tests cover the same decision.
         Assert.True(compiler is not null || Environment.GetEnvironmentVariable("CI") != "true", "cc required on CI");

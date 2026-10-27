@@ -24,12 +24,9 @@ public class Finding3ClientStoreSecurityTests
         Assert.Throws<RealmPortal.Core.Servers.StoreException>(() => store.List());
     }
 
-    [Fact]
+    [LinuxFact]
     public void Add_RejectsSymlinkClientRoot()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var dir = new TempDirectory();
         var config = dir.Combine("config");
         Directory.CreateDirectory(config);

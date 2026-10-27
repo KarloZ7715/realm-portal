@@ -13,12 +13,9 @@ public class ClientFilesSymlinkTests
     private const string Original = "set realmlist shared.example.org\r\n";
     private static readonly ClientVersion V3 = new(new Version(3, 3, 5, 12340));
 
-    [Fact]
+    [UnixFact]
     public void Undo_RestoresSymlinkedRealmlist()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -47,12 +44,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(Original, File.ReadAllText(linkPath));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_PreservesRelativeSymlinkText_FromSidecar()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -69,12 +63,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(Original, File.ReadAllText(linkPath));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_RejectsTamperedSymlinkSidecar_OutsideClient()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -96,12 +87,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(Original, File.ReadAllText(shared));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_FallsBackToRegularFile_WhenSymlinkVerifyFails()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -124,12 +112,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal("tampered after apply\r\n", File.ReadAllText(good));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_AbsoluteLinkOutsideClient_RestoresRegularFile()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -149,12 +134,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(Original, File.ReadAllText(outside));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_RelativeLinkEscapingClient_RestoresRegularFile()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -174,12 +156,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(Original, File.ReadAllText(outside));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_TwoHopChainLeavingClient_RestoresRegularFile()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -202,12 +181,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(Original, File.ReadAllText(outside));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_SidecarWithoutSymlinkSha256_IsHashMismatch()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var env = LinkedRealmlist();
         var switched = File.ReadAllText(env.LinkPath);
         EditManifest(env.ManifestPath, node =>
@@ -226,12 +202,9 @@ public class ClientFilesSymlinkTests
         Assert.Null(new FileInfo(env.LinkPath).LinkTarget);
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_SidecarThatIsItselfASymlink_IsVerifyFailed()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var env = LinkedRealmlist();
         var switched = File.ReadAllText(env.LinkPath);
         var decoy = env.Temp.Combine("decoy.txt");
@@ -247,12 +220,9 @@ public class ClientFilesSymlinkTests
         Assert.Null(new FileInfo(env.LinkPath).LinkTarget);
     }
 
-    [Fact]
+    [LinuxFact]
     public void Undo_SidecarReplacedByFifo_IsVerifyFailed()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var env = LinkedRealmlist();
         var switched = File.ReadAllText(env.LinkPath);
         File.Delete(env.Sidecar);
@@ -270,12 +240,9 @@ public class ClientFilesSymlinkTests
         Assert.Null(new FileInfo(env.LinkPath).LinkTarget);
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_OversizedSidecar_IsVerifyFailed()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var env = LinkedRealmlist();
         var switched = File.ReadAllText(env.LinkPath);
         File.WriteAllText(env.Sidecar, new string('a', SymlinkSnapshot.MaxSidecarBytes + 1));
@@ -287,12 +254,9 @@ public class ClientFilesSymlinkTests
         Assert.Null(new FileInfo(env.LinkPath).LinkTarget);
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_BadSidecarOnLaterEntry_RestoresNothing()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -324,12 +288,9 @@ public class ClientFilesSymlinkTests
         Assert.Null(new FileInfo(configPath).LinkTarget);
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_TwoHopChainInsideClient_RestoresSymlink()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -352,12 +313,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(Original, File.ReadAllText(shared));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_ManagedParentFolderSymlinkOutside_DoesNotWriteOutside()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var outside = temp.Combine("outside");
@@ -383,12 +341,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(applied, File.ReadAllBytes(Path.Combine(client, "Data.real", "enUS", "realmlist.wtf")));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_DanglingLink_RestoresRegularFile()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -410,12 +365,9 @@ public class ClientFilesSymlinkTests
         Assert.False(File.Exists(shared));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_MissingSidecarWithSymlinkSha256_IsHashMismatch()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var env = LinkedRealmlist();
         var switched = File.ReadAllText(env.LinkPath);
         File.Delete(env.Sidecar);
@@ -427,12 +379,9 @@ public class ClientFilesSymlinkTests
         Assert.Null(new FileInfo(env.LinkPath).LinkTarget);
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_SidecarInvalidUtf8_IsVerifyFailed()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var env = LinkedRealmlist();
         var switched = File.ReadAllText(env.LinkPath);
         File.WriteAllBytes(env.Sidecar, [0x80]);
@@ -445,12 +394,9 @@ public class ClientFilesSymlinkTests
         Assert.Null(new FileInfo(env.LinkPath).LinkTarget);
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_SidecarControlCharacter_IsVerifyFailed()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var env = LinkedRealmlist();
         var switched = File.ReadAllText(env.LinkPath);
         File.WriteAllBytes(env.Sidecar, "link\u0001text"u8.ToArray());
@@ -463,12 +409,9 @@ public class ClientFilesSymlinkTests
         Assert.Null(new FileInfo(env.LinkPath).LinkTarget);
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_AbsoluteLinkToClientPrefixLookalike_RestoresRegularFile()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -490,12 +433,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(Original, File.ReadAllText(evilFile));
     }
 
-    [Fact]
+    [UnixFact]
     public void Undo_BackupFileReplacedBySymlink_IsVerifyFailed()
     {
-        if (!SymlinksSupported())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
@@ -522,12 +462,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(payload, File.ReadAllBytes(decoy));
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task Undo_BackupFileReplacedByFifo_IsVerifyFailed()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var env = new AppliedRealm();
         var switched = File.ReadAllText(env.RealmPath);
         var payloadPath = PayloadPath(env, "Data/enUS/realmlist.wtf");
@@ -546,12 +483,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(switched, File.ReadAllText(env.RealmPath));
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task Undo_ManagedRealmlistReplacedByFifo_IsConflict()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var env = new AppliedRealm();
         File.Delete(env.RealmPath);
         if (!TryCreateFifo(env.RealmPath))
@@ -566,12 +500,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal(0x1000, LinuxMode(env.RealmPath) & 0xF000);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task Undo_ManagedRealmlistSymlinkToDevZero_IsConflict()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var env = new AppliedRealm();
         File.Delete(env.RealmPath);
         File.CreateSymbolicLink(env.RealmPath, "/dev/zero");
@@ -585,12 +516,9 @@ public class ClientFilesSymlinkTests
         Assert.Equal("/dev/zero", new FileInfo(env.RealmPath).LinkTarget);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task Undo_RecreatedLinkTargetReplacedByFifo_RestoresRegularFileWithoutHanging()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var env = LinkedRealmlist();
         // The managed file was a symlink to <client>/shared-realmlist.wtf. Someone swaps that target for a
         // FIFO, which a following, unbounded read would block on while Undo holds the installation lock.
@@ -630,8 +558,6 @@ public class ClientFilesSymlinkTests
             throw new InvalidOperationException($"stat did not finish for '{path}'.");
         return Convert.ToInt32(process.StandardOutput.ReadToEnd().Trim(), 16);
     }
-
-    private static bool SymlinksSupported() => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
 
     private static bool TryCreateFifo(string path)
     {
