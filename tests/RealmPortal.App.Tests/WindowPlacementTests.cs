@@ -177,6 +177,7 @@ public class WindowPlacementPersistenceTests
     }
 
     [Theory]
+    [InlineData("""{"X":10,"Y":20,"Width":1000,"Height":600}""")]
     [InlineData("""{"X":"bad","Y":1,"Width":1000,"Height":600,"Maximized":false}""")]
     [InlineData("""{"X":10,"Y":20,"Width":0,"Height":600,"Maximized":false}""")]
     [InlineData("""{"X":10}""")]

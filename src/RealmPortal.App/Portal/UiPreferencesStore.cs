@@ -129,7 +129,9 @@ internal sealed class LenientWindowPlacementConverter : JsonConverter<WindowPlac
             if (!HasNumberProperty(root, "X")
                 || !HasNumberProperty(root, "Y")
                 || !HasNumberProperty(root, "Width")
-                || !HasNumberProperty(root, "Height"))
+                || !HasNumberProperty(root, "Height")
+                || !root.TryGetProperty("Maximized", out var maximized)
+                || maximized.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
             {
                 return null;
             }
