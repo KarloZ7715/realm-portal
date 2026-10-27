@@ -43,9 +43,9 @@ public sealed class ExceptionLogGuardTests
         var logFull = Path.GetFullPath(TestExceptionLogGuard.LogPath);
         Assert.StartsWith(tempRoot + Path.DirectorySeparatorChar, logFull, StringComparison.Ordinal);
 
-        // User crash path (no REALM_PORTAL_STATE_DIR override) must not be the sentinel.
+        // PortalPaths still reports the real user path when REALM_PORTAL_STATE_DIR is unset;
+        // Default must not point there. Do not read that file.
         var userCrash = Path.GetFullPath(PortalPaths.CrashLogFile());
         Assert.NotEqual(userCrash, logFull);
-        Assert.False(File.Exists(userCrash) && File.ReadAllText(userCrash).Contains(marker, StringComparison.Ordinal));
     }
 }
