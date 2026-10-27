@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Network;
 using RealmPortal.App.Settings;
 
 namespace RealmPortal.App.ViewModels;
@@ -13,16 +14,26 @@ namespace RealmPortal.App.ViewModels;
 public sealed partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsStore _store;
+    private readonly INetworkSettingsStore _network;
+    private readonly IUpdateChecker _updates;
     private readonly Func<Task<string?>>? _pickFolder;
     private SettingsModel _saved;
     private bool _justSaved;
+    private bool _networkHydrating;
 
-    public SettingsViewModel(ISettingsStore store, Func<Task<string?>>? pickFolder = null)
+    public SettingsViewModel(
+        ISettingsStore store,
+        Func<Task<string?>>? pickFolder = null,
+        INetworkSettingsStore? network = null,
+        IUpdateChecker? updates = null)
     {
         _store = store;
         _pickFolder = pickFolder;
+        _network = network ?? new MemoryNetworkSettingsStore();
+        _updates = updates ?? new NullUpdateChecker();
         _saved = store.Load();
         Reset();
+        LoadNetwork();
     }
 
     /// <summary>Switches the UI to the saved language; the app calls it once at startup.</summary>
@@ -73,6 +84,27 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDirty), nameof(StatusText))]
     private bool _clearCacheOnSwitch;
+
+    /// <summary>Daily automatic GitHub Releases check (<c>updates.auto_check</c>). Persists immediately.</summary>
+    [ObservableProperty]
+    private bool _autoCheckUpdates = true;
+
+    /// <summary>Login-port status dots (<c>status.probe_enabled</c>). Persists immediately.</summary>
+    [ObservableProperty]
+    private bool _statusProbeEnabled = true;
+
+    /// <summary>Soft status after a manual Check for updates (null when idle).</summary>
+    [ObservableProperty]
+    private string? _updateCheckStatus;
+
+    /// <summary>Raised when the user toggles <see cref="StatusProbeEnabled"/> so the probe scheduler can follow.</summary>
+    public event Action<bool>? StatusProbeEnabledChanged;
+
+    /// <summary>
+    /// Main sets this to present an <see cref="UpdateOffer"/> (Update / Later / Skip).
+    /// Returns the user's choice; null means the dialog could not be shown.
+    /// </summary>
+    public Func<UpdateOffer, Task<ConfirmDialogChoice?>>? PresentUpdateAsync { get; set; }
 
     /// <summary>Which field the last failed save blamed: "template", "backup" or null.</summary>
     [ObservableProperty]
@@ -195,6 +227,42 @@ public sealed partial class SettingsViewModel : ViewModelBase
         && template.Contains("{exe}", StringComparison.Ordinal);
 
     [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        UpdateCheckStatus = Loc.Get("settings.updates.status.checking");
+        var result = await _updates.CheckAsync(UpdateCheckKind.Manual).ConfigureAwait(true);
+        switch (result.Kind)
+        {
+            case UpdateCheckResultKind.Offer when result.Offer is { } offer && PresentUpdateAsync is { } present:
+                UpdateCheckStatus = null;
+                var choice = await present(offer).ConfigureAwait(true);
+                if (choice == ConfirmDialogChoice.Confirm)
+                    await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+                else if (choice == ConfirmDialogChoice.Secondary)
+                    _updates.RemindLater(offer);
+                else if (choice == ConfirmDialogChoice.Cancel)
+                    _updates.SkipThisVersion(offer);
+                break;
+            case UpdateCheckResultKind.Offer when result.Offer is { } offer:
+                // No presenter (tests): treat as UpToDate path skipped — leave a soft note.
+                UpdateCheckStatus = Loc.Format("update.title", offer.Version);
+                break;
+            case UpdateCheckResultKind.UpToDate:
+                UpdateCheckStatus = Loc.Get("settings.updates.status.uptodate");
+                break;
+            case UpdateCheckResultKind.RateLimited:
+                UpdateCheckStatus = Loc.Get("settings.updates.status.ratelimited");
+                break;
+            case UpdateCheckResultKind.Failed:
+                UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
+                break;
+            default:
+                UpdateCheckStatus = null;
+                break;
+        }
+    }
+
+    [RelayCommand]
     private async Task BrowseAsync()
     {
         if (_pickFolder is null)
@@ -228,6 +296,45 @@ public sealed partial class SettingsViewModel : ViewModelBase
         BackupFolder = _saved.BackupFolder;
         ClearCacheOnSwitch = _saved.ClearCacheOnSwitch;
         ServiceErrorField = null;
+    }
+
+    private void LoadNetwork()
+    {
+        _networkHydrating = true;
+        try
+        {
+            var net = _network.Load();
+            AutoCheckUpdates = net.UpdatesAutoCheck;
+            StatusProbeEnabled = net.StatusProbeEnabled;
+            UpdateCheckStatus = null;
+        }
+        finally
+        {
+            _networkHydrating = false;
+        }
+    }
+
+    private void PersistNetwork()
+    {
+        var net = _network.Load();
+        net.UpdatesAutoCheck = AutoCheckUpdates;
+        net.StatusProbeEnabled = StatusProbeEnabled;
+        _network.Save(net);
+    }
+
+    partial void OnAutoCheckUpdatesChanged(bool value)
+    {
+        if (_networkHydrating)
+            return;
+        PersistNetwork();
+    }
+
+    partial void OnStatusProbeEnabledChanged(bool value)
+    {
+        if (_networkHydrating)
+            return;
+        PersistNetwork();
+        StatusProbeEnabledChanged?.Invoke(value);
     }
 
     private void Changed()

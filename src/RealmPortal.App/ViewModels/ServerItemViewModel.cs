@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Network;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Servers;
 using RealmPortal.Core.Service;
@@ -327,5 +328,102 @@ public sealed partial class ServerItemViewModel : ObservableObject
         OnPropertyChanged(nameof(ClientLabel));
         OnPropertyChanged(nameof(MenuDisabledHint));
         OnPropertyChanged(nameof(ShowMenuDisabledHint));
+        OnPropertyChanged(nameof(StatusTooltip));
+        OnPropertyChanged(nameof(StatusAccessibleName));
+    }
+
+    // --- Login reachability status dot (#104) ---
+
+    private LoginReachability _loginStatus = LoginReachability.Unknown;
+    private string? _statusReason;
+    private DateTimeOffset? _statusCheckedAt;
+    private bool _showStatusDot;
+
+    /// <summary>When false the status dot is hidden (probes disabled in Settings).</summary>
+    public bool ShowStatusDot
+    {
+        get => _showStatusDot;
+        private set
+        {
+            if (SetProperty(ref _showStatusDot, value))
+                NotifyStatusDot();
+        }
+    }
+
+    public LoginReachability LoginStatus => _loginStatus;
+
+    public bool IsStatusOnline => _showStatusDot && _loginStatus == LoginReachability.Online;
+    public bool IsStatusOffline => _showStatusDot && _loginStatus == LoginReachability.Offline;
+    public bool IsStatusNeutral => _showStatusDot
+        && (_loginStatus is LoginReachability.Unknown or LoginReachability.Checking);
+
+    public string StatusTooltip => BuildStatusTooltip();
+
+    public string StatusAccessibleName => StatusTooltip;
+
+    public void SetStatusDotVisible(bool visible) => ShowStatusDot = visible;
+
+    public void ApplyProbeSnapshot(ServerProbeSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        _loginStatus = snapshot.Status;
+        _statusReason = snapshot.Reason;
+        _statusCheckedAt = snapshot.CheckedAtUtc;
+        NotifyStatusDot();
+    }
+
+    public void ClearProbeStatus()
+    {
+        _loginStatus = LoginReachability.Unknown;
+        _statusReason = null;
+        _statusCheckedAt = null;
+        NotifyStatusDot();
+    }
+
+    private void NotifyStatusDot()
+    {
+        OnPropertyChanged(nameof(LoginStatus));
+        OnPropertyChanged(nameof(IsStatusOnline));
+        OnPropertyChanged(nameof(IsStatusOffline));
+        OnPropertyChanged(nameof(IsStatusNeutral));
+        OnPropertyChanged(nameof(StatusTooltip));
+        OnPropertyChanged(nameof(StatusAccessibleName));
+        OnPropertyChanged(nameof(ShowStatusDot));
+    }
+
+    private string BuildStatusTooltip()
+    {
+        var age = FormatAge(_statusCheckedAt);
+        return _loginStatus switch
+        {
+            LoginReachability.Online when age is not null =>
+                Loc.Format("status.probe.online.age", age),
+            LoginReachability.Online =>
+                Loc.Get("status.probe.online"),
+            LoginReachability.Offline when _statusReason is { Length: > 0 } reason && age is not null =>
+                Loc.Format("status.probe.offline.age", reason, age),
+            LoginReachability.Offline when _statusReason is { Length: > 0 } reason =>
+                Loc.Format("status.probe.offline.reason", reason),
+            LoginReachability.Offline =>
+                Loc.Get("status.probe.offline"),
+            LoginReachability.Checking =>
+                Loc.Get("status.probe.checking"),
+            _ when _statusReason is { Length: > 0 } reason =>
+                Loc.Format("status.probe.unknown.reason", reason),
+            _ =>
+                Loc.Get("status.probe.unknown"),
+        };
+    }
+
+    private static string? FormatAge(DateTimeOffset? checkedAt)
+    {
+        if (checkedAt is null)
+            return null;
+        var elapsed = DateTimeOffset.UtcNow - checkedAt.Value;
+        if (elapsed < TimeSpan.FromSeconds(45))
+            return Loc.Get("status.probe.age.justnow");
+        if (elapsed < TimeSpan.FromHours(1))
+            return Loc.Format("status.probe.age.minutes", Math.Max(1, (int)elapsed.TotalMinutes));
+        return Loc.Format("status.probe.age.hours", Math.Max(1, (int)elapsed.TotalHours));
     }
 }

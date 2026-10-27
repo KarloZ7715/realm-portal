@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Network;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Platform;
 using RealmPortal.App.Settings;
@@ -17,6 +18,9 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ViewModelBase[] _sections;
     private readonly PortalSession? _session;
     private readonly IConnectionProbe? _probe;
+    private readonly INetworkSettingsStore _network;
+    private readonly IProbeScheduler _probes;
+    private readonly IUpdateChecker _updates;
     private readonly Func<Task<string?>>? _pickFolder;
     private AddServerViewModel? _adding;
     private EditClientViewModel? _editingClient;
@@ -32,11 +36,16 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _uriOpener = uriOpener ?? new ShellUriOpener();
         Backend = backend ?? new DemoBackend();
+        _network = new MemoryNetworkSettingsStore();
+        _probes = new ProbeScheduler();
+        _updates = new PersistingUpdateChecker(new NullUpdateChecker(), _network);
         Servers = new ServersViewModel(Backend, autoTick);
         Clients = new ClientsViewModel(Backend);
         var settingsScreen = new SettingsViewModel(
             settings ?? new DemoSettingsStore(),
-            () => Task.FromResult<string?>("/home/demo/.local/share/RealmPortal/backups-2"));
+            () => Task.FromResult<string?>("/home/demo/.local/share/RealmPortal/backups-2"),
+            _network,
+            _updates);
         settingsScreen.ApplySavedLanguage();
         settingsScreen.CanManageBackups = false;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
@@ -46,17 +55,26 @@ public sealed partial class MainViewModel : ObservableObject
         WireSections();
         Clients.ClientEditRequested += ShowEditClient;
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
+        WireNetwork();
     }
 
-    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null, Func<TimeSpan, Task>? delay = null, IUriOpener? uriOpener = null)
+    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null, Func<TimeSpan, Task>? delay = null, IUriOpener? uriOpener = null,
+        INetworkSettingsStore? network = null, IProbeScheduler? probes = null, IUpdateChecker? updates = null)
     {
         _uriOpener = uriOpener ?? new ShellUriOpener();
         _session = session;
         _probe = probe ?? new TcpConnectionProbe();
         _pickFolder = pickFolder;
+        var configDir = PortalPaths.ConfigDirectory(session.GetVariable);
+        _network = network ?? new NetworkSettingsStore(configDir);
+        _probes = probes ?? new ProbeScheduler(_probe);
+        var innerUpdates = updates ?? new NullUpdateChecker();
+        _updates = innerUpdates is PersistingUpdateChecker
+            ? innerUpdates
+            : new PersistingUpdateChecker(innerUpdates, _network);
         Servers = new ServersViewModel(session, autoTick, delay);
         Clients = new ClientsViewModel(session, pickFolder, startFirstScan: false);
-        var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder);
+        var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder, _network, _updates);
         settingsScreen.ApplySavedLanguage();
         settingsScreen.CanManageBackups = true;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
@@ -69,6 +87,7 @@ public sealed partial class MainViewModel : ObservableObject
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
         Clients.FirstScanFoundNoClients += ShowClientsAfterEmptyScan;
         Servers.ConfirmDiscardAsync = () => ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
+        WireNetwork();
         if (!session.UiPreferences.Load().IsWelcomeDone)
         {
             Welcome = new WelcomeViewModel(
@@ -82,6 +101,8 @@ public sealed partial class MainViewModel : ObservableObject
         else
         {
             Clients.StartFirstScanIfNeeded();
+            ExceptionLog.Observe(RunAutomaticUpdateCheckAsync());
+            SyncProbeListVisibility();
         }
     }
 
@@ -157,6 +178,8 @@ public sealed partial class MainViewModel : ObservableObject
         // Servers already reload at construction, on the welcome servers step, and via ClientsChanged after scans.
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(Content));
+        SyncProbeListVisibility();
+        ExceptionLog.Observe(RunAutomaticUpdateCheckAsync());
     }
 
     private async Task OpenAddServerFromWelcomeAsync()
@@ -232,9 +255,18 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The non-affiliation note shown at the foot of the wide sidebar.</summary>
     public string Disclaimer => Loc.Instance.Current == Language.Es ? AppInfo.DisclaimerEs : AppInfo.DisclaimerEn;
 
-    /// <summary>The modal question being shown, or null.</summary>
+    /// <summary>The confirm modal being shown, or null.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasModal))]
     private ConfirmDialogViewModel? _dialog;
+
+    /// <summary>The update notice modal (#105), or null. Separate from <see cref="Dialog"/> so existing confirm flows stay typed.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasModal))]
+    private UpdateNoticeViewModel? _updateNotice;
+
+    /// <summary>True when any modal (confirm or update notice) is open.</summary>
+    public bool HasModal => Dialog is not null || UpdateNotice is not null;
 
     /// <summary>Raised before <see cref="Dialog"/> is set so the window can capture keyboard focus.</summary>
     public event Action? DialogOpening;
@@ -250,7 +282,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public async Task<ConfirmDialogChoice> ChooseAsync(ConfirmDialogViewModel dialog)
     {
-        if (Dialog is not null)
+        if (Dialog is not null || UpdateNotice is not null)
         {
             dialog.Reject();
             return ConfirmDialogChoice.Cancel;
@@ -266,6 +298,76 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Dialog = null;
             DialogClosed?.Invoke();
+        }
+    }
+
+    /// <summary>Shows the update notice (#105) and returns the user's choice, or null if another dialog is open.</summary>
+    public async Task<ConfirmDialogChoice?> ShowUpdateNoticeAsync(UpdateOffer offer)
+    {
+        ArgumentNullException.ThrowIfNull(offer);
+        if (Dialog is not null || UpdateNotice is not null)
+            return null;
+
+        var dialog = new UpdateNoticeViewModel(offer);
+        dialog.OpenUrlRequested += url =>
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                return;
+            ExceptionLog.Observe(_uriOpener.OpenAsync(uri));
+        };
+        DialogOpening?.Invoke();
+        UpdateNotice = dialog;
+        try
+        {
+            return await dialog.Choice;
+        }
+        finally
+        {
+            UpdateNotice = null;
+            DialogClosed?.Invoke();
+        }
+    }
+
+
+    private void WireNetwork()
+    {
+        var net = _network.Load();
+        _probes.SetEnabled(net.StatusProbeEnabled);
+        Servers.AttachProbeScheduler(_probes, net.StatusProbeEnabled);
+        Settings.StatusProbeEnabledChanged += enabled =>
+        {
+            _probes.SetEnabled(enabled);
+            Servers.SetStatusDotsVisible(enabled);
+        };
+        Settings.PresentUpdateAsync = async offer => await ShowUpdateNoticeAsync(offer).ConfigureAwait(true);
+        SyncProbeListVisibility();
+    }
+
+    private void SyncProbeListVisibility()
+    {
+        // No probes until the servers list is the visible section and welcome is done.
+        var visible = !IsWelcomeActive && SectionIndex == 0 && _adding is null;
+        _probes.NotifyListVisible(visible);
+    }
+
+    private async Task RunAutomaticUpdateCheckAsync()
+    {
+        try
+        {
+            var result = await _updates.CheckAsync(UpdateCheckKind.Automatic).ConfigureAwait(true);
+            if (result.Kind != UpdateCheckResultKind.Offer || result.Offer is null)
+                return;
+            var choice = await ShowUpdateNoticeAsync(result.Offer).ConfigureAwait(true);
+            if (choice == ConfirmDialogChoice.Confirm)
+                await _updates.InstallUpdateAsync(result.Offer).ConfigureAwait(true);
+            else if (choice == ConfirmDialogChoice.Secondary)
+                _updates.RemindLater(result.Offer);
+            else if (choice == ConfirmDialogChoice.Cancel)
+                _updates.SkipThisVersion(result.Offer);
+        }
+        catch
+        {
+            // Automatic failures are silent per docs/updates-and-status.md.
         }
     }
 
@@ -292,6 +394,7 @@ public sealed partial class MainViewModel : ObservableObject
             CloseEditClient();
         else
             Clients.RefreshRunningState();
+        SyncProbeListVisibility();
     }
 
     private void ShowAddServer()
@@ -323,6 +426,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(Adding));
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
+        SyncProbeListVisibility();
     }
 
     private void ShowEditServer(ServerItemViewModel card)
@@ -354,6 +458,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(Adding));
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
+        SyncProbeListVisibility();
     }
 
     private void CloseAddServer()
@@ -369,6 +474,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(Adding));
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
+        SyncProbeListVisibility();
     }
 
     private void ShowEditClient(ClientItemViewModel client)
