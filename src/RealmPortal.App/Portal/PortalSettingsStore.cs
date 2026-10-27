@@ -4,7 +4,7 @@ using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.Portal;
 
-/// <summary>Maps <see cref="ISettingsStore"/> to <see cref="IPortalService"/> plus UI language preferences and network settings.</summary>
+/// <summary>Maps <see cref="ISettingsStore"/> to <see cref="IPortalService"/> plus UI language preferences.</summary>
 public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
 {
     public SettingsModel Load()
@@ -21,7 +21,6 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
                 : string.Empty;
 
         var clearCache = backup.Succeeded && backup.Value!.ClearCacheOnSwitch;
-        var autoCheck = session.NetworkSettings.LoadOrDefault(out _).UpdatesAutoCheck;
         return new SettingsModel(
             language,
             launcherValue.CommandTemplate,
@@ -29,42 +28,11 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
             launcherValue.Arguments ?? [],
             launcherValue.Environment ?? new Dictionary<string, string?>(),
             backupFolder,
-            clearCache,
-            autoCheck);
+            clearCache);
     }
 
     public SettingsError? Save(SettingsModel settings)
     {
-        // Network settings first so a failure commits nothing else.
-        // Valid file: Update only UpdatesAutoCheck so concurrent LastAttemptUtc / ETag are preserved.
-        // Corrupt JSON/empty: Overwrite after moving the bad file aside.
-        // Unsupported version / unreadable: preserve the file and fail the save (do not reset toggles).
-        var currentNetwork = session.NetworkSettings.LoadOrDefault(out var networkError);
-        if (networkError is not null)
-        {
-            if (!NetworkSettingsStore.IsCorruptContent(networkError))
-                return new SettingsError("StoreCorrupt");
-            try
-            {
-                session.NetworkSettings.Overwrite(currentNetwork with { UpdatesAutoCheck = settings.AutoCheckUpdates });
-            }
-            catch (Exception)
-            {
-                return new SettingsError("StoreCorrupt");
-            }
-        }
-        else if (currentNetwork.UpdatesAutoCheck != settings.AutoCheckUpdates)
-        {
-            try
-            {
-                session.NetworkSettings.Update(s => s with { UpdatesAutoCheck = settings.AutoCheckUpdates });
-            }
-            catch (Exception)
-            {
-                return new SettingsError("StoreCorrupt");
-            }
-        }
-
         var launcher = new LauncherSettings(
             settings.CommandTemplate,
             settings.Arguments,

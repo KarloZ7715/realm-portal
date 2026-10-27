@@ -13,8 +13,7 @@ public sealed class DemoSettingsStore : ISettingsStore
         ["-windowed", "-nosound"],
         new Dictionary<string, string?> { ["WINEPREFIX"] = "/home/demo/.wine", ["DXVK_HUD"] = "fps", ["WINEDEBUG"] = "-all" },
         "/home/demo/.local/share/RealmPortal/backups",
-        ClearCacheOnSwitch: false,
-        AutoCheckUpdates: true);
+        ClearCacheOnSwitch: false);
 
     public SettingsModel Load() => _saved;
 

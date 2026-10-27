@@ -892,7 +892,11 @@ public sealed class PortalService : IPortalService
     {
         try
         {
-            return ServiceResult<NetworkSettings>.Ok(_networkSettings.Get());
+            // Startup-safe: missing/corrupt JSON → defaults; unsupported version / IO → fail.
+            var settings = _networkSettings.LoadOrDefault(out var error);
+            if (error is not null && !NetworkSettingsStore.IsCorruptContent(error))
+                return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(error));
+            return ServiceResult<NetworkSettings>.Ok(settings);
         }
         catch (Exception ex)
         {
@@ -909,6 +913,19 @@ public sealed class PortalService : IPortalService
         {
             _networkSettings.Set(settings);
             return ServiceResult<Unit>.Ok(default);
+        }
+        catch (Exception ex) when (NetworkSettingsStore.IsCorruptContent(ex))
+        {
+            // Set re-reads and cannot repair; Overwrite moves the bad file aside first.
+            try
+            {
+                _networkSettings.Overwrite(settings);
+                return ServiceResult<Unit>.Ok(default);
+            }
+            catch (Exception overwriteEx)
+            {
+                return ServiceResult<Unit>.Fail(ServiceErrors.FromException(overwriteEx));
+            }
         }
         catch (Exception ex)
         {

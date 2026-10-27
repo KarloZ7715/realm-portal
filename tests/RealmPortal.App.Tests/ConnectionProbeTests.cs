@@ -64,7 +64,9 @@ public class ConnectionProbeTests
     [Fact]
     public async Task UnresolvableInvalidHost_IsNeverOk()
     {
-        var probe = new TcpConnectionProbe();
+        // Inject HostNotFound — ambient DNS may NXDOMAIN-hijack *.invalid on some networks.
+        var probe = new TcpConnectionProbe((_, _) =>
+            throw new SocketException((int)SocketError.HostNotFound));
         var result = await probe.ProbeAsync("nonexistent.invalid", 3724, TimeSpan.FromSeconds(3), CancellationToken.None);
         Assert.NotEqual(ProbeResult.Ok, result.Outcome);
         Assert.True(result.Outcome is ProbeResult.Failed or ProbeResult.TimedOut);

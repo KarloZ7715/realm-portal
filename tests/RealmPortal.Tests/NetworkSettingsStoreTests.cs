@@ -96,6 +96,27 @@ public class NetworkSettingsStoreTests
         Assert.False(NetworkSettingsStore.IsCorruptContent(new StoreException("x has unsupported format version 99.")));
     }
 
+
+    [Fact]
+    public void PortalService_CorruptNetworkSettings_GetDefaults_SetRepairsViaOverwrite()
+    {
+        using var env = new ServiceEnv();
+        var path = Path.Combine(env.Config, "network-settings.json");
+        File.WriteAllText(path, "{ not json");
+
+        var got = env.Service.GetNetworkSettings();
+        Assert.True(got.Succeeded);
+        Assert.True(got.Value!.UpdatesAutoCheck);
+        Assert.True(got.Value.StatusProbeEnabled);
+
+        var set = env.Service.SetNetworkSettings(got.Value with { UpdatesAutoCheck = false, StatusProbeEnabled = false });
+        Assert.True(set.Succeeded);
+        Assert.True(File.Exists(path + ".corrupt"));
+        var again = env.Service.GetNetworkSettings().Value!;
+        Assert.False(again.UpdatesAutoCheck);
+        Assert.False(again.StatusProbeEnabled);
+    }
+
     private sealed class TempConfig : IDisposable
     {
         private readonly TempDirectory _temp = new();
@@ -115,18 +136,19 @@ public class NetworkSettingsStoreTests
     private sealed class ServiceEnv : IDisposable
     {
         private readonly TempDirectory _temp = new();
+        public string Config { get; }
         public PortalService Service { get; }
 
         public ServiceEnv()
         {
-            var config = _temp.Combine("config");
+            Config = _temp.Combine("config");
             var projection = _temp.Combine("projection");
             var backups = _temp.Combine("backups");
-            Directory.CreateDirectory(config);
+            Directory.CreateDirectory(Config);
             Directory.CreateDirectory(projection);
             Directory.CreateDirectory(backups);
             Service = new PortalService(
-                config,
+                Config,
                 projection,
                 new RealmPortal.Core.Clients.PeClientVersionReader(),
                 new NoLaunch(),
