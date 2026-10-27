@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Network;
+using RealmPortal.Core;
 using RealmPortal.Core.Service;
 using RealmPortal.App.Settings;
 
@@ -267,8 +268,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
         {
             UpdateCheckStatus = null;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            ExceptionLog.Default.Write(ex, "Settings.CheckForUpdates");
             UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
         }
     }
@@ -325,14 +327,21 @@ public sealed partial class SettingsViewModel : ViewModelBase
         }
     }
 
+    private readonly object _networkWriteGate = new();
+
     private void PersistNetwork()
     {
-        var auto = AutoCheckUpdates;
-        var probe = StatusProbeEnabled;
         void Write()
         {
-            var net = _network.Load();
-            _network.Save(net with { UpdatesAutoCheck = auto, StatusProbeEnabled = probe });
+            lock (_networkWriteGate)
+            {
+                // Read generated properties inside the lock so a later toggle cannot be
+                // overwritten by an older queued Task.Run snapshot.
+                var auto = AutoCheckUpdates;
+                var probe = StatusProbeEnabled;
+                var net = _network.Load();
+                _network.Save(net with { UpdatesAutoCheck = auto, StatusProbeEnabled = probe });
+            }
         }
 
         // Memory store is sync. PortalNetworkSettingsStore hits Core ConfigDirectoryLock —
