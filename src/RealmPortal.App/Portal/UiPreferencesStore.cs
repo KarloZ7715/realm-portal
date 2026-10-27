@@ -97,14 +97,21 @@ public sealed record UiPreferences(
     string? LanguageCode = null,
     IReadOnlyList<string>? ClientsInUse = null,
     bool FirstScanCompleted = false,
-    WindowPlacement? Window = null)
+    WindowPlacement? Window = null,
+    bool? WelcomeCompleted = null)
 {
     public HashSet<string> InUseSet => ClientsInUse?.ToHashSet(StringComparer.Ordinal) ?? [];
+
+    /// <summary>
+    /// True when the first-run welcome was finished or skipped, or when an older install already
+    /// completed its first client scan (so the welcome is not re-shown after upgrading).
+    /// </summary>
+    public bool IsWelcomeDone => WelcomeCompleted ?? FirstScanCompleted;
 }
 
 /// <summary>
 /// Deserializes <see cref="WindowPlacement"/> leniently: a malformed <c>Window</c> value becomes null so the rest of
-/// the preferences file still loads (language, clients in use, first-scan flag).
+/// the preferences file still loads (language, clients in use, first-scan and welcome flags).
 /// </summary>
 internal sealed class LenientWindowPlacementConverter : JsonConverter<WindowPlacement?>
 {

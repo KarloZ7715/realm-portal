@@ -61,7 +61,20 @@ public sealed partial class MainViewModel : ObservableObject
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
         Clients.FirstScanFoundNoClients += ShowClientsAfterEmptyScan;
         Servers.ConfirmDiscardAsync = () => ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
-        Clients.StartFirstScanIfNeeded();
+        if (!session.UiPreferences.Load().IsWelcomeDone)
+        {
+            Welcome = new WelcomeViewModel(
+                session,
+                Clients,
+                Servers,
+                Settings,
+                FinishWelcome,
+                openAddServer: OpenAddServerFromWelcomeAsync);
+        }
+        else
+        {
+            Clients.StartFirstScanIfNeeded();
+        }
     }
 
     public DemoBackend? Backend { get; }
@@ -71,6 +84,13 @@ public sealed partial class MainViewModel : ObservableObject
     public ClientsViewModel Clients { get; }
 
     public SettingsViewModel Settings { get; }
+
+    /// <summary>The one-time first-run welcome, or null once finished or skipped.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsWelcomeActive), nameof(StatusText), nameof(Content))]
+    private WelcomeViewModel? _welcome;
+
+    public bool IsWelcomeActive => Welcome is not null;
 
     private int _sectionIndex;
 
@@ -106,12 +126,33 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     private void ShowClientsAfterEmptyScan()
     {
+        if (IsWelcomeActive)
+        {
+            return;
+        }
+
         if (_sectionIndex == 2 && Settings.IsDirty)
         {
             return;
         }
 
         SectionIndex = 1;
+    }
+
+    private void FinishWelcome()
+    {
+        Welcome = null;
+        Clients.StartFirstScanIfNeeded();
+        Servers.ReloadFromService();
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(Content));
+    }
+
+    private async Task OpenAddServerFromWelcomeAsync()
+    {
+        // Welcome already cleared WelcomeCompleted; open the add-server form on the servers section.
+        ShowAddServer();
+        await Task.CompletedTask.ConfigureAwait(true);
     }
 
     /// <summary>Raised when a section change waits for the unsaved-changes question, so the sidebar can re-select Settings.</summary>
@@ -170,7 +211,7 @@ public sealed partial class MainViewModel : ObservableObject
             ? _editingClient
             : _sections[Math.Clamp(SectionIndex, 0, _sections.Length - 1)];
 
-    public string StatusText => Content.StatusText;
+    public string StatusText => Welcome?.StatusText ?? Content.StatusText;
 
     /// <summary>"ES · v1.0.0": the language toggle of the status bar (version from <see cref="AppInfo.Version"/>).</summary>
     public string LanguageLabel => $"{Loc.Instance.Code} · v{AppInfo.Version}";
@@ -455,6 +496,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnLanguageChanged()
     {
+        Welcome?.RefreshText();
         foreach (var section in _sections)
         {
             section.RefreshText();
