@@ -911,6 +911,9 @@ public sealed class PortalService : IPortalService
 
         try
         {
+            // Full snapshot write (App PersistNetwork / PersistingUpdateChecker LastAttempt).
+            // Field tweaks that must not clobber concurrent ETag/LastAttempt should use
+            // NetworkSettingsStore.Update(mutate) instead (UpdateChecker already does).
             _networkSettings.Set(settings);
             return ServiceResult<Unit>.Ok(default);
         }

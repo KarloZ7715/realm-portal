@@ -88,6 +88,9 @@ public sealed class NetworkSettingsStore
         {
             if (File.Exists(_path))
             {
+                // Another writer may have repaired the file after Set threw; do not clobber valid data.
+                if (!IsCorruptOnDiskUnlocked())
+                    throw new InvalidOperationException("Network settings are no longer corrupt; refusing to overwrite.");
                 var backup = AllocateCorruptBackupPath(_path);
                 File.Move(_path, backup);
             }
@@ -101,10 +104,21 @@ public sealed class NetworkSettingsStore
     /// <summary>True when <paramref name="error"/> is empty/invalid JSON content (safe to repair by overwrite).</summary>
     public static bool IsCorruptContent(Exception? error) =>
         error is JsonException
-        || (error is StoreException se
-            && (se.Message.Contains("is empty", StringComparison.Ordinal)
-                || se.Message.Contains("is not valid", StringComparison.Ordinal)
-                || se.InnerException is JsonException));
+        || error is StoreException { ContentCorrupt: true }
+        || error is StoreException { InnerException: JsonException };
+
+    private bool IsCorruptOnDiskUnlocked()
+    {
+        try
+        {
+            _ = LoadUnlocked();
+            return false;
+        }
+        catch (Exception ex) when (IsCorruptContent(ex))
+        {
+            return true;
+        }
+    }
 
     private static string AllocateCorruptBackupPath(string path)
     {
@@ -154,14 +168,14 @@ public sealed class NetworkSettingsStore
         try
         {
             var file = JsonSerializer.Deserialize<NetworkFile>(PortalConfigFile.ReadBounded(_path), JsonOptions)
-                       ?? throw new StoreException($"'{_path}' is empty.");
+                       ?? throw new StoreException($"'{_path}' is empty.", contentCorrupt: true);
             if (file.Version != FormatVersion)
                 throw new StoreException($"'{_path}' has unsupported format version {file.Version}.");
             return file;
         }
         catch (JsonException ex)
         {
-            throw new StoreException($"'{_path}' is not valid: {ex.Message}", ex);
+            throw new StoreException($"'{_path}' is not valid: {ex.Message}", ex, contentCorrupt: true);
         }
         catch (IOException ex)
         {

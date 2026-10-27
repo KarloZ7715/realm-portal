@@ -92,8 +92,10 @@ public class NetworkSettingsStoreTests
         store.Overwrite(new NetworkSettings(UpdatesAutoCheck: true));
         Assert.True(File.Exists(path + ".corrupt")); // preserved
         Assert.True(File.Exists(path + ".corrupt.1"));
-        Assert.True(NetworkSettingsStore.IsCorruptContent(new StoreException("x is not valid: boom")));
+        Assert.True(NetworkSettingsStore.IsCorruptContent(new StoreException("x is not valid: boom", contentCorrupt: true)));
+        Assert.True(NetworkSettingsStore.IsCorruptContent(new StoreException("wrap", new System.Text.Json.JsonException("bad"))));
         Assert.False(NetworkSettingsStore.IsCorruptContent(new StoreException("x has unsupported format version 99.")));
+        Assert.False(NetworkSettingsStore.IsCorruptContent(new StoreException("path/is not valid/dir has unsupported format version 99.")));
     }
 
 
@@ -115,6 +117,20 @@ public class NetworkSettingsStoreTests
         var again = env.Service.GetNetworkSettings().Value!;
         Assert.False(again.UpdatesAutoCheck);
         Assert.False(again.StatusProbeEnabled);
+    }
+
+
+    [Fact]
+    public void Overwrite_RefusesWhenFileIsNoLongerCorrupt()
+    {
+        using var env = new TempConfig();
+        var store = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock);
+        store.Set(new NetworkSettings(UpdatesAutoCheck: false, UpdatesEtag: "\"keep\""));
+        Assert.Throws<InvalidOperationException>(() =>
+            store.Overwrite(new NetworkSettings(UpdatesAutoCheck: true)));
+        Assert.Equal("\"keep\"", store.Get().UpdatesEtag);
+        Assert.False(store.Get().UpdatesAutoCheck);
+        Assert.False(File.Exists(Path.Combine(env.Config, "network-settings.json.corrupt")));
     }
 
     private sealed class TempConfig : IDisposable
