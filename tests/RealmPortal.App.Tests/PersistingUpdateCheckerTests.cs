@@ -50,7 +50,7 @@ public class PersistingUpdateCheckerTests
         var result = await checker.CheckAsync(UpdateCheckKind.Automatic);
         Assert.Equal(UpdateCheckResultKind.Offer, result.Kind);
         Assert.Equal("1.2.0", result.Offer!.Version);
-        Assert.NotNull(store.Load().UpdatesLastAttemptUtc);
+        Assert.NotNull(store.Load().Value!.UpdatesLastAttemptUtc);
         Assert.Single(inner.Checks);
         Assert.Equal(UpdateCheckKind.Automatic, inner.Checks[0].Kind);
     }
@@ -107,7 +107,7 @@ public class PersistingUpdateCheckerTests
         var checker = new PersistingUpdateChecker(new NullUpdateChecker(), store);
         var before = DateTimeOffset.UtcNow;
         checker.RemindLater(offer);
-        var saved = store.Load();
+        var saved = store.Load().Value!;
         Assert.Equal("1.4.0", saved.UpdatesLaterVersion);
         Assert.NotNull(saved.UpdatesLaterUntilUtc);
         Assert.True(saved.UpdatesLaterUntilUtc >= before.AddDays(3).AddSeconds(-2));
@@ -120,7 +120,7 @@ public class PersistingUpdateCheckerTests
         var store = new MemoryNetworkSettingsStore();
         var checker = new PersistingUpdateChecker(new NullUpdateChecker(), store);
         checker.SkipThisVersion(Offer("1.5.0"));
-        Assert.Equal("1.5.0", store.Load().UpdatesSkippedVersion);
+        Assert.Equal("1.5.0", store.Load().Value!.UpdatesSkippedVersion);
     }
 
     [Fact]

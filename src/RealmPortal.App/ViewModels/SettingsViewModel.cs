@@ -316,9 +316,22 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _networkHydrating = true;
         try
         {
-            var net = _network.Load();
-            AutoCheckUpdates = net.UpdatesAutoCheck;
-            StatusProbeEnabled = net.StatusProbeEnabled;
+            var loaded = _network.Load();
+            if (!loaded.Succeeded)
+            {
+                ExceptionLog.Default.WriteMessage(
+                    $"LoadNetwork failed: {loaded.Error}",
+                    "Settings.LoadNetwork");
+                // Privacy-safe fallback when prefs cannot be read: leave network features off.
+                AutoCheckUpdates = false;
+                StatusProbeEnabled = false;
+            }
+            else
+            {
+                var net = loaded.Value!;
+                AutoCheckUpdates = net.UpdatesAutoCheck;
+                StatusProbeEnabled = net.StatusProbeEnabled;
+            }
             UpdateCheckStatus = null;
         }
         finally
@@ -339,8 +352,22 @@ public sealed partial class SettingsViewModel : ViewModelBase
                 // overwritten by an older queued Task.Run snapshot.
                 var auto = AutoCheckUpdates;
                 var probe = StatusProbeEnabled;
-                var net = _network.Load();
-                _network.Save(net with { UpdatesAutoCheck = auto, StatusProbeEnabled = probe });
+                var loaded = _network.Load();
+                if (!loaded.Succeeded)
+                {
+                    ExceptionLog.Default.WriteMessage(
+                        $"PersistNetwork load failed: {loaded.Error}",
+                        "Settings.PersistNetwork");
+                    return;
+                }
+
+                var saved = _network.Save(loaded.Value! with { UpdatesAutoCheck = auto, StatusProbeEnabled = probe });
+                if (!saved.Succeeded)
+                {
+                    ExceptionLog.Default.WriteMessage(
+                        $"PersistNetwork save failed: {saved.Error}",
+                        "Settings.PersistNetwork");
+                }
             }
         }
 

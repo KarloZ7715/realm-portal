@@ -41,7 +41,7 @@ public class NetworkUiTests
         vm.AutoCheckUpdates = false;
         vm.StatusProbeEnabled = false;
 
-        var saved = network.Load();
+        var saved = network.Load().Value!;
         Assert.False(saved.UpdatesAutoCheck);
         Assert.False(saved.StatusProbeEnabled);
     }
@@ -90,7 +90,7 @@ public class NetworkUiTests
 
         await vm.CheckForUpdatesCommand.ExecuteAsync(null);
         Assert.Equal(ConfirmDialogChoice.Secondary, presented);
-        Assert.Equal("1.9.0", store.Load().UpdatesLaterVersion);
+        Assert.Equal("1.9.0", store.Load().Value!.UpdatesLaterVersion);
         Assert.Null(vm.UpdateCheckStatus);
     }
 

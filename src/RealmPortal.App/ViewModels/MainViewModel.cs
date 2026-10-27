@@ -335,10 +335,18 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void WireNetwork()
     {
-        var net = _network.Load();
+        var loaded = _network.Load();
+        var probeEnabled = loaded.Succeeded && loaded.Value!.StatusProbeEnabled;
+        if (!loaded.Succeeded)
+        {
+            ExceptionLog.Default.WriteMessage(
+                $"WireNetwork load failed: {loaded.Error}",
+                "Main.WireNetwork");
+        }
+
         // Seguridad: SetEnabled(status.probe_enabled) before NotifyListVisible(true).
-        _probes.SetEnabled(net.StatusProbeEnabled);
-        Servers.AttachProbeScheduler(_probes, net.StatusProbeEnabled);
+        _probes.SetEnabled(probeEnabled);
+        Servers.AttachProbeScheduler(_probes, probeEnabled);
         Settings.StatusProbeEnabledChanged += enabled =>
         {
             _probes.SetEnabled(enabled);

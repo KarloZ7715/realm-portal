@@ -10,15 +10,11 @@ public sealed class PortalNetworkSettingsStore(IPortalService service) : INetwor
 {
     private readonly IPortalService _service = service ?? throw new ArgumentNullException(nameof(service));
 
-    public NetworkSettings Load()
-    {
-        var result = _service.GetNetworkSettings();
-        return result.Succeeded ? result.Value! : NetworkSettings.Default;
-    }
+    public ServiceResult<NetworkSettings> Load() => _service.GetNetworkSettings();
 
-    public void Save(NetworkSettings settings)
+    public ServiceResult<Unit> Save(NetworkSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        _ = _service.SetNetworkSettings(settings);
+        return _service.SetNetworkSettings(settings);
     }
 }

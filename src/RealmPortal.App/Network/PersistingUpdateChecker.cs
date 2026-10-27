@@ -34,7 +34,10 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
 
     private async Task<UpdateCheckResult> CheckCoreAsync(UpdateCheckKind kind, CancellationToken cancellationToken)
     {
-        var settings = _store.Load();
+        var loaded = _store.Load();
+        if (!loaded.Succeeded)
+            return kind == UpdateCheckKind.Manual ? UpdateCheckResult.Failed : UpdateCheckResult.None;
+        var settings = loaded.Value!;
         var now = _time.GetUtcNow();
 
         if (kind == UpdateCheckKind.Automatic)
@@ -44,7 +47,9 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
             if (settings.UpdatesLastAttemptUtc is { } last && now - last < AutoCheckInterval)
                 return UpdateCheckResult.None;
 
-            _store.Save(settings with { UpdatesLastAttemptUtc = now });
+            var saved = _store.Save(settings with { UpdatesLastAttemptUtc = now });
+            if (!saved.Succeeded)
+                return UpdateCheckResult.None;
         }
         else
         {
@@ -61,7 +66,10 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
             return result;
 
         var offer = result.Offer;
-        settings = _store.Load();
+        loaded = _store.Load();
+        if (!loaded.Succeeded)
+            return result;
+        settings = loaded.Value!;
         if (string.Equals(offer.Version, settings.UpdatesSkippedVersion, StringComparison.Ordinal))
             return kind == UpdateCheckKind.Manual ? UpdateCheckResult.UpToDate : UpdateCheckResult.None;
 
@@ -77,8 +85,10 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.RemindLater(offer);
-        var settings = _store.Load();
-        _store.Save(settings with
+        var loaded = _store.Load();
+        if (!loaded.Succeeded)
+            return;
+        _ = _store.Save(loaded.Value! with
         {
             UpdatesLaterVersion = offer.Version,
             UpdatesLaterUntilUtc = _time.GetUtcNow() + LaterPostpone,
@@ -89,8 +99,10 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.SkipThisVersion(offer);
-        var settings = _store.Load();
-        _store.Save(settings with { UpdatesSkippedVersion = offer.Version });
+        var loaded = _store.Load();
+        if (!loaded.Succeeded)
+            return;
+        _ = _store.Save(loaded.Value! with { UpdatesSkippedVersion = offer.Version });
     }
 
     public Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)

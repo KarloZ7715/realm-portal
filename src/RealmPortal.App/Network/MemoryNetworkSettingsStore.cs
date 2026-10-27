@@ -7,11 +7,12 @@ public sealed class MemoryNetworkSettingsStore : INetworkSettingsStore
 {
     private NetworkSettings _settings = NetworkSettings.Default;
 
-    public NetworkSettings Load() => _settings;
+    public ServiceResult<NetworkSettings> Load() => ServiceResult<NetworkSettings>.Ok(_settings);
 
-    public void Save(NetworkSettings settings)
+    public ServiceResult<Unit> Save(NetworkSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         _settings = settings;
+        return ServiceResult<Unit>.Ok(default);
     }
 }
