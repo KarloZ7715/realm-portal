@@ -107,7 +107,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private string _name = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(AddressError), nameof(HasAddressError))]
+    [NotifyPropertyChangedFor(nameof(AddressError), nameof(HasAddressError), nameof(AddressInterpretation), nameof(HasAddressInterpretation))]
     private string _address = string.Empty;
 
     [ObservableProperty]
@@ -178,13 +178,40 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     public bool HasClientError => ClientError is not null;
 
+    /// <summary>Shown under the address field when paste normalization produced a host (and optionally dropped other lines).</summary>
+    public string? AddressInterpretation
+    {
+        get
+        {
+            if (!TryParseAddress(Address, out var host, out var port))
+                return null;
+
+            var pasted = RealmlistAddress.NormalizePastedAddress(Address);
+            var display = port == DefaultPort ? host : $"{host}:{port}";
+            var raw = Address.Trim();
+            var changed = !string.Equals(raw, pasted.Token, StringComparison.Ordinal)
+                || !string.Equals(raw, display, StringComparison.OrdinalIgnoreCase);
+            if (!changed && !pasted.IgnoredOtherLines)
+                return null;
+
+            return pasted.IgnoredOtherLines
+                ? Loc.Format("add.address.willuse.ignored", display)
+                : Loc.Format("add.address.willuse", display);
+        }
+    }
+
+    public bool HasAddressInterpretation => AddressInterpretation is not null;
+
     public override string StatusText => TestState == ConnectionTest.Testing ? Loc.Get("status.testing") : Loc.Get("status.add");
 
     private bool IsNameValid => Name.Trim().Length is > 0 and <= Server.MaxNameLength;
 
-    /// <summary>host or host:port; the port defaults to <see cref="DefaultPort"/>. Same rules as a realmlist host.</summary>
+    /// <summary>
+    /// Host or host:port after paste normalization (<c>set realmlist …</c>, quotes, trailing <c>;</c>).
+    /// The port defaults to <see cref="DefaultPort"/>. Same rules as a realmlist host.
+    /// </summary>
     public static bool TryParseAddress(string? text, out string host, out int port) =>
-        RealmlistAddress.TryParseHostAddress(text, out host, out port, DefaultPort);
+        RealmlistAddress.TryParsePastedHostAddress(text, out host, out port, out _, DefaultPort);
 
     /// <summary>Drops the brackets around an IPv6 literal so a connect/DNS call sees <c>::1</c>, not <c>[::1]</c>.</summary>
     internal static string HostForProbe(string host)
@@ -221,6 +248,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
         OnPropertyChanged(nameof(ResultText));
         OnPropertyChanged(nameof(NameError));
         OnPropertyChanged(nameof(AddressError));
+        OnPropertyChanged(nameof(AddressInterpretation));
+        OnPropertyChanged(nameof(HasAddressInterpretation));
         OnPropertyChanged(nameof(ClientError));
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));

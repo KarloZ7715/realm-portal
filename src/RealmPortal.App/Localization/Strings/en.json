@@ -101,6 +101,8 @@
   "add.name": "Name",
   "add.name.help": "How you'll see it in the list.",
   "add.address": "Address (realmlist)",
+  "add.address.willuse": "Will use: {0}",
+  "add.address.willuse.ignored": "Will use: {0} (other pasted lines were ignored).",
   "add.address.help": "With the port if needed.",
   "add.client": "Client",
   "add.client.help": "Pick one of the detected clients.",
