@@ -34,6 +34,13 @@ public sealed partial class ServersViewModel : ViewModelBase
     /// <summary>How long the undo notice stays.</summary>
     public static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(8);
 
+    /// <summary>Probe interval while waiting for the game process to appear after Play.</summary>
+    public static readonly TimeSpan StartupProbeInterval = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>Probe interval after the game is confirmed running (backs off to cut CPU on long sessions).</summary>
+    public static readonly TimeSpan RunningProbeInterval = TimeSpan.FromSeconds(4);
+
+
     private static readonly int[] SwitchProgress = [20, 55, 85];
     private static readonly int[] OpenProgress = [25, 60, 100];
 
@@ -744,7 +751,8 @@ public sealed partial class ServersViewModel : ViewModelBase
         var sawRunning = false;
         var consecutiveMisses = 0;
         const int closeMisses = 3;
-        var interval = TimeSpan.FromMilliseconds(500);
+        // Fast while waiting for the process to appear; back off once it is confirmed running.
+        var interval = StartupProbeInterval;
         var startupTimeout = TimeSpan.FromSeconds(30);
         while (_runningClients.Contains(clientId))
         {
@@ -773,7 +781,12 @@ public sealed partial class ServersViewModel : ViewModelBase
             }
             else
             {
-                sawRunning = true;
+                if (!sawRunning)
+                {
+                    sawRunning = true;
+                    interval = RunningProbeInterval;
+                }
+
                 consecutiveMisses = 0;
                 if (_runningClients.Add(clientId))
                 {
