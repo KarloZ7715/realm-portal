@@ -79,6 +79,14 @@ public class ProbeSchedulerTests
     }
 
     [Fact]
+    public void MapResult_TryAgain_IsUnknown()
+    {
+        ProbeScheduler.MapResult(ConnectionProbeResult.Failed(SocketError.TryAgain), out var status, out var reason);
+        Assert.Equal(ServerProbeStatus.Unknown, status);
+        Assert.Equal(ProbeScheduler.ReasonDns, reason);
+    }
+
+    [Fact]
     public async Task NoProbesUntilListVisible()
     {
         var probe = new ScriptedProbe(_ => ConnectionProbeResult.Ok);

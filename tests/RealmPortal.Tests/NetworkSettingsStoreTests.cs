@@ -39,7 +39,7 @@ public class NetworkSettingsStoreTests
         if (!OperatingSystem.IsWindows())
         {
             var mode = File.GetUnixFileMode(path);
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, mode & (UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead));
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, mode);
         }
 
         var json = File.ReadAllText(path);

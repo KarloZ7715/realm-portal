@@ -145,7 +145,16 @@ public sealed class ProbeScheduler : IDisposable
             }
 
             foreach (var target in next)
-                _states.GetOrAdd(target.ServerId, static _ => new ServerState());
+            {
+                var state = _states.GetOrAdd(target.ServerId, static _ => new ServerState());
+                if (state.TrackedHost is not null
+                    && !string.Equals(state.TrackedHost, target.Host, StringComparison.OrdinalIgnoreCase))
+                {
+                    state.ResetToUnknown();
+                }
+
+                state.TrackedHost = target.Host;
+            }
         }
 
         KickScheduling();
@@ -188,7 +197,7 @@ public sealed class ProbeScheduler : IDisposable
                 {
                     pair.Value.CancelInFlight();
                     pair.Value.ResetToUnknown();
-                    pair.Value.LoopRunning = false;
+                    pair.Value.InvalidateLoop();
                     resets.Add((pair.Key, pair.Value.ToSnapshot(pair.Key)));
                 }
             }
@@ -239,7 +248,7 @@ public sealed class ProbeScheduler : IDisposable
             foreach (var state in _states.Values)
             {
                 state.CancelInFlight();
-                state.LoopRunning = false;
+                state.InvalidateLoop();
             }
         }
 
@@ -278,17 +287,24 @@ public sealed class ProbeScheduler : IDisposable
 
     private async Task RunServerLoopAsync(ProbeServerTarget target, ServerState state, CancellationToken appToken)
     {
+        var serverId = target.ServerId;
+        var loopGen = state.LoopGeneration;
         try
         {
             while (!appToken.IsCancellationRequested && !_disposed)
             {
                 TimeSpan wait;
+                ProbeServerTarget? current;
                 lock (_gate)
                 {
                     if (!_enabled || !_listVisible || _disposed)
                         return;
-                    if (!_servers.Exists(s => s.ServerId == target.ServerId))
+                    if (!state.OwnsLoop(loopGen))
                         return;
+                    var match = _servers.FirstOrDefault(s => s.ServerId == serverId);
+                    if (match is null)
+                        return;
+                    current = match;
                     if (state.InFlight)
                         return;
 
@@ -327,12 +343,12 @@ public sealed class ProbeScheduler : IDisposable
                     continue;
                 }
 
-                await ProbeOnceAsync(target, state, appToken).ConfigureAwait(false);
+                await ProbeOnceAsync(current, state, appToken).ConfigureAwait(false);
             }
         }
         finally
         {
-            state.LoopRunning = false;
+            state.ReleaseLoop(loopGen);
             // If we exited because a delay finished and conditions flipped back on, another Kick may be needed.
             KickScheduling();
         }
@@ -367,7 +383,7 @@ public sealed class ProbeScheduler : IDisposable
 
             if (!RealmlistAddress.TryParseHostAddress(target.Host, out var host, out var port))
             {
-                Finish(target.ServerId, state, ServerProbeStatus.Unknown, "invalid realmlist host", _clock());
+                Finish(linked, target.ServerId, state, ServerProbeStatus.Unknown, "invalid realmlist host", _clock());
                 return;
             }
 
@@ -394,9 +410,12 @@ public sealed class ProbeScheduler : IDisposable
                 }
             }
 
+            if (linked.IsCancellationRequested)
+                return;
+
             var checkedAt = _clock();
             MapResult(result, out var status, out var reason);
-            Finish(target.ServerId, state, status, reason, checkedAt);
+            Finish(linked, target.ServerId, state, status, reason, checkedAt);
         }
         catch (OperationCanceledException) when (linked.IsCancellationRequested)
         {
@@ -416,18 +435,33 @@ public sealed class ProbeScheduler : IDisposable
             }
 
             lock (_gate)
-                state.EndFlight();
+                state.EndFlight(linked);
 
             linked.Dispose();
         }
     }
 
-    private void Finish(string serverId, ServerState state, ServerProbeStatus status, string? reason, DateTimeOffset checkedAt)
+    private void Finish(
+        CancellationTokenSource flight,
+        string serverId,
+        ServerState state,
+        ServerProbeStatus status,
+        string? reason,
+        DateTimeOffset checkedAt)
     {
+        ServerProbeSnapshot snap;
         lock (_gate)
-            state.ApplyResult(status, reason, checkedAt);
+        {
+            if (flight.IsCancellationRequested || !state.OwnsFlight(flight))
+                return;
+            if (!_states.TryGetValue(serverId, out var current) || !ReferenceEquals(current, state))
+                return;
 
-        Raise(state.ToSnapshot(serverId));
+            state.ApplyResult(status, reason, checkedAt);
+            snap = state.ToSnapshot(serverId);
+        }
+
+        Raise(snap);
     }
 
     private void Raise(ServerProbeSnapshot snapshot)
@@ -469,7 +503,7 @@ public sealed class ProbeScheduler : IDisposable
                 reason = ReasonTimedOut;
                 return;
             default:
-                if (result.SocketError is SocketError.HostNotFound or SocketError.NoData)
+                if (result.SocketError is SocketError.HostNotFound or SocketError.NoData or SocketError.TryAgain)
                 {
                     status = ServerProbeStatus.Unknown;
                     reason = ReasonDns;
@@ -524,6 +558,9 @@ public sealed class ProbeScheduler : IDisposable
     {
         private CancellationTokenSource? _flightCts;
         private int _loopRunning;
+        private int _loopGeneration;
+
+        public int LoopGeneration => Volatile.Read(ref _loopGeneration);
 
         public bool LoopRunning
         {
@@ -531,7 +568,25 @@ public sealed class ProbeScheduler : IDisposable
             set => Volatile.Write(ref _loopRunning, value ? 1 : 0);
         }
 
-        public bool TryClaimLoop() => Interlocked.CompareExchange(ref _loopRunning, 1, 0) == 0;
+        public bool TryClaimLoop()
+        {
+            if (Interlocked.CompareExchange(ref _loopRunning, 1, 0) != 0)
+                return false;
+            Interlocked.Increment(ref _loopGeneration);
+            return true;
+        }
+
+        public bool OwnsLoop(int generation) =>
+            Volatile.Read(ref _loopRunning) != 0 && Volatile.Read(ref _loopGeneration) == generation;
+
+        public void ReleaseLoop(int generation)
+        {
+            if (Volatile.Read(ref _loopGeneration) != generation)
+                return;
+            Volatile.Write(ref _loopRunning, 0);
+        }
+
+        public string? TrackedHost { get; set; }
 
         public bool InFlight { get; private set; }
         public DateTimeOffset? LastStartedUtc { get; private set; }
@@ -548,8 +603,12 @@ public sealed class ProbeScheduler : IDisposable
             Status = ServerProbeStatus.Checking;
         }
 
-        public void EndFlight()
+        public bool OwnsFlight(CancellationTokenSource cts) => ReferenceEquals(_flightCts, cts);
+
+        public void EndFlight(CancellationTokenSource cts)
         {
+            if (!ReferenceEquals(_flightCts, cts))
+                return;
             InFlight = false;
             _flightCts = null;
         }
@@ -573,6 +632,12 @@ public sealed class ProbeScheduler : IDisposable
             Status = status;
             Reason = reason;
             CheckedAtUtc = checkedAt;
+        }
+
+        public void InvalidateLoop()
+        {
+            Interlocked.Increment(ref _loopGeneration);
+            Volatile.Write(ref _loopRunning, 0);
         }
 
         public void ResetToUnknown()

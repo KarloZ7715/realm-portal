@@ -64,22 +64,22 @@ internal sealed class NetworkSettingsStore(
         try
         {
             var file = JsonSerializer.Deserialize<NetworkFile>(PortalConfigFile.ReadBounded(_path), JsonOptions)
-                       ?? throw new StoreException($"'{_path}' is empty.");
+                       ?? throw new StoreException("network-settings.json is empty.");
             if (file.Version != FormatVersion)
-                throw new StoreException($"'{_path}' has unsupported format version {file.Version}.");
+                throw new StoreException($"network-settings.json has unsupported format version {file.Version}.");
             return file;
         }
         catch (JsonException ex)
         {
-            throw new StoreException($"'{_path}' is not valid: {ex.Message}", ex);
+            throw new StoreException("network-settings.json is not valid.", ex);
         }
         catch (IOException ex)
         {
-            throw new StoreException($"'{_path}' cannot be read: {ex.Message}", ex);
+            throw new StoreException("network-settings.json cannot be read.", ex);
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new StoreException($"'{_path}' cannot be read: {ex.Message}", ex);
+            throw new StoreException("network-settings.json cannot be read.", ex);
         }
     }
 
