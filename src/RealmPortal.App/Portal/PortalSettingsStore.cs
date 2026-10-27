@@ -4,7 +4,7 @@ using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.Portal;
 
-/// <summary>Maps <see cref="ISettingsStore"/> to <see cref="IPortalService"/> plus UI language preferences.</summary>
+/// <summary>Maps <see cref="ISettingsStore"/> to <see cref="IPortalService"/> plus UI language preferences and network settings.</summary>
 public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
 {
     public SettingsModel Load()
@@ -21,6 +21,7 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
                 : string.Empty;
 
         var clearCache = backup.Succeeded && backup.Value!.ClearCacheOnSwitch;
+        var autoCheck = session.NetworkSettings.LoadOrDefault(out _).AutoCheckUpdates;
         return new SettingsModel(
             language,
             launcherValue.CommandTemplate,
@@ -28,7 +29,8 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
             launcherValue.Arguments ?? [],
             launcherValue.Environment ?? new Dictionary<string, string?>(),
             backupFolder,
-            clearCache);
+            clearCache,
+            autoCheck);
     }
 
     public SettingsError? Save(SettingsModel settings)
@@ -56,6 +58,15 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
                     _ => "PathNotFound",
                 },
                 settings.BackupFolder);
+        }
+
+        try
+        {
+            session.NetworkSettings.Update(s => s with { AutoCheckUpdates = settings.AutoCheckUpdates });
+        }
+        catch (Exception)
+        {
+            return new SettingsError("StoreCorrupt");
         }
 
         session.UiPreferences.SetLanguage(settings.Language);

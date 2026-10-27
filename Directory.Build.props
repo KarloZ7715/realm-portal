@@ -16,4 +16,13 @@
   <PropertyGroup Condition="'$(PublishTrimmed)' == 'true'">
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
+  <!-- Packaging sets InstallKind and AppImageSelfReplace at publish time (docs/updates-and-status.md). -->
+  <PropertyGroup>
+    <InstallKind Condition="'$(InstallKind)' == ''">Unknown</InstallKind>
+    <AppImageSelfReplace Condition="'$(AppImageSelfReplace)' == ''">false</AppImageSelfReplace>
+    <DefineConstants Condition="'$(InstallKind)' == 'AppImage'">$(DefineConstants);REALM_PORTAL_INSTALL_APPIMAGE</DefineConstants>
+    <DefineConstants Condition="'$(InstallKind)' == 'Deb'">$(DefineConstants);REALM_PORTAL_INSTALL_DEB</DefineConstants>
+    <DefineConstants Condition="'$(InstallKind)' == 'WindowsZip'">$(DefineConstants);REALM_PORTAL_INSTALL_WINDOWSZIP</DefineConstants>
+    <DefineConstants Condition="'$(AppImageSelfReplace)' == 'true'">$(DefineConstants);REALM_PORTAL_APPIMAGE_SELF_REPLACE</DefineConstants>
+  </PropertyGroup>
 </Project>

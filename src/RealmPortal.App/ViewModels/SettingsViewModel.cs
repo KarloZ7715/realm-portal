@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Settings;
+using RealmPortal.Core.Updates;
 
 namespace RealmPortal.App.ViewModels;
 
@@ -14,13 +15,19 @@ public sealed partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsStore _store;
     private readonly Func<Task<string?>>? _pickFolder;
+    private readonly IUpdateChecker? _updateChecker;
     private SettingsModel _saved;
     private bool _justSaved;
+    private bool _checkingUpdates;
 
-    public SettingsViewModel(ISettingsStore store, Func<Task<string?>>? pickFolder = null)
+    public SettingsViewModel(
+        ISettingsStore store,
+        Func<Task<string?>>? pickFolder = null,
+        IUpdateChecker? updateChecker = null)
     {
         _store = store;
         _pickFolder = pickFolder;
+        _updateChecker = updateChecker;
         _saved = store.Load();
         Reset();
     }
@@ -74,6 +81,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsDirty), nameof(StatusText))]
     private bool _clearCacheOnSwitch;
 
+    /// <summary>Maps to <c>updates.auto_check</c> in network-settings.json (on by default).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDirty), nameof(StatusText))]
+    private bool _autoCheckUpdates = true;
+
+    /// <summary>Last manual check outcome for the UI banner / status line; null when idle.</summary>
+    [ObservableProperty]
+    private UpdateCheckResult? _lastUpdateCheck;
+
     /// <summary>Which field the last failed save blamed: "template", "backup" or null.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TemplateError), nameof(BackupError))]
@@ -110,7 +126,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         || Arguments != LauncherText.Join(_saved.Arguments)
         || Environment != LauncherText.JoinEnvironment(_saved.Environment)
         || BackupFolder != _saved.BackupFolder
-        || ClearCacheOnSwitch != _saved.ClearCacheOnSwitch;
+        || ClearCacheOnSwitch != _saved.ClearCacheOnSwitch
+        || AutoCheckUpdates != _saved.AutoCheckUpdates;
 
     public bool CanSave => IsDirty;
 
@@ -159,7 +176,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
             LauncherText.Tokens(Arguments),
             environment,
             BackupFolder.Trim(),
-            ClearCacheOnSwitch);
+            ClearCacheOnSwitch,
+            AutoCheckUpdates);
 
         var error = _store.Save(model);
         if (error is not null)
@@ -227,6 +245,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Environment = LauncherText.JoinEnvironment(_saved.Environment);
         BackupFolder = _saved.BackupFolder;
         ClearCacheOnSwitch = _saved.ClearCacheOnSwitch;
+        AutoCheckUpdates = _saved.AutoCheckUpdates;
         ServiceErrorField = null;
     }
 
@@ -269,6 +288,29 @@ public sealed partial class SettingsViewModel : ViewModelBase
     }
 
     partial void OnClearCacheOnSwitchChanged(bool value) => EditedField();
+
+    partial void OnAutoCheckUpdatesChanged(bool value) => EditedField();
+
+    /// <summary>Manual "Check for updates" — works even when <see cref="AutoCheckUpdates"/> is off; debounced in Core.</summary>
+    [RelayCommand(CanExecute = nameof(CanCheckForUpdates))]
+    private async Task CheckForUpdatesAsync()
+    {
+        if (_updateChecker is null)
+            return;
+        _checkingUpdates = true;
+        CheckForUpdatesCommand.NotifyCanExecuteChanged();
+        try
+        {
+            LastUpdateCheck = await _updateChecker.CheckAsync(UpdateCheckMode.Manual).ConfigureAwait(true);
+        }
+        finally
+        {
+            _checkingUpdates = false;
+            CheckForUpdatesCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private bool CanCheckForUpdates() => _updateChecker is not null && !_checkingUpdates;
 
     private void EditedField()
     {

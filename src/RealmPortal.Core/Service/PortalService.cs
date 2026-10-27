@@ -11,6 +11,9 @@ public sealed class PortalService : IPortalService
 {
     private readonly string _configDirectory;
     private readonly string _projectionDirectory;
+
+    /// <summary>Config directory this service was constructed with.</summary>
+    public string ConfigDirectory => _configDirectory;
     private readonly IClientVersionReader _versionReader;
     private readonly IGameLaunchService _launchService;
     private readonly IGameProcessProbe _probe;

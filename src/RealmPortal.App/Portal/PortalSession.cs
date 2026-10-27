@@ -3,6 +3,7 @@ using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
+using RealmPortal.Core.Updates;
 
 namespace RealmPortal.App.Portal;
 
@@ -12,11 +13,19 @@ public sealed class PortalSession
     public PortalSession(
         IPortalService service,
         UiPreferencesStore uiPreferences,
-        Func<string, string?>? getVariable = null)
+        Func<string, string?>? getVariable = null,
+        string? configDirectory = null,
+        NetworkSettingsStore? networkSettings = null,
+        IUpdateChecker? updateChecker = null)
     {
         Service = service;
         UiPreferences = uiPreferences;
         GetVariable = getVariable ?? Environment.GetEnvironmentVariable;
+        var configDir = configDirectory
+            ?? (service as PortalService)?.ConfigDirectory
+            ?? PortalPaths.ConfigDirectory(GetVariable);
+        NetworkSettings = networkSettings ?? new NetworkSettingsStore(configDir);
+        UpdateChecker = updateChecker ?? CreateDefaultUpdateChecker(NetworkSettings, configDir);
     }
 
     public IPortalService Service { get; }
@@ -24,6 +33,18 @@ public sealed class PortalSession
     public UiPreferencesStore UiPreferences { get; }
 
     public Func<string, string?> GetVariable { get; }
+
+    public NetworkSettingsStore NetworkSettings { get; }
+
+    public IUpdateChecker UpdateChecker { get; }
+
+    private static IUpdateChecker CreateDefaultUpdateChecker(NetworkSettingsStore network, string configDir)
+    {
+        var cache = new UpdateCacheStore(configDir);
+        var feed = new GitHubReleaseFeed();
+        var downloader = new UpdateDownloader();
+        return new UpdateChecker(network, cache, feed, downloader);
+    }
 
     public static PortalSession Create(Func<string, string?>? getVariable = null)
     {
@@ -36,7 +57,7 @@ public sealed class PortalSession
             new PeClientVersionReader(),
             new ProcessGameLauncher(),
             getVariable: getVariable);
-        return new PortalSession(service, new UiPreferencesStore(configDir), getVariable);
+        return new PortalSession(service, new UiPreferencesStore(configDir), getVariable, configDir);
     }
 
     public static PortalSession CreateForPaths(
@@ -58,7 +79,7 @@ public sealed class PortalSession
             probe,
             getVariable: getVariable,
             scanOptions: scanOptions);
-        return new PortalSession(service, new UiPreferencesStore(configDir), getVariable);
+        return new PortalSession(service, new UiPreferencesStore(configDir), getVariable, configDir);
     }
 
     /// <summary>The client used for server list compatibility and switch/play when none is pinned on the server.</summary>

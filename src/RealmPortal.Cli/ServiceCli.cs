@@ -68,6 +68,12 @@ internal static class ServiceCli
             ServiceErrorCode.InvalidLauncherSettings => string.IsNullOrEmpty(error.Diagnostic)
                 ? "Launcher settings are invalid."
                 : error.Diagnostic,
+            ServiceErrorCode.UpdateCheckFailed => "The update check failed.",
+            ServiceErrorCode.ChecksumMismatch => "The downloaded update did not match its checksum.",
+            ServiceErrorCode.AssetMissing => "The expected update file is missing from the release.",
+            ServiceErrorCode.DownloadTooLarge => "The update download exceeded the allowed size.",
+            ServiceErrorCode.UntrustedRedirect => "The update URL was outside the allowed GitHub hosts.",
+            ServiceErrorCode.RateLimited => "GitHub rate-limited the update check; try again later.",
             ServiceErrorCode.Unexpected => "An unexpected error occurred.",
             _ => throw new ArgumentOutOfRangeException(nameof(error), error.Code, "Unhandled ServiceErrorCode in CLI messages."),
         };

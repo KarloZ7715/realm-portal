@@ -100,6 +100,25 @@ public enum ServiceErrorCode
     /// <summary>The game process could not be started.</summary>
     LaunchFailed,
 
+    // ---- updates (#105) ----
+    /// <summary>The GitHub Releases check failed (network, HTTP status, parse).</summary>
+    UpdateCheckFailed,
+
+    /// <summary>Downloaded bytes did not match the release SHA256SUMS digest.</summary>
+    ChecksumMismatch,
+
+    /// <summary>The expected release asset or its SHA256SUMS line is missing or duplicated.</summary>
+    AssetMissing,
+
+    /// <summary>A download exceeded the pinned size or the hard 300 MB / 1 MiB cap.</summary>
+    DownloadTooLarge,
+
+    /// <summary>A URL was outside the HTTPS allowlist (host / scheme / port / userinfo).</summary>
+    UntrustedRedirect,
+
+    /// <summary>GitHub returned 403/429; wait for Retry-After before trying again.</summary>
+    RateLimited,
+
     // ---- cross-cutting ----
     /// <summary>A multi-step operation failed and the compensating step failed too: the app state and the client files may disagree. See <see cref="ServiceError.Consistency"/>.</summary>
     InconsistentState,

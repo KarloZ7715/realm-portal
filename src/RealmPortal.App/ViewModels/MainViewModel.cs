@@ -56,7 +56,7 @@ public sealed partial class MainViewModel : ObservableObject
         _pickFolder = pickFolder;
         Servers = new ServersViewModel(session, autoTick, delay);
         Clients = new ClientsViewModel(session, pickFolder, startFirstScan: false);
-        var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder);
+        var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder, session.UpdateChecker);
         settingsScreen.ApplySavedLanguage();
         settingsScreen.CanManageBackups = true;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
