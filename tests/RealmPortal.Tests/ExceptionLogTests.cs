@@ -145,6 +145,32 @@ public class ExceptionLogTests
     }
 
     [Fact]
+    public void Write_RedactsClientPathUnderHomeBeforeTildeShortening()
+    {
+        using var dir = new TempDirectory();
+        var home = dir.Combine("home", "player");
+        Directory.CreateDirectory(home);
+        var path = dir.Combine(ExceptionLog.FileName);
+        var log = new ExceptionLog(
+            logPath: () => path,
+            version: () => "1.0.0",
+            homeDirectory: () => home);
+
+        var clientPath = Path.Combine(home, "Games", "alice@example.com", "WoW");
+        Directory.CreateDirectory(clientPath);
+        log.Write(new ClientFilesException(
+            ClientFilesErrorCode.PathNotFound,
+            clientPath,
+            $"The client directory '{clientPath}' does not exist."));
+
+        var text = File.ReadAllText(path);
+        Assert.DoesNotContain(clientPath, text, StringComparison.Ordinal);
+        Assert.DoesNotContain("alice@example.com", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(Path.Combine("Games", "alice@example.com"), text, StringComparison.Ordinal);
+        Assert.Contains("[client-path]", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Write_RedactsClientPathInsideAggregateException()
     {
         using var dir = new TempDirectory();

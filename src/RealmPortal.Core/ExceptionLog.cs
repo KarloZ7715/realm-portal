@@ -139,6 +139,15 @@ public sealed class ExceptionLog
             return text;
 
         var result = text;
+
+        // Client paths first so a path under home is fully replaced before "~" shortens
+        // the prefix and leaves a personal suffix (e.g. an email segment) in the log.
+        if (extraPaths is not null)
+        {
+            foreach (var path in extraPaths)
+                result = RedactClientPath(result, path);
+        }
+
         var home = _homeDirectory();
         if (!string.IsNullOrWhiteSpace(home))
         {
@@ -156,12 +165,6 @@ public sealed class ExceptionLog
         var appImage = Environment.GetEnvironmentVariable("APPIMAGE");
         if (!string.IsNullOrWhiteSpace(appImage))
             result = ReplacePath(result, appImage, Path.GetFileName(appImage));
-
-        if (extraPaths is not null)
-        {
-            foreach (var path in extraPaths)
-                result = RedactClientPath(result, path);
-        }
 
         return result;
     }
