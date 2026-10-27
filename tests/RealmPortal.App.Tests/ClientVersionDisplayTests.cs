@@ -1,9 +1,11 @@
 using Avalonia.Headless.XUnit;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Tests.Support;
 using RealmPortal.App.Portal;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.Service;
 using RealmPortal.Tests.Support;
+using TempDirectory = RealmPortal.Tests.Support.TempDirectory;
 
 namespace RealmPortal.App.Tests;
 
@@ -16,8 +18,14 @@ public sealed class ClientVersionDisplayTests : IDisposable
     public ClientVersionDisplayTests()
     {
         var config = _temp.Combine("config");
+        var home = _temp.Combine("home");
         Directory.CreateDirectory(config);
-        _session = PortalSession.CreateForPaths(config, _temp.Combine("projection"), _temp.Combine("backups"));
+        Directory.CreateDirectory(home);
+        _session = TestSessions.Create(
+            config,
+            _temp.Combine("projection"),
+            _temp.Combine("backups"),
+            home);
         Loc.Instance.SetLanguage(Language.En);
     }
 

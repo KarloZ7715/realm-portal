@@ -1,5 +1,6 @@
 using Avalonia.Headless.XUnit;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Tests.Support;
 using RealmPortal.App.Portal;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.ClientFiles;
@@ -7,6 +8,7 @@ using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
 using RealmPortal.Tests.Support;
+using TempDirectory = RealmPortal.Tests.Support.TempDirectory;
 
 namespace RealmPortal.App.Tests;
 
@@ -46,30 +48,26 @@ public sealed class ClientsCrudTests
             Config = _temp.Combine("config");
             Projection = _temp.Combine("projection");
             Backups = _temp.Combine("backups");
+            Home = _temp.Combine("home");
             Directory.CreateDirectory(Backups);
+            Directory.CreateDirectory(Home);
             Probe = new Probe(running, probeFails);
-            var service = new PortalService(
+            Session = TestSessions.Create(
                 Config,
                 Projection,
-                new PeClientVersionReader(),
+                Backups,
+                Home,
                 new NoLaunch(),
                 Probe,
-                name => name == ClientFilesApplier.BackupDirectoryVariable ? Backups : null,
-                scanOptions: new ClientScanOptions
-                {
-                    IncludeDefaultRoots = false,
-                    IncludeSystemRoots = false,
-                    AdditionalRoots = additionalRoots ?? [],
-                });
-            Session = new PortalSession(service, new UiPreferencesStore(Config),
-                name => name == ClientFilesApplier.BackupDirectoryVariable ? Backups : null);
-            Session.UiPreferences.Save(new UiPreferences("en", [], FirstScanCompleted: firstScanCompleted));
+                firstScanCompleted: firstScanCompleted,
+                additionalScanRoots: additionalRoots);
             Main = new MainViewModel(Session, autoTick: false);
         }
 
         public string Config { get; }
         public string Projection { get; }
         public string Backups { get; }
+        public string Home { get; }
         public Probe Probe { get; }
         public PortalSession Session { get; }
         public MainViewModel Main { get; }

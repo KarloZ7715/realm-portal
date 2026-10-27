@@ -1,8 +1,10 @@
 using Avalonia.Headless.XUnit;
 using RealmPortal.App.Portal;
+using RealmPortal.App.Tests.Support;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.Launch;
 using RealmPortal.Tests.Support;
+using TempDirectory = RealmPortal.Tests.Support.TempDirectory;
 
 namespace RealmPortal.App.Tests;
 
@@ -115,7 +117,16 @@ public class UiPreferencesLoadTests
         Directory.CreateDirectory(backups);
         Seed(config, kind);
 
-        var session = PortalSession.CreateForPaths(config, projection, backups, new NoLaunch(), new NeverRunningGameProbe());
+        var home = temp.Combine("home");
+        Directory.CreateDirectory(home);
+        var session = TestSessions.Create(
+            config,
+            projection,
+            backups,
+            home,
+            new NoLaunch(),
+            new NeverRunningGameProbe(),
+            seedPreferences: false);
         var main = new MainViewModel(session, () => Task.FromResult<string?>(null), autoTick: false);
         var loaded = session.UiPreferences.Load();
 

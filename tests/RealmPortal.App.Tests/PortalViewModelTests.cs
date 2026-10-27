@@ -5,6 +5,7 @@ using Avalonia.Headless.XUnit;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Tests.Support;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Settings;
 using RealmPortal.App.ViewModels;
@@ -13,6 +14,7 @@ using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
 using RealmPortal.Tests.Support;
+using TempDirectory = RealmPortal.Tests.Support.TempDirectory;
 
 namespace RealmPortal.App.Tests;
 
@@ -142,14 +144,23 @@ public class PortalViewModelTests
             Projection = _temp.Combine("projection");
             Client = _temp.Combine("client");
             Backups = _temp.Combine("backups");
+            Home = _temp.Combine("home");
             Directory.CreateDirectory(Config);
             Directory.CreateDirectory(Projection);
             Directory.CreateDirectory(Path.Combine(Client, "Data", "enUS"));
             File.WriteAllBytes(Path.Combine(Client, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
             Directory.CreateDirectory(Backups);
+            Directory.CreateDirectory(Home);
             Launch = new FakeLaunch();
             IGameLaunchService launch = throwOnLaunch ? new ThrowingLaunch() : Launch;
-            Session = PortalSession.CreateForPaths(Config, Projection, Backups, launch, probe ?? new NeverRunningGameProbe());
+            Session = TestSessions.Create(
+                Config,
+                Projection,
+                Backups,
+                Home,
+                launch,
+                probe ?? new NeverRunningGameProbe(),
+                seedPreferences: false);
             var clientId = Session.Service.AddClient(Client).Value!.Id;
             Session.UiPreferences.Save(new UiPreferences("en", [clientId], FirstScanCompleted: true));
             Loc.Instance.SetLanguage(Language.En);
@@ -160,6 +171,7 @@ public class PortalViewModelTests
         public string Projection { get; }
         public string Client { get; }
         public string Backups { get; }
+        public string Home { get; }
         public FakeLaunch Launch { get; }
         public PortalSession Session { get; }
         public MainViewModel Main { get; }
@@ -928,7 +940,14 @@ public class PortalViewModelTests
         Assert.True(env.Session.Service.SwitchServer(new SwitchRequest(clientId, b.Id)).Succeeded);
 
         var restarted = new MainViewModel(
-            PortalSession.CreateForPaths(env.Config, env.Projection, env.Backups, env.Launch, new NeverRunningGameProbe()),
+            TestSessions.Create(
+                env.Config,
+                env.Projection,
+                env.Backups,
+                env.Home,
+                env.Launch,
+                new NeverRunningGameProbe(),
+                seedPreferences: false),
             () => Task.FromResult<string?>(env.Client),
             autoTick: false);
         Assert.True(restarted.Servers.CanUndoPending);
