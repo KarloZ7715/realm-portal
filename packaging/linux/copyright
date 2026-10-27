@@ -1,0 +1,73 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Realm Portal
+Source: https://github.com/KarloZ7715/realm-portal
+Comment:
+ Self-contained builds also redistribute the .NET runtime and NuGet
+ dependencies (MIT, Apache-2.0, BSD-3-Clause, and others). Full license
+ texts for those components are installed under
+ /usr/share/doc/realm-portal/licenses/ and inventoried in
+ THIRD_PARTY_LICENSES.md and licenses/nuget/PACKAGES.txt. This copyright
+ file covers the Realm Portal sources and the bundled fonts and artwork;
+ it intentionally points at those shipped files rather than inlining every
+ third-party license text.
+
+Files: *
+Copyright: 2026 Carlos Canabal Cordero
+License: MIT
+
+Files: assets/branding/*
+ assets/frames/*
+ assets/ui/*
+ assets/icons/*
+ packaging/linux/icons/*
+Copyright: 2026 Carlos Canabal Cordero
+License: MIT
+Comment:
+ Original branding and UI artwork (logo, frames, seals, UI kit). See
+ assets/branding/LICENSE-ART.md in the source tree.
+
+Files: assets/fonts/*
+Copyright: 2011-2012 Ana Sanfelippo
+           2012 Brian J. Bonislawsky DBA Astigmatic (AOETI)
+           2011 The Alegreya Project Authors
+           2013 The Alegreya Sans Project Authors
+           2020 The JetBrains Mono Project Authors
+License: OFL-1.1
+Comment:
+ Bundled typefaces under the SIL Open Font License 1.1. Full texts ship
+ with the package as:
+ licenses/fonts/OFL-Almendra.txt
+ licenses/fonts/OFL-MarcellusSC.txt
+ licenses/fonts/OFL-Alegreya.txt
+ licenses/fonts/OFL-AlegreyaSans.txt
+ licenses/fonts/OFL-JetBrainsMono.txt
+ under /usr/share/doc/realm-portal/. See also THIRD_PARTY_LICENSES.md.
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the
+ "Software"), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish,
+ distribute, sublicense, and/or sell copies of the Software, and to
+ permit persons to whom the Software is furnished to do so, subject to
+ the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included
+ in all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+License: OFL-1.1
+ SIL Open Font License, Version 1.1.
+ .
+ The complete license text for each bundled family is shipped with this
+ package under /usr/share/doc/realm-portal/licenses/fonts/OFL-*.txt
+ (OFL-Almendra.txt, OFL-MarcellusSC.txt, OFL-Alegreya.txt,
+ OFL-AlegreyaSans.txt, OFL-JetBrainsMono.txt). See also
+ THIRD_PARTY_LICENSES.md.

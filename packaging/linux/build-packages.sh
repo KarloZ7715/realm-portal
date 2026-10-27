@@ -83,6 +83,7 @@ install_tree "${DEB_STAGING}${DEB_INSTALL_LIB}"
 write_deb_launcher "${DEB_STAGING}/usr/bin/realm-portal"
 # The self-contained build bundles the .NET runtime: ship its license and notices with ours.
 "${ROOT_DIR}/packaging/collect-licenses.sh" "${PUBLISH_DIR}" linux-x64 "${DEB_STAGING}/usr/share/doc/realm-portal"
+install -m 644 "${PACKAGING_DIR}/copyright" "${DEB_STAGING}/usr/share/doc/realm-portal/copyright"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${DEB_STAGING}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
@@ -106,6 +107,7 @@ dpkg-deb --build --root-owner-group "${DEB_STAGING}" "${DEB_FILE}"
 
 REQUIRED_DOCS=(
   LICENSE
+  copyright
   THIRD_PARTY_LICENSES.md
   licenses/dotnet-runtime/LICENSE.TXT
   licenses/dotnet-runtime/THIRD-PARTY-NOTICES.TXT
@@ -128,6 +130,7 @@ mkdir -p "${APPIMAGE_INSTALL_LIB}" \
 install_tree "${APPIMAGE_INSTALL_LIB}"
 write_appimage_launcher "${APPDIR}/usr/bin/realm-portal"
 "${ROOT_DIR}/packaging/collect-licenses.sh" "${PUBLISH_DIR}" linux-x64 "${APPDIR}/usr/share/doc/realm-portal"
+install -m 644 "${PACKAGING_DIR}/copyright" "${APPDIR}/usr/share/doc/realm-portal/copyright"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
   "${APPDIR}/usr/share/applications/com.karloz7715.RealmPortal.desktop"
