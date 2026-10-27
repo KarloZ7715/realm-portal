@@ -75,6 +75,64 @@ public class NetworkSettingsStoreTests
         Assert.False(again.UpdatesAutoCheck);
     }
 
+    [Fact]
+    public void Overwrite_RepairsCorruptFile_WithoutReadingIt()
+    {
+        using var env = new TempConfig();
+        var path = Path.Combine(env.Config, "network-settings.json");
+        File.WriteAllText(path, "{ not json");
+        var store = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock);
+        store.Overwrite(new NetworkSettings(UpdatesAutoCheck: false, StatusProbeEnabled: false));
+        Assert.True(File.Exists(path + ".corrupt"));
+        var got = store.Get();
+        Assert.False(got.UpdatesAutoCheck);
+        Assert.False(got.StatusProbeEnabled);
+
+        File.WriteAllText(path, "{ still bad");
+        store.Overwrite(new NetworkSettings(UpdatesAutoCheck: true));
+        Assert.True(File.Exists(path + ".corrupt")); // preserved
+        Assert.True(File.Exists(path + ".corrupt.1"));
+        Assert.True(NetworkSettingsStore.IsCorruptContent(new StoreException("x is not valid: boom", contentCorrupt: true)));
+        Assert.True(NetworkSettingsStore.IsCorruptContent(new StoreException("wrap", new System.Text.Json.JsonException("bad"))));
+        Assert.False(NetworkSettingsStore.IsCorruptContent(new StoreException("x has unsupported format version 99.")));
+        Assert.False(NetworkSettingsStore.IsCorruptContent(new StoreException("path/is not valid/dir has unsupported format version 99.")));
+    }
+
+
+    [Fact]
+    public void PortalService_CorruptNetworkSettings_GetDefaults_SetRepairsViaOverwrite()
+    {
+        using var env = new ServiceEnv();
+        var path = Path.Combine(env.Config, "network-settings.json");
+        File.WriteAllText(path, "{ not json");
+
+        var got = env.Service.GetNetworkSettings();
+        Assert.True(got.Succeeded);
+        Assert.True(got.Value!.UpdatesAutoCheck);
+        Assert.True(got.Value.StatusProbeEnabled);
+
+        var set = env.Service.SetNetworkSettings(got.Value with { UpdatesAutoCheck = false, StatusProbeEnabled = false });
+        Assert.True(set.Succeeded);
+        Assert.True(File.Exists(path + ".corrupt"));
+        var again = env.Service.GetNetworkSettings().Value!;
+        Assert.False(again.UpdatesAutoCheck);
+        Assert.False(again.StatusProbeEnabled);
+    }
+
+
+    [Fact]
+    public void Overwrite_RefusesWhenFileIsNoLongerCorrupt()
+    {
+        using var env = new TempConfig();
+        var store = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock);
+        store.Set(new NetworkSettings(UpdatesAutoCheck: false, UpdatesEtag: "\"keep\""));
+        Assert.Throws<InvalidOperationException>(() =>
+            store.Overwrite(new NetworkSettings(UpdatesAutoCheck: true)));
+        Assert.Equal("\"keep\"", store.Get().UpdatesEtag);
+        Assert.False(store.Get().UpdatesAutoCheck);
+        Assert.False(File.Exists(Path.Combine(env.Config, "network-settings.json.corrupt")));
+    }
+
     private sealed class TempConfig : IDisposable
     {
         private readonly TempDirectory _temp = new();
@@ -94,18 +152,19 @@ public class NetworkSettingsStoreTests
     private sealed class ServiceEnv : IDisposable
     {
         private readonly TempDirectory _temp = new();
+        public string Config { get; }
         public PortalService Service { get; }
 
         public ServiceEnv()
         {
-            var config = _temp.Combine("config");
+            Config = _temp.Combine("config");
             var projection = _temp.Combine("projection");
             var backups = _temp.Combine("backups");
-            Directory.CreateDirectory(config);
+            Directory.CreateDirectory(Config);
             Directory.CreateDirectory(projection);
             Directory.CreateDirectory(backups);
             Service = new PortalService(
-                config,
+                Config,
                 projection,
                 new RealmPortal.Core.Clients.PeClientVersionReader(),
                 new NoLaunch(),

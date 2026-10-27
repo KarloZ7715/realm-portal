@@ -10,13 +10,12 @@ namespace RealmPortal.Core.Service;
 /// <summary>
 /// Persists update-check and status-probe settings in <c>network-settings.json</c>
 /// (docs/updates-and-status.md). Same lock, bounded read, and <c>0600</c> write pattern as storage-settings.
+/// Nested JSON: <c>updates.*</c> and <c>status.probe_enabled</c>.
 /// </summary>
-internal sealed class NetworkSettingsStore(
-    string configDirectory,
-    IAtomicFileWriter writer,
-    ConfigDirectoryLock? directoryLock = null)
+public sealed class NetworkSettingsStore
 {
-    private const int FormatVersion = 1;
+    public const string FileName = "network-settings.json";
+    public const int FormatVersion = 1;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -27,13 +26,42 @@ internal sealed class NetworkSettingsStore(
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
 
-    private readonly string _path = Path.Combine(configDirectory, "network-settings.json");
-    private readonly ConfigDirectoryLock _directoryLock = directoryLock ?? new ConfigDirectoryLock(configDirectory);
+    private readonly string _path;
+    private readonly IAtomicFileWriter _writer;
+    private readonly ConfigDirectoryLock _directoryLock;
+
+    public NetworkSettingsStore(
+        string configDirectory,
+        IAtomicFileWriter? writer = null,
+        ConfigDirectoryLock? directoryLock = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(configDirectory);
+        _path = Path.Combine(Path.GetFullPath(configDirectory), FileName);
+        _writer = writer ?? new AtomicFileWriter();
+        _directoryLock = directoryLock ?? new ConfigDirectoryLock(configDirectory);
+    }
+
+    public string FilePath => _path;
 
     public NetworkSettings Get()
     {
         var file = Load();
         return file is null ? NetworkSettings.Default : ToModel(file);
+    }
+
+    /// <summary>Loads settings, returning defaults when the file is missing or unreadable (startup-safe).</summary>
+    public NetworkSettings LoadOrDefault(out Exception? error)
+    {
+        try
+        {
+            error = null;
+            return Get();
+        }
+        catch (Exception ex) when (ex is StoreException or JsonException or IOException or UnauthorizedAccessException)
+        {
+            error = ex;
+            return NetworkSettings.Default;
+        }
     }
 
     public void Set(NetworkSettings settings)
@@ -45,6 +73,82 @@ internal sealed class NetworkSettingsStore(
             var file = Apply(existing, settings);
             file.Version = FormatVersion;
             Write(file);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the file without reading the old content (corrupt-file repair only).
+    /// Moves any existing file aside first (never deletes an existing <c>.corrupt*</c> backup);
+    /// if the move fails, nothing is written.
+    /// </summary>
+    public void Overwrite(NetworkSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        using (_directoryLock.Acquire())
+        {
+            if (File.Exists(_path))
+            {
+                // Another writer may have repaired the file after Set threw; do not clobber valid data.
+                if (!IsCorruptOnDiskUnlocked())
+                    throw new InvalidOperationException("Network settings are no longer corrupt; refusing to overwrite.");
+                var backup = AllocateCorruptBackupPath(_path);
+                File.Move(_path, backup);
+            }
+
+            var file = Apply(new NetworkFile { Version = FormatVersion }, settings);
+            file.Version = FormatVersion;
+            Write(file);
+        }
+    }
+
+    /// <summary>True when <paramref name="error"/> is empty/invalid JSON content (safe to repair by overwrite).</summary>
+    public static bool IsCorruptContent(Exception? error) =>
+        error is JsonException
+        || error is StoreException { ContentCorrupt: true }
+        || error is StoreException { InnerException: JsonException };
+
+    private bool IsCorruptOnDiskUnlocked()
+    {
+        try
+        {
+            _ = LoadUnlocked();
+            return false;
+        }
+        catch (Exception ex) when (IsCorruptContent(ex))
+        {
+            return true;
+        }
+    }
+
+    private static string AllocateCorruptBackupPath(string path)
+    {
+        var candidate = path + ".corrupt";
+        if (!File.Exists(candidate) && !Directory.Exists(candidate))
+            return candidate;
+        for (var i = 1; i < 10_000; i++)
+        {
+            candidate = path + ".corrupt." + i.ToString(CultureInfo.InvariantCulture);
+            if (!File.Exists(candidate) && !Directory.Exists(candidate))
+                return candidate;
+        }
+
+        throw new IOException("Could not allocate a network-settings corrupt backup path.");
+    }
+
+    /// <summary>Read-modify-write under the config lock so concurrent ETag / LastAttempt updates are preserved.</summary>
+    public NetworkSettings Update(Func<NetworkSettings, NetworkSettings> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+        using (_directoryLock.Acquire())
+        {
+            var current = File.Exists(_path) && LoadUnlocked() is { } loaded
+                ? ToModel(loaded)
+                : NetworkSettings.Default;
+            var next = mutate(current) ?? throw new InvalidOperationException("mutate returned null.");
+            var file = Apply(new NetworkFile { Version = FormatVersion }, next);
+            // Preserve nested sections from existing when Apply starts fresh — Apply always sets both sections.
+            Write(file);
+            return next;
         }
     }
 
@@ -64,22 +168,22 @@ internal sealed class NetworkSettingsStore(
         try
         {
             var file = JsonSerializer.Deserialize<NetworkFile>(PortalConfigFile.ReadBounded(_path), JsonOptions)
-                       ?? throw new StoreException("network-settings.json is empty.");
+                       ?? throw new StoreException($"'{_path}' is empty.", contentCorrupt: true);
             if (file.Version != FormatVersion)
-                throw new StoreException($"network-settings.json has unsupported format version {file.Version}.");
+                throw new StoreException($"'{_path}' has unsupported format version {file.Version}.");
             return file;
         }
         catch (JsonException ex)
         {
-            throw new StoreException("network-settings.json is not valid.", ex);
+            throw new StoreException($"'{_path}' is not valid: {ex.Message}", ex, contentCorrupt: true);
         }
         catch (IOException ex)
         {
-            throw new StoreException("network-settings.json cannot be read.", ex);
+            throw new StoreException($"'{_path}' cannot be read: {ex.Message}", ex);
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new StoreException("network-settings.json cannot be read.", ex);
+            throw new StoreException($"'{_path}' cannot be read: {ex.Message}", ex);
         }
     }
 
@@ -88,7 +192,7 @@ internal sealed class NetworkSettingsStore(
         PortalConfigFile.WithConfigLock(() =>
         {
             var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
-            writer.WriteAllBytes(_path, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
+            _writer.WriteAllBytes(_path, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
             PortalConfigFile.AfterWrite(_path);
         });
     }

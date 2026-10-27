@@ -392,5 +392,19 @@
   "status.probe.reason.dns": "Host could not be resolved",
   "status.probe.reason.invalidhost": "Invalid host",
   "status.probe.reason.disabled": "Probes disabled",
-  "status.probe.reason.refused": "Connection refused"
+  "status.probe.reason.refused": "Connection refused",
+  "error.updatecheckfailed.title": "Could not check for updates",
+  "error.updatecheckfailed.body": "The update check failed. Try again later.",
+  "error.checksummismatch.title": "Download corrupted",
+  "error.checksummismatch.body": "The downloaded file did not match its checksum. Nothing was installed.",
+  "error.assetmissing.title": "Update file missing",
+  "error.assetmissing.body": "The release does not include the expected file for this install.",
+  "error.downloadtoolarge.title": "Download too large",
+  "error.downloadtoolarge.body": "The download exceeded the allowed size and was aborted.",
+  "error.untrustedredirect.title": "Untrusted download address",
+  "error.untrustedredirect.body": "The update URL was outside the allowed GitHub hosts.",
+  "error.ratelimited.title": "Too many update checks",
+  "error.ratelimited.body": "GitHub asked us to wait before checking again.",
+  "settings.updates.checking": "Checking…",
+  "settings.error.network": "Could not save network settings. Check the config folder."
 }
