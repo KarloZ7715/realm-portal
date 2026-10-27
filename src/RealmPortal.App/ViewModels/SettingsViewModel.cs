@@ -405,13 +405,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             OpenExternalUrl?.Invoke(outcome.SavedPath);
             return Loc.Get("update.install.open_release");
         }
-        if (!string.IsNullOrWhiteSpace(outcome.CopyableCommand))
-            return outcome.CopyableCommand;
-        if (!string.IsNullOrWhiteSpace(outcome.Instructions))
-            return outcome.Instructions;
-        if (!string.IsNullOrWhiteSpace(outcome.SavedPath))
-            return Loc.Format("update.install.saved", outcome.SavedPath);
-        return null;
+        return UpdateInstallPresentation.FormatDetail(outcome);
     }
 
 

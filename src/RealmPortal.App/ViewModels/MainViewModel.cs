@@ -472,7 +472,7 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var detail = outcome.CopyableCommand ?? outcome.Instructions ?? outcome.SavedPath;
+        var detail = UpdateInstallPresentation.FormatDetail(outcome);
         if (string.IsNullOrWhiteSpace(detail))
             return;
 

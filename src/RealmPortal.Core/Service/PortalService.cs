@@ -952,6 +952,19 @@ public sealed class PortalService : IPortalService
                 _networkSettings.Overwrite(repaired);
                 return ServiceResult<NetworkSettings>.Ok(repaired);
             }
+            catch (InvalidOperationException overwriteEx)
+                when (overwriteEx.Message.Contains("no longer corrupt", StringComparison.Ordinal))
+            {
+                // Another caller repaired the file first — apply our mutation to the repaired content.
+                try
+                {
+                    return ServiceResult<NetworkSettings>.Ok(_networkSettings.Update(mutate));
+                }
+                catch (Exception retryEx)
+                {
+                    return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(retryEx));
+                }
+            }
             catch (Exception overwriteEx)
             {
                 return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(overwriteEx));

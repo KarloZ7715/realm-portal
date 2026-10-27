@@ -112,6 +112,40 @@ public class UpdateNotice105UiTests
         Assert.Equal(UpdateCheckResultKind.None, result.Kind);
     }
 
+
+    [AvaloniaFact]
+    public void FormatDetail_WindowsZip_IncludesSavedPath_AndIsLocalized()
+    {
+        Loc.Instance.SetLanguage(Language.En);
+        var outcome = new UpdateInstallOutcome(
+            SavedPath: @"C:\Users\x\Downloads\RealmPortal-1.1.0-win-x64.zip",
+            Kind: RealmPortal.Core.Updates.InstallKind.WindowsZip,
+            Instructions: "Extract the zip over your current Realm Portal folder.");
+        var detail = UpdateInstallPresentation.FormatDetail(outcome)!;
+        Assert.Contains("RealmPortal-1.1.0-win-x64.zip", detail, StringComparison.Ordinal);
+        Assert.Contains("File:", detail, StringComparison.Ordinal);
+
+        Loc.Instance.SetLanguage(Language.Es);
+        var es = UpdateInstallPresentation.FormatDetail(outcome)!;
+        Assert.Contains("RealmPortal-1.1.0-win-x64.zip", es, StringComparison.Ordinal);
+        Assert.Contains("Extrae el zip", es, StringComparison.Ordinal);
+        Assert.DoesNotContain("Extract the zip over your current Realm Portal folder.", es, StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public void FormatDetail_Deb_IncludesPathAndCommand()
+    {
+        Loc.Instance.SetLanguage(Language.En);
+        var outcome = new UpdateInstallOutcome(
+            SavedPath: "/home/u/Downloads/realm-portal_1.1.0_amd64.deb",
+            Kind: RealmPortal.Core.Updates.InstallKind.Deb,
+            CopyableCommand: "sudo apt install '/home/u/Downloads/realm-portal_1.1.0_amd64.deb'",
+            Instructions: "Open the Downloads folder and install the .deb with the shown command. The app never runs sudo.");
+        var detail = UpdateInstallPresentation.FormatDetail(outcome)!;
+        Assert.Contains("realm-portal_1.1.0_amd64.deb", detail, StringComparison.Ordinal);
+        Assert.Contains("sudo apt install", detail, StringComparison.Ordinal);
+    }
+
     private sealed class StubCoreChecker : RealmPortal.Core.Updates.IUpdateChecker
     {
         private readonly RealmPortal.Core.Updates.UpdateCheckResult _result;
