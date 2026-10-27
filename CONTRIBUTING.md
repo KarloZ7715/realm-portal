@@ -84,6 +84,30 @@ RP_SCREENSHOT_DIR=/tmp/rp-shots dotnet test tests/RealmPortal.App.Tests -c Relea
 - [docs/ui-screens.md](docs/ui-screens.md): the F3b screens, their states and what is simulated.
 - [assets/ASSETS.md](assets/ASSETS.md) and [assets/branding/README.md](assets/branding/README.md): assets and the Tésera mark.
 
+## NuGet lock files
+
+This repo enables `RestorePackagesWithLockFile` (see `Directory.Build.props`). CI restores with
+`dotnet restore --locked-mode`, so every `packages.lock.json` must match `Directory.Packages.props`.
+
+Dependabot often updates `Directory.Packages.props` and the lock file of the project that
+declares a package, but not locks of projects that only take it transitively (for example
+`tests/RealmPortal.App.Tests` via `RealmPortal.Tests`). After a Dependabot NuGet PR, or after
+any manual bump of a centrally managed package version, refresh every lock file:
+
+```bash
+dotnet restore RealmPortal.sln --force-evaluate
+dotnet restore RealmPortal.sln --locked-mode   # must succeed before you push
+```
+
+Commit any updated `**/packages.lock.json` files with the version bump.
+
+A ready-to-enable workflow lives at
+[`.github/workflow-proposals/dependabot-lockfiles.yml`](.github/workflow-proposals/dependabot-lockfiles.yml).
+Copy it to `.github/workflows/dependabot-lockfiles.yml` (requires a GitHub credential with the
+`workflow` scope) to have Actions regenerate lock files automatically on Dependabot PRs:
+`dependabot[bot]` only, `dependabot/**` branches of this repository only (never forks), with
+`contents: write` scoped to that job.
+
 ## Secret scanning (gitleaks)
 
 Never commit credentials, tokens, private keys or `.env` files. CI scans the full git
