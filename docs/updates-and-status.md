@@ -27,7 +27,7 @@ with the controls above. Settings shows next to each toggle:
 - "Shows whether each server's login port answers (your IP address is visible to that server every 5 minutes while the list
   is open)."
 
-The 1.1.0 implementation PR adds a **Privacy** section to the README with the same text (it does not exist yet).
+The **Privacy** section in `README.md` / `README.es.md` uses the same Settings toggle wording.
 
 The **Check for updates** button works even when `updates.auto_check` is `false`, because it is an explicit user action. It
 is debounced to one request per minute.
