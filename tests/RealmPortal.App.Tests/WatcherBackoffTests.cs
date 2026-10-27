@@ -102,6 +102,8 @@ public class WatcherBackoffTests
 
             Assert.False(_waiters.IsEmpty, "expected an in-flight watcher delay");
         }
+
+        public bool HasPending => !_waiters.IsEmpty;
     }
 
     private sealed class Env : IDisposable
@@ -199,11 +201,22 @@ public class WatcherBackoffTests
         Assert.Equal(ServersPhase.Running, env.Main.Servers.Phase);
         Assert.False(env.Main.Servers.GameClosed);
 
-        // Stop the watcher: in-flight delay + two miss delays; the third miss closes with no further delay.
+        // Stop the watcher: miss probes until GameClosed. Do not assume a fixed number of delays —
+        // under load the in-flight delay may already be the first miss, so fewer waiters remain.
         probe.Running = false;
         var beforeClose = delay.Requested.Count;
-        await delay.WaitUntilPendingAsync();
-        await delay.AdvanceAsync(3);
+        var closeDeadline = DateTime.UtcNow.AddSeconds(30);
+        while (!env.Main.Servers.GameClosed && DateTime.UtcNow < closeDeadline)
+        {
+            if (delay.HasPending)
+                await delay.AdvanceAsync(1);
+            else
+            {
+                Dispatcher.UIThread.RunJobs();
+                await Task.Delay(5).ConfigureAwait(true);
+            }
+        }
+
         await PumpUntilAsync(() => env.Main.Servers.GameClosed, TimeSpan.FromSeconds(2));
         Assert.True(env.Main.Servers.GameClosed);
         Assert.All(delay.Requested.Skip(beforeClose), t => Assert.Equal(ServersViewModel.RunningProbeInterval, t));
