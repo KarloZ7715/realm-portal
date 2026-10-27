@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
+using RealmPortal.App.Platform;
 using RealmPortal.App.Settings;
 using RealmPortal.Core;
 using RealmPortal.Core.ClientFiles;
@@ -20,12 +21,15 @@ public sealed partial class MainViewModel : ObservableObject
     private AddServerViewModel? _adding;
     private EditClientViewModel? _editingClient;
     private BackupsViewModel? _backups;
+    private AboutViewModel? _about;
+    private readonly IUriOpener _uriOpener;
 
-    public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null) =>
-        new(backend, autoTick, settings);
+    public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null, IUriOpener? uriOpener = null) =>
+        new(backend, autoTick, settings, uriOpener);
 
-    public MainViewModel(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null)
+    public MainViewModel(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null, IUriOpener? uriOpener = null)
     {
+        _uriOpener = uriOpener ?? new ShellUriOpener();
         Backend = backend ?? new DemoBackend();
         Servers = new ServersViewModel(Backend, autoTick);
         Clients = new ClientsViewModel(Backend);
@@ -35,6 +39,7 @@ public sealed partial class MainViewModel : ObservableObject
         settingsScreen.ApplySavedLanguage();
         settingsScreen.CanManageBackups = false;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
+        settingsScreen.OpenAboutRequested += ShowAbout;
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
@@ -42,8 +47,9 @@ public sealed partial class MainViewModel : ObservableObject
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
     }
 
-    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null, Func<TimeSpan, Task>? delay = null)
+    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null, Func<TimeSpan, Task>? delay = null, IUriOpener? uriOpener = null)
     {
+        _uriOpener = uriOpener ?? new ShellUriOpener();
         _session = session;
         _probe = probe ?? new TcpConnectionProbe();
         _pickFolder = pickFolder;
@@ -53,6 +59,7 @@ public sealed partial class MainViewModel : ObservableObject
         settingsScreen.ApplySavedLanguage();
         settingsScreen.CanManageBackups = true;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
+        settingsScreen.OpenAboutRequested += ShowAbout;
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
@@ -162,7 +169,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The form being filled in, or null. It belongs to the servers section: leaving the section drops it.</summary>
     public AddServerViewModel? Adding => _adding;
 
-    public ViewModelBase Content => SectionIndex == 2 && _backups is not null
+    public ViewModelBase Content => SectionIndex == 2 && _about is not null
+        ? _about
+        : SectionIndex == 2 && _backups is not null
         ? _backups
         : SectionIndex == 0 && _adding is not null
         ? _adding
@@ -226,7 +235,10 @@ public sealed partial class MainViewModel : ObservableObject
     private void OnSectionIndexChanged(int value)
     {
         if (value != 2)
+        {
             CloseBackupsManager();
+            CloseAbout();
+        }
         if (value != 0)
         {
             CloseAddServer();
@@ -347,6 +359,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (_session is null || _backups is not null)
             return;
 
+        CloseAbout();
         _backups = new BackupsViewModel(_session, backRequested: CloseBackupsManager)
         {
             ConfirmDeleteBackupAsync = ConfirmDeleteBackupAsync,
@@ -363,6 +376,28 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         _backups.PropertyChanged -= OnSectionChanged;
         _backups = null;
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void ShowAbout()
+    {
+        if (_about is not null)
+            return;
+
+        CloseBackupsManager();
+        _about = new AboutViewModel(_uriOpener, CloseAbout);
+        _about.PropertyChanged += OnSectionChanged;
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void CloseAbout()
+    {
+        if (_about is null)
+            return;
+        _about.PropertyChanged -= OnSectionChanged;
+        _about = null;
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
     }
@@ -463,6 +498,7 @@ public sealed partial class MainViewModel : ObservableObject
         _adding?.RefreshText();
         _editingClient?.RefreshText();
         _backups?.RefreshText();
+        _about?.RefreshText();
         OnPropertyChanged(nameof(LanguageLabel));
         OnPropertyChanged(nameof(Disclaimer));
         OnPropertyChanged(nameof(StatusText));
