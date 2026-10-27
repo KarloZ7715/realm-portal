@@ -336,6 +336,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void WireNetwork()
     {
         var net = _network.Load();
+        // Seguridad: SetEnabled(status.probe_enabled) before NotifyListVisible(true).
         _probes.SetEnabled(net.StatusProbeEnabled);
         Servers.AttachProbeScheduler(_probes, net.StatusProbeEnabled);
         Settings.StatusProbeEnabledChanged += enabled =>
