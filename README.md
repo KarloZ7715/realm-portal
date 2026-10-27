@@ -81,7 +81,7 @@ Realm Portal writes a backup before it changes any client file, so every switch 
 Realm Portal does not send telemetry. The only network connections it makes are the two optional features below. Both are on by default and can be turned off in **Settings**.
 
 - **Check for updates automatically.** Checks GitHub once a day for a new version (sends your IP address and the app version to GitHub). Turn this off in Settings to stop automatic requests. The **Check for updates** button still works when the automatic check is off, because it is an explicit action you take.
-- **Show server login status.** Shows whether each server's login port answers (your IP address is visible to that server every 5 minutes while the list is open). Resolving a host name may also query the system DNS resolver. Turn this off in Settings to hide the status dot and schedule no probes.
+- **Show server login status.** Shows whether each server's login port answers (your IP address is visible to that server at most once every 5 minutes while the list is open). Resolving a host name may also query the system DNS resolver. Turn this off in Settings to hide the status dot and schedule no probes.
 
 ## Scope and legal notices
 
