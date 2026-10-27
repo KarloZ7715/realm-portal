@@ -154,7 +154,7 @@ public sealed partial class MainViewModel : ObservableObject
         // that in-flight scan will persist FirstScanCompleted when it finishes.
         if (!Clients.IsScanning)
             Clients.StartFirstScanIfNeeded();
-        Servers.ReloadFromService();
+        // Servers already reload at construction, on the welcome servers step, and via ClientsChanged after scans.
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(Content));
     }
