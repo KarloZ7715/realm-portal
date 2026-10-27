@@ -199,4 +199,17 @@ public class NetworkSettingsStoreTests
         Assert.True(updated.Value.StatusProbeEnabled);
         Assert.Equal("etag-x", updated.Value.UpdatesEtag);
     }
+
+    [Fact]
+    public void PortalService_UpdateNetworkSettings_RepairsCorruptFile()
+    {
+        using var env = new ServiceEnv();
+        var path = Path.Combine(env.Config, "network-settings.json");
+        File.WriteAllText(path, "{ not json");
+        var updated = env.Service.UpdateNetworkSettings(s => s with { UpdatesAutoCheck = false, StatusProbeEnabled = false });
+        Assert.True(updated.Succeeded);
+        Assert.False(updated.Value!.UpdatesAutoCheck);
+        Assert.False(updated.Value.StatusProbeEnabled);
+        Assert.True(File.Exists(path + ".corrupt") || Directory.EnumerateFiles(env.Config, "network-settings.json.corrupt*").Any());
+    }
 }

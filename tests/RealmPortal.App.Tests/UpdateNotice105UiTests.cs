@@ -101,4 +101,28 @@ public class UpdateNotice105UiTests
         Assert.Equal("keep", saved.UpdatesEtag);
         Assert.Equal(DateTimeOffset.Parse("2026-01-01T00:00:00Z"), saved.UpdatesLastAttemptUtc);
     }
+
+    [Fact]
+    public async Task CoreAdapter_NoNotice_MapsToNone_NotUpToDate()
+    {
+        var core = new StubCoreChecker(new RealmPortal.Core.Updates.UpdateCheckResult(
+            RealmPortal.Core.Updates.UpdateCheckOutcome.NoNotice));
+        var adapter = new CoreUpdateCheckerAdapter(core);
+        var result = await adapter.CheckAsync(UpdateCheckKind.Manual);
+        Assert.Equal(UpdateCheckResultKind.None, result.Kind);
+    }
+
+    private sealed class StubCoreChecker : RealmPortal.Core.Updates.IUpdateChecker
+    {
+        private readonly RealmPortal.Core.Updates.UpdateCheckResult _result;
+        public StubCoreChecker(RealmPortal.Core.Updates.UpdateCheckResult result) => _result = result;
+        public Task<RealmPortal.Core.Updates.UpdateCheckResult> CheckAsync(
+            RealmPortal.Core.Updates.UpdateCheckMode mode, CancellationToken cancellationToken = default)
+            => Task.FromResult(_result);
+        public void RemindLater(string version) { }
+        public void SkipThisVersion(string version) { }
+        public Task<RealmPortal.Core.Updates.UpdateInstallResult> InstallUpdateAsync(
+            RealmPortal.Core.Updates.UpdateOffer offer, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
 }

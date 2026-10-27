@@ -109,6 +109,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// </summary>
     public Func<UpdateOffer, Task<ConfirmDialogChoice?>>? PresentUpdateAsync { get; set; }
 
+    /// <summary>Main sets this so install release-page fallback can open a trusted URL.</summary>
+    public Action<string>? OpenExternalUrl { get; set; }
+
     /// <summary>Which field the last failed save blamed: "template", "backup" or null.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TemplateError), nameof(BackupError))]
@@ -242,7 +245,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
                     UpdateCheckStatus = null;
                     var choice = await present(offer).ConfigureAwait(true);
                     if (choice == ConfirmDialogChoice.Confirm)
-                        await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+                        UpdateCheckStatus = FormatInstallOutcome(
+                            await _updates.InstallUpdateAsync(offer).ConfigureAwait(true));
                     else if (choice == ConfirmDialogChoice.Secondary)
                         _updates.RemindLater(offer);
                     else if (choice == ConfirmDialogChoice.Cancel)
@@ -259,6 +263,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
                     break;
                 case UpdateCheckResultKind.Failed:
                     UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
+                    break;
+                case UpdateCheckResultKind.None:
+                    // Skipped / postponed / ineligible — not "up to date".
+                    UpdateCheckStatus = null;
                     break;
                 default:
                     UpdateCheckStatus = null;
@@ -386,6 +394,26 @@ public sealed partial class SettingsViewModel : ViewModelBase
     }
 
     private readonly object _networkWriteGate = new();
+
+    /// <summary>Soft status after install; opens release-page fallback when Core returned an Unknown install.</summary>
+    internal string? FormatInstallOutcome(UpdateInstallOutcome? outcome)
+    {
+        if (outcome is null)
+            return Loc.Get("settings.updates.status.failed");
+        if (outcome.IsReleasePageFallback)
+        {
+            OpenExternalUrl?.Invoke(outcome.SavedPath);
+            return Loc.Get("update.install.open_release");
+        }
+        if (!string.IsNullOrWhiteSpace(outcome.CopyableCommand))
+            return outcome.CopyableCommand;
+        if (!string.IsNullOrWhiteSpace(outcome.Instructions))
+            return outcome.Instructions;
+        if (!string.IsNullOrWhiteSpace(outcome.SavedPath))
+            return Loc.Format("update.install.saved", outcome.SavedPath);
+        return null;
+    }
+
 
     private void PersistNetwork()
     {

@@ -406,5 +406,10 @@
   "error.ratelimited.title": "Demasiadas comprobaciones",
   "error.ratelimited.body": "GitHub pidió esperar antes de volver a comprobar.",
   "settings.updates.checking": "Buscando…",
-  "settings.error.network": "No se pudieron guardar los ajustes de red. Revisa la carpeta de configuración."
+  "settings.error.network": "No se pudieron guardar los ajustes de red. Revisa la carpeta de configuración.",
+  "update.install.open_release": "Abre la página de la versión para descargar la actualización.",
+  "update.install.saved": "Actualización guardada en {0}.",
+  "update.install.title": "Actualización lista",
+  "update.install.body": "{0}",
+  "dialog.ok": "Aceptar"
 }

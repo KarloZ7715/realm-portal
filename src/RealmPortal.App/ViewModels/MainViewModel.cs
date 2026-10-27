@@ -342,6 +342,12 @@ public sealed partial class MainViewModel : ObservableObject
             Servers.SetStatusDotsVisible(enabled);
         };
         Settings.PresentUpdateAsync = async offer => await ShowUpdateNoticeAsync(offer).ConfigureAwait(true);
+        Settings.OpenExternalUrl = url =>
+        {
+            if (!ReleasePageUrl.TryGetTrusted(url, out var uri))
+                return;
+            ExceptionLog.Observe(_uriOpener.OpenAsync(uri));
+        };
 
         // Memory store is sync (tests). Portal store takes ConfigDirectoryLock — load off the UI thread.
         if (_network is MemoryNetworkSettingsStore)
@@ -441,11 +447,40 @@ public sealed partial class MainViewModel : ObservableObject
 
         _pendingUpdateOffer = null;
         if (choice == ConfirmDialogChoice.Confirm)
-            await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+        {
+            var outcome = await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+            await HandleInstallOutcomeAsync(outcome, offer).ConfigureAwait(true);
+        }
         else if (choice == ConfirmDialogChoice.Secondary)
             _updates.RemindLater(offer);
         else if (choice == ConfirmDialogChoice.Cancel)
             _updates.SkipThisVersion(offer);
+    }
+
+    private async Task HandleInstallOutcomeAsync(UpdateInstallOutcome? outcome, UpdateOffer offer)
+    {
+        if (outcome is null)
+            return;
+
+        if (outcome.IsReleasePageFallback)
+        {
+            var url = outcome.SavedPath;
+            if (!ReleasePageUrl.TryGetTrusted(url, out _))
+                url = ReleasePageUrl.Resolve(offer);
+            if (ReleasePageUrl.TryGetTrusted(url, out var uri))
+                await _uriOpener.OpenAsync(uri).ConfigureAwait(true);
+            return;
+        }
+
+        var detail = outcome.CopyableCommand ?? outcome.Instructions ?? outcome.SavedPath;
+        if (string.IsNullOrWhiteSpace(detail))
+            return;
+
+        await ConfirmAsync(new ConfirmDialogViewModel(
+            "update.install.title",
+            "update.install.body",
+            "dialog.ok",
+            bodyArguments: [detail])).ConfigureAwait(true);
     }
 
     private void TryPresentDeferredUpdate()

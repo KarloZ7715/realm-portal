@@ -942,6 +942,21 @@ public sealed class PortalService : IPortalService
         {
             return ServiceResult<NetworkSettings>.Ok(_networkSettings.Update(mutate));
         }
+        catch (Exception ex) when (NetworkSettingsStore.IsCorruptContent(ex))
+        {
+            // Same backup-and-repair path as SetNetworkSettings: move corrupt aside, then apply mutate to defaults.
+            try
+            {
+                var repaired = mutate(NetworkSettings.Default)
+                    ?? throw new InvalidOperationException("mutate returned null.");
+                _networkSettings.Overwrite(repaired);
+                return ServiceResult<NetworkSettings>.Ok(repaired);
+            }
+            catch (Exception overwriteEx)
+            {
+                return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(overwriteEx));
+            }
+        }
         catch (Exception ex)
         {
             return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(ex));

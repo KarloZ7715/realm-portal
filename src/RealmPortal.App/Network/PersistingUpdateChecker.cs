@@ -110,6 +110,7 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
             throw new InvalidOperationException($"Network settings update failed during {action}: {updated.Error}");
     }
 
-    public Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
+    public Task<UpdateInstallOutcome?> InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
         => _inner.InstallUpdateAsync(offer, cancellationToken);
 }
+

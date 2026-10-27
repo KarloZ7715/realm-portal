@@ -20,7 +20,11 @@ public sealed class CoreUpdateCheckerAdapter : IUpdateChecker
         var mode = kind == UpdateCheckKind.Automatic
             ? CoreUpdates.UpdateCheckMode.Automatic
             : CoreUpdates.UpdateCheckMode.Manual;
-        var result = await _inner.CheckAsync(mode, cancellationToken).ConfigureAwait(false);
+        // Core CheckAsync does sync settings I/O and config-lock writes before its network await —
+        // keep that off the Avalonia UI thread (same as PersistingUpdateChecker).
+        var result = await Task.Run(
+            () => _inner.CheckAsync(mode, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
         return Map(result, kind);
     }
 
@@ -36,7 +40,7 @@ public sealed class CoreUpdateCheckerAdapter : IUpdateChecker
         _inner.SkipThisVersion(offer.Version);
     }
 
-    public async Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
+    public async Task<UpdateInstallOutcome?> InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(offer);
         var coreOffer = new CoreUpdates.UpdateOffer(
@@ -44,7 +48,10 @@ public sealed class CoreUpdateCheckerAdapter : IUpdateChecker
             offer.TagName,
             offer.ReleaseNotesPlain,
             offer.HtmlUrl);
-        _ = await _inner.InstallUpdateAsync(coreOffer, cancellationToken).ConfigureAwait(false);
+        var result = await Task.Run(
+            () => _inner.InstallUpdateAsync(coreOffer, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+        return UpdateInstallOutcome.FromCore(result);
     }
 
     private static UpdateCheckResult Map(CoreUpdates.UpdateCheckResult result, UpdateCheckKind kind)
@@ -65,9 +72,10 @@ public sealed class CoreUpdateCheckerAdapter : IUpdateChecker
                     && result.Diagnostic is { } d
                     && d.Contains("debounc", StringComparison.OrdinalIgnoreCase))
                     return UpdateCheckResult.RateLimited;
-                return kind == UpdateCheckKind.Manual ? UpdateCheckResult.UpToDate : UpdateCheckResult.None;
+                return UpdateCheckResult.None;
             case CoreUpdates.UpdateCheckOutcome.NoNotice:
-                return kind == UpdateCheckKind.Manual ? UpdateCheckResult.UpToDate : UpdateCheckResult.None;
+                // Skipped / postponed / ineligible — not "you are up to date".
+                return UpdateCheckResult.None;
             default:
                 return UpdateCheckResult.None;
         }

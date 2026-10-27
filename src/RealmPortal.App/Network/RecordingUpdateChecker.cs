@@ -25,9 +25,9 @@ public sealed class RecordingUpdateChecker : IUpdateChecker
 
     public void SkipThisVersion(UpdateOffer offer) => SkipCalls.Add(offer);
 
-    public Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
+    public Task<UpdateInstallOutcome?> InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
     {
         InstallCalls.Add(offer);
-        return Task.CompletedTask;
+        return Task.FromResult<UpdateInstallOutcome?>(null);
     }
 }

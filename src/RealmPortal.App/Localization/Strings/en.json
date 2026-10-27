@@ -406,5 +406,10 @@
   "error.ratelimited.title": "Too many update checks",
   "error.ratelimited.body": "GitHub asked us to wait before checking again.",
   "settings.updates.checking": "Checking…",
-  "settings.error.network": "Could not save network settings. Check the config folder."
+  "settings.error.network": "Could not save network settings. Check the config folder.",
+  "update.install.open_release": "Open the release page to download the update.",
+  "update.install.saved": "Update saved to {0}.",
+  "update.install.title": "Update ready",
+  "update.install.body": "{0}",
+  "dialog.ok": "OK"
 }

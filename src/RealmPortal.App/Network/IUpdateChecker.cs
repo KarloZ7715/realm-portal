@@ -12,6 +12,9 @@ public interface IUpdateChecker
 
     void SkipThisVersion(UpdateOffer offer);
 
-    /// <summary>Opens the release page or starts install; never silent-replaces the binary from this seam.</summary>
-    Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Download / verify / place (or release-page fallback). Never silent-replaces without user confirmation upstream.
+    /// Returns null when the checker cannot install (demo / null double).
+    /// </summary>
+    Task<UpdateInstallOutcome?> InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default);
 }
