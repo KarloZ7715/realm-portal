@@ -138,7 +138,7 @@ public class PortalViewModelTests
     {
         private readonly TempDirectory _temp = new();
 
-        public Env(bool throwOnLaunch = false, IGameProcessProbe? probe = null)
+        public Env(bool throwOnLaunch = false, IGameProcessProbe? probe = null, Func<TimeSpan, Task>? delay = null)
         {
             Config = _temp.Combine("config");
             Projection = _temp.Combine("projection");
@@ -164,7 +164,7 @@ public class PortalViewModelTests
             var clientId = Session.Service.AddClient(Client).Value!.Id;
             Session.UiPreferences.Save(new UiPreferences("en", [clientId], FirstScanCompleted: true));
             Loc.Instance.SetLanguage(Language.En);
-            Main = new MainViewModel(Session, () => Task.FromResult<string?>(Client), autoTick: false);
+            Main = new MainViewModel(Session, () => Task.FromResult<string?>(Client), autoTick: false, delay: delay);
         }
 
         public string Config { get; }
