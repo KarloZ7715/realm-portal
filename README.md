@@ -76,6 +76,13 @@ Realm Portal writes a backup before it changes any client file, so every switch 
 - **Undo**: the Undo notice in the app restores the server that was active before the last switch. It remembers one step. If the client files changed by hand since the switch, Realm Portal asks before overwriting them.
 - **Manual**: in **Settings → Backup**, use **Manage backups…** to create a backup, list the saved ones, restore an older one or delete one. Backups are stored under the folder set in **Backup folder**.
 
+## Privacy
+
+Realm Portal does not send telemetry. The only network connections it makes are the two optional features below. Both are on by default and can be turned off in **Settings**.
+
+- **Check for updates automatically.** Checks GitHub once a day for a new version (sends your IP address and the app version to GitHub). Turn this off in Settings to stop automatic requests. The **Check for updates** button still works when the automatic check is off, because it is an explicit action you take.
+- **Show server login status.** Shows whether each server's login port answers (your IP address is visible to that server at most once every 5 minutes while the list is open). Resolving a host name may also query the system DNS resolver. Turn this off in Settings to hide the status dot and schedule no probes.
+
 ## Scope and legal notices
 
 - Realm Portal is **not affiliated with or endorsed by Blizzard Entertainment**.

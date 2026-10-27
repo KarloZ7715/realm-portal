@@ -76,6 +76,13 @@ Realm Portal escribe una copia de seguridad antes de cambiar cualquier archivo d
 - **Deshacer**: el aviso de Deshacer en la aplicación restaura el servidor que estaba activo antes del último cambio. Recuerda un solo paso. Si los archivos del cliente cambiaron a mano desde el cambio, Realm Portal pregunta antes de sobrescribirlos.
 - **Manual**: en **Ajustes → Copia de respaldo**, usa **Gestionar respaldos…** para crear un respaldo, ver los guardados, restaurar uno anterior o eliminarlo. Los respaldos se guardan en la carpeta indicada en **Carpeta de respaldo**.
 
+## Privacidad
+
+Realm Portal no envía telemetría. Las únicas conexiones de red que hace son las dos funciones opcionales siguientes. Ambas están activadas por defecto y se pueden desactivar en **Ajustes**.
+
+- **Buscar actualizaciones automáticamente.** Consulta GitHub una vez al día por una versión nueva (envía tu IP y la versión de la app a GitHub). Desactiva esta opción en Ajustes para detener las peticiones automáticas. El botón **Buscar actualizaciones** sigue funcionando con la comprobación automática desactivada, porque es una acción explícita tuya.
+- **Mostrar estado del login del servidor.** Muestra si el puerto de login de cada servidor responde (tu IP es visible para ese servidor como máximo una vez cada 5 minutos mientras la lista está abierta). Resolver un nombre de host también puede consultar el resolvedor DNS del sistema. Desactiva esta opción en Ajustes para ocultar el indicador y no programar sondas.
+
 ## Alcance y avisos legales
 
 - Realm Portal **no está afiliado ni respaldado por Blizzard Entertainment**.
