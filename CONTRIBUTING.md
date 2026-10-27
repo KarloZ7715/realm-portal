@@ -81,7 +81,7 @@ RP_SCREENSHOT_DIR=/tmp/rp-shots dotnet test tests/RealmPortal.App.Tests -c Relea
 - [docs/client-files.md](docs/client-files.md): what is written into the game client.
 - [docs/client-files-backup.md](docs/client-files-backup.md): backup, apply and undo.
 - [docs/launch.md](docs/launch.md): starting the game.
-- [docs/ui-screens.md](docs/ui-screens.md): the F3b screens, their states and what is simulated.
+- [docs/ui-screens.md](docs/ui-screens.md): UI screens, their states, and what the early prototype simulates.
 - [assets/ASSETS.md](assets/ASSETS.md) and [assets/branding/README.md](assets/branding/README.md): assets and the Tésera mark.
 
 ## NuGet lock files
