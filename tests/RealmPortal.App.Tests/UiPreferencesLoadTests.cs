@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Avalonia.Headless.XUnit;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Tests.Support;
@@ -23,12 +22,9 @@ public class UiPreferencesLoadTests
         Assert.True(store.Load().FirstScanCompleted);
     }
 
-    [Fact]
+    [NonWindowsFact]
     public void Save_CreatesPrivateConfigAndPreferencesOnUnix()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
         using var temp = new TempDirectory();
         var config = temp.Combine("config");
         new UiPreferencesStore(config).Save(new UiPreferences("en"));
@@ -69,19 +65,9 @@ public class UiPreferencesLoadTests
         Assert.Equal(["client-1"], again.InUseSet.OrderBy(id => id, StringComparer.Ordinal));
     }
 
-    [Fact]
+    [NonRootUnixFact]
     public void Load_UnreadableFile_ReturnsDefaults()
     {
-        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
-        {
-            return;
-        }
-
-        if (geteuid() == 0)
-        {
-            return;
-        }
-
         using var temp = new TempDirectory();
         var config = temp.Combine("config");
         Directory.CreateDirectory(config);
@@ -168,6 +154,4 @@ public class UiPreferencesLoadTests
         }
     }
 
-    [DllImport("libc")]
-    private static extern uint geteuid();
 }

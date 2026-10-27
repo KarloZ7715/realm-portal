@@ -199,21 +199,15 @@ public class ClientPathsTests
         Assert.Equal(applied, File.ReadAllText(Path.Combine(env.Client, "Data", "enUS", "realmlist.wtf")));
     }
 
-    [Fact]
+    [UnixFact]
     public void CanonicalRoot_PreservesUnixFilesystemRoot()
     {
-        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
-            return;
-
         Assert.Equal("/", ClientPaths.CanonicalRoot("/"));
     }
 
-    [Fact]
+    [WindowsFact]
     public void CanonicalRoot_PreservesWindowsDriveRoot()
     {
-        if (!OperatingSystem.IsWindows())
-            return;
-
         var drive = Path.GetPathRoot(Environment.SystemDirectory)!;
         Assert.Equal(drive.TrimEnd('\\') + '\\', ClientPaths.CanonicalRoot(drive));
     }

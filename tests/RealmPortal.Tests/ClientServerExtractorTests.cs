@@ -218,12 +218,9 @@ public class ClientServerExtractorTests
         Assert.Equal(before, Snapshot(dir.Path));
     }
 
-    [Fact]
+    [NonWindowsFact]
     public void Extract_RefusesAConfigReachedThroughASymlinkedFolder()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
         using var client = new TempDirectory();
         using var outside = new TempDirectory();
         File.WriteAllText(outside.Combine("Config.wtf"), $"SET realmList \"{ExampleHost}\"\r\n");
@@ -232,12 +229,9 @@ public class ClientServerExtractorTests
         Assert.Null(_extractor.Extract(client.Path, 12340));
     }
 
-    [Fact]
+    [NonWindowsFact]
     public void Extract_RefusesASymlinkedConfigFile()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
         using var client = new TempDirectory();
         using var outside = new TempDirectory();
         File.WriteAllText(outside.Combine("Config.wtf"), $"SET realmList \"{ExampleHost}\"\r\n");

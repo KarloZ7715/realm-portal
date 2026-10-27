@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using RealmPortal.Cli;
 using RealmPortal.Core.Clients;
@@ -10,12 +9,9 @@ namespace RealmPortal.Tests.Product;
 
 public class Bug7FailedSwitchRollsBackStateTests
 {
-    [Fact]
+    [NonPrivilegedLinuxFact]
     public void Switch_WithReadOnlyProjectionDir_LeavesStateAndActivoUnchanged()
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            return;
-
         using var dir = new TempDirectory();
         var config = dir.Combine("config");
         var projection = dir.Combine("projection");

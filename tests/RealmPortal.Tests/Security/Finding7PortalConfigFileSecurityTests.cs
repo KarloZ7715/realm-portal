@@ -23,12 +23,9 @@ public class Finding7PortalConfigFileSecurityTests
         Assert.False(result.Succeeded);
     }
 
-    [Fact]
+    [NonWindowsFact]
     public void SetStorageSettings_WritesConfigWithUserOnlyModeOnUnix()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
         using var dir = new Support.TempDirectory();
         var config = dir.Combine("config");
         var backups = dir.Combine("backups");

@@ -93,13 +93,9 @@ public class CliServerFlowTests
         Assert.Equal("", undo.Err);
     }
 
-    [Fact]
+    [NonWindowsFact]
     public void Undo_NewlineInClientFolderName_StaysEscapedAndCannotInjectALine()
     {
-        // Windows does not allow control characters in folder names.
-        if (OperatingSystem.IsWindows())
-            return;
-
         using var box = new Sandbox(clientBuild: 12340);
 
         Assert.Equal(0, box.Run("add", "A", "a.example.org").Code);

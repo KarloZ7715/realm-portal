@@ -82,13 +82,9 @@ public class ActiveServerManagerTests
         Assert.False(File.Exists(env.ActivoPath));
     }
 
-    [Fact]
+    [NonPrivilegedLinuxFact]
     public void Undo_ToNoActiveServer_WhenActivoDeleteFails_KeepsStateAndActivo()
     {
-        // A read-only directory does not stop root from unlinking activo.json.
-        if (!OperatingSystem.IsLinux() || Environment.IsPrivilegedProcess)
-            return;
-
         using var env = new Env();
         var a = env.Add("Alpha");
         env.Manager.Switch(a);

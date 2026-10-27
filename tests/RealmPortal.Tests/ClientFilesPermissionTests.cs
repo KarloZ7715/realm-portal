@@ -10,12 +10,9 @@ public class ClientFilesPermissionTests
     private const string BlobA = "set realmlist logon-a.example.org\r\n";
     private static readonly ClientVersion V3 = new(new Version(3, 3, 5, 12340));
 
-    [Fact]
+    [LinuxFact]
     public void Apply_AndUndo_PreserveReadOnlyUnixMode()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
-
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");

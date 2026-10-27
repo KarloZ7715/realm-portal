@@ -13,14 +13,9 @@ namespace RealmPortal.Tests.Security;
 /// </summary>
 public class FindingDClientPathAncestorSymlinkTests
 {
-    private static bool LinksSupported => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
-
-    [Fact]
+    [UnixFact]
     public void AddClient_AcceptsSymlinkedAncestor_AndStoresTheUnresolvedPath()
     {
-        if (!LinksSupported)
-            return;
-
         using var dir = new TempDirectory();
         var realRoot = dir.Combine("real");
         var linkRoot = dir.Combine("link");
@@ -50,12 +45,9 @@ public class FindingDClientPathAncestorSymlinkTests
         Assert.Contains("a.example.org", File.ReadAllText(Path.Combine(realClient, "Data", "enUS", "realmlist.wtf")), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [UnixFact]
     public void AddClient_RejectsWhenTheClientFolderItselfIsASymlink()
     {
-        if (!LinksSupported)
-            return;
-
         using var dir = new TempDirectory();
         var realClient = dir.Combine("real-client");
         var linkClient = dir.Combine("client-link");
@@ -71,12 +63,9 @@ public class FindingDClientPathAncestorSymlinkTests
         Assert.False(File.Exists(Path.Combine(dir.Combine("config"), "clients.json")));
     }
 
-    [Fact]
+    [UnixFact]
     public void Switch_RefusesDataLocaleSymlinkPointingOutside_UnderASymlinkedAncestor()
     {
-        if (!LinksSupported)
-            return;
-
         using var dir = new TempDirectory();
         var realRoot = dir.Combine("real");
         var linkRoot = dir.Combine("link");

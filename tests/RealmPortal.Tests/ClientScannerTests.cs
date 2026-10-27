@@ -257,12 +257,9 @@ public class ClientScannerTests
         Assert.Equal(before, Snapshot(home.Path));
     }
 
-    [Fact]
+    [NonWindowsFact]
     public void Scan_DoesNotFollowSymlinkedFolders()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-
         using var home = new TempDirectory();
         using var outside = new TempDirectory();
         CreateClient(outside.Combine("WoW"));
