@@ -135,6 +135,7 @@ public class NetworkUiTests
         Assert.True(card.IsStatusOnline);
         Assert.False(card.IsStatusOffline);
         Assert.Contains("reachable", card.StatusTooltip, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("unreachable", card.StatusTooltip, StringComparison.OrdinalIgnoreCase);
 
         card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", ServerProbeStatus.Offline, ProbeScheduler.ReasonTimedOut, DateTimeOffset.UtcNow));
         Assert.True(card.IsStatusOffline);

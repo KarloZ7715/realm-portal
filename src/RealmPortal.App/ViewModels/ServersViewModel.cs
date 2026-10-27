@@ -64,6 +64,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     private ProbeScheduler? _probes;
     private bool _statusDotsVisible;
     private readonly Dictionary<string, ServerProbeSnapshot> _probeCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _probeEndpoints = new(StringComparer.Ordinal);
 
     public ServersViewModel(DemoBackend backend, bool autoTick = true)
     {
@@ -155,6 +156,7 @@ public sealed partial class ServersViewModel : ViewModelBase
             return;
 
         var servers = new List<ProbeServerTarget>();
+        var keepIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var card in _all)
         {
             if (card.ServerId is null)
@@ -165,7 +167,20 @@ public sealed partial class ServersViewModel : ViewModelBase
                 continue;
             if (!RealmlistAddress.TryParseHostAddress(token, out _, out _))
                 continue;
-            servers.Add(new ProbeServerTarget(card.ServerId, token.Trim()));
+            var host = token.Trim();
+            keepIds.Add(card.ServerId);
+            if (_probeEndpoints.TryGetValue(card.ServerId, out var previous)
+                && !string.Equals(previous, host, StringComparison.OrdinalIgnoreCase))
+            {
+                _probeCache.Remove(card.ServerId);
+            }
+            _probeEndpoints[card.ServerId] = host;
+            servers.Add(new ProbeServerTarget(card.ServerId, host));
+        }
+        foreach (var id in _probeEndpoints.Keys.Where(id => !keepIds.Contains(id)).ToArray())
+        {
+            _probeEndpoints.Remove(id);
+            _probeCache.Remove(id);
         }
         _probes.SetServers(servers);
 

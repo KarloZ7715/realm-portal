@@ -90,7 +90,6 @@ public sealed partial class MainViewModel : ObservableObject
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
         Clients.FirstScanFoundNoClients += ShowClientsAfterEmptyScan;
         Servers.ConfirmDiscardAsync = () => ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
-        WireNetwork();
         if (!session.UiPreferences.Load().IsWelcomeDone)
         {
             Welcome = new WelcomeViewModel(
@@ -105,8 +104,9 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Clients.StartFirstScanIfNeeded();
             ExceptionLog.Observe(RunAutomaticUpdateCheckAsync());
-            SyncProbeListVisibility();
         }
+        // After Welcome is assigned so SyncProbeListVisibility sees IsWelcomeActive.
+        WireNetwork();
     }
 
     public DemoBackend? Backend { get; }
@@ -386,9 +386,13 @@ public sealed partial class MainViewModel : ObservableObject
                 return;
             await PresentOrDeferUpdateAsync(result.Offer).ConfigureAwait(true);
         }
-        catch
+        catch (OperationCanceledException)
         {
-            // Automatic failures are silent per docs/updates-and-status.md.
+        }
+        catch (Exception ex)
+        {
+            // Silent in the UI per docs/updates-and-status.md; still logged for diagnosis.
+            ExceptionLog.Default.Write(ex, "Main.AutomaticUpdateCheck");
         }
     }
 
