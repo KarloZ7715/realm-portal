@@ -81,8 +81,8 @@ public static class WindowPlacementFit
         }
         else
         {
-            x = screen.X + Math.Max(0, (screen.Width - widthPx) / 2);
-            y = screen.Y + Math.Max(0, (screen.Height - heightPx) / 2);
+            x = screen.X + Math.Max(0, (screen.Width - widthPx - frameW) / 2);
+            y = screen.Y + Math.Max(0, (screen.Height - heightPx - frameH) / 2);
         }
 
         // A saved size that already fills the working area (before the frame reserve) is restored maximized so the

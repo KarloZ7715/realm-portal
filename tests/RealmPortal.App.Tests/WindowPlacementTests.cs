@@ -68,7 +68,10 @@ public class WindowPlacementFitTests
         Assert.Equal(saved, WindowPlacementFit.Fit(saved, [Primary, Right], 720, 440));
 
         var fit = WindowPlacementFit.Fit(saved, [Primary], 720, 440)!;
-        Assert.Equal((460, 220), (fit.X, fit.Y));
+        Assert.Equal(
+            ((1920 - 1000 - WindowPlacementFit.DefaultFrameReserveWidthPx) / 2,
+                (1040 - 600 - WindowPlacementFit.DefaultFrameReserveHeightPx) / 2),
+            (fit.X, fit.Y));
         Assert.Equal((1000.0, 600.0), (fit.Width, fit.Height));
     }
 
