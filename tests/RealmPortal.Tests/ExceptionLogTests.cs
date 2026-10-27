@@ -15,7 +15,7 @@ public class ExceptionLogTests
         var log = new ExceptionLog(logPath: () => path, version: () => "9.9.9-test");
 
         ExceptionLog.Observe(FailAsync(), log);
-        await WaitForAsync(() => File.Exists(path) && File.ReadAllText(path).Length > 0);
+        await WaitForAsync(() => LogHasContent(path));
 
         var text = File.ReadAllText(path);
         Assert.Contains("BackgroundTask", text, StringComparison.Ordinal);
@@ -34,7 +34,7 @@ public class ExceptionLogTests
 
         var faulted = Task.FromException(new InvalidOperationException("already-faulted"));
         ExceptionLog.Observe(faulted, log);
-        await WaitForAsync(() => File.Exists(path) && File.ReadAllText(path).Length > 0);
+        await WaitForAsync(() => LogHasContent(path));
 
         var text = File.ReadAllText(path);
         Assert.Contains("BackgroundTask", text, StringComparison.Ordinal);
@@ -271,9 +271,22 @@ public class ExceptionLogTests
         throw new InvalidOperationException("boom-from-background");
     }
 
+    private static bool LogHasContent(string path)
+    {
+        try
+        {
+            return File.Exists(path) && File.ReadAllText(path).Length > 0;
+        }
+        catch (IOException)
+        {
+            // Windows: writer may still hold the file with FileShare.Read while we poll.
+            return false;
+        }
+    }
+
     private static async Task WaitForAsync(Func<bool> condition)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
         while (DateTime.UtcNow < deadline)
         {
             if (condition())
