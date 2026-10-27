@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
+using Avalonia.Threading;
 using RealmPortal.App.Network;
 using RealmPortal.Core;
 using RealmPortal.Core.Service;
@@ -313,10 +314,54 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     private void LoadNetwork()
     {
+        // Memory store is sync (tests). Portal store takes ConfigDirectoryLock — keep it off the UI thread.
+        if (_network is MemoryNetworkSettingsStore)
+        {
+            ApplyNetworkLoad(_network.Load());
+            return;
+        }
+
+        _networkHydrating = true;
+        AutoCheckUpdates = false;
+        StatusProbeEnabled = false;
+        ExceptionLog.Observe(LoadNetworkOffUiAsync());
+    }
+
+    private async Task LoadNetworkOffUiAsync()
+    {
+        ServiceResult<NetworkSettings> loaded;
+        try
+        {
+            loaded = await Task.Run(_network.Load).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            ExceptionLog.Default.Write(ex, "Settings.LoadNetwork");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                _networkHydrating = true;
+                try
+                {
+                    AutoCheckUpdates = false;
+                    StatusProbeEnabled = false;
+                    UpdateCheckStatus = null;
+                }
+                finally
+                {
+                    _networkHydrating = false;
+                }
+            });
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(() => ApplyNetworkLoad(loaded));
+    }
+
+    private void ApplyNetworkLoad(ServiceResult<NetworkSettings> loaded)
+    {
         _networkHydrating = true;
         try
         {
-            var loaded = _network.Load();
             if (!loaded.Succeeded)
             {
                 ExceptionLog.Default.WriteMessage(

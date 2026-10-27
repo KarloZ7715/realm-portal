@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Demo;
@@ -335,7 +336,45 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void WireNetwork()
     {
-        var loaded = _network.Load();
+        Settings.StatusProbeEnabledChanged += enabled =>
+        {
+            _probes.SetEnabled(enabled);
+            Servers.SetStatusDotsVisible(enabled);
+        };
+        Settings.PresentUpdateAsync = async offer => await ShowUpdateNoticeAsync(offer).ConfigureAwait(true);
+
+        // Memory store is sync (tests). Portal store takes ConfigDirectoryLock — load off the UI thread.
+        if (_network is MemoryNetworkSettingsStore)
+        {
+            ApplyProbePrefs(_network.Load());
+            return;
+        }
+
+        // Safe until prefs arrive: disabled before any NotifyListVisible(true).
+        _probes.SetEnabled(false);
+        Servers.AttachProbeScheduler(_probes, false);
+        SyncProbeListVisibility();
+        ExceptionLog.Observe(WireNetworkOffUiAsync());
+    }
+
+    private async Task WireNetworkOffUiAsync()
+    {
+        ServiceResult<NetworkSettings> loaded;
+        try
+        {
+            loaded = await Task.Run(_network.Load).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            ExceptionLog.Default.Write(ex, "Main.WireNetwork");
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(() => ApplyProbePrefs(loaded));
+    }
+
+    private void ApplyProbePrefs(ServiceResult<NetworkSettings> loaded)
+    {
         var probeEnabled = loaded.Succeeded && loaded.Value!.StatusProbeEnabled;
         if (!loaded.Succeeded)
         {
@@ -347,12 +386,6 @@ public sealed partial class MainViewModel : ObservableObject
         // Seguridad: SetEnabled(status.probe_enabled) before NotifyListVisible(true).
         _probes.SetEnabled(probeEnabled);
         Servers.AttachProbeScheduler(_probes, probeEnabled);
-        Settings.StatusProbeEnabledChanged += enabled =>
-        {
-            _probes.SetEnabled(enabled);
-            Servers.SetStatusDotsVisible(enabled);
-        };
-        Settings.PresentUpdateAsync = async offer => await ShowUpdateNoticeAsync(offer).ConfigureAwait(true);
         SyncProbeListVisibility();
     }
 

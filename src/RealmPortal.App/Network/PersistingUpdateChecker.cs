@@ -85,24 +85,28 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.RemindLater(offer);
-        var loaded = _store.Load();
-        if (!loaded.Succeeded)
-            return;
-        _ = _store.Save(loaded.Value! with
+        PersistChoice(loaded => loaded with
         {
             UpdatesLaterVersion = offer.Version,
             UpdatesLaterUntilUtc = _time.GetUtcNow() + LaterPostpone,
-        });
+        }, "RemindLater");
     }
 
     public void SkipThisVersion(UpdateOffer offer)
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.SkipThisVersion(offer);
+        PersistChoice(loaded => loaded with { UpdatesSkippedVersion = offer.Version }, "SkipThisVersion");
+    }
+
+    private void PersistChoice(Func<NetworkSettings, NetworkSettings> mutate, string action)
+    {
         var loaded = _store.Load();
         if (!loaded.Succeeded)
-            return;
-        _ = _store.Save(loaded.Value! with { UpdatesSkippedVersion = offer.Version });
+            throw new InvalidOperationException($"Network settings load failed during {action}: {loaded.Error}");
+        var saved = _store.Save(mutate(loaded.Value!));
+        if (!saved.Succeeded)
+            throw new InvalidOperationException($"Network settings save failed during {action}: {saved.Error}");
     }
 
     public Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)

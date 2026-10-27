@@ -139,4 +139,19 @@ public class PersistingUpdateCheckerTests
         var result = await checker.CheckAsync(UpdateCheckKind.Automatic);
         Assert.Equal(UpdateCheckResultKind.None, result.Kind);
     }
+    private sealed class FailingNetworkSettingsStore : INetworkSettingsStore
+    {
+        public ServiceResult<NetworkSettings> Load() =>
+            ServiceResult<NetworkSettings>.Fail(new ServiceError(ServiceErrorCode.Unexpected, Diagnostic: "boom"));
+
+        public ServiceResult<Unit> Save(NetworkSettings settings) =>
+            ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.Unexpected, Diagnostic: "boom"));
+    }
+
+    [Fact]
+    public void RemindLater_PropagatesStoreLoadFailure()
+    {
+        var checker = new PersistingUpdateChecker(new NullUpdateChecker(), new FailingNetworkSettingsStore());
+        Assert.Throws<InvalidOperationException>(() => checker.RemindLater(Offer("2.0.0")));
+    }
 }
