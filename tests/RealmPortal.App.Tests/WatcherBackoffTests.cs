@@ -88,6 +88,19 @@ public class WatcherBackoffTests
                 Dispatcher.UIThread.RunJobs();
             }
         }
+
+        /// <summary>Pumps until the watcher has requested a delay that is still waiting.</summary>
+        public async Task WaitUntilPendingAsync()
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (_waiters.IsEmpty && DateTime.UtcNow < deadline)
+            {
+                Dispatcher.UIThread.RunJobs();
+                await Task.Delay(5).ConfigureAwait(true);
+            }
+
+            Assert.False(_waiters.IsEmpty, "expected an in-flight watcher delay");
+        }
     }
 
     private sealed class Env : IDisposable
@@ -217,16 +230,21 @@ public class WatcherBackoffTests
         Assert.Equal(ServersPhase.Running, env.Main.Servers.Phase);
         Assert.False(env.Main.Servers.GameClosed);
 
-        var beforeClose = delay.Requested.Count;
+        // Sync on the in-flight running delay, then treat it as the first of the three
+        // close-window intervals: that delay + two miss delays; the third miss closes
+        // without requesting another.
+        await delay.WaitUntilPendingAsync();
+        var inFlightIndex = delay.Requested.Count - 1;
+        Assert.Equal(ServersViewModel.RunningProbeInterval, delay.Requested[inFlightIndex]);
+
         probe.Running = false;
-        // In-flight (post-running) delay + two miss delays; third miss closes without another delay.
         await delay.AdvanceAsync(3);
         await PumpUntilAsync(() => env.Main.Servers.GameClosed, TimeSpan.FromSeconds(2));
 
         // Closed banner stays on the Running phase until the user hits Retry (Finish).
         Assert.True(env.Main.Servers.GameClosed);
         Assert.Equal(ServersPhase.Running, env.Main.Servers.Phase);
-        var closing = delay.Requested.Skip(beforeClose).ToArray();
+        var closing = delay.Requested.Skip(inFlightIndex).ToArray();
         Assert.Equal(3, closing.Length);
         Assert.All(closing, t => Assert.Equal(ServersViewModel.RunningProbeInterval, t));
         // 3 misses × 4 s cadence ⇒ exit reflected within ~12 s (≤ 15 s acceptance window).
