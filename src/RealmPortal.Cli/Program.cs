@@ -39,7 +39,7 @@ public static class Program
             }
             catch (ClientVersionException ex)
             {
-                error.WriteLine($"error: {ex.Message}");
+                CliApp.SafeWriteLine(error, $"error: {ex.Message}");
                 return 2;
             }
         }
@@ -54,7 +54,7 @@ public static class Program
         {
             if (leading + 1 >= args.Length || args[leading + 1].StartsWith("--", StringComparison.Ordinal))
             {
-                error.WriteLine($"error: option {args[leading]} needs a value");
+                CliApp.SafeWriteLine(error, $"error: option {args[leading]} needs a value");
                 error.WriteLine(CliApp.Usage);
                 return 1;
             }
@@ -69,7 +69,7 @@ public static class Program
         {
             if (args[i].StartsWith("--", StringComparison.Ordinal) && !CliApp.IsKnownLeadingOption(args[i]))
             {
-                error.WriteLine($"error: unknown option {args[i]}");
+                CliApp.SafeWriteLine(error, $"error: unknown option {args[i]}");
                 error.WriteLine(CliApp.Usage);
                 return 1;
             }
