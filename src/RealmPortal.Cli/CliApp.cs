@@ -210,6 +210,20 @@ public sealed class CliApp(
             throw new UsageException($"option {extra} does not apply to this command");
     }
 
+
+    /// <summary>Accepts a pasted <c>set realmlist …</c> line the same way the App add-server form does.</summary>
+    private static string NormalizeHostArgument(string raw)
+    {
+        var pasted = RealmlistAddress.NormalizePastedAddress(raw);
+
+        // Prefer the canonical host[:port] form when the token parses; otherwise pass the (possibly
+        // empty) token through so AddServer/UpdateServer report the typed Core error and exit 2.
+        if (RealmlistAddress.TryParseHostAddress(pasted.Token, out var host, out var port))
+            return port == RealmlistAddress.DefaultPort ? host : $"{host}:{port}";
+
+        return pasted.Token;
+    }
+
     private int Add(Parsed parsed, PortalService service)
     {
         Expect(parsed, 2, 2, "<name> <host>");
@@ -225,7 +239,7 @@ public sealed class CliApp(
 
         var result = service.AddServer(new NewServer(
             parsed.Positionals[0],
-            parsed.Positionals[1],
+            NormalizeHostArgument(parsed.Positionals[1]),
             parsed.Get("--realm"),
             null,
             build,
@@ -279,10 +293,13 @@ public sealed class CliApp(
         }
 
         var extraLines = server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+        var host = parsed.Get("--host") is { } hostRaw
+            ? NormalizeHostArgument(hostRaw)
+            : server.Host;
         var result = service.UpdateServer(new UpdateServerRequest(
             server.Id,
             parsed.Get("--name") ?? server.Name,
-            parsed.Get("--host") ?? server.Host,
+            host,
             parsed.Get("--realm") ?? server.Realm,
             RequiredClientBuild: build,
             Account: parsed.Options.ContainsKey("--account") ? parsed.Get("--account") : server.Account,

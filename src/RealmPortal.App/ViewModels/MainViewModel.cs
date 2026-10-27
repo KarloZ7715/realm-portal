@@ -42,12 +42,12 @@ public sealed partial class MainViewModel : ObservableObject
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
     }
 
-    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null)
+    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null, Func<TimeSpan, Task>? delay = null)
     {
         _session = session;
         _probe = probe ?? new TcpConnectionProbe();
         _pickFolder = pickFolder;
-        Servers = new ServersViewModel(session, autoTick);
+        Servers = new ServersViewModel(session, autoTick, delay);
         Clients = new ClientsViewModel(session, pickFolder, startFirstScan: false);
         var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder);
         settingsScreen.ApplySavedLanguage();

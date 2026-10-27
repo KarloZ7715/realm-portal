@@ -45,6 +45,94 @@ public static partial class RealmlistAddress
         return true;
     }
 
+
+    /// <summary>
+    /// Result of stripping a pasted <c>set realmlist …</c> line (or multi-line paste) into a host token.
+    /// </summary>
+    /// <param name="Token">Host or host:port ready for <see cref="TryParseHostAddress"/>; empty when nothing usable remains.</param>
+    /// <param name="IgnoredOtherLines">True when the paste had more than one non-empty line and only the realmlist line was kept.</param>
+    public readonly record struct PastedAddress(string Token, bool IgnoredOtherLines);
+
+    /// <summary>
+    /// Normalizes a pasted address: trim, pick the <c>set realmlist</c> line from a multi-line paste,
+    /// drop that prefix (case-insensitive), surrounding quotes and a trailing <c>;</c>.
+    /// </summary>
+    public static PastedAddress NormalizePastedAddress(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return new PastedAddress(string.Empty, false);
+
+        var lines = text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n')
+            .Select(static line => line.Trim())
+            .Where(static line => line.Length > 0)
+            .ToArray();
+        if (lines.Length == 0)
+            return new PastedAddress(string.Empty, false);
+
+        var realmlistLines = lines.Where(LooksLikeRealmlistDirective).ToArray();
+        var chosen = realmlistLines.Length > 0 ? realmlistLines[0] : lines[0];
+        var ignoredOther = lines.Length > 1;
+        return new PastedAddress(StripRealmlistDecorations(chosen), ignoredOther);
+    }
+
+    /// <summary>
+    /// Normalizes a pasted address then parses it with <see cref="TryParseHostAddress"/>.
+    /// </summary>
+    public static bool TryParsePastedHostAddress(
+        string? text,
+        out string host,
+        out int port,
+        out bool ignoredOtherLines,
+        int defaultPort = DefaultPort)
+    {
+        var pasted = NormalizePastedAddress(text);
+        ignoredOtherLines = pasted.IgnoredOtherLines;
+        return TryParseHostAddress(pasted.Token, out host, out port, defaultPort);
+    }
+
+    private static bool LooksLikeRealmlistDirective(string line)
+    {
+        // "set" + whitespace + "realmlist" + word boundary (any casing), so a pasted Config.wtf /
+        // website line is recognized. Reject glued forms like "setrealmlist …" or "set realmlistx…".
+        if (line.Length < 4 || !line.StartsWith("set", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (!char.IsWhiteSpace(line[3]))
+            return false;
+        var rest = line[3..].TrimStart();
+        if (!rest.StartsWith("realmlist", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (rest.Length == "realmlist".Length)
+            return true;
+        return !char.IsLetterOrDigit(rest["realmlist".Length]);
+    }
+
+    private static string StripRealmlistDecorations(string line)
+    {
+        var value = line.Trim();
+        if (LooksLikeRealmlistDirective(value))
+        {
+            // Drop "set" then "realmlist", allowing any whitespace between the words.
+            value = value[3..].TrimStart();
+            value = value["realmlist".Length..].TrimStart();
+        }
+
+        // Trailing ';' is common in website instructions ("set realmlist host;"). Strip it before quotes
+        // so 'set realmlist "host";' still yields host.
+        if (value.EndsWith(';'))
+            value = value[..^1].TrimEnd();
+
+        if (value.Length >= 2
+            && ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\'')))
+        {
+            value = value[1..^1].Trim();
+        }
+
+        return value.Trim();
+    }
+
     /// <summary>Validates a <c>set realmlist</c> host token (not a full URL).</summary>
     public static void ValidateRealmlistHost(string value, int lineNumber)
     {

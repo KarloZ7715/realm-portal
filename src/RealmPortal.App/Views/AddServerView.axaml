@@ -31,10 +31,15 @@
           </StackPanel>
           <StackPanel Spacing="6" Grid.Column="1" Grid.Row="0">
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.address}"/>
-            <TextBox Name="AddressBox" Classes="parchment" Classes.error="{Binding HasAddressError}" Text="{Binding Address, Mode=TwoWay}" Watermark="logon.ejemplo.com:3724"/>
+            <TextBox Name="AddressBox" Classes="parchment" Classes.error="{Binding HasAddressError}" Text="{Binding Address, Mode=TwoWay}" AcceptsReturn="True" Watermark="logon.ejemplo.com:3724"/>
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding !HasAddressError}">
               <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
-              <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.address.help}"/>
+              <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}"
+                           Text="{Binding AddressInterpretation}" IsVisible="{Binding HasAddressInterpretation}"/>
+                <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}"
+                           Text="{loc:T add.address.help}" IsVisible="{Binding !HasAddressInterpretation}"/>
+              </StackPanel>
             </Grid>
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding HasAddressError}">
               <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
