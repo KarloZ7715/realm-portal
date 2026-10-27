@@ -268,14 +268,18 @@ public class WelcomeTests
         using var env = new Env(additionalRoots: [scanRoot]);
         var welcome = env.Main.Welcome!;
         welcome.ContinueLanguageCommand.Execute(null);
-        await WaitUntil(() => welcome.Step == WelcomeViewModel.WelcomeStep.Clients);
+        await WaitUntil(() => welcome.Step == WelcomeViewModel.WelcomeStep.Clients && welcome.IsScanningClients);
 
-        // Skip while discovery may still be active (or right after); FinishWelcome must not stack a second scan.
+        // Skip while the welcome-driven scan is still marked running. FinishWelcome must not
+        // call StartFirstScanIfNeeded (which would clear then restart IsScanning).
+        Assert.True(env.Main.Clients.IsScanning);
         env.Main.Welcome!.SkipCommand.Execute(null);
         Assert.False(env.Main.IsWelcomeActive);
+        Assert.True(env.Session.UiPreferences.Load().WelcomeCompleted);
+        // Same in-flight scan is still the one running (no reset via a second StartFirstScanIfNeeded).
+        Assert.True(env.Main.Clients.IsScanning);
 
         await WaitUntil(() => !env.Main.Clients.IsScanning);
-        Assert.False(env.Main.Clients.IsScanning);
-        Assert.True(env.Session.UiPreferences.Load().WelcomeCompleted);
+        Assert.True(env.Session.UiPreferences.Load().FirstScanCompleted);
     }
 }

@@ -74,6 +74,8 @@ public sealed partial class WelcomeViewModel : ViewModelBase
             OnPropertyChanged(nameof(HasClients));
             OnPropertyChanged(nameof(NoClients));
             OnPropertyChanged(nameof(ContinueClientsLabel));
+            OnPropertyChanged(nameof(Title));
+            OnPropertyChanged(nameof(Subtitle));
             OnPropertyChanged(nameof(StatusText));
             ContinueClientsCommand.NotifyCanExecuteChanged();
             RescanClientsCommand.NotifyCanExecuteChanged();
