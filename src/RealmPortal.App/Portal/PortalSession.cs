@@ -39,12 +39,25 @@ public sealed class PortalSession
         return new PortalSession(service, new UiPreferencesStore(configDir), getVariable);
     }
 
-    public static PortalSession CreateForPaths(string configDir, string projectionDir, string backupDir, IGameLaunchService? launch = null, IGameProcessProbe? probe = null)
+    public static PortalSession CreateForPaths(
+        string configDir,
+        string projectionDir,
+        string backupDir,
+        IGameLaunchService? launch = null,
+        IGameProcessProbe? probe = null,
+        ClientScanOptions? scanOptions = null)
     {
         launch ??= new ProcessGameLauncher();
         var getVariable = (string name) =>
             name == ClientFilesApplier.BackupDirectoryVariable ? backupDir : null;
-        var service = new PortalService(configDir, projectionDir, new PeClientVersionReader(), launch, probe, getVariable: getVariable);
+        var service = new PortalService(
+            configDir,
+            projectionDir,
+            new PeClientVersionReader(),
+            launch,
+            probe,
+            getVariable: getVariable,
+            scanOptions: scanOptions);
         return new PortalSession(service, new UiPreferencesStore(configDir), getVariable);
     }
 
