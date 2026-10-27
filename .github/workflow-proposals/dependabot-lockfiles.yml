@@ -1,0 +1,127 @@
+name: Dependabot lock files
+
+# Regenerate NuGet packages.lock.json files on Dependabot PRs so locked-mode CI
+# stays green when a shared test dependency is bumped in Directory.Packages.props
+# but only some project locks are updated (see #160).
+on:
+  pull_request:
+    paths:
+      - Directory.Packages.props
+      - "**/*.csproj"
+      - "**/packages.lock.json"
+      - Directory.Build.props
+      - global.json
+      - nuget.config
+
+# Default least privilege; the job below elevates only for the Dependabot case.
+permissions:
+  contents: read
+
+# Do not share a concurrency group with CI — never cancel human PR checks.
+concurrency:
+  group: dependabot-lockfiles-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  refresh-lockfiles:
+    name: refresh NuGet lock files
+    # Strict gate: Dependabot only, dependabot/** branches, never forks.
+    if: >
+      github.event_name == 'pull_request' &&
+      github.actor == 'dependabot[bot]' &&
+      startsWith(github.head_ref, 'dependabot/') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          # Need the default token with contents:write to push lock updates.
+          persist-credentials: true
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Regenerate all NuGet lock files
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          solutions=(./*.sln ./*.slnx)
+          if [ "${#solutions[@]}" -eq 1 ]; then
+            echo "Restoring ${solutions[0]} with --force-evaluate"
+            dotnet restore "${solutions[0]}" --force-evaluate
+          elif [ "${#solutions[@]}" -gt 1 ]; then
+            echo "::error::Multiple solution files in the root: ${solutions[*]}"
+            exit 1
+          else
+            echo "No solution file; restoring each project that has a packages.lock.json"
+            while IFS= read -r -d '' lock; do
+              dir=$(dirname "$lock")
+              projects=("$dir"/*.csproj)
+              if [ "${#projects[@]}" -ne 1 ]; then
+                echo "::error::Expected exactly one .csproj next to $lock"
+                exit 1
+              fi
+              echo "Restoring ${projects[0]} with --force-evaluate"
+              dotnet restore "${projects[0]}" --force-evaluate
+            done < <(find . -name packages.lock.json -not -path './.git/*' -not -path '*/bin/*' -not -path '*/obj/*' -print0)
+          fi
+
+      - name: Verify locked-mode restore
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          solutions=(./*.sln ./*.slnx)
+          if [ "${#solutions[@]}" -eq 1 ]; then
+            dotnet restore "${solutions[0]}" --locked-mode
+          fi
+
+      - name: Commit and push lock file updates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stage only lock files (never other restore side effects).
+          mapfile -t locks < <(find . -name packages.lock.json -not -path './.git/*' -not -path '*/bin/*' -not -path '*/obj/*' | sort)
+          if [ "${#locks[@]}" -eq 0 ]; then
+            echo "No packages.lock.json files found; nothing to do."
+            exit 0
+          fi
+          git add -- "${locks[@]}"
+
+          if git diff --cached --quiet; then
+            echo "Lock files already up to date."
+            exit 0
+          fi
+
+          git commit -m "chore(deps): refresh NuGet lock files for Dependabot" \
+            -m "Regenerate packages.lock.json after a Dependabot version bump so every project that uses RestorePackagesWithLockFile matches Directory.Packages.props (including transitive test dependencies)."
+
+          git push origin "HEAD:${HEAD_REF}"
+
+          # GITHUB_TOKEN pushes do not create new workflow runs, so PR checks on
+          # the new commit may be missing until a non-token push or a close/reopen.
+          new_sha=$(git rev-parse HEAD)
+          gh pr comment "${PR_NUMBER}" --body "Refreshed NuGet \`packages.lock.json\` files for this Dependabot PR (\`${new_sha}\`).
+
+          Locked-mode restore was verified in this workflow. GitHub does not re-run workflows for pushes made with \`GITHUB_TOKEN\`; if required checks are missing on the new commit, push an empty commit to the branch or close and reopen the PR."
