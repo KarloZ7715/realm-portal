@@ -17,7 +17,7 @@ status bar and `realm-portal --version` all agree.
 
 To release: bump `<Version>` in `Directory.Build.props` in a PR, merge it, then push the matching `v<version>` tag (or `v<version>-rc.N` for a prerelease).
 
-On a tag push, after both package jobs succeed, the **publish** job creates a **draft** GitHub Release, uploads every package plus a merged `SHA256SUMS`, verifies digests/sizes/download URLs, then publishes. An `rc` tag is published with `--prerelease --latest=false` so GitHub’s `/releases/latest` (and the in-app update check) never offers it. Stable tags become the latest release. The job refuses to modify an already-published release; if the published release is not immutable, it is reverted to draft and the job fails.
+On a tag push, after both package jobs succeed, a **publish** job (added in the same PR once the Actions workflow file can be updated) creates a **draft** GitHub Release, uploads every package plus a merged `SHA256SUMS`, verifies digests/sizes/download URLs, then publishes. An `rc` tag is published with `--prerelease --latest=false` so GitHub’s `/releases/latest` (and the in-app update check) never offers it. Stable tags become the latest release. The job refuses to modify an already-published release; if the published release is not immutable, it is reverted to draft and the job fails. Until that job is in `.github/workflows/release-linux.yml`, tag builds still only upload workflow artifacts (same as before).
 
 Linux outputs are also uploaded as a workflow artifact named `realm-portal-linux-<version>` containing:
 
