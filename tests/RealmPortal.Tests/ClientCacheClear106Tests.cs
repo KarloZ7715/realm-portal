@@ -108,8 +108,7 @@ public sealed class ClientCacheClear106Tests
         var ex = Assert.Throws<ClientFilesException>(() => ClientCacheClearer.Clear(env.Client));
 
         Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
-        Assert.True(File.Exists(Path.Combine(env.Client, "WTF", "Config.wtf")));
-        Assert.Contains("Keep", File.ReadAllText(Path.Combine(env.Client, "WTF", "Config.wtf")));
+        Assert.Equal("SET realmName \"Keep\"\r\n", File.ReadAllText(Path.Combine(env.Client, "WTF", "Config.wtf")));
     }
 
     [UnixFact]
