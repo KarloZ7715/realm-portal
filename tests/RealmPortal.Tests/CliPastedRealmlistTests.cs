@@ -62,11 +62,15 @@ public class CliPastedRealmlistTests
     [InlineData("set realmlist bad host")]
     [InlineData("set realmlist host;rm")]
     [InlineData("set realmlist http://evil.example")]
+    [InlineData("set realmlist ")]
+    [InlineData("setrealmlist host.example")]
+    [InlineData("set realmlistx.example")]
     public void Add_RejectsInvalidPastedHost(string pasted)
     {
         using var box = new Sandbox();
         var result = box.Run("add", "Bad", pasted);
-        Assert.NotEqual(0, result.Code);
+        // Service validation (not UsageException) so invalid/empty host keeps exit code 2.
+        Assert.Equal(2, result.Code);
         Assert.False(string.IsNullOrWhiteSpace(result.Err));
         Assert.False(File.Exists(Path.Combine(box.Config, "servers.json")));
     }

@@ -29,6 +29,9 @@ public class RealmlistPastedAddressTests
             true
         },
         { "set  realmlist   logon.example.org", "logon.example.org", false },
+        // Glued "set"/"realmlist" is not a directive — token left as-is for host parse to reject.
+        { "setrealmlist host.example", "setrealmlist host.example", false },
+        { "set realmlistx.example", "set realmlistx.example", false },
         { "", "", false },
         { "   ", "", false },
     };
@@ -53,6 +56,8 @@ public class RealmlistPastedAddressTests
         { "set realmlist host;rm", false, "", 3724 },
         { "set realmlist http://evil", false, "", 3724 },
         { "set realmlist ", false, "", 3724 },
+        { "setrealmlist host.example", false, "", 3724 },
+        { "set realmlistx.example", false, "", 3724 },
         { "not a host line with spaces", false, "", 3724 },
     };
 

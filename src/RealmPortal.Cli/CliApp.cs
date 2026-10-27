@@ -215,11 +215,9 @@ public sealed class CliApp(
     private static string NormalizeHostArgument(string raw)
     {
         var pasted = RealmlistAddress.NormalizePastedAddress(raw);
-        if (pasted.Token.Length == 0)
-            throw new UsageException($"host is invalid: '{raw}'");
 
-        // Prefer the canonical host[:port] form when the token parses; otherwise pass it through so
-        // AddServer/UpdateServer can report the typed Core error (for example NotAscii).
+        // Prefer the canonical host[:port] form when the token parses; otherwise pass the (possibly
+        // empty) token through so AddServer/UpdateServer report the typed Core error and exit 2.
         if (RealmlistAddress.TryParseHostAddress(pasted.Token, out var host, out var port))
             return port == RealmlistAddress.DefaultPort ? host : $"{host}:{port}";
 

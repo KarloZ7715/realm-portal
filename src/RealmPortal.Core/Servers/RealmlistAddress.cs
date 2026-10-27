@@ -95,11 +95,18 @@ public static partial class RealmlistAddress
 
     private static bool LooksLikeRealmlistDirective(string line)
     {
-        // "set" + whitespace + "realmlist" (any casing), so a pasted Config.wtf / website line is recognized.
-        if (!line.StartsWith("set", StringComparison.OrdinalIgnoreCase))
+        // "set" + whitespace + "realmlist" + word boundary (any casing), so a pasted Config.wtf /
+        // website line is recognized. Reject glued forms like "setrealmlist …" or "set realmlistx…".
+        if (line.Length < 4 || !line.StartsWith("set", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (!char.IsWhiteSpace(line[3]))
             return false;
         var rest = line[3..].TrimStart();
-        return rest.StartsWith("realmlist", StringComparison.OrdinalIgnoreCase);
+        if (!rest.StartsWith("realmlist", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (rest.Length == "realmlist".Length)
+            return true;
+        return !char.IsLetterOrDigit(rest["realmlist".Length]);
     }
 
     private static string StripRealmlistDecorations(string line)
