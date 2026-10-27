@@ -394,25 +394,36 @@ public sealed partial class ServerItemViewModel : ObservableObject
     private string BuildStatusTooltip()
     {
         var age = FormatAge(_statusCheckedAt);
+        var reason = ResolveReason(_statusReason);
         return _loginStatus switch
         {
             LoginReachability.Online when age is not null =>
                 Loc.Format("status.probe.online.age", age),
             LoginReachability.Online =>
                 Loc.Get("status.probe.online"),
-            LoginReachability.Offline when _statusReason is { Length: > 0 } reason && age is not null =>
+            LoginReachability.Offline when reason is { Length: > 0 } && age is not null =>
                 Loc.Format("status.probe.offline.age", reason, age),
-            LoginReachability.Offline when _statusReason is { Length: > 0 } reason =>
+            LoginReachability.Offline when reason is { Length: > 0 } =>
                 Loc.Format("status.probe.offline.reason", reason),
             LoginReachability.Offline =>
                 Loc.Get("status.probe.offline"),
             LoginReachability.Checking =>
                 Loc.Get("status.probe.checking"),
-            _ when _statusReason is { Length: > 0 } reason =>
+            _ when reason is { Length: > 0 } =>
                 Loc.Format("status.probe.unknown.reason", reason),
             _ =>
                 Loc.Get("status.probe.unknown"),
         };
+    }
+
+    /// <summary>Reasons from the scheduler are Loc keys (<c>status.probe.reason.*</c>); fall back to the raw string.</summary>
+    private static string? ResolveReason(string? reasonOrKey)
+    {
+        if (string.IsNullOrEmpty(reasonOrKey))
+            return null;
+        if (reasonOrKey.StartsWith("status.probe.reason.", StringComparison.Ordinal))
+            return Loc.Get(reasonOrKey);
+        return reasonOrKey;
     }
 
     private static string? FormatAge(DateTimeOffset? checkedAt)

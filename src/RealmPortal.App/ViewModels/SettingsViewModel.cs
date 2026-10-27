@@ -230,35 +230,45 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private async Task CheckForUpdatesAsync()
     {
         UpdateCheckStatus = Loc.Get("settings.updates.status.checking");
-        var result = await _updates.CheckAsync(UpdateCheckKind.Manual).ConfigureAwait(true);
-        switch (result.Kind)
+        try
         {
-            case UpdateCheckResultKind.Offer when result.Offer is { } offer && PresentUpdateAsync is { } present:
-                UpdateCheckStatus = null;
-                var choice = await present(offer).ConfigureAwait(true);
-                if (choice == ConfirmDialogChoice.Confirm)
-                    await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
-                else if (choice == ConfirmDialogChoice.Secondary)
-                    _updates.RemindLater(offer);
-                else if (choice == ConfirmDialogChoice.Cancel)
-                    _updates.SkipThisVersion(offer);
-                break;
-            case UpdateCheckResultKind.Offer when result.Offer is { } offer:
-                // No presenter (tests): treat as UpToDate path skipped — leave a soft note.
-                UpdateCheckStatus = Loc.Format("update.title", offer.Version);
-                break;
-            case UpdateCheckResultKind.UpToDate:
-                UpdateCheckStatus = Loc.Get("settings.updates.status.uptodate");
-                break;
-            case UpdateCheckResultKind.RateLimited:
-                UpdateCheckStatus = Loc.Get("settings.updates.status.ratelimited");
-                break;
-            case UpdateCheckResultKind.Failed:
-                UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
-                break;
-            default:
-                UpdateCheckStatus = null;
-                break;
+            var result = await _updates.CheckAsync(UpdateCheckKind.Manual).ConfigureAwait(true);
+            switch (result.Kind)
+            {
+                case UpdateCheckResultKind.Offer when result.Offer is { } offer && PresentUpdateAsync is { } present:
+                    UpdateCheckStatus = null;
+                    var choice = await present(offer).ConfigureAwait(true);
+                    if (choice == ConfirmDialogChoice.Confirm)
+                        await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+                    else if (choice == ConfirmDialogChoice.Secondary)
+                        _updates.RemindLater(offer);
+                    else if (choice == ConfirmDialogChoice.Cancel)
+                        _updates.SkipThisVersion(offer);
+                    break;
+                case UpdateCheckResultKind.Offer when result.Offer is { } offer:
+                    UpdateCheckStatus = Loc.Format("update.title", offer.Version);
+                    break;
+                case UpdateCheckResultKind.UpToDate:
+                    UpdateCheckStatus = Loc.Get("settings.updates.status.uptodate");
+                    break;
+                case UpdateCheckResultKind.RateLimited:
+                    UpdateCheckStatus = Loc.Get("settings.updates.status.ratelimited");
+                    break;
+                case UpdateCheckResultKind.Failed:
+                    UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
+                    break;
+                default:
+                    UpdateCheckStatus = null;
+                    break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateCheckStatus = null;
+        }
+        catch (Exception)
+        {
+            UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
         }
     }
 
@@ -316,10 +326,22 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     private void PersistNetwork()
     {
-        var net = _network.Load();
-        net.UpdatesAutoCheck = AutoCheckUpdates;
-        net.StatusProbeEnabled = StatusProbeEnabled;
-        _network.Save(net);
+        var auto = AutoCheckUpdates;
+        var probe = StatusProbeEnabled;
+        void Write()
+        {
+            var net = _network.Load();
+            net.UpdatesAutoCheck = auto;
+            net.StatusProbeEnabled = probe;
+            _network.Save(net);
+        }
+
+        // In-memory test/demo store is sync and lock-free. File store can wait on
+        // ConfigDirectoryLock — never block the Avalonia UI thread for that.
+        if (_network is MemoryNetworkSettingsStore)
+            Write();
+        else
+            _ = Task.Run(Write);
     }
 
     partial void OnAutoCheckUpdatesChanged(bool value)

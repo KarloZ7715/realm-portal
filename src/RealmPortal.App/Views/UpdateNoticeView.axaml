@@ -30,10 +30,10 @@
           <TextBlock Text="{Binding OpenGitHubText}"/>
         </Button>
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
-          <Button Name="SkipButton" Classes="secondary" MinWidth="130" IsCancel="True" Command="{Binding SkipCommand}">
+          <Button Name="SkipButton" Classes="secondary" MinWidth="130" Command="{Binding SkipCommand}">
             <TextBlock Text="{Binding SkipText}"/>
           </Button>
-          <Button Name="LaterButton" Classes="secondary" MinWidth="130" Command="{Binding LaterCommand}">
+          <Button Name="LaterButton" Classes="secondary" MinWidth="130" IsCancel="True" Command="{Binding LaterCommand}">
             <TextBlock Text="{Binding LaterText}"/>
           </Button>
           <Button Name="UpdateButton" Classes="primary" MinWidth="160" Command="{Binding UpdateCommand}">

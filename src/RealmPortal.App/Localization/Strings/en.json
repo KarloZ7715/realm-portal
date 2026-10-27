@@ -386,5 +386,10 @@
   "status.probe.unknown.reason": "Login status unknown · {0}",
   "status.probe.age.justnow": "just now",
   "status.probe.age.minutes": "{0} min",
-  "status.probe.age.hours": "{0} h"
+  "status.probe.age.hours": "{0} h",
+  "status.probe.reason.timeout": "Connection timed out",
+  "status.probe.reason.failed": "Connection failed",
+  "status.probe.reason.dns": "Host could not be resolved",
+  "status.probe.reason.invalidhost": "Invalid host",
+  "status.probe.reason.disabled": "Probes disabled"
 }

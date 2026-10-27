@@ -134,11 +134,11 @@ public class NetworkUiTests
         Assert.False(card.IsStatusOffline);
         Assert.Contains("reachable", card.StatusTooltip, StringComparison.OrdinalIgnoreCase);
 
-        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", LoginReachability.Offline, "Connection timed out", DateTimeOffset.UtcNow));
+        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", LoginReachability.Offline, "status.probe.reason.timeout", DateTimeOffset.UtcNow));
         Assert.True(card.IsStatusOffline);
         Assert.Contains("timed out", card.StatusTooltip, StringComparison.OrdinalIgnoreCase);
 
-        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", LoginReachability.Unknown, "Host could not be resolved", null));
+        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", LoginReachability.Unknown, "status.probe.reason.dns", null));
         Assert.True(card.IsStatusNeutral);
         Assert.Contains("unknown", card.StatusTooltip, StringComparison.OrdinalIgnoreCase);
 

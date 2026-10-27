@@ -81,7 +81,7 @@ public class ProbeSchedulerTests
 
         await WaitForAsync(() => last?.Status == LoginReachability.Offline, TimeSpan.FromSeconds(2));
         Assert.Equal(LoginReachability.Offline, last!.Status);
-        Assert.Contains("timed out", last.Reason!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("status.probe.reason.timeout", last.Reason);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class ProbeSchedulerTests
         var disabled = new List<ServerProbeSnapshot>();
         scheduler.StatusChanged += disabled.Add;
         scheduler.SetEnabled(false);
-        Assert.Contains(disabled, s => s.Status == LoginReachability.Unknown && s.Reason == "Probes disabled");
+        Assert.Contains(disabled, s => s.Status == LoginReachability.Unknown && s.Reason == "status.probe.reason.disabled");
 
         await Task.Delay(200);
         Assert.Equal(callsAfterOnline, probe.Calls);

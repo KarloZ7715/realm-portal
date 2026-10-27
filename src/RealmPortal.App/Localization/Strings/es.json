@@ -386,5 +386,10 @@
   "status.probe.unknown.reason": "Estado de login desconocido · {0}",
   "status.probe.age.justnow": "un momento",
   "status.probe.age.minutes": "{0} min",
-  "status.probe.age.hours": "{0} h"
+  "status.probe.age.hours": "{0} h",
+  "status.probe.reason.timeout": "Tiempo de espera agotado",
+  "status.probe.reason.failed": "Conexión fallida",
+  "status.probe.reason.dns": "No se pudo resolver el host",
+  "status.probe.reason.invalidhost": "Host no válido",
+  "status.probe.reason.disabled": "Sondas desactivadas"
 }

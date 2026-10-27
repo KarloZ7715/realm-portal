@@ -21,6 +21,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly INetworkSettingsStore _network;
     private readonly IProbeScheduler _probes;
     private readonly IUpdateChecker _updates;
+    private UpdateOffer? _pendingUpdateOffer;
     private readonly Func<Task<string?>>? _pickFolder;
     private AddServerViewModel? _adding;
     private EditClientViewModel? _editingClient;
@@ -325,6 +326,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             UpdateNotice = null;
             DialogClosed?.Invoke();
+            TryPresentDeferredUpdate();
         }
     }
 
@@ -357,18 +359,40 @@ public sealed partial class MainViewModel : ObservableObject
             var result = await _updates.CheckAsync(UpdateCheckKind.Automatic).ConfigureAwait(true);
             if (result.Kind != UpdateCheckResultKind.Offer || result.Offer is null)
                 return;
-            var choice = await ShowUpdateNoticeAsync(result.Offer).ConfigureAwait(true);
-            if (choice == ConfirmDialogChoice.Confirm)
-                await _updates.InstallUpdateAsync(result.Offer).ConfigureAwait(true);
-            else if (choice == ConfirmDialogChoice.Secondary)
-                _updates.RemindLater(result.Offer);
-            else if (choice == ConfirmDialogChoice.Cancel)
-                _updates.SkipThisVersion(result.Offer);
+            await PresentOrDeferUpdateAsync(result.Offer).ConfigureAwait(true);
         }
         catch
         {
             // Automatic failures are silent per docs/updates-and-status.md.
         }
+    }
+
+    private async Task PresentOrDeferUpdateAsync(UpdateOffer offer)
+    {
+        var choice = await ShowUpdateNoticeAsync(offer).ConfigureAwait(true);
+        if (choice is null)
+        {
+            // Another modal is open — keep the offer for when it closes.
+            _pendingUpdateOffer = offer;
+            return;
+        }
+
+        _pendingUpdateOffer = null;
+        if (choice == ConfirmDialogChoice.Confirm)
+            await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+        else if (choice == ConfirmDialogChoice.Secondary)
+            _updates.RemindLater(offer);
+        else if (choice == ConfirmDialogChoice.Cancel)
+            _updates.SkipThisVersion(offer);
+    }
+
+    private void TryPresentDeferredUpdate()
+    {
+        if (_pendingUpdateOffer is null || Dialog is not null || UpdateNotice is not null)
+            return;
+        var offer = _pendingUpdateOffer;
+        _pendingUpdateOffer = null;
+        ExceptionLog.Observe(PresentOrDeferUpdateAsync(offer));
     }
 
     [RelayCommand]

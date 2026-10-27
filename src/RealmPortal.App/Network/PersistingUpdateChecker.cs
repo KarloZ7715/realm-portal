@@ -25,6 +25,14 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
 
     public async Task<UpdateCheckResult> CheckAsync(UpdateCheckKind kind, CancellationToken cancellationToken = default)
     {
+        // Store Load/Save and ConfigDirectoryLock must not run on the Avalonia UI thread.
+        return await Task.Run(
+            () => CheckCoreAsync(kind, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<UpdateCheckResult> CheckCoreAsync(UpdateCheckKind kind, CancellationToken cancellationToken)
+    {
         var settings = _store.Load();
         var now = _time.GetUtcNow();
 
@@ -69,21 +77,29 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.RemindLater(offer);
-        var settings = _store.Load();
-        settings.UpdatesLaterVersion = offer.Version;
-        settings.UpdatesLaterUntilUtc = _time.GetUtcNow() + LaterPostpone;
-        _store.Save(settings);
+        Persist(s =>
+        {
+            s.UpdatesLaterVersion = offer.Version;
+            s.UpdatesLaterUntilUtc = _time.GetUtcNow() + LaterPostpone;
+        });
     }
 
     public void SkipThisVersion(UpdateOffer offer)
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.SkipThisVersion(offer);
-        var settings = _store.Load();
-        settings.UpdatesSkippedVersion = offer.Version;
-        _store.Save(settings);
+        Persist(s => s.UpdatesSkippedVersion = offer.Version);
     }
 
     public Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
         => _inner.InstallUpdateAsync(offer, cancellationToken);
+
+    private void Persist(Action<NetworkSettings> mutate)
+    {
+        // IUpdateChecker.RemindLater / SkipThisVersion are synchronous by contract.
+        // File-backed saves can briefly block; Core's checker may replace this seam.
+        var settings = _store.Load();
+        mutate(settings);
+        _store.Save(settings);
+    }
 }

@@ -133,15 +133,20 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     private void OnProbeStatusChanged(ServerProbeSnapshot snapshot)
     {
-        _probeCache[snapshot.ServerId] = snapshot;
-        var card = _all.FirstOrDefault(c => c.ServerId == snapshot.ServerId);
-        if (card is null || !_statusDotsVisible)
-            return;
-        // Probe callbacks may arrive off the UI thread.
+        // Probe callbacks arrive off the UI thread; touch cache + cards only on the UI thread.
         if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
-            card.ApplyProbeSnapshot(snapshot);
+            ApplyProbeStatusOnUi(snapshot);
         else
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => card.ApplyProbeSnapshot(snapshot));
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyProbeStatusOnUi(snapshot));
+    }
+
+    private void ApplyProbeStatusOnUi(ServerProbeSnapshot snapshot)
+    {
+        _probeCache[snapshot.ServerId] = snapshot;
+        if (!_statusDotsVisible)
+            return;
+        var card = _all.FirstOrDefault(c => c.ServerId == snapshot.ServerId);
+        card?.ApplyProbeSnapshot(snapshot);
     }
 
     private void PushServersToProbe()

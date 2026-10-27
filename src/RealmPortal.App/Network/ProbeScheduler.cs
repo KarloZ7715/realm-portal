@@ -25,8 +25,8 @@ public sealed class ProbeScheduler : IProbeScheduler
     private readonly object _gate = new();
     private readonly ConcurrentDictionary<string, ServerProbeSnapshot> _status = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastAttempt = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _nextDue = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _slots = new(MaxConcurrent, MaxConcurrent);
-    private readonly Random _jitter = new();
 
     private IReadOnlyList<(string ServerId, string Host, int Port)> _servers =
         Array.Empty<(string, string, int)>();
@@ -63,17 +63,33 @@ public sealed class ProbeScheduler : IProbeScheduler
         lock (_gate)
         {
             ThrowIfDisposed();
+            var previous = _servers.ToDictionary(s => s.ServerId, s => (s.Host, s.Port), StringComparer.Ordinal);
             _servers = servers.ToArray();
             var keep = new HashSet<string>(servers.Select(s => s.ServerId), StringComparer.Ordinal);
-            foreach (var key in _status.Keys)
+            foreach (var key in _status.Keys.ToArray())
             {
                 if (!keep.Contains(key))
                     _status.TryRemove(key, out _);
             }
-            foreach (var key in _lastAttempt.Keys)
+            foreach (var key in _lastAttempt.Keys.ToArray())
             {
                 if (!keep.Contains(key))
                     _lastAttempt.TryRemove(key, out _);
+            }
+            foreach (var key in _nextDue.Keys.ToArray())
+            {
+                if (!keep.Contains(key))
+                    _nextDue.TryRemove(key, out _);
+            }
+            foreach (var server in _servers)
+            {
+                if (previous.TryGetValue(server.ServerId, out var old)
+                    && (old.Host != server.Host || old.Port != server.Port))
+                {
+                    _status.TryRemove(server.ServerId, out _);
+                    _lastAttempt.TryRemove(server.ServerId, out _);
+                    _nextDue.TryRemove(server.ServerId, out _);
+                }
             }
         }
         EnsureLoop();
@@ -98,7 +114,7 @@ public sealed class ProbeScheduler : IProbeScheduler
             if (!enabled)
             {
                 foreach (var id in _status.Keys.ToArray())
-                    Publish(new ServerProbeSnapshot(id, LoginReachability.Unknown, "Probes disabled", null));
+                    Publish(new ServerProbeSnapshot(id, LoginReachability.Unknown, "status.probe.reason.disabled", null));
             }
         }
         EnsureLoop();
@@ -144,12 +160,8 @@ public sealed class ProbeScheduler : IProbeScheduler
             {
                 if (ct.IsCancellationRequested)
                     return;
-                if (_lastAttempt.TryGetValue(server.ServerId, out var last))
-                {
-                    var due = last + _minInterval + TimeSpan.FromMilliseconds(_jitter.Next(Math.Max(1, (int)_jitterMax.TotalMilliseconds)));
-                    if (now < due)
-                        continue;
-                }
+                if (_nextDue.TryGetValue(server.ServerId, out var due) && now < due)
+                    continue;
 
                 if (!await _slots.WaitAsync(0, ct).ConfigureAwait(false))
                     continue;
@@ -173,7 +185,10 @@ public sealed class ProbeScheduler : IProbeScheduler
         try
         {
             Publish(new ServerProbeSnapshot(server.ServerId, LoginReachability.Checking, null, null));
-            _lastAttempt[server.ServerId] = _time.GetUtcNow();
+            var attemptedAt = _time.GetUtcNow();
+            _lastAttempt[server.ServerId] = attemptedAt;
+            var jitterMs = _jitterMax <= TimeSpan.Zero ? 0 : Random.Shared.Next((int)_jitterMax.TotalMilliseconds + 1);
+            _nextDue[server.ServerId] = attemptedAt + _minInterval + TimeSpan.FromMilliseconds(jitterMs);
 
             IPAddress[] addresses;
             try
@@ -185,7 +200,7 @@ public sealed class ProbeScheduler : IProbeScheduler
                 Publish(new ServerProbeSnapshot(
                     server.ServerId,
                     LoginReachability.Unknown,
-                    "Host could not be resolved",
+                    "status.probe.reason.dns",
                     _time.GetUtcNow()));
                 return;
             }
@@ -194,7 +209,7 @@ public sealed class ProbeScheduler : IProbeScheduler
                 Publish(new ServerProbeSnapshot(
                     server.ServerId,
                     LoginReachability.Unknown,
-                    "Invalid host",
+                    "status.probe.reason.invalidhost",
                     _time.GetUtcNow()));
                 return;
             }
@@ -204,7 +219,7 @@ public sealed class ProbeScheduler : IProbeScheduler
                 Publish(new ServerProbeSnapshot(
                     server.ServerId,
                     LoginReachability.Unknown,
-                    "Host could not be resolved",
+                    "status.probe.reason.dns",
                     _time.GetUtcNow()));
                 return;
             }
@@ -218,11 +233,11 @@ public sealed class ProbeScheduler : IProbeScheduler
                     break;
                 case ProbeResult.TimedOut:
                     Publish(new ServerProbeSnapshot(
-                        server.ServerId, LoginReachability.Offline, "Connection timed out", checkedAt));
+                        server.ServerId, LoginReachability.Offline, "status.probe.reason.timeout", checkedAt));
                     break;
                 default:
                     Publish(new ServerProbeSnapshot(
-                        server.ServerId, LoginReachability.Offline, "Connection failed", checkedAt));
+                        server.ServerId, LoginReachability.Offline, "status.probe.reason.failed", checkedAt));
                     break;
             }
         }
@@ -235,7 +250,7 @@ public sealed class ProbeScheduler : IProbeScheduler
             Publish(new ServerProbeSnapshot(
                 server.ServerId,
                 LoginReachability.Offline,
-                "Connection failed",
+                "status.probe.reason.failed",
                 _time.GetUtcNow()));
         }
         finally

@@ -67,7 +67,8 @@ public sealed partial class UpdateNoticeViewModel : ObservableObject
         if (_choice.Task.IsCompleted)
             return;
         Loc.Instance.Changed -= Refresh;
-        Complete(ConfirmDialogChoice.Cancel);
+        // Host dismiss → Later (postpone), not a permanent skip.
+        Complete(ConfirmDialogChoice.Secondary);
     }
 
     private void Complete(ConfirmDialogChoice choice) => _choice.TrySetResult(choice);
