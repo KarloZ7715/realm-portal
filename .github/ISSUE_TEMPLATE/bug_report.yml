@@ -67,5 +67,8 @@ body:
     id: logs
     attributes:
       label: Logs or command output
-      description: Optional. Remove personal paths and names before pasting.
+      description: >
+        Optional. If the app crashed or a background action failed, attach the relevant lines from the local
+        exception log (Linux: ~/.local/state/realm-portal/logs/realm-portal.log or $XDG_STATE_HOME/realm-portal/logs/realm-portal.log;
+        Windows: %LOCALAPPDATA%\RealmPortal\logs\realm-portal.log). Remove personal paths and names before pasting.
       render: text

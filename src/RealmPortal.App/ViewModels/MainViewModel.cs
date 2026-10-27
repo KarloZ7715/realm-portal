@@ -92,7 +92,7 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 // The sidebar has already moved its selection; the window puts it back while the question is open.
                 SectionChangeHeld?.Invoke();
-                _ = ConfirmLeaveSettingsAsync(value);
+                ExceptionLog.Observe(ConfirmLeaveSettingsAsync(value));
                 return;
             }
 

@@ -5,6 +5,7 @@ using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.Core.Service;
+using RealmPortal.Core;
 
 namespace RealmPortal.App.ViewModels;
 
@@ -137,7 +138,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
             return;
         _firstScanStarted = true;
         if (!_session.UiPreferences.Load().FirstScanCompleted)
-            _ = RunScanAsync(markFirstScanCompleted: true);
+            ExceptionLog.Observe(RunScanAsync(markFirstScanCompleted: true));
     }
 
     [RelayCommand(CanExecute = nameof(CanScan))]
@@ -248,7 +249,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
 
     private void AddDemo(ClientSeed seed)
     {
-        var item = new ClientItemViewModel(seed, EditRequested, itemToRemove => _ = RemoveClientAsync(itemToRemove));
+        var item = new ClientItemViewModel(seed, EditRequested, itemToRemove => ExceptionLog.Observe(RemoveClientAsync(itemToRemove)));
         WireInUse(item);
         Items.Add(item);
     }
@@ -256,7 +257,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
     private void AddPortal(Core.Service.ClientEntry entry, bool inUse, bool isRunning, bool isStateUnknown)
     {
         var item = ClientItemViewModel.FromEntry(entry, inUse, isRunning, isStateUnknown,
-            EditRequested, itemToRemove => _ = RemoveClientAsync(itemToRemove));
+            EditRequested, itemToRemove => ExceptionLog.Observe(RemoveClientAsync(itemToRemove)));
         WireInUse(item);
         Items.Add(item);
     }

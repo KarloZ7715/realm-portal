@@ -11,11 +11,14 @@ public class PortalPathsTests
         {
             PortalPaths.ConfigDirVariable => "/x/cfg",
             PortalPaths.ProjectionDirVariable => "/x/proj",
+            PortalPaths.StateDirVariable => "/x/state",
             _ => null,
         };
 
         Assert.Equal("/x/cfg", PortalPaths.ConfigDirectory(Env));
         Assert.Equal("/x/proj", PortalPaths.ProjectionDirectory(Env));
+        Assert.Equal("/x/state", PortalPaths.StateDirectory(Env));
+        Assert.Equal(Path.Combine("/x/state", "logs", ExceptionLog.FileName), PortalPaths.CrashLogFile(Env));
     }
 
     [Fact]
@@ -26,5 +29,13 @@ public class PortalPathsTests
 
         Assert.Equal("realm-portal", Path.GetFileName(config));
         Assert.EndsWith(Path.Combine(".config", "wow-servidores"), projection);
+    }
+
+    [Fact]
+    public void CrashLogFile_DefaultEndsWithDocumentedName()
+    {
+        var log = PortalPaths.CrashLogFile(_ => null);
+        Assert.Equal(ExceptionLog.FileName, Path.GetFileName(log));
+        Assert.Equal("logs", Path.GetFileName(Path.GetDirectoryName(log)!));
     }
 }

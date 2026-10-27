@@ -7,6 +7,7 @@ using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Service;
+using RealmPortal.Core;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
@@ -67,7 +68,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         var order = 0;
         foreach (var seed in DemoData.Servers)
         {
-            var card = ServerItemViewModel.FromSeed(seed, item => _ = PlayAsync(item), item => _ = SwitchOnlyAsync(item));
+            var card = ServerItemViewModel.FromSeed(seed, item => ExceptionLog.Observe(PlayAsync(item)), item => ExceptionLog.Observe(SwitchOnlyAsync(item)));
             card.Order = order++;
             _all.Add(card);
         }
@@ -263,7 +264,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     private void EditRequested(ServerItemViewModel item) => EditServerRequested?.Invoke(item);
 
-    private void DeleteRequested(ServerItemViewModel item) => _ = DeleteServerAsync(item);
+    private void DeleteRequested(ServerItemViewModel item) => ExceptionLog.Observe(DeleteServerAsync(item));
 
     /// <summary>Asks the shell to confirm, then removes the server (with its active record) and reloads the list.</summary>
     public async Task DeleteServerAsync(ServerItemViewModel card)
@@ -419,7 +420,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public ServerItemViewModel AddServer(ServerSeed seed)
     {
-        var item = ServerItemViewModel.FromSeed(seed, i => _ = PlayAsync(i), i => _ = SwitchOnlyAsync(i));
+        var item = ServerItemViewModel.FromSeed(seed, i => ExceptionLog.Observe(PlayAsync(i)), i => ExceptionLog.Observe(SwitchOnlyAsync(i)));
         item.Order = _all.Count == 0 ? 0 : _all.Max(s => s.Order) + 1;
         _all.Add(item);
         SearchText = string.Empty;
@@ -485,8 +486,8 @@ public sealed partial class ServersViewModel : ViewModelBase
                 entry,
                 clientVersion,
                 projectionInSync,
-                item => _ = PlayAsync(item),
-                item => _ = SwitchOnlyAsync(item),
+                item => ExceptionLog.Observe(PlayAsync(item)),
+                item => ExceptionLog.Observe(SwitchOnlyAsync(item)),
                 clientId,
                 compatibleIds,
                 _hasMultipleClients,
@@ -662,7 +663,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         _target = target;
         target.Overlay = ServerOverlay.Running;
         Refresh();
-        _ = WatchGamePortalAsync(clientId);
+        ExceptionLog.Observe(WatchGamePortalAsync(clientId));
     }
 
     private async Task RunDemoAsync(ServerItemViewModel target, ServersPhase phase, StepKind[] kinds, int[] progress)
@@ -722,7 +723,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         Phase = ServersPhase.Running;
         _backend.StartGame();
         Refresh();
-        _ = WatchGameAsync();
+        ExceptionLog.Observe(WatchGameAsync());
     }
 
     private async Task WatchGameAsync()
