@@ -1,0 +1,206 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.WelcomeView"
+             x:DataType="vm:WelcomeViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button.primary, Button.secondary">
+      <Setter Property="c:ButtonSurface.Surface" Value="Parchment"/>
+    </Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="Auto,*,Auto,Auto">
+    <!-- Progress -->
+    <ItemsControl Margin="16,10,16,0" HorizontalAlignment="Center" ItemsSource="{Binding ProgressSteps}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="0" HorizontalAlignment="Center"/>
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:WelcomeProgressStep">
+          <c:StepIndicator Width="{Binding SlotWidth}" Label="{Binding Label}" State="{Binding State}" ShowConnector="{Binding ShowConnector}"/>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- Step body -->
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Margin="16,8,16,0">
+      <Panel>
+        <!-- Language -->
+        <StackPanel Spacing="10" IsVisible="{Binding IsLanguageStep}" HorizontalAlignment="Center" MaxWidth="520">
+          <c:Seal Status="Ready" Width="56" Height="56" HorizontalAlignment="Center" Margin="0,4,0,2"/>
+          <TextBlock Classes="h1" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{DynamicResource IvoryBrush}" Text="{Binding Title}"/>
+          <TextBlock Classes="body-sm" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{DynamicResource BoneSoftBrush}" Text="{Binding Subtitle}"/>
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+            <ContentControl Classes="card thin" Classes.active="{Binding IsSpanish}" Padding="14,12">
+              <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                      Command="{Binding SelectSpanishCommand}">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2">
+                    <TextBlock Classes="h2" Foreground="{DynamicResource InkBrush}" Text="ES"/>
+                    <TextBlock Classes="body-bold" Foreground="{DynamicResource InkBrush}" Text="{Binding SpanishTitle}"/>
+                    <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding SpanishBody}"/>
+                  </StackPanel>
+                  <RadioButton Grid.Column="1" Classes="parchment" GroupName="welcome-lang"
+                               IsChecked="{Binding IsSpanish, Mode=TwoWay}" VerticalAlignment="Top"/>
+                </Grid>
+              </Button>
+            </ContentControl>
+            <ContentControl Grid.Column="1" Classes="card thin" Classes.active="{Binding IsEnglish}" Padding="14,12">
+              <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                      Command="{Binding SelectEnglishCommand}">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2">
+                    <TextBlock Classes="h2" Foreground="{DynamicResource InkBrush}" Text="EN"/>
+                    <TextBlock Classes="body-bold" Foreground="{DynamicResource InkBrush}" Text="{Binding EnglishTitle}"/>
+                    <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding EnglishBody}"/>
+                  </StackPanel>
+                  <RadioButton Grid.Column="1" Classes="parchment" GroupName="welcome-lang"
+                               IsChecked="{Binding IsEnglish, Mode=TwoWay}" VerticalAlignment="Top"/>
+                </Grid>
+              </Button>
+            </ContentControl>
+          </Grid>
+        </StackPanel>
+
+        <!-- Clients -->
+        <StackPanel Spacing="8" IsVisible="{Binding IsClientsStep}">
+          <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Text="{Binding Title}"/>
+          <TextBlock Classes="body-sm" TextWrapping="Wrap" Foreground="{DynamicResource BoneSoftBrush}" Text="{Binding Subtitle}"/>
+
+          <ContentControl Classes="card" Padding="18,12,18,8" Margin="0,4,0,0" IsVisible="{Binding HasClients}">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="sheet-title" Text="{loc:T welcome.clients.sheet}"/>
+              <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+              <ItemsControl ItemsSource="{Binding Clients.Items}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ClientItemViewModel">
+                    <Border Padding="0,6">
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <CheckBox Classes="parchment" IsChecked="{Binding IsInUse, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                          <TextBlock Classes="body-bold" Foreground="{DynamicResource InkBrush}" Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Classes="path" FontSize="12" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding Path}" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                        <c:Badge Grid.Column="2" Status="Inactive" Text="{Binding OriginText}" IsVisible="{Binding ShowOriginBadge}" VerticalAlignment="Center"/>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="footnote" Margin="0,4,0,0" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T welcome.clients.readonly}"/>
+            </StackPanel>
+          </ContentControl>
+
+          <ContentControl Classes="card" Padding="18,14" Margin="0,4,0,0" IsVisible="{Binding NoClients}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+              <c:Icon Data="{DynamicResource IconWarning}" Width="22" Height="22" VerticalAlignment="Top" Margin="0,2,0,0"
+                      Foreground="{DynamicResource AmberLightBrush}" StrokeThickness="2"/>
+              <TextBlock Grid.Column="1" Classes="body" TextWrapping="Wrap" Foreground="{DynamicResource InkBrush}" Text="{Binding Subtitle}"/>
+            </Grid>
+          </ContentControl>
+
+          <TextBlock Classes="body-sm" IsVisible="{Binding IsScanningClients}" Foreground="{DynamicResource BoneSoftBrush}" Text="{loc:T status.scanning}"/>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,4,0,0" IsVisible="{Binding HasClientNotice}">
+            <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0"
+                    Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+            <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding ClientNotice}"/>
+          </Grid>
+        </StackPanel>
+
+        <!-- Servers -->
+        <StackPanel Spacing="8" IsVisible="{Binding IsServersStep}">
+          <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Text="{Binding Title}"/>
+          <TextBlock Classes="body-sm" TextWrapping="Wrap" Foreground="{DynamicResource BoneSoftBrush}" Text="{Binding Subtitle}"/>
+
+          <ContentControl Classes="card" Padding="18,12,18,8" Margin="0,4,0,0" IsVisible="{Binding HasServers}">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="sheet-title" Text="{loc:T welcome.servers.sheet}"/>
+              <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+              <ItemsControl ItemsSource="{Binding ServerItems}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ServerItemViewModel">
+                    <Border Padding="0,6">
+                      <StackPanel Spacing="1">
+                        <TextBlock Classes="body-bold" Foreground="{DynamicResource InkBrush}" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Classes="path" FontSize="12" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding Host}" TextTrimming="CharacterEllipsis"/>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ContentControl>
+        </StackPanel>
+      </Panel>
+    </ScrollViewer>
+
+    <!-- Footer actions -->
+    <Grid Grid.Row="2" Margin="16,8,16,6" ColumnDefinitions="*,Auto">
+      <!-- Language footer -->
+      <StackPanel Grid.ColumnSpan="2" Spacing="8" IsVisible="{Binding IsLanguageStep}" HorizontalAlignment="Center">
+        <Button Name="ContinueLanguageButton" Classes="primary" MinWidth="180" HorizontalAlignment="Center" Command="{Binding ContinueLanguageCommand}">
+          <TextBlock Text="{Binding ContinueLabel}"/>
+        </Button>
+        <TextBlock Classes="footnote" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{DynamicResource BoneSoftBrush}" Text="{Binding LanguageFootnote}"/>
+        <Button Classes="link caps" HorizontalAlignment="Center" Command="{Binding SkipCommand}">
+          <TextBlock Text="{Binding SkipLabel}"/>
+        </Button>
+      </StackPanel>
+
+      <!-- Clients footer -->
+      <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center" IsVisible="{Binding IsClientsStep}">
+        <Button Name="PickFolderButton" Classes="secondary" Command="{Binding PickClientFolderCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <c:Icon Data="{DynamicResource IconFolder}" Width="14" Height="14" StrokeThickness="2"/>
+            <TextBlock Text="{loc:T clients.pick}"/>
+          </StackPanel>
+        </Button>
+        <Button Classes="link caps" Command="{Binding RescanClientsCommand}" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <c:Icon Data="{DynamicResource IconRefresh}" Width="14" Height="14" StrokeThickness="2.2"/>
+            <TextBlock Text="{loc:T clients.rescan}"/>
+          </StackPanel>
+        </Button>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsClientsStep}">
+        <Button Classes="link caps" Command="{Binding SkipCommand}" VerticalAlignment="Center">
+          <TextBlock Text="{Binding SkipLabel}"/>
+        </Button>
+        <Button Name="ContinueClientsButton" Classes="primary" MinWidth="160" Command="{Binding ContinueClientsCommand}">
+          <TextBlock Text="{Binding ContinueClientsLabel}"/>
+        </Button>
+      </StackPanel>
+
+      <!-- Servers footer -->
+      <Button Classes="secondary" IsVisible="{Binding IsServersStep}" Command="{Binding AddServerCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <c:Icon Data="{DynamicResource IconPlus}" Width="14" Height="14" StrokeThickness="2"/>
+          <TextBlock Text="{loc:T servers.add}"/>
+        </StackPanel>
+      </Button>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsServersStep}">
+        <Button Classes="link caps" Command="{Binding SkipCommand}" VerticalAlignment="Center">
+          <TextBlock Text="{Binding SkipLabel}"/>
+        </Button>
+        <Button Name="FinishButton" Classes="primary" MinWidth="140" Command="{Binding FinishCommand}">
+          <TextBlock Text="{Binding FinishLabel}"/>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- Status strip -->
+    <Border Grid.Row="3" Classes="statusbar" Height="26">
+      <Grid ColumnDefinitions="*,Auto" Margin="14,0,8,0">
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <c:Icon Data="{DynamicResource IconDiamond}" IsFilled="True" Width="9" Height="9" Foreground="{DynamicResource ForestLightBrush}"/>
+          <TextBlock Classes="path" FontSize="11.5" Foreground="{DynamicResource BoneBrush}" Text="{Binding StatusText}"/>
+        </StackPanel>
+        <TextBlock Grid.Column="1" Classes="mono" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,6,0"
+                   Foreground="{DynamicResource BoneSoftBrush}" Text="{Binding LanguageLabel}"/>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

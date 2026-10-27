@@ -30,7 +30,8 @@ public static class TestSessions
 
     /// <summary>
     /// Builds an isolated session on the given paths. By default seeds
-    /// <see cref="UiPreferences.FirstScanCompleted"/> so <see cref="MainViewModel"/> does not start a background scan.
+    /// <see cref="UiPreferences.FirstScanCompleted"/> and <see cref="UiPreferences.WelcomeCompleted"/> so
+    /// <see cref="MainViewModel"/> does not start a background scan or the welcome wizard.
     /// </summary>
     public static PortalSession Create(
         string configDir,
@@ -70,7 +71,9 @@ public static class TestSessions
             session.UiPreferences.Save(new UiPreferences(
                 languageCode,
                 clientsInUse?.ToList() ?? [],
-                FirstScanCompleted: firstScanCompleted));
+                FirstScanCompleted: firstScanCompleted,
+                // App tests exercise screens after first-run; the welcome wizard is covered separately.
+                WelcomeCompleted: true));
         }
 
         return session;
