@@ -80,7 +80,8 @@ public sealed class WindowPlacementPersistence
         _window.Width = fit.Width;
         _window.Height = fit.Height;
         _window.Position = new PixelPoint(fit.X, fit.Y);
-        _normalPosition = _window.Position;
+        // Keep the fitted restore bounds, not whatever the WM reports after SetPosition (xfwm4 can shift by +5,+5).
+        _normalPosition = new PixelPoint(fit.X, fit.Y);
         _normalSize = new Size(fit.Width, fit.Height);
         if (fit.Maximized)
         {
@@ -94,7 +95,17 @@ public sealed class WindowPlacementPersistence
         {
             // Keep a move or resize that happened just before maximizing, unless what was seen is already the
             // maximized size (the size notification can arrive before the state change).
-            if (_pending is { } pending && !LooksMaximized(pending.Size))
+            if (_pending is { } pending
+                && !LooksMaximized(pending.Size)
+                && WindowPlacementFit.IsMeaningfulNormalUpdate(
+                    _normalPosition.X,
+                    _normalPosition.Y,
+                    _normalSize.Width,
+                    _normalSize.Height,
+                    pending.Position.X,
+                    pending.Position.Y,
+                    pending.Size.Width,
+                    pending.Size.Height))
             {
                 (_normalPosition, _normalSize) = pending;
             }

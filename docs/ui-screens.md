@@ -375,8 +375,9 @@ See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
 The main window remembers its last normal size and position and whether it was maximized (`ui-preferences.json` in the app's own config directory, key `Window`; `WindowPlacementPersistence`). It is saved on close and restored at start, before the window is shown:
 
 - No saved value: the default 720×440, centred.
-- The saved bounds are fitted to the screens present now (`WindowPlacementFit`): never below 720×440, never larger than the working area (on a screen smaller than 720×440 the minimum wins and the window sits at the top-left corner), moved fully inside the screen that holds most of the window, or centred on the first screen if that monitor is gone.
-- A maximized window restores maximized and keeps the size it returns to; a minimized window is never restored minimized.
+- The saved bounds are fitted to the screens present now (`WindowPlacementFit`): never below 720×440, never larger than the working area minus a small frame reserve (so the window-manager title bar/borders stay on-screen), moved fully inside the screen that holds most of the window, or centred on the first screen if that monitor is gone. On a screen smaller than 720×440 the minimum wins and the window sits at the top-left corner. A saved size that already fills the working area is restored maximized.
+- A maximized window restores maximized and keeps the size it returns to; while maximized, tiny position-only shifts from the window-manager frame (about +5,+5 on xfwm4) are ignored so the saved restore bounds stay correct. A minimized window is never restored minimized.
+- A malformed `Window` entry in `ui-preferences.json` is ignored (treated as no saved placement); language, clients in use and `FirstScanCompleted` still load.
 - Demo (`--demo`), gallery and tests do not read or write it.
 
-Known platform gap (plain Avalonia, X11): the window manager decides the final position and may offset it by its frame (`_NET_FRAME_EXTENTS`), so on some window managers the window can shift by the title-bar height between runs. Native Wayland ignores client positions (size and maximized still apply).
+Known platform gap (plain Avalonia, X11): without reading `_NET_FRAME_EXTENTS`, some window managers may still shift a non-maximized window by the title-bar height between runs. Native Wayland ignores client positions (size and maximized still apply).

@@ -19,13 +19,36 @@ public readonly record struct ScreenArea(int X, int Y, int Width, int Height, do
 public static class WindowPlacementFit
 {
     /// <summary>
+    /// Horizontal pixels reserved for the window-manager frame (left+right borders) when capping the client size.
+    /// Without this, a saved size equal to the working area restores slightly larger than the screen once the frame is added.
+    /// </summary>
+    public const int DefaultFrameReserveWidthPx = 16;
+
+    /// <summary>
+    /// Vertical pixels reserved for the window-manager frame (title bar + bottom border) when capping the client size.
+    /// </summary>
+    public const int DefaultFrameReserveHeightPx = 40;
+
+    /// <summary>
+    /// Position-only shifts up to this many pixels are treated as window-manager frame offsets while maximizing,
+    /// not as a real move of the restore bounds (xfwm4 reports about +5,+5).
+    /// </summary>
+    public const int FrameExtentFudgePx = 16;
+
+    /// <summary>
     /// Returns the placement to restore: on the screen that holds most of the saved window (or the first screen when
     /// none does, e.g. the monitor was unplugged), no smaller than <paramref name="minWidth"/>×<paramref name="minHeight"/>,
-    /// no larger than that screen's working area, and moved so it lies fully inside it. The minimum wins over the
+    /// no larger than that screen's working area minus a frame reserve, and moved so it lies fully inside it. The minimum wins over the
     /// working area: on a screen smaller than the minimum the window keeps the minimum size at the screen's top-left corner. Null means "use the defaults"
     /// (no screens, or a saved size that is not a finite positive number).
     /// </summary>
-    public static WindowPlacement? Fit(WindowPlacement saved, IReadOnlyList<ScreenArea> screens, double minWidth, double minHeight)
+    public static WindowPlacement? Fit(
+        WindowPlacement saved,
+        IReadOnlyList<ScreenArea> screens,
+        double minWidth,
+        double minHeight,
+        int frameReserveWidthPx = DefaultFrameReserveWidthPx,
+        int frameReserveHeightPx = DefaultFrameReserveHeightPx)
     {
         ArgumentNullException.ThrowIfNull(saved);
         if (screens.Count == 0 || !IsUsable(saved.Width) || !IsUsable(saved.Height))
@@ -38,8 +61,10 @@ public static class WindowPlacementFit
         var screen = visible ? savedOn : screens[0];
         var scaling = screen.Scaling > 0 ? screen.Scaling : 1;
 
-        var maxWidth = Math.Max(minWidth, screen.Width / scaling);
-        var maxHeight = Math.Max(minHeight, screen.Height / scaling);
+        var usableWidthPx = Math.Max(0, screen.Width - Math.Max(0, frameReserveWidthPx));
+        var usableHeightPx = Math.Max(0, screen.Height - Math.Max(0, frameReserveHeightPx));
+        var maxWidth = Math.Max(minWidth, usableWidthPx / scaling);
+        var maxHeight = Math.Max(minHeight, usableHeightPx / scaling);
         var width = Math.Clamp(saved.Width, minWidth, maxWidth);
         var height = Math.Clamp(saved.Height, minHeight, maxHeight);
         var widthPx = (int)Math.Ceiling(width * scaling);
@@ -57,8 +82,46 @@ public static class WindowPlacementFit
             y = screen.Y + Math.Max(0, (screen.Height - heightPx) / 2);
         }
 
-        return new WindowPlacement(x, y, width, height, saved.Maximized);
+        // A saved size that already fills the working area (before the frame reserve) is restored maximized so the
+        // framed window does not overflow the screen on the next run.
+        var fillsWorkingArea =
+            saved.Width * scaling >= screen.Width - 2 &&
+            saved.Height * scaling >= screen.Height - 2;
+        var maximized = saved.Maximized || fillsWorkingArea;
+
+        return new WindowPlacement(x, y, width, height, maximized);
     }
+
+    /// <summary>
+    /// Whether a pending Normal-state capture should replace the remembered restore bounds when leaving Normal
+    /// (e.g. maximizing). Ignores tiny position-only shifts from the window-manager frame.
+    /// </summary>
+    public static bool IsMeaningfulNormalUpdate(
+        int normalX,
+        int normalY,
+        double normalWidth,
+        double normalHeight,
+        int pendingX,
+        int pendingY,
+        double pendingWidth,
+        double pendingHeight,
+        int frameExtentFudgePx = FrameExtentFudgePx)
+    {
+        var sizeChanged =
+            Math.Abs(pendingWidth - normalWidth) > 1 ||
+            Math.Abs(pendingHeight - normalHeight) > 1;
+        if (sizeChanged)
+        {
+            return true;
+        }
+
+        return Math.Abs(pendingX - normalX) > frameExtentFudgePx
+               || Math.Abs(pendingY - normalY) > frameExtentFudgePx;
+    }
+
+    /// <summary>True when width/height are finite and positive (safe to restore).</summary>
+    public static bool HasUsableSize(WindowPlacement placement) =>
+        placement is not null && IsUsable(placement.Width) && IsUsable(placement.Height);
 
     private static bool IsUsable(double value) => double.IsFinite(value) && value > 0;
 

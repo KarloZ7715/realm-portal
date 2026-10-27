@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using RealmPortal.App.Localization;
 using RealmPortal.Core.IO;
 using RealmPortal.Core.Servers;
@@ -12,10 +13,17 @@ namespace RealmPortal.App.Portal;
 /// </summary>
 public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter? writer = null)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
     private readonly IAtomicFileWriter _writer = writer ?? new AtomicFileWriter();
     private readonly string _path = Path.Combine(configDirectory, "ui-preferences.json");
+
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        options.Converters.Add(new LenientWindowPlacementConverter());
+        return options;
+    }
 
     public UiPreferences Load()
     {
@@ -29,7 +37,13 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
             using var boundedStream = new MemoryStream(PrivateStorage.ReadBounded(_path, PrivateStorage.MaxJsonBytes));
             using var reader = new StreamReader(boundedStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var json = reader.ReadToEnd();
-            return JsonSerializer.Deserialize<UiPreferences>(json, JsonOptions) ?? new UiPreferences();
+            var loaded = JsonSerializer.Deserialize<UiPreferences>(json, JsonOptions) ?? new UiPreferences();
+            if (loaded.Window is { } window && !WindowPlacementFit.HasUsableSize(window))
+            {
+                return loaded with { Window = null };
+            }
+
+            return loaded;
         }
         catch (Exception ex) when (IsUnreadable(ex))
         {
@@ -86,4 +100,61 @@ public sealed record UiPreferences(
     WindowPlacement? Window = null)
 {
     public HashSet<string> InUseSet => ClientsInUse?.ToHashSet(StringComparer.Ordinal) ?? [];
+}
+
+/// <summary>
+/// Deserializes <see cref="WindowPlacement"/> leniently: a malformed <c>Window</c> value becomes null so the rest of
+/// the preferences file still loads (language, clients in use, first-scan flag).
+/// </summary>
+internal sealed class LenientWindowPlacementConverter : JsonConverter<WindowPlacement?>
+{
+    public override WindowPlacement? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.ParseValue(ref reader);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            // Use options without this converter to avoid recursion.
+            var plain = new JsonSerializerOptions { WriteIndented = options.WriteIndented };
+            var placement = document.RootElement.Deserialize<WindowPlacement>(plain);
+            return placement is not null && WindowPlacementFit.HasUsableSize(placement) ? placement : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, WindowPlacement? value, JsonSerializerOptions options)
+    {
+        if (value is null)
+        {
+            writer.WriteNullValue();
+            return;
+        }
+
+        var plain = new JsonSerializerOptions { WriteIndented = options.WriteIndented };
+        JsonSerializer.Serialize(writer, value, plain);
+    }
 }
