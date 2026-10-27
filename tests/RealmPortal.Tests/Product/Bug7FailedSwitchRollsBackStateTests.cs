@@ -9,7 +9,7 @@ namespace RealmPortal.Tests.Product;
 
 public class Bug7FailedSwitchRollsBackStateTests
 {
-    [LinuxFact]
+    [NonPrivilegedLinuxFact]
     public void Switch_WithReadOnlyProjectionDir_LeavesStateAndActivoUnchanged()
     {
         using var dir = new TempDirectory();
