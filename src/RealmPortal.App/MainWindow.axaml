@@ -24,9 +24,13 @@
     <DataTemplate DataType="vm:PlaceholderViewModel"><v:PlaceholderView/></DataTemplate>
     <DataTemplate DataType="vm:SettingsViewModel"><v:SettingsView/></DataTemplate>
     <DataTemplate DataType="vm:BackupsViewModel"><v:BackupsView/></DataTemplate>
+    <DataTemplate DataType="vm:WelcomeViewModel"><v:WelcomeView/></DataTemplate>
+    <DataTemplate DataType="vm:AboutViewModel"><v:AboutView/></DataTemplate>
   </Window.DataTemplates>
   <Grid RowDefinitions="*,Auto">
-    <Panel Grid.RowSpan="2" Name="MainChrome" IsEnabled="{Binding Dialog, Converter={x:Static ObjectConverters.IsNull}}">
+    <Panel Grid.RowSpan="2" Name="MainChrome"
+           IsVisible="{Binding !IsWelcomeActive}"
+           IsEnabled="{Binding Dialog, Converter={x:Static ObjectConverters.IsNull}}">
     <Grid RowDefinitions="*,Auto">
     <Grid ColumnDefinitions="Auto,*">
       <!-- Sidebar: icons only below 960 px wide, icons + labels + the non-affiliation note above. -->
@@ -64,6 +68,10 @@
     </Border>
     </Grid>
     </Panel>
+
+    <!-- First-run welcome covers the shell until finished or skipped. -->
+    <ContentControl Grid.RowSpan="2" Name="WelcomeHost" Content="{Binding Welcome}"
+                    IsVisible="{Binding IsWelcomeActive}"/>
 
     <!-- Modal question (e.g. discard a conflicting backup) over everything, status bar included. -->
     <ContentControl Grid.RowSpan="2" Name="DialogHost" Content="{Binding Dialog}" IsVisible="{Binding Dialog, Converter={x:Static ObjectConverters.IsNotNull}}">

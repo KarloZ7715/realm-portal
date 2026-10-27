@@ -67,7 +67,8 @@ public sealed class ServerEditPreservesFieldsTests
 
     /// <summary>The request the App's edit form sends today: no build, patchlist or extra lines.</summary>
     private static UpdateServerRequest FormEdit(Server server, string name) =>
-        new(server.Id, name, server.Host, server.Realm, Account: server.Account, ClientId: server.ClientId);
+        new(server.Id, name, server.Host, server.Realm, Account: server.Account, ClientId: server.ClientId,
+            ClearCacheOnSwitch: server.ClearCacheOnSwitch);
 
     [Fact]
     public void Edit_WithNullBuildAndExtraLines_KeepsStoredValues()

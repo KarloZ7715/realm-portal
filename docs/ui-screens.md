@@ -27,6 +27,7 @@ a pretend game process). For `1.0.0`, the UI screens and flows below connect to 
 | Client backups manager (`BackupsView`) | Follows `compact-01` + `compact-07` sub-sheet layout — *New (1.0.0)* | "Gestionar respaldos…" / "Manage backups…" inside the `BACKUP` card in Settings |
 | Confirm delete backup | Reuses `07b-confirm-incompatible-switch@2x.png` modal — *New (1.0.0)* | inline `✕` ("Eliminar respaldo") button on a backup row |
 | Backup restore conflict (`Restore anyway`) | `compact-09-backup-conflict@2x.png` & `compact-09b-backup-conflict-restore-anyway@2x.png` — *Exists in Figma* | "Restaurar" / "Restore" on an older backup while a recent switch has a pending Undo |
+| First-run welcome | `01-first-run@2x.png`, `02-detection-*.png` — *Implemented (1.1.0 #107)* | Shown when `IsWelcomeDone` is false: unset `WelcomeCompleted` uses `FirstScanCompleted` (upgrades skip); explicit `false` still shows the wizard; Skip/Finish persist `WelcomeCompleted=true`. Flow: language → clients → servers |
 
 The language toggle in the status bar ("ES · v1.0.0"; the version comes from `Directory.Build.props` through `AppInfo.Version`) switches Spanish and English at run time. The first language follows the system language.
 
@@ -370,6 +371,10 @@ All keys below are specified for `src/RealmPortal.App/Localization/Strings/en.js
 
 See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
 
+## About
+
+Opened from Settings (**About Realm Portal…**). Shows `AppInfo.Name` and `AppInfo.Version` (same value as the status-bar `v…` label), credits, a short MIT note, the Blizzard disclaimer, a scrollable copy of `THIRD_PARTY_LICENSES.md`, and **Open on GitHub** which launches `AppInfo.RepositoryUrl` in the system browser (`IUriOpener` / shell execute). Available in demo and real sessions. Strings: `about.*` and `settings.about*`.
+
 ## Window size and position
 
 The main window remembers its last normal size and position and whether it was maximized (`ui-preferences.json` in the app's own config directory, key `Window`; `WindowPlacementPersistence`). It is saved on close and restored at start, before the window is shown:
@@ -377,7 +382,7 @@ The main window remembers its last normal size and position and whether it was m
 - No saved value: the default 720×440, centred.
 - The saved bounds are fitted to the screens present now (`WindowPlacementFit`): never below 720×440, never larger than the working area minus a small frame reserve (so the window-manager title bar/borders stay on-screen), moved fully inside the screen that holds most of the window, or centred on the first screen if that monitor is gone. On a screen smaller than 720×440 the minimum wins and the window sits at the top-left corner. A saved size that already fills the working area is restored maximized.
 - A maximized window restores maximized and keeps the size it returns to; while maximized, tiny position-only shifts from the window-manager frame (about +5,+5 on xfwm4) are ignored so the saved restore bounds stay correct. A minimized window is never restored minimized.
-- A malformed `Window` entry in `ui-preferences.json` is ignored (treated as no saved placement); language, clients in use and `FirstScanCompleted` still load.
+- A malformed `Window` entry in `ui-preferences.json` is ignored (treated as no saved placement); language, clients in use, `FirstScanCompleted` and `WelcomeCompleted` still load.
 - Demo (`--demo`), gallery and tests do not read or write it.
 
 Known platform gap (plain Avalonia, X11): without reading `_NET_FRAME_EXTENTS`, some window managers may still shift a non-maximized window by the title-bar height between runs. Native Wayland ignores client positions (size and maximized still apply).

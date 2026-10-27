@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
+using RealmPortal.App.Platform;
 using RealmPortal.App.Settings;
 using RealmPortal.Core;
 using RealmPortal.Core.ClientFiles;
@@ -20,12 +21,16 @@ public sealed partial class MainViewModel : ObservableObject
     private AddServerViewModel? _adding;
     private EditClientViewModel? _editingClient;
     private BackupsViewModel? _backups;
+    private AboutViewModel? _about;
+    private int _aboutRequest;
+    private readonly IUriOpener _uriOpener;
 
-    public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null) =>
-        new(backend, autoTick, settings);
+    public static MainViewModel ForDemo(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null, IUriOpener? uriOpener = null) =>
+        new(backend, autoTick, settings, uriOpener);
 
-    public MainViewModel(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null)
+    public MainViewModel(DemoBackend? backend = null, bool autoTick = true, ISettingsStore? settings = null, IUriOpener? uriOpener = null)
     {
+        _uriOpener = uriOpener ?? new ShellUriOpener();
         Backend = backend ?? new DemoBackend();
         Servers = new ServersViewModel(Backend, autoTick);
         Clients = new ClientsViewModel(Backend);
@@ -35,6 +40,7 @@ public sealed partial class MainViewModel : ObservableObject
         settingsScreen.ApplySavedLanguage();
         settingsScreen.CanManageBackups = false;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
+        settingsScreen.OpenAboutRequested += ShowAbout;
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
@@ -42,8 +48,9 @@ public sealed partial class MainViewModel : ObservableObject
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
     }
 
-    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null, Func<TimeSpan, Task>? delay = null)
+    public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null, Func<TimeSpan, Task>? delay = null, IUriOpener? uriOpener = null)
     {
+        _uriOpener = uriOpener ?? new ShellUriOpener();
         _session = session;
         _probe = probe ?? new TcpConnectionProbe();
         _pickFolder = pickFolder;
@@ -53,6 +60,7 @@ public sealed partial class MainViewModel : ObservableObject
         settingsScreen.ApplySavedLanguage();
         settingsScreen.CanManageBackups = true;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
+        settingsScreen.OpenAboutRequested += ShowAbout;
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
@@ -61,7 +69,20 @@ public sealed partial class MainViewModel : ObservableObject
         Clients.ConfirmRemoveAsync = ConfirmRemoveClientAsync;
         Clients.FirstScanFoundNoClients += ShowClientsAfterEmptyScan;
         Servers.ConfirmDiscardAsync = () => ConfirmAsync(ConfirmDialogViewModel.DiscardBackup());
-        Clients.StartFirstScanIfNeeded();
+        if (!session.UiPreferences.Load().IsWelcomeDone)
+        {
+            Welcome = new WelcomeViewModel(
+                session,
+                Clients,
+                Servers,
+                Settings,
+                FinishWelcome,
+                openAddServer: OpenAddServerFromWelcomeAsync);
+        }
+        else
+        {
+            Clients.StartFirstScanIfNeeded();
+        }
     }
 
     public DemoBackend? Backend { get; }
@@ -71,6 +92,13 @@ public sealed partial class MainViewModel : ObservableObject
     public ClientsViewModel Clients { get; }
 
     public SettingsViewModel Settings { get; }
+
+    /// <summary>The one-time first-run welcome, or null once finished or skipped.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsWelcomeActive), nameof(StatusText), nameof(Content))]
+    private WelcomeViewModel? _welcome;
+
+    public bool IsWelcomeActive => Welcome is not null;
 
     private int _sectionIndex;
 
@@ -106,12 +134,36 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     private void ShowClientsAfterEmptyScan()
     {
+        if (IsWelcomeActive)
+        {
+            return;
+        }
+
         if (_sectionIndex == 2 && Settings.IsDirty)
         {
             return;
         }
 
         SectionIndex = 1;
+    }
+
+    private void FinishWelcome()
+    {
+        Welcome = null;
+        // Skip must not start a second scan while the welcome-driven discovery is still running;
+        // that in-flight scan will persist FirstScanCompleted when it finishes.
+        if (!Clients.IsScanning)
+            Clients.StartFirstScanIfNeeded();
+        // Servers already reload at construction, on the welcome servers step, and via ClientsChanged after scans.
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(Content));
+    }
+
+    private async Task OpenAddServerFromWelcomeAsync()
+    {
+        // Welcome already cleared WelcomeCompleted; open the add-server form on the servers section.
+        ShowAddServer();
+        await Task.CompletedTask.ConfigureAwait(true);
     }
 
     /// <summary>Raised when a section change waits for the unsaved-changes question, so the sidebar can re-select Settings.</summary>
@@ -162,7 +214,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The form being filled in, or null. It belongs to the servers section: leaving the section drops it.</summary>
     public AddServerViewModel? Adding => _adding;
 
-    public ViewModelBase Content => SectionIndex == 2 && _backups is not null
+    public ViewModelBase Content => SectionIndex == 2 && _about is not null
+        ? _about
+        : SectionIndex == 2 && _backups is not null
         ? _backups
         : SectionIndex == 0 && _adding is not null
         ? _adding
@@ -170,7 +224,7 @@ public sealed partial class MainViewModel : ObservableObject
             ? _editingClient
             : _sections[Math.Clamp(SectionIndex, 0, _sections.Length - 1)];
 
-    public string StatusText => Content.StatusText;
+    public string StatusText => Welcome?.StatusText ?? Content.StatusText;
 
     /// <summary>"ES · v1.0.0": the language toggle of the status bar (version from <see cref="AppInfo.Version"/>).</summary>
     public string LanguageLabel => $"{Loc.Instance.Code} · v{AppInfo.Version}";
@@ -226,7 +280,10 @@ public sealed partial class MainViewModel : ObservableObject
     private void OnSectionIndexChanged(int value)
     {
         if (value != 2)
+        {
             CloseBackupsManager();
+            CloseAbout();
+        }
         if (value != 0)
         {
             CloseAddServer();
@@ -347,6 +404,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (_session is null || _backups is not null)
             return;
 
+        CloseAbout();
         _backups = new BackupsViewModel(_session, backRequested: CloseBackupsManager)
         {
             ConfirmDeleteBackupAsync = ConfirmDeleteBackupAsync,
@@ -363,6 +421,58 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         _backups.PropertyChanged -= OnSectionChanged;
         _backups = null;
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void ShowAbout()
+    {
+        if (_about is not null)
+        {
+            return;
+        }
+
+        CloseBackupsManager();
+        var request = ++_aboutRequest;
+        _ = ShowAboutAsync(request);
+    }
+
+    private async Task ShowAboutAsync(int request)
+    {
+        // License file/asset I/O stays off the UI thread; the result is cached for later opens.
+        string licenses;
+        try
+        {
+            licenses = await AboutDocuments.LoadThirdPartyLicensesAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            // Still open About; third-party text stays empty.
+            licenses = string.Empty;
+        }
+
+        // Drop the result if the user left Settings, opened backups, or closed a prior About.
+        if (request != _aboutRequest || _about is not null || SectionIndex != 2)
+        {
+            return;
+        }
+
+        _about = new AboutViewModel(_uriOpener, CloseAbout, licenses);
+        _about.PropertyChanged += OnSectionChanged;
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void CloseAbout()
+    {
+        _aboutRequest++;
+        if (_about is null)
+        {
+            return;
+        }
+
+        _about.PropertyChanged -= OnSectionChanged;
+        _about = null;
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
     }
@@ -455,6 +565,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnLanguageChanged()
     {
+        Welcome?.RefreshText();
         foreach (var section in _sections)
         {
             section.RefreshText();
@@ -463,6 +574,7 @@ public sealed partial class MainViewModel : ObservableObject
         _adding?.RefreshText();
         _editingClient?.RefreshText();
         _backups?.RefreshText();
+        _about?.RefreshText();
         OnPropertyChanged(nameof(LanguageLabel));
         OnPropertyChanged(nameof(Disclaimer));
         OnPropertyChanged(nameof(StatusText));

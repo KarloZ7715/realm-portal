@@ -8,7 +8,7 @@ namespace RealmPortal.App.ViewModels;
 /// <summary>
 /// The Settings screen: language, launcher (command template, prefix, arguments, environment) and the backup folder.
 /// The language applies as soon as it is picked (a live preview, like the status bar toggle); everything is only persisted by Save,
-/// and Cancel puts the saved values (and language) back. There is deliberately no cache-cleanup option in 0.1.
+/// and Cancel puts the saved values (and language) back. Clear Cache/WDB on switch is off by default (#106).
 /// </summary>
 public sealed partial class SettingsViewModel : ViewModelBase
 {
@@ -44,6 +44,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public event Action? OpenBackupsManagerRequested;
 
+    public event Action? OpenAboutRequested;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(OpenBackupsManagerCommand))]
     private bool _canManageBackups;
@@ -67,6 +69,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDirty), nameof(StatusText), nameof(BackupError))]
     private string _backupFolder = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDirty), nameof(StatusText))]
+    private bool _clearCacheOnSwitch;
 
     /// <summary>Which field the last failed save blamed: "template", "backup" or null.</summary>
     [ObservableProperty]
@@ -103,7 +109,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         || Prefix != LauncherText.Join(_saved.Prefix)
         || Arguments != LauncherText.Join(_saved.Arguments)
         || Environment != LauncherText.JoinEnvironment(_saved.Environment)
-        || BackupFolder != _saved.BackupFolder;
+        || BackupFolder != _saved.BackupFolder
+        || ClearCacheOnSwitch != _saved.ClearCacheOnSwitch;
 
     public bool CanSave => IsDirty;
 
@@ -151,7 +158,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
             LauncherText.Tokens(Prefix),
             LauncherText.Tokens(Arguments),
             environment,
-            BackupFolder.Trim());
+            BackupFolder.Trim(),
+            ClearCacheOnSwitch);
 
         var error = _store.Save(model);
         if (error is not null)
@@ -178,6 +186,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private void OpenBackupsManager() => OpenBackupsManagerRequested?.Invoke();
 
     private bool CanOpenBackupsManager() => CanManageBackups;
+
+    [RelayCommand]
+    private void OpenAbout() => OpenAboutRequested?.Invoke();
 
     internal static bool IsValidTemplate(string? template) =>
         !string.IsNullOrWhiteSpace(template)
@@ -215,6 +226,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Arguments = LauncherText.Join(_saved.Arguments);
         Environment = LauncherText.JoinEnvironment(_saved.Environment);
         BackupFolder = _saved.BackupFolder;
+        ClearCacheOnSwitch = _saved.ClearCacheOnSwitch;
         ServiceErrorField = null;
     }
 
@@ -255,6 +267,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
         EditedField();
     }
+
+    partial void OnClearCacheOnSwitchChanged(bool value) => EditedField();
 
     private void EditedField()
     {

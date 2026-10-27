@@ -311,7 +311,8 @@ public sealed class CliApp(
             Account: parsed.Options.ContainsKey("--account") ? parsed.Get("--account") : server.Account,
             ClientId: clientId,
             ExtraRealmlistLines: extraLines,
-            ClearRequiredClientBuild: clearBuild));
+            ClearRequiredClientBuild: clearBuild,
+            ClearCacheOnSwitch: server.ClearCacheOnSwitch));
         if (!result.Succeeded)
             return Fail(result.Error!);
         SafeWriteLine(output, $"Updated '{server.Name}' to '{result.Value!.Name}' ({result.Value.Id})");
@@ -461,6 +462,8 @@ public sealed class CliApp(
             return Fail(sw.Error!);
         var previous = sw.Value!.Previous?.Name;
         SafeWriteLine(output, $"Switched to '{server.Name}'" + (previous is null || previous == server.Name ? "" : $" (previous: '{previous}')"));
+        if (sw.Value.CacheClearWarning is { } cacheWarning)
+            SafeWriteLine(error, $"warning: {cacheWarning}");
         return 0;
     }
 
@@ -588,6 +591,8 @@ public sealed class CliApp(
             var play = service.Play(new SwitchRequest(clientId, server.Id, force));
             if (!play.Succeeded)
                 return FailLaunch(play.Error!, server.Name, service);
+            if (play.Value!.CacheClearWarning is { } playCacheWarning)
+                SafeWriteLine(error, $"warning: {playCacheWarning}");
             SafeWriteLine(output, $"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
             return 0;
         }
@@ -608,6 +613,8 @@ public sealed class CliApp(
         var launch = service.Play(new SwitchRequest(clientId, server.Id, force));
         if (!launch.Succeeded)
             return FailLaunch(launch.Error!, server.Name, service);
+        if (launch.Value!.CacheClearWarning is { } launchCacheWarning)
+            SafeWriteLine(error, $"warning: {launchCacheWarning}");
         SafeWriteLine(output, $"Launched {GameExecutable.Find(clientDir)} for '{server.Name}'.");
         return 0;
     }

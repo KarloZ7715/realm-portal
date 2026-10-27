@@ -16,7 +16,7 @@
             <c:Badge Grid.Column="1" Name="ResultBadge" IsVisible="{Binding HasResult}" Status="{Binding ResultStatus}" Text="{Binding ResultText}"/>
           </Grid>
           <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,0,0,14"/>
-          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="20" RowSpacing="12">
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="20" RowSpacing="12">
           <StackPanel Spacing="6" Grid.Column="0" Grid.Row="0">
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.name}"/>
             <TextBox Name="NameBox" Classes="parchment" Classes.error="{Binding HasNameError}" Text="{Binding Name, Mode=TwoWay}" MaxLength="64"/>
@@ -84,6 +84,15 @@
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
               <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T edit.build.help}"/>
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Spacing="6" Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="4" IsVisible="{Binding IsEditing}">
+            <CheckBox Name="ClearCacheBox" Classes="parchment" IsThreeState="True"
+                      IsChecked="{Binding ClearCacheOnSwitch, Mode=TwoWay}"
+                      Content="{loc:T edit.cache.clear}"/>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+              <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T edit.cache.hint}"/>
             </StackPanel>
           </StackPanel>
           </Grid>

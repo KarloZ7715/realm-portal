@@ -9,7 +9,8 @@ public sealed record SettingsModel(
     IReadOnlyList<string> Prefix,
     IReadOnlyList<string> Arguments,
     IReadOnlyDictionary<string, string?> Environment,
-    string BackupFolder);
+    string BackupFolder,
+    bool ClearCacheOnSwitch = false);
 
 /// <summary>Why a save failed: a stable code (the UI localizes it) and the field to mark.</summary>
 public sealed record SettingsError(string Code, string? Path = null);

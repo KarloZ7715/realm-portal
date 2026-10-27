@@ -5,7 +5,7 @@
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
-  <!-- compact-07 settings: fixed header and footer, the cards scroll. No cache-cleanup card (architect: not in 0.1). -->
+  <!-- compact-07 settings: fixed header and footer, the cards scroll. Cache/WDB clear toggle (#106). -->
   <Grid RowDefinitions="Auto,*,Auto" Margin="20,10,20,0">
     <Grid Height="44">
       <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T nav.settings}"/>
@@ -81,6 +81,33 @@
             <Button Name="ManageBackupsButton" Classes="secondary compact" HorizontalAlignment="Right" MinWidth="172"
                     c:ButtonSurface.Surface="Parchment" IsEnabled="{Binding CanManageBackups}" Command="{Binding OpenBackupsManagerCommand}">
               <TextBlock Text="{loc:T settings.backup.manage}"/>
+            </Button>
+          </StackPanel>
+        </ContentControl>
+
+        <!-- Client cache -->
+        <ContentControl Classes="card thin" Padding="26,12,26,16">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="sheet-title" Text="{loc:T settings.cache}"/>
+            <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+            <CheckBox Name="ClearCacheOption" Classes="parchment" Margin="0,4,0,0"
+                      IsChecked="{Binding ClearCacheOnSwitch, Mode=TwoWay}"
+                      Content="{loc:T settings.cache.clear}"/>
+            <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}"
+                       Text="{loc:T settings.cache.hint}"/>
+          </StackPanel>
+        </ContentControl>
+
+        <!-- About -->
+        <ContentControl Classes="card thin" Padding="26,12,26,16">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="sheet-title" Text="{loc:T settings.about}"/>
+            <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+            <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Margin="0,4,0,0"
+                       Text="{loc:T settings.about.hint}"/>
+            <Button Name="AboutButton" Classes="secondary compact" HorizontalAlignment="Right" MinWidth="200"
+                    c:ButtonSurface.Surface="Parchment" Command="{Binding OpenAboutCommand}">
+              <TextBlock Text="{loc:T settings.about.open}"/>
             </Button>
           </StackPanel>
         </ContentControl>

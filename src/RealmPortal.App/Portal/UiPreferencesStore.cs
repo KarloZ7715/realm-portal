@@ -97,14 +97,25 @@ public sealed record UiPreferences(
     string? LanguageCode = null,
     IReadOnlyList<string>? ClientsInUse = null,
     bool FirstScanCompleted = false,
-    WindowPlacement? Window = null)
+    WindowPlacement? Window = null,
+    bool? WelcomeCompleted = null)
 {
     public HashSet<string> InUseSet => ClientsInUse?.ToHashSet(StringComparer.Ordinal) ?? [];
+
+    /// <summary>
+    /// Whether the first-run welcome should stay hidden.
+    /// <list type="bullet">
+    /// <item><description><c>WelcomeCompleted == true</c>: finished or skipped — done.</description></item>
+    /// <item><description><c>WelcomeCompleted == false</c>: explicit reopen — not done (ignores first-scan).</description></item>
+    /// <item><description><c>WelcomeCompleted == null</c> (legacy/missing): done only when <see cref="FirstScanCompleted"/> is true.</description></item>
+    /// </list>
+    /// </summary>
+    public bool IsWelcomeDone => WelcomeCompleted ?? FirstScanCompleted;
 }
 
 /// <summary>
 /// Deserializes <see cref="WindowPlacement"/> leniently: a malformed <c>Window</c> value becomes null so the rest of
-/// the preferences file still loads (language, clients in use, first-scan flag).
+/// the preferences file still loads (language, clients in use, first-scan and welcome flags).
 /// </summary>
 internal sealed class LenientWindowPlacementConverter : JsonConverter<WindowPlacement?>
 {

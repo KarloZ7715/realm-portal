@@ -199,7 +199,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     public string BannerHeader => HasErrorBanner
         ? _bannerError is { } error && PlayServiceResults.SwitchWasApplied(error)
             ? ErrorText.Title(error)
-            : Loc.Get("error.banner.title")
+            : Loc.Get(_bannerMessageKey == "switch.cache.clear.warning" ? "banner.warning.title" : "error.banner.title")
         : Phase switch
         {
             ServersPhase.Switching when _repairRun => Loc.Format("repair.title", _target?.Name),
@@ -634,6 +634,9 @@ public sealed partial class ServersViewModel : ViewModelBase
 
         var outcome = result.Value!;
         var previous = outcome.Previous;
+        if (outcome.CacheClearWarning is not null)
+            SetError(null, "switch.cache.clear.warning");
+
         if (!play)
         {
             target.Overlay = ServerOverlay.None;
