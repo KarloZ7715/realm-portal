@@ -51,13 +51,14 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
-    public void ShowsTheSavedValuesAndHasNoCacheOption()
+    public void ShowsTheSavedValuesAndCacheToggleOffByDefault()
     {
         var (shell, settings) = Open();
         var texts = shell.Window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text ?? string.Empty).ToList();
         Assert.Contains("Ajustes", texts);
         Assert.Contains("Lanzador", texts);
-        Assert.DoesNotContain(texts, t => t.Contains("caché", StringComparison.OrdinalIgnoreCase) || t.Contains("cache", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(texts, t => t.Contains("Caché", StringComparison.OrdinalIgnoreCase) || t.Contains("Cache", StringComparison.OrdinalIgnoreCase));
+        Assert.False(settings.ClearCacheOnSwitch);
         Assert.Equal("wine {exe}", settings.Template);
         Assert.Equal("gamemoderun", settings.Prefix);
         Assert.Equal("-windowed -nosound", settings.Arguments);

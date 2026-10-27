@@ -359,7 +359,8 @@ public sealed class PortalService : IPortalService
                 extra,
                 server.RequiredClientBuild,
                 server.Account,
-                clientId: server.ClientId);
+                clientId: server.ClientId,
+                clearCacheOnSwitch: server.ClearCacheOnSwitch);
             _servers.Add(created);
             var activeId = _active.GetActive(server.ClientId)?.Id;
             return ServiceResult<ServerEntry>.Ok(ToServerEntry(created, activeId, server.ClientId, null));
@@ -402,7 +403,8 @@ public sealed class PortalService : IPortalService
                 build,
                 request.Account,
                 request.ServerId,
-                request.ClientId);
+                request.ClientId,
+                clearCacheOnSwitch: request.ClearCacheOnSwitch);
 
             if (existing.Realmlist != updated.Realmlist
                 || existing.Realm != updated.Realm
@@ -1028,7 +1030,25 @@ public sealed class PortalService : IPortalService
 
                 var activeEntry = ToServerEntry(server, server.Id, request.ClientId, version);
                 var previous = sameServerActive ? activeEntry : previousEntry;
-                outcome = new SwitchOutcome(activeEntry, previous, backupId, changedFiles);
+
+                // Clear Cache/WDB only after a successful apply+activate that targets another server (or first
+                // activation). Fail-soft: a clear failure must not roll back the switch (#106).
+                string? cacheClearWarning = null;
+                if (!sameServerActive && ShouldClearCacheOnSwitch(server))
+                {
+                    try
+                    {
+                        ClientCacheClearer.Clear(client.Path);
+                    }
+                    catch (Exception ex) when (ex is ClientFilesException or IOException or UnauthorizedAccessException)
+                    {
+                        cacheClearWarning = ex is ClientFilesException cfe
+                            ? cfe.Message
+                            : $"Could not clear Cache/WDB: {ex.Message}";
+                    }
+                }
+
+                outcome = new SwitchOutcome(activeEntry, previous, backupId, changedFiles, cacheClearWarning);
             }
 
             if (launch)
@@ -1454,6 +1474,21 @@ public sealed class PortalService : IPortalService
         }
     }
 
+    /// <summary>Per-server override wins when set; otherwise the global Settings toggle (off by default).</summary>
+    private bool ShouldClearCacheOnSwitch(Server server)
+    {
+        if (server.ClearCacheOnSwitch is { } overrideValue)
+            return overrideValue;
+        try
+        {
+            return _settings.GetStorageSettings().ClearCacheOnSwitch;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private ServerEntry ToServerEntry(Server server, string? activeId, string? selectedClientId, ClientVersion? clientVersion)
     {
         string? clientId = server.ClientId;
@@ -1472,7 +1507,8 @@ public sealed class PortalService : IPortalService
             server.RequiredClientBuild,
             clientId,
             server.Id == activeId,
-            compatible);
+            compatible,
+            server.ClearCacheOnSwitch);
     }
 
 }

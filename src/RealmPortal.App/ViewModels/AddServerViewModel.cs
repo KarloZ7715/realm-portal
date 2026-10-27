@@ -83,6 +83,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         BuildOptions = [new ServerBuildOption(null), .. builds.Select(b => new ServerBuildOption(b))];
         _initialBuild = BuildOptions.First(o => o.Build == entry.RequiredClientBuild);
         SelectedBuild = _initialBuild;
+        ClearCacheOnSwitch = entry.ClearCacheOnSwitch;
     }
 
     /// <summary>Edit mode only: which client builds the server accepts ("Any client" or one build).</summary>
@@ -119,6 +120,10 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _account = string.Empty;
+
+    /// <summary>Per-server Cache/WDB clear override; <c>null</c> uses the global Settings toggle. Edit form only.</summary>
+    [ObservableProperty]
+    private bool? _clearCacheOnSwitch;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NameError), nameof(HasNameError), nameof(AddressError), nameof(HasAddressError), nameof(ClientError), nameof(HasClientError))]
@@ -375,8 +380,10 @@ public sealed partial class AddServerViewModel : ViewModelBase
             var (build, clearBuild) = BuildChange();
             var result = _editingServerId is { } serverId
                 ? _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue,
-                    RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild))
-                : _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId));
+                    RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
+                    ClearCacheOnSwitch: ClearCacheOnSwitch))
+                : _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId,
+                    ClearCacheOnSwitch: ClearCacheOnSwitch));
             if (!result.Succeeded)
             {
                 SetSaveError(result.Error);

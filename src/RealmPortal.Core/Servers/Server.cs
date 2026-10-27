@@ -9,6 +9,7 @@ namespace RealmPortal.Core.Servers;
 /// <param name="RequiredClientBuild">Client build number the server needs (for example <c>12340</c>), or <c>null</c> when any client works. Compared with <c>ClientVersion.Build</c>.</param>
 /// <param name="Account">Remembered account name (never a password), or <c>null</c>.</param>
 /// <param name="ClientId">Preferred client id when the server was added; <c>null</c> when none.</param>
+/// <param name="ClearCacheOnSwitch">When set, overrides the global Settings toggle for clearing Cache/WDB on switch; <c>null</c> uses the global setting.</param>
 public sealed record Server(
     string Id,
     string Name,
@@ -17,7 +18,8 @@ public sealed record Server(
     string Realmlist,
     int? RequiredClientBuild,
     string? Account,
-    string? ClientId = null)
+    string? ClientId = null,
+    bool? ClearCacheOnSwitch = null)
 {
     public const int MaxNameLength = 64;
     public const int MaxRealmLength = 64;
@@ -35,7 +37,8 @@ public sealed record Server(
         int? requiredClientBuild = null,
         string? account = null,
         string? id = null,
-        string? clientId = null)
+        string? clientId = null,
+        bool? clearCacheOnSwitch = null)
     {
         name = name?.Trim() ?? "";
         if (name.Length == 0)
@@ -52,7 +55,7 @@ public sealed record Server(
             throw new ArgumentException("Client build must be a positive number.", nameof(requiredClientBuild));
 
         id ??= Guid.NewGuid().ToString("N");
-        var server = new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account, clientId);
+        var server = new Server(id, name, host, realm, RealmlistText.Build(host, extraRealmlistLines), requiredClientBuild, account, clientId, clearCacheOnSwitch);
         ServerValidator.Validate(server);
         return server;
     }
