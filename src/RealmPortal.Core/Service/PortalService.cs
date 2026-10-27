@@ -911,9 +911,8 @@ public sealed class PortalService : IPortalService
 
         try
         {
-            // Full snapshot write (App PersistNetwork / PersistingUpdateChecker LastAttempt).
-            // Field tweaks that must not clobber concurrent ETag/LastAttempt should use
-            // NetworkSettingsStore.Update(mutate) instead (UpdateChecker already does).
+            // Full snapshot write. Field tweaks that must not clobber concurrent ETag/LastAttempt
+            // must use UpdateNetworkSettings / NetworkSettingsStore.Update instead.
             _networkSettings.Set(settings);
             return ServiceResult<Unit>.Ok(default);
         }
@@ -933,6 +932,47 @@ public sealed class PortalService : IPortalService
         catch (Exception ex)
         {
             return ServiceResult<Unit>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<NetworkSettings> UpdateNetworkSettings(Func<NetworkSettings, NetworkSettings> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+        try
+        {
+            return ServiceResult<NetworkSettings>.Ok(_networkSettings.Update(mutate));
+        }
+        catch (Exception ex) when (NetworkSettingsStore.IsCorruptContent(ex))
+        {
+            // Same backup-and-repair path as SetNetworkSettings: move corrupt aside, then apply mutate to defaults.
+            try
+            {
+                var repaired = mutate(NetworkSettings.Default)
+                    ?? throw new InvalidOperationException("mutate returned null.");
+                _networkSettings.Overwrite(repaired);
+                return ServiceResult<NetworkSettings>.Ok(repaired);
+            }
+            catch (InvalidOperationException overwriteEx)
+                when (overwriteEx.Message.Contains("no longer corrupt", StringComparison.Ordinal))
+            {
+                // Another caller repaired the file first — apply our mutation to the repaired content.
+                try
+                {
+                    return ServiceResult<NetworkSettings>.Ok(_networkSettings.Update(mutate));
+                }
+                catch (Exception retryEx)
+                {
+                    return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(retryEx));
+                }
+            }
+            catch (Exception overwriteEx)
+            {
+                return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(overwriteEx));
+            }
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(ex));
         }
     }
 

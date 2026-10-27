@@ -5,6 +5,9 @@ namespace RealmPortal.App.Network;
 /// <summary>
 /// Applies <c>network-settings.json</c> gates (auto_check, 24 h, skipped, later) around an inner
 /// <see cref="IUpdateChecker"/> using Core <see cref="NetworkSettings"/> (Service store).
+/// Field tweaks go through <see cref="INetworkSettingsStore.Update"/> so concurrent probe/ETag writes are preserved.
+/// Production prefers Core <c>UpdateChecker</c> via <see cref="CoreUpdateCheckerAdapter"/>; this wrapper
+/// still stamps <c>last_attempt</c> when the inner checker is a no-op (demo / null).
 /// </summary>
 public sealed class PersistingUpdateChecker : IUpdateChecker
 {
@@ -47,8 +50,9 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
             if (settings.UpdatesLastAttemptUtc is { } last && now - last < AutoCheckInterval)
                 return UpdateCheckResult.None;
 
-            var saved = _store.Save(settings with { UpdatesLastAttemptUtc = now });
-            if (!saved.Succeeded)
+            // Stamp attempt under lock even when the inner checker is null/no-op.
+            var stamped = _store.Update(s => s with { UpdatesLastAttemptUtc = now });
+            if (!stamped.Succeeded)
                 return UpdateCheckResult.None;
         }
         else
@@ -85,7 +89,7 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.RemindLater(offer);
-        PersistChoice(loaded => loaded with
+        PersistChoice(s => s with
         {
             UpdatesLaterVersion = offer.Version,
             UpdatesLaterUntilUtc = _time.GetUtcNow() + LaterPostpone,
@@ -96,19 +100,17 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.SkipThisVersion(offer);
-        PersistChoice(loaded => loaded with { UpdatesSkippedVersion = offer.Version }, "SkipThisVersion");
+        PersistChoice(s => s with { UpdatesSkippedVersion = offer.Version }, "SkipThisVersion");
     }
 
     private void PersistChoice(Func<NetworkSettings, NetworkSettings> mutate, string action)
     {
-        var loaded = _store.Load();
-        if (!loaded.Succeeded)
-            throw new InvalidOperationException($"Network settings load failed during {action}: {loaded.Error}");
-        var saved = _store.Save(mutate(loaded.Value!));
-        if (!saved.Succeeded)
-            throw new InvalidOperationException($"Network settings save failed during {action}: {saved.Error}");
+        var updated = _store.Update(mutate);
+        if (!updated.Succeeded)
+            throw new InvalidOperationException($"Network settings update failed during {action}: {updated.Error}");
     }
 
-    public Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
+    public Task<UpdateInstallOutcome?> InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
         => _inner.InstallUpdateAsync(offer, cancellationToken);
 }
+

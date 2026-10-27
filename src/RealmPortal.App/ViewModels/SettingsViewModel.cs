@@ -109,6 +109,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// </summary>
     public Func<UpdateOffer, Task<ConfirmDialogChoice?>>? PresentUpdateAsync { get; set; }
 
+    /// <summary>Main sets this so install release-page fallback can open a trusted URL.</summary>
+    public Action<string>? OpenExternalUrl { get; set; }
+
     /// <summary>Which field the last failed save blamed: "template", "backup" or null.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TemplateError), nameof(BackupError))]
@@ -242,11 +245,22 @@ public sealed partial class SettingsViewModel : ViewModelBase
                     UpdateCheckStatus = null;
                     var choice = await present(offer).ConfigureAwait(true);
                     if (choice == ConfirmDialogChoice.Confirm)
-                        await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+                    {
+                        try
+                        {
+                            UpdateCheckStatus = FormatInstallOutcome(
+                                await _updates.InstallUpdateAsync(offer).ConfigureAwait(true));
+                        }
+                        catch (Exception ex)
+                        {
+                            ExceptionLog.Default.Write(ex, "Settings.InstallUpdate");
+                            UpdateCheckStatus = Loc.Get("update.install.failed.body");
+                        }
+                    }
                     else if (choice == ConfirmDialogChoice.Secondary)
-                        _updates.RemindLater(offer);
+                        await Task.Run(() => _updates.RemindLater(offer)).ConfigureAwait(true);
                     else if (choice == ConfirmDialogChoice.Cancel)
-                        _updates.SkipThisVersion(offer);
+                        await Task.Run(() => _updates.SkipThisVersion(offer)).ConfigureAwait(true);
                     break;
                 case UpdateCheckResultKind.Offer when result.Offer is { } offer:
                     UpdateCheckStatus = Loc.Format("update.title", offer.Version);
@@ -259,6 +273,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
                     break;
                 case UpdateCheckResultKind.Failed:
                     UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
+                    break;
+                case UpdateCheckResultKind.None:
+                    // Skipped / postponed / ineligible — not "up to date".
+                    UpdateCheckStatus = null;
                     break;
                 default:
                     UpdateCheckStatus = null;
@@ -387,6 +405,20 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     private readonly object _networkWriteGate = new();
 
+    /// <summary>Soft status after install; opens release-page fallback when Core returned an Unknown install.</summary>
+    internal string? FormatInstallOutcome(UpdateInstallOutcome? outcome)
+    {
+        if (outcome is null)
+            return Loc.Get("settings.updates.status.failed");
+        if (outcome.IsReleasePageFallback)
+        {
+            OpenExternalUrl?.Invoke(outcome.SavedPath);
+            return Loc.Get("update.install.open_release");
+        }
+        return UpdateInstallPresentation.FormatDetail(outcome);
+    }
+
+
     private void PersistNetwork()
     {
         void Write()
@@ -395,22 +427,19 @@ public sealed partial class SettingsViewModel : ViewModelBase
             {
                 // Read generated properties inside the lock so a later toggle cannot be
                 // overwritten by an older queued Task.Run snapshot.
+                // Update(mutate) under lock — never Load + Save of a stale full snapshot
+                // (that would clobber StatusProbeEnabled / ETag / last_attempt).
                 var auto = AutoCheckUpdates;
                 var probe = StatusProbeEnabled;
-                var loaded = _network.Load();
-                if (!loaded.Succeeded)
+                var updated = _network.Update(s => s with
+                {
+                    UpdatesAutoCheck = auto,
+                    StatusProbeEnabled = probe,
+                });
+                if (!updated.Succeeded)
                 {
                     ExceptionLog.Default.WriteMessage(
-                        $"PersistNetwork load failed: {loaded.Error}",
-                        "Settings.PersistNetwork");
-                    return;
-                }
-
-                var saved = _network.Save(loaded.Value! with { UpdatesAutoCheck = auto, StatusProbeEnabled = probe });
-                if (!saved.Succeeded)
-                {
-                    ExceptionLog.Default.WriteMessage(
-                        $"PersistNetwork save failed: {saved.Error}",
+                        $"PersistNetwork update failed: {updated.Error}",
                         "Settings.PersistNetwork");
                 }
             }

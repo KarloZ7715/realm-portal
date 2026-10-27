@@ -406,5 +406,17 @@
   "error.ratelimited.title": "Too many update checks",
   "error.ratelimited.body": "GitHub asked us to wait before checking again.",
   "settings.updates.checking": "Checking…",
-  "settings.error.network": "Could not save network settings. Check the config folder."
+  "settings.error.network": "Could not save network settings. Check the config folder.",
+  "update.install.open_release": "Open the release page to download the update.",
+  "update.install.saved": "Update saved to {0}.",
+  "update.install.title": "Update ready",
+  "update.install.body": "{0}",
+  "dialog.ok": "OK",
+  "update.install.appimage.restart": "Restart now to run the new AppImage.\n\nInstalled at:\n{0}",
+  "update.install.appimage.chmod": "Make the new AppImage executable, start it, then delete the old one. No apt command is shown.\n\nFile:\n{0}\n\n{1}",
+  "update.install.deb": "Open the Downloads folder and install the .deb with the shown command. The app never runs sudo.\n\nFile:\n{0}\n\n{1}",
+  "update.install.windows": "Extract the zip over your current Realm Portal folder.\n\nFile:\n{0}",
+  "update.install.command_and_path": "File:\n{0}\n\n{1}",
+  "update.install.failed.title": "Update failed",
+  "update.install.failed.body": "Could not download or verify the update. Try again, or open the release page."
 }

@@ -123,5 +123,11 @@ public interface IPortalService
 
     /// <summary>Saves update-check and status-probe settings. Both features default to on; see docs/updates-and-status.md.</summary>
     ServiceResult<Unit> SetNetworkSettings(NetworkSettings settings);
+
+    /// <summary>
+    /// Read-modify-write under the config lock. Prefer this for field tweaks (last_attempt, auto_check, etag, skipped, later, probe)
+    /// so concurrent writers cannot clobber each other via a stale full snapshot.
+    /// </summary>
+    ServiceResult<NetworkSettings> UpdateNetworkSettings(Func<NetworkSettings, NetworkSettings> mutate);
 }
 

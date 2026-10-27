@@ -146,6 +146,29 @@ public class PersistingUpdateCheckerTests
 
         public ServiceResult<Unit> Save(NetworkSettings settings) =>
             ServiceResult<Unit>.Fail(new ServiceError(ServiceErrorCode.Unexpected, Diagnostic: "boom"));
+
+        public ServiceResult<NetworkSettings> Update(Func<NetworkSettings, NetworkSettings> mutate) =>
+            ServiceResult<NetworkSettings>.Fail(new ServiceError(ServiceErrorCode.Unexpected, Diagnostic: "boom"));
+    }
+
+    [Fact]
+    public async Task Automatic_StampsLastAttempt_WithoutClobberingProbeEnabled()
+    {
+        var inner = new NullUpdateChecker();
+        var store = new MemoryNetworkSettingsStore();
+        store.Save(NetworkSettings.Default with
+        {
+            StatusProbeEnabled = true,
+            UpdatesAutoCheck = true,
+            UpdatesEtag = "W/\"keep-me\"",
+            UpdatesLastAttemptUtc = null,
+        });
+        var checker = new PersistingUpdateChecker(inner, store);
+        _ = await checker.CheckAsync(UpdateCheckKind.Automatic);
+        var saved = store.Load().Value!;
+        Assert.True(saved.StatusProbeEnabled);
+        Assert.Equal("W/\"keep-me\"", saved.UpdatesEtag);
+        Assert.NotNull(saved.UpdatesLastAttemptUtc);
     }
 
     [Fact]

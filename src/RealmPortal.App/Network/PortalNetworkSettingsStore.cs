@@ -4,7 +4,8 @@ namespace RealmPortal.App.Network;
 
 /// <summary>
 /// Forwards to Core <c>NetworkSettingsStore</c> through <see cref="IPortalService"/>
-/// (<c>GetNetworkSettings</c> / <c>SetNetworkSettings</c>). Prefer this over any App-local JSON writer.
+/// (<c>GetNetworkSettings</c> / <c>SetNetworkSettings</c> / <c>UpdateNetworkSettings</c>).
+/// Prefer this over any App-local JSON writer.
 /// </summary>
 public sealed class PortalNetworkSettingsStore(IPortalService service) : INetworkSettingsStore
 {
@@ -16,5 +17,11 @@ public sealed class PortalNetworkSettingsStore(IPortalService service) : INetwor
     {
         ArgumentNullException.ThrowIfNull(settings);
         return _service.SetNetworkSettings(settings);
+    }
+
+    public ServiceResult<NetworkSettings> Update(Func<NetworkSettings, NetworkSettings> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+        return _service.UpdateNetworkSettings(mutate);
     }
 }
