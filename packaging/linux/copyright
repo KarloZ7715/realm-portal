@@ -7,9 +7,9 @@ Comment:
  texts for those components are installed under
  /usr/share/doc/realm-portal/licenses/ and inventoried in
  THIRD_PARTY_LICENSES.md and licenses/nuget/PACKAGES.txt. This copyright
- file covers the Realm Portal sources and the bundled fonts and artwork;
- it intentionally points at those shipped files rather than inlining every
- third-party license text.
+ file covers the Realm Portal sources, bundled fonts, artwork, and
+ ambientCG-derived textures; it points at shipped third-party license
+ files under licenses/ for the .NET runtime and NuGet packages.
 
 Files: *
 Copyright: 2026 Carlos Canabal Cordero
@@ -24,7 +24,8 @@ Copyright: 2026 Carlos Canabal Cordero
 License: MIT
 Comment:
  Original branding and UI artwork (logo, frames, seals, UI kit). See
- assets/branding/LICENSE-ART.md in the source tree.
+ assets/branding/LICENSE-ART.md in the source tree. PNGs in frames/ and
+ ui/ may bake in ambientCG CC0 textures (see assets/textures/ below).
 
 Files: assets/fonts/*
 Copyright: 2011-2012 Ana Sanfelippo
@@ -34,14 +35,51 @@ Copyright: 2011-2012 Ana Sanfelippo
            2020 The JetBrains Mono Project Authors
 License: OFL-1.1
 Comment:
- Bundled typefaces under the SIL Open Font License 1.1. Full texts ship
- with the package as:
+ Bundled typefaces under the SIL Open Font License 1.1. Per-family copies
+ also ship with the package as:
  licenses/fonts/OFL-Almendra.txt
  licenses/fonts/OFL-MarcellusSC.txt
  licenses/fonts/OFL-Alegreya.txt
  licenses/fonts/OFL-AlegreyaSans.txt
  licenses/fonts/OFL-JetBrainsMono.txt
  under /usr/share/doc/realm-portal/. See also THIRD_PARTY_LICENSES.md.
+
+Files: assets/textures/tex-leather.jpg
+Copyright: ambientCG contributors
+License: CC0-1.0
+Comment:
+ Derived from ambientCG Leather 037 (https://ambientcg.com/a/Leather037),
+ official download https://ambientcg.com/get?file=Leather037_1K-JPG.zip,
+ license https://docs.ambientcg.com/license/ (CC0 1.0). Displacement map
+ converted to grayscale and tinted dark brown; JPEG q90. See
+ THIRD_PARTY_LICENSES.md.
+
+Files: assets/textures/tex-parchment.jpg
+Copyright: ambientCG contributors
+License: CC0-1.0
+Comment:
+ Derived from ambientCG Paper 003 (https://ambientcg.com/a/Paper003),
+ official download https://ambientcg.com/get?file=Paper003_1K-JPG.zip,
+ license https://docs.ambientcg.com/license/ (CC0 1.0). Color map in
+ grays, contrast reduced and tinted parchment; JPEG q90. See
+ THIRD_PARTY_LICENSES.md.
+
+Files: assets/textures/tex-bronze.jpg
+Copyright: ambientCG contributors
+License: CC0-1.0
+Comment:
+ Derived from ambientCG Metal 008 (https://ambientcg.com/a/Metal008),
+ official download https://ambientcg.com/get?file=Metal008_1K-JPG.zip,
+ license https://docs.ambientcg.com/license/ (CC0 1.0). Color map
+ grayscale-tinted muted bronze, reduced to 512²; JPEG q90. See
+ THIRD_PARTY_LICENSES.md.
+
+Files: assets/textures/preview-tiling-2x2.png
+Copyright: 2026 Carlos Canabal Cordero
+License: MIT
+Comment:
+ Check image composing the ambientCG-derived textures above; no
+ additional third parties. See THIRD_PARTY_LICENSES.md.
 
 License: MIT
  Permission is hereby granted, free of charge, to any person obtaining a
@@ -64,10 +102,97 @@ License: MIT
  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 License: OFL-1.1
- SIL Open Font License, Version 1.1.
+ SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+ -----------------------------------------------------------
  .
- The complete license text for each bundled family is shipped with this
- package under /usr/share/doc/realm-portal/licenses/fonts/OFL-*.txt
- (OFL-Almendra.txt, OFL-MarcellusSC.txt, OFL-Alegreya.txt,
- OFL-AlegreyaSans.txt, OFL-JetBrainsMono.txt). See also
- THIRD_PARTY_LICENSES.md.
+ PREAMBLE
+ The goals of the Open Font License (OFL) are to stimulate worldwide
+ development of collaborative font projects, to support the font creation
+ efforts of academic and linguistic communities, and to provide a free and
+ open framework in which fonts may be shared and improved in partnership
+ with others.
+ .
+ The OFL allows the licensed fonts to be used, studied, modified and
+ redistributed freely as long as they are not sold by themselves. The
+ fonts, including any derivative works, can be bundled, embedded,
+ redistributed and/or sold with any software provided that any reserved
+ names are not used by derivative works. The fonts and derivatives,
+ however, cannot be released under any other type of license. The
+ requirement for fonts to remain under this license does not apply
+ to any document created using the fonts or their derivatives.
+ .
+ DEFINITIONS
+ "Font Software" refers to the set of files released by the Copyright
+ Holder(s) under this license and clearly marked as such. This may
+ include source files, build scripts and documentation.
+ .
+ "Reserved Font Name" refers to any names specified as such after the
+ copyright statement(s).
+ .
+ "Original Version" refers to the collection of Font Software components as
+ distributed by the Copyright Holder(s).
+ .
+ "Modified Version" refers to any derivative made by adding to, deleting,
+ or substituting -- in part or in whole -- any of the components of the
+ Original Version, by changing formats or by porting the Font Software to a
+ new environment.
+ .
+ "Author" refers to any designer, engineer, programmer, technical
+ writer or other person who contributed to the Font Software.
+ .
+ PERMISSION & CONDITIONS
+ Permission is hereby granted, free of charge, to any person obtaining
+ a copy of the Font Software, to use, study, copy, merge, embed, modify,
+ redistribute, and sell modified and unmodified copies of the Font
+ Software, subject to the following conditions:
+ .
+ 1) Neither the Font Software nor any of its individual components,
+ in Original or Modified Versions, may be sold by itself.
+ .
+ 2) Original or Modified Versions of the Font Software may be bundled,
+ redistributed and/or sold with any software, provided that each copy
+ contains the above copyright notice and this license. These can be
+ included either as stand-alone text files, human-readable headers or
+ in the appropriate machine-readable metadata fields within text or
+ binary files as long as those fields can be easily viewed by the user.
+ .
+ 3) No Modified Version of the Font Software may use the Reserved Font
+ Name(s) unless explicit written permission is granted by the corresponding
+ Copyright Holder. This restriction only applies to the primary font name as
+ presented to the users.
+ .
+ 4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+ Software shall not be used to promote, endorse or advertise any
+ Modified Version, except to acknowledge the contribution(s) of the
+ Copyright Holder(s) and the Author(s) or with their explicit written
+ permission.
+ .
+ 5) The Font Software, modified or unmodified, in part or in whole,
+ must be distributed entirely under this license, and must not be
+ distributed under any other license. The requirement for fonts to
+ remain under this license does not apply to any document created
+ using the Font Software.
+ .
+ TERMINATION
+ This license becomes null and void if any of the above conditions are
+ not met.
+ .
+ DISCLAIMER
+ THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+ OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+ COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+ DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+ OTHER DEALINGS IN THE FONT SOFTWARE.
+
+License: CC0-1.0
+ To the extent possible under law, the author(s) have dedicated all
+ copyright and related rights to this software to the public domain
+ worldwide. This software is distributed without any warranty.
+ .
+ You should have received a copy of the CC0 Public Domain Dedication
+ along with this software. If not, see
+ <https://creativecommons.org/publicdomain/zero/1.0/>.
