@@ -20,13 +20,15 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
                 ? backup.Value!.BackupFolder
                 : string.Empty;
 
+        var clearCache = backup.Succeeded && backup.Value!.ClearCacheOnSwitch;
         return new SettingsModel(
             language,
             launcherValue.CommandTemplate,
             launcherValue.Prefix ?? [],
             launcherValue.Arguments ?? [],
             launcherValue.Environment ?? new Dictionary<string, string?>(),
-            backupFolder);
+            backupFolder,
+            clearCache);
     }
 
     public SettingsError? Save(SettingsModel settings)
@@ -44,7 +46,7 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
                 : new SettingsError("PathNotFound", settings.BackupFolder);
         }
 
-        var storageResult = session.Service.SetStorageSettings(new StorageSettings(settings.BackupFolder));
+        var storageResult = session.Service.SetStorageSettings(new StorageSettings(settings.BackupFolder, settings.ClearCacheOnSwitch));
         if (!storageResult.Succeeded)
         {
             return new SettingsError(

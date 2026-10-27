@@ -50,7 +50,8 @@ public sealed record ServerEntry(
     int? RequiredClientBuild,
     string? ClientId,
     bool IsActive,
-    bool IsCompatible);
+    bool IsCompatible,
+    bool? ClearCacheOnSwitch = null);
 
 /// <summary>Data of a server to add by hand.</summary>
 /// <param name="Name">Display name.</param>
@@ -61,6 +62,7 @@ public sealed record ServerEntry(
 /// <param name="Account">Remembered account name (never a password); <c>null</c> for none.</param>
 /// <param name="ClientId">Preferred client for this server (<see cref="ClientEntry.Id"/>), shown on its card; <c>null</c> for none. Unknown id: <see cref="ServiceErrorCode.ClientNotFound"/>.</param>
 /// <param name="ExtraRealmlistLines">Extra realmlist lines after <c>set realmlist</c> (for example <c>set patchlist …</c>).</param>
+/// <param name="ClearCacheOnSwitch">Per-server override for clearing Cache/WDB on switch; <c>null</c> uses the global Settings toggle.</param>
 public sealed record NewServer(
     string Name,
     string Host,
@@ -69,7 +71,8 @@ public sealed record NewServer(
     int? RequiredClientBuild = null,
     string? Account = null,
     string? ClientId = null,
-    IReadOnlyList<string>? ExtraRealmlistLines = null);
+    IReadOnlyList<string>? ExtraRealmlistLines = null,
+    bool? ClearCacheOnSwitch = null);
 
 /// <summary>Request to update an existing server.</summary>
 /// <remarks>
@@ -77,7 +80,8 @@ public sealed record NewServer(
 /// removes it (the server then accepts any client; setting both is <see cref="ServiceErrorCode.InvalidServerInput"/> with
 /// <c>Field = "build"</c>). <see cref="ExtraRealmlistLines"/> and
 /// <see cref="PatchlistHost"/> both <c>null</c> keep the stored extra realmlist lines; an empty
-/// <see cref="ExtraRealmlistLines"/> clears them. The other fields are always taken from the request.
+/// <see cref="ExtraRealmlistLines"/> clears them. The other fields are always taken from the request
+/// (including <see cref="ClearCacheOnSwitch"/>, which may be <c>null</c> to use the global Settings toggle).
 /// </remarks>
 public sealed record UpdateServerRequest(
     string ServerId,
@@ -89,7 +93,8 @@ public sealed record UpdateServerRequest(
     string? Account = null,
     string? ClientId = null,
     IReadOnlyList<string>? ExtraRealmlistLines = null,
-    bool ClearRequiredClientBuild = false);
+    bool ClearRequiredClientBuild = false,
+    bool? ClearCacheOnSwitch = null);
 
 // ---------------------------------------------------------------- switch, play, undo
 
@@ -130,11 +135,13 @@ public sealed record SwitchRequest(string ClientId, string ServerId, bool Force 
 /// <param name="Previous">The server that was active before; <c>null</c> when none was.</param>
 /// <param name="BackupId">Backup made for this switch; <c>null</c> when the client already had this configuration (nothing written).</param>
 /// <param name="ChangedFiles">Client files written, relative to the client folder, with <c>/</c> separators.</param>
+/// <param name="CacheClearWarning">When cache clear was attempted and failed soft, an English diagnostic; <c>null</c> when cleared successfully or skipped.</param>
 public sealed record SwitchOutcome(
     ServerEntry Active,
     ServerEntry? Previous,
     string? BackupId,
-    IReadOnlyList<string> ChangedFiles);
+    IReadOnlyList<string> ChangedFiles,
+    string? CacheClearWarning = null);
 
 /// <summary>
 /// Result of a completed undo: the client files are back to what they were before the switch and the previous server is active again.
@@ -164,9 +171,10 @@ public sealed record PortalStatus(
     IReadOnlyList<ClientEntry> ClientsNotMatchingActive,
     IReadOnlyDictionary<string, ServerEntry>? ActiveByClient = null);
 
-/// <summary>Where backups are kept, set from the Settings screen.</summary>
+/// <summary>Where backups are kept and whether Cache/WDB is cleared on switch, set from the Settings screen.</summary>
 /// <param name="BackupFolder">Folder for backups. A change applies from the next start of the app (<see cref="PortalStatus.BackupFolder"/> shows the one in use); existing backups are not moved or deleted.</param>
-public sealed record StorageSettings(string BackupFolder);
+/// <param name="ClearCacheOnSwitch">When true, a successful switch to another server clears the client's <c>Cache</c> and <c>WDB</c> folders (off by default). A per-server override on <see cref="Servers.Server.ClearCacheOnSwitch"/> wins when set.</param>
+public sealed record StorageSettings(string BackupFolder, bool ClearCacheOnSwitch = false);
 
 /// <summary>
 /// How to start the game, set from the Settings screen. Everything of a <see cref="GameLaunchSpec"/> except the

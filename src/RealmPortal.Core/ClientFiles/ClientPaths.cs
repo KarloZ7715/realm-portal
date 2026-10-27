@@ -197,4 +197,50 @@ public static class ClientPaths
 
     private static bool IsDirectorySeparator(char c) =>
         c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar;
+
+    /// <summary>
+    /// Finds a direct child directory of the client by case-insensitive name and ensures it stays under
+    /// the client root through symbolic links. Returns <c>null</c> when the child is missing.
+    /// </summary>
+    /// <exception cref="ClientFilesException"><see cref="ClientFilesErrorCode.PathEscapesClient"/> when the child resolves outside the client.</exception>
+    public static string? ResolveChildDirectoryInsideClient(string canonicalRoot, string childName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(canonicalRoot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(childName);
+        if (childName.Contains('/') || childName.Contains('\\') || childName is "." or "..")
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, childName,
+                $"'{childName}' is not a single directory name under the client folder.");
+
+        var realName = CaseInsensitivePath.FindDirectory(canonicalRoot, childName);
+        if (realName is null)
+            return null;
+
+        var combined = Path.Combine(canonicalRoot, realName);
+        var hops = 0;
+        string realRoot, realChild;
+        try
+        {
+            realRoot = ResolveLinks(canonicalRoot, ref hops);
+            hops = 0;
+            realChild = ResolveLinks(combined, ref hops);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, childName,
+                $"'{childName}' could not be resolved inside the client directory: {ex.Message}", ex);
+        }
+
+        if (!IsUnderRoot(realRoot, realChild))
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, childName,
+                $"'{childName}' resolves outside the client directory through a symbolic link.");
+
+        // The leaf must be a directory (or a directory symlink already verified to stay inside).
+        if (!Directory.Exists(combined))
+            return null;
+
+        return combined;
+    }
+
+    /// <summary>True when <paramref name="path"/> is under <paramref name="root"/> (after both are full paths).</summary>
+    internal static bool IsPathUnderRoot(string root, string path) => IsUnderRoot(root, path);
 }

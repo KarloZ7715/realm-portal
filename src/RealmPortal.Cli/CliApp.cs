@@ -461,6 +461,8 @@ public sealed class CliApp(
             return Fail(sw.Error!);
         var previous = sw.Value!.Previous?.Name;
         SafeWriteLine(output, $"Switched to '{server.Name}'" + (previous is null || previous == server.Name ? "" : $" (previous: '{previous}')"));
+        if (sw.Value.CacheClearWarning is { } cacheWarning)
+            SafeWriteLine(error, $"warning: {cacheWarning}");
         return 0;
     }
 

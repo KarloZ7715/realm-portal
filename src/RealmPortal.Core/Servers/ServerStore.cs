@@ -11,7 +11,7 @@ namespace RealmPortal.Core.Servers;
 /// </summary>
 /// <remarks>
 /// File format (UTF-8 without BOM, 2-space indent, <c>\n</c> newlines, trailing newline):
-/// <c>{ "version": 1, "servers": [ { "id", "name", "host", "realm", "realmlist", "required_client_build", "account", "client_id" } ] }</c>.
+/// <c>{ "version": 1, "servers": [ { "id", "name", "host", "realm", "realmlist", "required_client_build", "account", "client_id", "clear_cache_on_switch?" } ] }</c>.
 /// A missing file is an empty store; an unreadable or unsupported file raises <see cref="StoreException"/>
 /// and is never overwritten.
 /// </remarks>
@@ -188,7 +188,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
             || r.Realmlist is null)
             throw new StoreException("A stored server is missing id, name, host or realmlist.");
 
-        var server = new Server(r.Id, r.Name, r.Host, r.Realm ?? "", r.Realmlist, r.RequiredClientBuild, r.Account, r.ClientId);
+        var server = new Server(r.Id, r.Name, r.Host, r.Realm ?? "", r.Realmlist, r.RequiredClientBuild, r.Account, r.ClientId, r.ClearCacheOnSwitch);
         try
         {
             ServerValidator.Validate(server);
@@ -211,6 +211,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
         RequiredClientBuild = s.RequiredClientBuild,
         Account = s.Account,
         ClientId = s.ClientId,
+        ClearCacheOnSwitch = s.ClearCacheOnSwitch,
     };
 
     private sealed class StoreFile
@@ -231,5 +232,8 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
         [JsonPropertyName("client_id")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? ClientId { get; set; }
+        [JsonPropertyName("clear_cache_on_switch")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? ClearCacheOnSwitch { get; set; }
     }
 }

@@ -59,7 +59,11 @@ internal sealed class PortalSettingsStore(
         }
     }
 
-    public StorageSettings GetStorageSettings() => new(LoadStorage()?.BackupFolder ?? DefaultBackupFolder);
+    public StorageSettings GetStorageSettings()
+    {
+        var file = LoadStorage();
+        return new(file?.BackupFolder ?? DefaultBackupFolder, file?.ClearCacheOnSwitch ?? false);
+    }
 
     public void SetStorageSettings(StorageSettings settings)
     {
@@ -68,7 +72,12 @@ internal sealed class PortalSettingsStore(
         var full = ValidateBackupFolder(settings.BackupFolder);
         using (_directoryLock.Acquire())
         {
-            var file = new StorageFile { Version = FormatVersion, BackupFolder = full };
+            var file = new StorageFile
+            {
+                Version = FormatVersion,
+                BackupFolder = full,
+                ClearCacheOnSwitch = settings.ClearCacheOnSwitch,
+            };
             Write(_storagePath, file);
         }
     }
@@ -224,6 +233,7 @@ internal sealed class PortalSettingsStore(
     {
         [JsonPropertyName("version")] public int Version { get; set; }
         [JsonPropertyName("backup_folder")] public string? BackupFolder { get; set; }
+        [JsonPropertyName("clear_cache_on_switch")] public bool ClearCacheOnSwitch { get; set; }
     }
 
     private sealed class LauncherFile
