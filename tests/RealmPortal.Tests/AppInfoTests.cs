@@ -12,6 +12,10 @@ public class AppInfoTests
     public void Name_IsRealmPortal() => Assert.Equal("Realm Portal", AppInfo.Name);
 
     [Fact]
+    public void RepositoryUrl_IsThePublicGitHubRepo() =>
+        Assert.Equal("https://github.com/KarloZ7715/realm-portal", AppInfo.RepositoryUrl);
+
+    [Fact]
     public void Version_IsParseableAndHasNoBuildMetadata()
     {
         Assert.DoesNotContain('+', AppInfo.Version);

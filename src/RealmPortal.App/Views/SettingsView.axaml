@@ -97,6 +97,20 @@
                        Text="{loc:T settings.cache.hint}"/>
           </StackPanel>
         </ContentControl>
+
+        <!-- About -->
+        <ContentControl Classes="card thin" Padding="26,12,26,16">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="sheet-title" Text="{loc:T settings.about}"/>
+            <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+            <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Margin="0,4,0,0"
+                       Text="{loc:T settings.about.hint}"/>
+            <Button Name="AboutButton" Classes="secondary compact" HorizontalAlignment="Right" MinWidth="200"
+                    c:ButtonSurface.Surface="Parchment" Command="{Binding OpenAboutCommand}">
+              <TextBlock Text="{loc:T settings.about.open}"/>
+            </Button>
+          </StackPanel>
+        </ContentControl>
       </StackPanel>
     </ScrollViewer>
 

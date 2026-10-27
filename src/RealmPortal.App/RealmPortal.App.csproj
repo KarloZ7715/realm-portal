@@ -52,4 +52,7 @@
     <AvaloniaResource Include="..\..\assets\fonts\alegreyasans\OFL.txt" Link="Assets/Fonts/licenses/OFL-AlegreyaSans.txt" />
     <AvaloniaResource Include="..\..\assets\fonts\jetbrainsmono\OFL.txt" Link="Assets/Fonts/licenses/OFL-JetBrainsMono.txt" />
   </ItemGroup>
+  <ItemGroup Label="About: third-party license notices shown in the About screen">
+    <AvaloniaResource Include="../../THIRD_PARTY_LICENSES.md" Link="Assets/THIRD_PARTY_LICENSES.md" />
+  </ItemGroup>
 </Project>
