@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Platform;
 using RealmPortal.App.ViewModels;
 
 namespace RealmPortal.App.Tests;
@@ -34,12 +35,12 @@ internal sealed class StepHold
 /// <summary>A main window over a zero-delay demo backend, sized like the compact mockups' client area.</summary>
 internal sealed class Shell
 {
-    public Shell(double width = 720, double height = 440)
+    public Shell(double width = 720, double height = 440, IUriOpener? uriOpener = null)
     {
         // The expected texts are Spanish: tests do not depend on the machine's language.
         Loc.Instance.SetLanguage(Language.Es);
         Backend = new DemoBackend { TimeScale = 0 };
-        Model = MainViewModel.ForDemo(Backend, autoTick: false);
+        Model = MainViewModel.ForDemo(Backend, autoTick: false, uriOpener: uriOpener);
         Window = new MainWindow(Model) { Width = width, Height = height };
         Window.Show();
         Screenshots.Settle();

@@ -44,6 +44,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public event Action? OpenBackupsManagerRequested;
 
+    public event Action? OpenAboutRequested;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(OpenBackupsManagerCommand))]
     private bool _canManageBackups;
@@ -178,6 +180,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private void OpenBackupsManager() => OpenBackupsManagerRequested?.Invoke();
 
     private bool CanOpenBackupsManager() => CanManageBackups;
+
+    [RelayCommand]
+    private void OpenAbout() => OpenAboutRequested?.Invoke();
 
     internal static bool IsValidTemplate(string? template) =>
         !string.IsNullOrWhiteSpace(template)
