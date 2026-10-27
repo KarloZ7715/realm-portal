@@ -35,20 +35,30 @@ public class WindowPlacementFitTests
     }
 
     [Fact]
-    public void SizeIsCappedToTheWorkingArea()
+    public void SizeIsCappedBelowTheWorkingAreaToLeaveRoomForTheFrame()
     {
         var fit = WindowPlacementFit.Fit(new WindowPlacement(0, 0, 4000, 3000, false), [Primary], 720, 440)!;
-        Assert.Equal(1920, fit.Width);
-        Assert.Equal(1040, fit.Height);
+        Assert.Equal(1920 - WindowPlacementFit.DefaultFrameReserveWidthPx, fit.Width);
+        Assert.Equal(1040 - WindowPlacementFit.DefaultFrameReserveHeightPx, fit.Height);
         Assert.Equal((0, 0), (fit.X, fit.Y));
+        Assert.True(fit.Maximized);
+    }
+
+    [Fact]
+    public void ASavedSizeThatFillsTheWorkingAreaIsRestoredMaximized()
+    {
+        var fit = WindowPlacementFit.Fit(new WindowPlacement(0, 0, 1920, 1040, Maximized: false), [Primary], 720, 440)!;
+        Assert.True(fit.Maximized);
+        Assert.True(fit.Width < 1920);
+        Assert.True(fit.Height < 1040);
     }
 
     [Fact]
     public void APartlyOffScreenWindowIsPulledInside()
     {
         var fit = WindowPlacementFit.Fit(new WindowPlacement(1700, 900, 800, 500, false), [Primary], 720, 440)!;
-        Assert.Equal(1920 - 800, fit.X);
-        Assert.Equal(1040 - 500, fit.Y);
+        Assert.Equal(1920 - 800 - WindowPlacementFit.DefaultFrameReserveWidthPx, fit.X);
+        Assert.Equal(1040 - 500 - WindowPlacementFit.DefaultFrameReserveHeightPx, fit.Y);
     }
 
     [Fact]
@@ -58,7 +68,10 @@ public class WindowPlacementFitTests
         Assert.Equal(saved, WindowPlacementFit.Fit(saved, [Primary, Right], 720, 440));
 
         var fit = WindowPlacementFit.Fit(saved, [Primary], 720, 440)!;
-        Assert.Equal((460, 220), (fit.X, fit.Y));
+        Assert.Equal(
+            ((1920 - 1000 - WindowPlacementFit.DefaultFrameReserveWidthPx) / 2,
+                (1040 - 600 - WindowPlacementFit.DefaultFrameReserveHeightPx) / 2),
+            (fit.X, fit.Y));
         Assert.Equal((1000.0, 600.0), (fit.Width, fit.Height));
     }
 
@@ -67,10 +80,14 @@ public class WindowPlacementFitTests
     {
         var hiDpi = new ScreenArea(0, 0, 2880, 1620, 2.0);
         var fit = WindowPlacementFit.Fit(new WindowPlacement(2000, 1000, 1000, 600, false), [hiDpi], 720, 440)!;
-        Assert.Equal(2880 - 2000, fit.X);
-        Assert.Equal(1620 - 1200, fit.Y);
+        Assert.Equal(2880 - 2000 - WindowPlacementFit.DefaultFrameReserveWidthPx, fit.X);
+        Assert.Equal(1620 - 1200 - WindowPlacementFit.DefaultFrameReserveHeightPx, fit.Y);
         var capped = WindowPlacementFit.Fit(new WindowPlacement(0, 0, 3000, 3000, false), [hiDpi], 720, 440)!;
-        Assert.Equal((1440.0, 810.0), (capped.Width, capped.Height));
+        Assert.Equal(
+            ((2880 - WindowPlacementFit.DefaultFrameReserveWidthPx) / 2.0,
+                (1620 - WindowPlacementFit.DefaultFrameReserveHeightPx) / 2.0),
+            (capped.Width, capped.Height));
+        Assert.True(capped.Maximized);
     }
 
     [Fact]
@@ -92,6 +109,22 @@ public class WindowPlacementFitTests
     [Fact]
     public void NoScreensFallBackToTheDefaults() =>
         Assert.Null(WindowPlacementFit.Fit(new WindowPlacement(0, 0, 1000, 600, false), [], 720, 440));
+
+    [Fact]
+    public void ATinyPositionOnlyShiftWhileMaximizingIsIgnored()
+    {
+        Assert.False(WindowPlacementFit.IsMeaningfulNormalUpdate(40, 30, 900, 560, 45, 35, 900, 560));
+        Assert.False(WindowPlacementFit.IsMeaningfulNormalUpdate(40, 30, 900, 560, 40 + WindowPlacementFit.FrameExtentFudgePx, 30, 900, 560));
+    }
+
+    [Fact]
+    public void ARealMoveOrResizeBeforeMaximizingIsKept()
+    {
+        Assert.True(WindowPlacementFit.IsMeaningfulNormalUpdate(40, 30, 900, 560, 120, 90, 900, 560));
+        Assert.True(WindowPlacementFit.IsMeaningfulNormalUpdate(40, 30, 900, 560, 40, 30, 1000, 600));
+        Assert.True(WindowPlacementFit.IsMeaningfulNormalUpdate(
+            40, 30, 900, 560, 40 + WindowPlacementFit.FrameExtentFudgePx + 1, 30, 900, 560));
+    }
 }
 
 public class WindowPlacementPersistenceTests
@@ -118,6 +151,59 @@ public class WindowPlacementPersistenceTests
         using var temp = new TempDirectory();
         File.WriteAllText(Path.Combine(temp.Path, "ui-preferences.json"), "{\"LanguageCode\":\"en\"}");
         Assert.Null(new UiPreferencesStore(temp.Path).Load().Window);
+    }
+
+    [Fact]
+    public void ACorruptWindowEntryIsIgnoredWhileOtherPreferencesLoad()
+    {
+        using var temp = new TempDirectory();
+        var path = Path.Combine(temp.Path, "ui-preferences.json");
+        File.WriteAllText(
+            path,
+            """
+            {
+              "LanguageCode": "en",
+              "ClientsInUse": ["client-1"],
+              "FirstScanCompleted": true,
+              "Window": "not-an-object"
+            }
+            """);
+
+        var loaded = new UiPreferencesStore(temp.Path).Load();
+        Assert.Equal("en", loaded.LanguageCode);
+        Assert.Equal(["client-1"], loaded.ClientsInUse!);
+        Assert.True(loaded.FirstScanCompleted);
+        Assert.Null(loaded.Window);
+    }
+
+    [Theory]
+    [InlineData("""{"X":10,"Y":20,"Width":1000,"Height":600}""")]
+    [InlineData("""{"X":"bad","Y":1,"Width":1000,"Height":600,"Maximized":false}""")]
+    [InlineData("""{"X":10,"Y":20,"Width":0,"Height":600,"Maximized":false}""")]
+    [InlineData("""{"X":10}""")]
+    [InlineData("""{"Width":1000,"Height":600}""")]
+    [InlineData("""{"Y":20,"Width":1000,"Height":600,"Maximized":false}""")]
+    [InlineData("42")]
+    [InlineData("[1,2,3]")]
+    public void MalformedWindowValuesAreTreatedAsNoPlacement(string windowJson)
+    {
+        using var temp = new TempDirectory();
+        File.WriteAllText(
+            Path.Combine(temp.Path, "ui-preferences.json"),
+            $$"""
+            {
+              "LanguageCode": "es",
+              "ClientsInUse": ["keep-me"],
+              "FirstScanCompleted": true,
+              "Window": {{windowJson}}
+            }
+            """);
+
+        var loaded = new UiPreferencesStore(temp.Path).Load();
+        Assert.Equal("es", loaded.LanguageCode);
+        Assert.Equal(["keep-me"], loaded.ClientsInUse!);
+        Assert.True(loaded.FirstScanCompleted);
+        Assert.Null(loaded.Window);
     }
 
     [AvaloniaFact]
@@ -159,14 +245,39 @@ public class WindowPlacementPersistenceTests
         store.SetWindowPlacement(new WindowPlacement(40, 30, 900, 560, Maximized: true));
 
         var window = new MainWindow(MainViewModel.ForDemo(autoTick: false));
-        WindowPlacementPersistence.Attach(window, store);
+        var persistence = WindowPlacementPersistence.Attach(window, store);
         Assert.Equal(WindowState.Maximized, window.WindowState);
+        Assert.Equal(new PixelPoint(40, 30), new PixelPoint(persistence.Current.X, persistence.Current.Y));
         window.Show();
         Screenshots.Settle();
         window.Close();
 
         var saved = store.Load().Window!;
         Assert.True(saved.Maximized);
+        Assert.Equal((900.0, 560.0), (saved.Width, saved.Height));
+        Assert.Equal((40, 30), (saved.X, saved.Y));
+    }
+
+    [AvaloniaFact]
+    public void AFrameSizedPositionNudgeWhileMaximizingDoesNotOffsetTheSavedRestoreBounds()
+    {
+        using var temp = new TempDirectory();
+        var store = new UiPreferencesStore(temp.Path);
+        store.SetWindowPlacement(new WindowPlacement(40, 30, 900, 560, Maximized: false));
+        var window = new MainWindow(MainViewModel.ForDemo(autoTick: false));
+        var persistence = WindowPlacementPersistence.Attach(window, store);
+        window.Show();
+        Screenshots.Settle();
+
+        // Simulate the xfwm4 +5,+5 frame nudge that can arrive before WindowState flips to Maximized.
+        window.Position = new PixelPoint(45, 35);
+        window.WindowState = WindowState.Maximized;
+        Assert.Equal((40, 30), (persistence.Current.X, persistence.Current.Y));
+        window.Close();
+
+        var saved = store.Load().Window!;
+        Assert.True(saved.Maximized);
+        Assert.Equal((40, 30), (saved.X, saved.Y));
         Assert.Equal((900.0, 560.0), (saved.Width, saved.Height));
     }
 
@@ -188,6 +299,28 @@ public class WindowPlacementPersistenceTests
 
         var saved = store.Load().Window!;
         Assert.True(saved.Maximized);
+        Assert.Equal((120, 90), (saved.X, saved.Y));
+        Assert.Equal((900.0, 560.0), (saved.Width, saved.Height));
+    }
+
+    [AvaloniaFact]
+    public void AMoveRightBeforeMinimizingIsNotLost()
+    {
+        using var temp = new TempDirectory();
+        var store = new UiPreferencesStore(temp.Path);
+        store.SetWindowPlacement(new WindowPlacement(40, 30, 900, 560, Maximized: false));
+        var window = new MainWindow(MainViewModel.ForDemo(autoTick: false));
+        WindowPlacementPersistence.Attach(window, store);
+        window.Show();
+        Screenshots.Settle();
+
+        // Move, then minimize before the deferred capture has run.
+        window.Position = new PixelPoint(120, 90);
+        window.WindowState = WindowState.Minimized;
+        window.Close();
+
+        var saved = store.Load().Window!;
+        Assert.False(saved.Maximized);
         Assert.Equal((120, 90), (saved.X, saved.Y));
         Assert.Equal((900.0, 560.0), (saved.Width, saved.Height));
     }

@@ -17,7 +17,9 @@ public sealed class WindowPlacementPersistence
     private PixelPoint _normalPosition;
     private Size _normalSize;
     private (PixelPoint Position, Size Size)? _pending;
+    private (PixelPoint Position, Size Size)? _normalBeforePending;
     private bool _maximizedBeforeMinimize;
+    private bool _restoredPlacement;
 
     private WindowPlacementPersistence(Window window, UiPreferencesStore store)
     {
@@ -34,7 +36,7 @@ public sealed class WindowPlacementPersistence
         ArgumentNullException.ThrowIfNull(store);
         var persistence = new WindowPlacementPersistence(window, store);
         persistence.Restore(store.Load().Window);
-        window.Opened += (_, _) => persistence.CaptureNormal();
+        window.Opened += (_, _) => persistence.CaptureInitialNormal();
         window.PositionChanged += (_, _) => persistence.CaptureNormalLater();
         window.Resized += (_, _) => persistence.CaptureNormalLater();
         window.PropertyChanged += (_, e) =>
@@ -80,7 +82,9 @@ public sealed class WindowPlacementPersistence
         _window.Width = fit.Width;
         _window.Height = fit.Height;
         _window.Position = new PixelPoint(fit.X, fit.Y);
-        _normalPosition = _window.Position;
+        _restoredPlacement = true;
+        // Keep the fitted restore bounds, not whatever the WM reports after SetPosition (xfwm4 can shift by +5,+5).
+        _normalPosition = new PixelPoint(fit.X, fit.Y);
         _normalSize = new Size(fit.Width, fit.Height);
         if (fit.Maximized)
         {
@@ -90,16 +94,46 @@ public sealed class WindowPlacementPersistence
 
     private void OnWindowStateChanged(WindowState oldState, WindowState newState)
     {
-        if (oldState == WindowState.Normal && newState != WindowState.Normal)
+        if (oldState == WindowState.Normal
+            && newState is (WindowState.Maximized or WindowState.FullScreen))
         {
+            var normalPosition = _normalBeforePending?.Position ?? _normalPosition;
+            var normalSize = _normalBeforePending?.Size ?? _normalSize;
             // Keep a move or resize that happened just before maximizing, unless what was seen is already the
-            // maximized size (the size notification can arrive before the state change).
-            if (_pending is { } pending && !LooksMaximized(pending.Size))
+            // maximized size (the size notification can arrive before the state change). Ignore tiny
+            // position-only frame nudges from the window manager.
+            if (_pending is { } pending
+                && !LooksMaximized(pending.Size)
+                && WindowPlacementFit.IsMeaningfulNormalUpdate(
+                    normalPosition.X,
+                    normalPosition.Y,
+                    normalSize.Width,
+                    normalSize.Height,
+                    pending.Position.X,
+                    pending.Position.Y,
+                    pending.Size.Width,
+                    pending.Size.Height))
+            {
+                (_normalPosition, _normalSize) = pending;
+            }
+            else if (_normalBeforePending is { } before)
+            {
+                (_normalPosition, _normalSize) = before;
+            }
+
+            _pending = null;
+            _normalBeforePending = null;
+        }
+        else if (oldState == WindowState.Normal && newState == WindowState.Minimized)
+        {
+            // A move/resize just before minimize must still be saved; do not apply the maximize filter.
+            if (_pending is { } pending)
             {
                 (_normalPosition, _normalSize) = pending;
             }
 
             _pending = null;
+            _normalBeforePending = null;
         }
 
         if (newState == WindowState.Minimized)
@@ -118,6 +152,7 @@ public sealed class WindowPlacementPersistence
         }
 
         var size = _window.ClientSize;
+        _normalBeforePending = (_normalPosition, _normalSize);
         _pending = (_window.Position, size.Width > 0 && size.Height > 0 ? size : _normalSize);
         Dispatcher.UIThread.Post(CaptureNormal, DispatcherPriority.Background);
     }
@@ -134,6 +169,18 @@ public sealed class WindowPlacementPersistence
         return size.Width >= screen.WorkingArea.Width / scaling - 2 && size.Height >= screen.WorkingArea.Height / scaling - 64;
     }
 
+    private void CaptureInitialNormal()
+    {
+        if (_restoredPlacement)
+        {
+            // Do not let Opened overwrite fitted restore bounds with a WM-adjusted Position (+5,+5 on xfwm4).
+            _restoredPlacement = false;
+            return;
+        }
+
+        CaptureNormal();
+    }
+
     private void CaptureNormal()
     {
         if (_window.WindowState != WindowState.Normal)
@@ -141,7 +188,8 @@ public sealed class WindowPlacementPersistence
             return;
         }
 
-        _pending = null;
+        // Leave _pending / _normalBeforePending for OnWindowStateChanged so a frame nudge committed here
+        // can still be rejected when maximizing.
         _normalPosition = _window.Position;
         var size = _window.ClientSize;
         if (size.Width > 0 && size.Height > 0)
