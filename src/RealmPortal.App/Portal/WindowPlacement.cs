@@ -70,11 +70,14 @@ public static class WindowPlacementFit
         var widthPx = (int)Math.Ceiling(width * scaling);
         var heightPx = (int)Math.Ceiling(height * scaling);
 
+        var frameW = Math.Max(0, frameReserveWidthPx);
+        var frameH = Math.Max(0, frameReserveHeightPx);
         int x, y;
         if (visible)
         {
-            x = Math.Clamp(saved.X, screen.X, Math.Max(screen.X, screen.Right - widthPx));
-            y = Math.Clamp(saved.Y, screen.Y, Math.Max(screen.Y, screen.Bottom - heightPx));
+            // Leave frame clearance at the right/bottom so chrome outside the client stays on-screen.
+            x = Math.Clamp(saved.X, screen.X, Math.Max(screen.X, screen.Right - widthPx - frameW));
+            y = Math.Clamp(saved.Y, screen.Y, Math.Max(screen.Y, screen.Bottom - heightPx - frameH));
         }
         else
         {

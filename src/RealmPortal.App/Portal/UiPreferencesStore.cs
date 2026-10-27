@@ -123,9 +123,20 @@ internal sealed class LenientWindowPlacementConverter : JsonConverter<WindowPlac
                 return null;
             }
 
+            // .NET 9 fills missing record ctor args with defaults, so require coordinates explicitly
+            // (otherwise {"Width":1000,"Height":600} would restore at (0,0)).
+            var root = document.RootElement;
+            if (!HasNumberProperty(root, "X")
+                || !HasNumberProperty(root, "Y")
+                || !HasNumberProperty(root, "Width")
+                || !HasNumberProperty(root, "Height"))
+            {
+                return null;
+            }
+
             // Use options without this converter to avoid recursion.
             var plain = new JsonSerializerOptions { WriteIndented = options.WriteIndented };
-            var placement = document.RootElement.Deserialize<WindowPlacement>(plain);
+            var placement = root.Deserialize<WindowPlacement>(plain);
             return placement is not null && WindowPlacementFit.HasUsableSize(placement) ? placement : null;
         }
         catch (JsonException)
@@ -145,6 +156,10 @@ internal sealed class LenientWindowPlacementConverter : JsonConverter<WindowPlac
             return null;
         }
     }
+
+    private static bool HasNumberProperty(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value)
+        && value.ValueKind is JsonValueKind.Number;
 
     public override void Write(Utf8JsonWriter writer, WindowPlacement? value, JsonSerializerOptions options)
     {

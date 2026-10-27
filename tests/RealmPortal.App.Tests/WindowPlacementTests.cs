@@ -57,8 +57,8 @@ public class WindowPlacementFitTests
     public void APartlyOffScreenWindowIsPulledInside()
     {
         var fit = WindowPlacementFit.Fit(new WindowPlacement(1700, 900, 800, 500, false), [Primary], 720, 440)!;
-        Assert.Equal(1920 - 800, fit.X);
-        Assert.Equal(1040 - 500, fit.Y);
+        Assert.Equal(1920 - 800 - WindowPlacementFit.DefaultFrameReserveWidthPx, fit.X);
+        Assert.Equal(1040 - 500 - WindowPlacementFit.DefaultFrameReserveHeightPx, fit.Y);
     }
 
     [Fact]
@@ -77,8 +77,8 @@ public class WindowPlacementFitTests
     {
         var hiDpi = new ScreenArea(0, 0, 2880, 1620, 2.0);
         var fit = WindowPlacementFit.Fit(new WindowPlacement(2000, 1000, 1000, 600, false), [hiDpi], 720, 440)!;
-        Assert.Equal(2880 - 2000, fit.X);
-        Assert.Equal(1620 - 1200, fit.Y);
+        Assert.Equal(2880 - 2000 - WindowPlacementFit.DefaultFrameReserveWidthPx, fit.X);
+        Assert.Equal(1620 - 1200 - WindowPlacementFit.DefaultFrameReserveHeightPx, fit.Y);
         var capped = WindowPlacementFit.Fit(new WindowPlacement(0, 0, 3000, 3000, false), [hiDpi], 720, 440)!;
         Assert.Equal(
             ((2880 - WindowPlacementFit.DefaultFrameReserveWidthPx) / 2.0,
@@ -177,6 +177,8 @@ public class WindowPlacementPersistenceTests
     [InlineData("""{"X":"bad","Y":1,"Width":1000,"Height":600,"Maximized":false}""")]
     [InlineData("""{"X":10,"Y":20,"Width":0,"Height":600,"Maximized":false}""")]
     [InlineData("""{"X":10}""")]
+    [InlineData("""{"Width":1000,"Height":600}""")]
+    [InlineData("""{"Y":20,"Width":1000,"Height":600,"Maximized":false}""")]
     [InlineData("42")]
     [InlineData("[1,2,3]")]
     public void MalformedWindowValuesAreTreatedAsNoPlacement(string windowJson)
