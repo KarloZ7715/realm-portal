@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Network;
+using RealmPortal.Core.Service;
 using RealmPortal.App.Settings;
 
 namespace RealmPortal.App.ViewModels;
@@ -331,13 +332,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
         void Write()
         {
             var net = _network.Load();
-            net.UpdatesAutoCheck = auto;
-            net.StatusProbeEnabled = probe;
-            _network.Save(net);
+            _network.Save(net with { UpdatesAutoCheck = auto, StatusProbeEnabled = probe });
         }
 
-        // In-memory test/demo store is sync and lock-free. File store can wait on
-        // ConfigDirectoryLock — never block the Avalonia UI thread for that.
+        // Memory store is sync. PortalNetworkSettingsStore hits Core ConfigDirectoryLock —
+        // never block the Avalonia UI thread for that.
         if (_network is MemoryNetworkSettingsStore)
             Write();
         else

@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
-using RealmPortal.App.Network;
+using RealmPortal.Core.Network;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Service;
 using RealmPortal.Core;
@@ -61,7 +61,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     private bool _canUndoPending;
     private ServiceError? _bannerError;
     private string? _bannerMessageKey;
-    private IProbeScheduler? _probes;
+    private ProbeScheduler? _probes;
     private bool _statusDotsVisible;
     private readonly Dictionary<string, ServerProbeSnapshot> _probeCache = new(StringComparer.Ordinal);
 
@@ -100,7 +100,7 @@ public sealed partial class ServersViewModel : ViewModelBase
     public bool IsPortal => _session is not null;
 
     /// <summary>Wires the login-port probe scheduler (#104). Safe to call once from Main.</summary>
-    public void AttachProbeScheduler(IProbeScheduler scheduler, bool dotsVisible)
+    public void AttachProbeScheduler(ProbeScheduler scheduler, bool dotsVisible)
     {
         ArgumentNullException.ThrowIfNull(scheduler);
         if (_probes is not null)
@@ -154,15 +154,18 @@ public sealed partial class ServersViewModel : ViewModelBase
         if (_probes is null)
             return;
 
-        var servers = new List<(string ServerId, string Host, int Port)>();
+        var servers = new List<ProbeServerTarget>();
         foreach (var card in _all)
         {
             if (card.ServerId is null)
                 continue;
+            // Core ProbeScheduler parses host:port (default 3724) from the stored realmlist host.
             var token = string.IsNullOrWhiteSpace(card.Address) ? card.Host : card.Address;
-            if (!RealmlistAddress.TryParseHostAddress(token, out var host, out var port))
+            if (string.IsNullOrWhiteSpace(token))
                 continue;
-            servers.Add((card.ServerId, host, port));
+            if (!RealmlistAddress.TryParseHostAddress(token, out _, out _))
+                continue;
+            servers.Add(new ProbeServerTarget(card.ServerId, token.Trim()));
         }
         _probes.SetServers(servers);
 

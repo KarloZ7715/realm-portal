@@ -391,5 +391,6 @@
   "status.probe.reason.failed": "Conexión fallida",
   "status.probe.reason.dns": "No se pudo resolver el host",
   "status.probe.reason.invalidhost": "Host no válido",
-  "status.probe.reason.disabled": "Sondas desactivadas"
+  "status.probe.reason.disabled": "Sondas desactivadas",
+  "status.probe.reason.refused": "Conexión rechazada"
 }

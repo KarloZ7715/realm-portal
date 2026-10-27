@@ -1,8 +1,10 @@
+using RealmPortal.Core.Service;
+
 namespace RealmPortal.App.Network;
 
 /// <summary>
 /// Applies <c>network-settings.json</c> gates (auto_check, 24 h, skipped, later) around an inner
-/// <see cref="IUpdateChecker"/>. Backend's production checker may absorb this; the UI keeps the seam.
+/// <see cref="IUpdateChecker"/> using Core <see cref="NetworkSettings"/> (Service store).
 /// </summary>
 public sealed class PersistingUpdateChecker : IUpdateChecker
 {
@@ -25,7 +27,6 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
 
     public async Task<UpdateCheckResult> CheckAsync(UpdateCheckKind kind, CancellationToken cancellationToken = default)
     {
-        // Store Load/Save and ConfigDirectoryLock must not run on the Avalonia UI thread.
         return await Task.Run(
             () => CheckCoreAsync(kind, cancellationToken),
             cancellationToken).ConfigureAwait(false);
@@ -43,8 +44,7 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
             if (settings.UpdatesLastAttemptUtc is { } last && now - last < AutoCheckInterval)
                 return UpdateCheckResult.None;
 
-            settings.UpdatesLastAttemptUtc = now;
-            _store.Save(settings);
+            _store.Save(settings with { UpdatesLastAttemptUtc = now });
         }
         else
         {
@@ -77,10 +77,11 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.RemindLater(offer);
-        Persist(s =>
+        var settings = _store.Load();
+        _store.Save(settings with
         {
-            s.UpdatesLaterVersion = offer.Version;
-            s.UpdatesLaterUntilUtc = _time.GetUtcNow() + LaterPostpone;
+            UpdatesLaterVersion = offer.Version,
+            UpdatesLaterUntilUtc = _time.GetUtcNow() + LaterPostpone,
         });
     }
 
@@ -88,18 +89,10 @@ public sealed class PersistingUpdateChecker : IUpdateChecker
     {
         ArgumentNullException.ThrowIfNull(offer);
         _inner.SkipThisVersion(offer);
-        Persist(s => s.UpdatesSkippedVersion = offer.Version);
+        var settings = _store.Load();
+        _store.Save(settings with { UpdatesSkippedVersion = offer.Version });
     }
 
     public Task InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
         => _inner.InstallUpdateAsync(offer, cancellationToken);
-
-    private void Persist(Action<NetworkSettings> mutate)
-    {
-        // IUpdateChecker.RemindLater / SkipThisVersion are synchronous by contract.
-        // File-backed saves can briefly block; Core's checker may replace this seam.
-        var settings = _store.Load();
-        mutate(settings);
-        _store.Save(settings);
-    }
 }

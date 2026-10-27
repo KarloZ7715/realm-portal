@@ -391,5 +391,6 @@
   "status.probe.reason.failed": "Connection failed",
   "status.probe.reason.dns": "Host could not be resolved",
   "status.probe.reason.invalidhost": "Invalid host",
-  "status.probe.reason.disabled": "Probes disabled"
+  "status.probe.reason.disabled": "Probes disabled",
+  "status.probe.reason.refused": "Connection refused"
 }

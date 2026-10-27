@@ -1,6 +1,11 @@
+using RealmPortal.Core.Service;
+
 namespace RealmPortal.App.Network;
 
-/// <summary>Persists <see cref="NetworkSettings"/> to <c>network-settings.json</c> in the config directory.</summary>
+/// <summary>
+/// App access to <c>network-settings.json</c> via Core's <see cref="NetworkSettings"/> model
+/// (Service/NetworkSettingsStore behind <see cref="IPortalService"/>).
+/// </summary>
 public interface INetworkSettingsStore
 {
     NetworkSettings Load();

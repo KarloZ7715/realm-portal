@@ -1,4 +1,5 @@
 using RealmPortal.App.Network;
+using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.Tests;
 
@@ -12,7 +13,7 @@ public class PersistingUpdateCheckerTests
     {
         var inner = new RecordingUpdateChecker(_ => UpdateCheckResult.FromOffer(Offer()));
         var store = new MemoryNetworkSettingsStore();
-        store.Save(new NetworkSettings { UpdatesAutoCheck = false });
+        store.Save(NetworkSettings.Default with { UpdatesAutoCheck = false });
         var checker = new PersistingUpdateChecker(inner, store);
 
         var result = await checker.CheckAsync(UpdateCheckKind.Automatic);
@@ -25,7 +26,7 @@ public class PersistingUpdateCheckerTests
     {
         var inner = new RecordingUpdateChecker(_ => UpdateCheckResult.FromOffer(Offer()));
         var store = new MemoryNetworkSettingsStore();
-        store.Save(new NetworkSettings
+        store.Save(NetworkSettings.Default with
         {
             UpdatesAutoCheck = true,
             UpdatesLastAttemptUtc = DateTimeOffset.UtcNow.AddHours(-1),
@@ -43,7 +44,7 @@ public class PersistingUpdateCheckerTests
         var offer = Offer("1.2.0");
         var inner = new RecordingUpdateChecker(_ => UpdateCheckResult.FromOffer(offer));
         var store = new MemoryNetworkSettingsStore();
-        store.Save(new NetworkSettings { UpdatesAutoCheck = true, UpdatesLastAttemptUtc = null });
+        store.Save(NetworkSettings.Default with { UpdatesAutoCheck = true, UpdatesLastAttemptUtc = null });
         var checker = new PersistingUpdateChecker(inner, store);
 
         var result = await checker.CheckAsync(UpdateCheckKind.Automatic);
@@ -60,7 +61,7 @@ public class PersistingUpdateCheckerTests
         var offer = Offer();
         var inner = new RecordingUpdateChecker(_ => UpdateCheckResult.FromOffer(offer));
         var store = new MemoryNetworkSettingsStore();
-        store.Save(new NetworkSettings { UpdatesAutoCheck = false });
+        store.Save(NetworkSettings.Default with { UpdatesAutoCheck = false });
         var checker = new PersistingUpdateChecker(inner, store);
 
         var result = await checker.CheckAsync(UpdateCheckKind.Manual);
@@ -85,14 +86,14 @@ public class PersistingUpdateCheckerTests
         var offer = Offer("1.3.0");
         var inner = new RecordingUpdateChecker(_ => UpdateCheckResult.FromOffer(offer));
         var store = new MemoryNetworkSettingsStore();
-        store.Save(new NetworkSettings { UpdatesSkippedVersion = "1.3.0", UpdatesLastAttemptUtc = null });
+        store.Save(NetworkSettings.Default with { UpdatesSkippedVersion = "1.3.0", UpdatesLastAttemptUtc = null });
         var checker = new PersistingUpdateChecker(inner, store);
 
         var auto = await checker.CheckAsync(UpdateCheckKind.Automatic);
         Assert.Equal(UpdateCheckResultKind.None, auto.Kind);
 
         // Reset debounce / last attempt for manual
-        store.Save(new NetworkSettings { UpdatesSkippedVersion = "1.3.0", UpdatesLastAttemptUtc = DateTimeOffset.UtcNow });
+        store.Save(NetworkSettings.Default with { UpdatesSkippedVersion = "1.3.0", UpdatesLastAttemptUtc = DateTimeOffset.UtcNow });
         var checker2 = new PersistingUpdateChecker(inner, store);
         var manual = await checker2.CheckAsync(UpdateCheckKind.Manual);
         Assert.Equal(UpdateCheckResultKind.UpToDate, manual.Kind);
@@ -128,7 +129,7 @@ public class PersistingUpdateCheckerTests
         var offer = Offer("1.6.0");
         var inner = new RecordingUpdateChecker(_ => UpdateCheckResult.FromOffer(offer));
         var store = new MemoryNetworkSettingsStore();
-        store.Save(new NetworkSettings
+        store.Save(NetworkSettings.Default with
         {
             UpdatesLaterVersion = "1.6.0",
             UpdatesLaterUntilUtc = DateTimeOffset.UtcNow.AddDays(1),

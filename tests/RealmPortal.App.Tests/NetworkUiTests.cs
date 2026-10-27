@@ -1,6 +1,8 @@
 using Avalonia.Headless.XUnit;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Network;
+using RealmPortal.Core.Network;
+using RealmPortal.Core.Service;
 using RealmPortal.App.Settings;
 using RealmPortal.App.ViewModels;
 
@@ -129,16 +131,16 @@ public class NetworkUiTests
         Assert.True(card.ShowStatusDot);
         Assert.True(card.IsStatusNeutral);
 
-        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", LoginReachability.Online, null, DateTimeOffset.UtcNow));
+        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", ServerProbeStatus.Online, null, DateTimeOffset.UtcNow));
         Assert.True(card.IsStatusOnline);
         Assert.False(card.IsStatusOffline);
         Assert.Contains("reachable", card.StatusTooltip, StringComparison.OrdinalIgnoreCase);
 
-        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", LoginReachability.Offline, "status.probe.reason.timeout", DateTimeOffset.UtcNow));
+        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", ServerProbeStatus.Offline, ProbeScheduler.ReasonTimedOut, DateTimeOffset.UtcNow));
         Assert.True(card.IsStatusOffline);
         Assert.Contains("timed out", card.StatusTooltip, StringComparison.OrdinalIgnoreCase);
 
-        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", LoginReachability.Unknown, "status.probe.reason.dns", null));
+        card.ApplyProbeSnapshot(new ServerProbeSnapshot("id", ServerProbeStatus.Unknown, ProbeScheduler.ReasonDns, null));
         Assert.True(card.IsStatusNeutral);
         Assert.Contains("unknown", card.StatusTooltip, StringComparison.OrdinalIgnoreCase);
 

@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
-using RealmPortal.App.Network;
+using RealmPortal.Core.Network;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Servers;
 using RealmPortal.Core.Service;
@@ -334,7 +334,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
 
     // --- Login reachability status dot (#104) ---
 
-    private LoginReachability _loginStatus = LoginReachability.Unknown;
+    private ServerProbeStatus _loginStatus = ServerProbeStatus.Unknown;
     private string? _statusReason;
     private DateTimeOffset? _statusCheckedAt;
     private bool _showStatusDot;
@@ -350,12 +350,12 @@ public sealed partial class ServerItemViewModel : ObservableObject
         }
     }
 
-    public LoginReachability LoginStatus => _loginStatus;
+    public ServerProbeStatus LoginStatus => _loginStatus;
 
-    public bool IsStatusOnline => _showStatusDot && _loginStatus == LoginReachability.Online;
-    public bool IsStatusOffline => _showStatusDot && _loginStatus == LoginReachability.Offline;
+    public bool IsStatusOnline => _showStatusDot && _loginStatus == ServerProbeStatus.Online;
+    public bool IsStatusOffline => _showStatusDot && _loginStatus == ServerProbeStatus.Offline;
     public bool IsStatusNeutral => _showStatusDot
-        && (_loginStatus is LoginReachability.Unknown or LoginReachability.Checking);
+        && (_loginStatus is ServerProbeStatus.Unknown or ServerProbeStatus.Checking);
 
     public string StatusTooltip => BuildStatusTooltip();
 
@@ -374,7 +374,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
 
     public void ClearProbeStatus()
     {
-        _loginStatus = LoginReachability.Unknown;
+        _loginStatus = ServerProbeStatus.Unknown;
         _statusReason = null;
         _statusCheckedAt = null;
         NotifyStatusDot();
@@ -397,17 +397,17 @@ public sealed partial class ServerItemViewModel : ObservableObject
         var reason = ResolveReason(_statusReason);
         return _loginStatus switch
         {
-            LoginReachability.Online when age is not null =>
+            ServerProbeStatus.Online when age is not null =>
                 Loc.Format("status.probe.online.age", age),
-            LoginReachability.Online =>
+            ServerProbeStatus.Online =>
                 Loc.Get("status.probe.online"),
-            LoginReachability.Offline when reason is { Length: > 0 } && age is not null =>
+            ServerProbeStatus.Offline when reason is { Length: > 0 } && age is not null =>
                 Loc.Format("status.probe.offline.age", reason, age),
-            LoginReachability.Offline when reason is { Length: > 0 } =>
+            ServerProbeStatus.Offline when reason is { Length: > 0 } =>
                 Loc.Format("status.probe.offline.reason", reason),
-            LoginReachability.Offline =>
+            ServerProbeStatus.Offline =>
                 Loc.Get("status.probe.offline"),
-            LoginReachability.Checking =>
+            ServerProbeStatus.Checking =>
                 Loc.Get("status.probe.checking"),
             _ when reason is { Length: > 0 } =>
                 Loc.Format("status.probe.unknown.reason", reason),
@@ -416,14 +416,26 @@ public sealed partial class ServerItemViewModel : ObservableObject
         };
     }
 
-    /// <summary>Reasons from the scheduler are Loc keys (<c>status.probe.reason.*</c>); fall back to the raw string.</summary>
+    /// <summary>Maps Core English probe reasons (and optional Loc keys) to the UI language.</summary>
     private static string? ResolveReason(string? reasonOrKey)
     {
         if (string.IsNullOrEmpty(reasonOrKey))
             return null;
         if (reasonOrKey.StartsWith("status.probe.reason.", StringComparison.Ordinal))
             return Loc.Get(reasonOrKey);
-        return reasonOrKey;
+        // Core ProbeScheduler.Reason* constants (English).
+        return reasonOrKey switch
+        {
+            ProbeScheduler.ReasonTimedOut => Loc.Get("status.probe.reason.timeout"),
+            ProbeScheduler.ReasonDns => Loc.Get("status.probe.reason.dns"),
+            ProbeScheduler.ReasonConnectionRefused => Loc.Get("status.probe.reason.refused"),
+            ProbeScheduler.ReasonLoginReachable => Loc.Get("status.probe.online"),
+            "invalid realmlist host" => Loc.Get("status.probe.reason.invalidhost"),
+            "connection failed" or "offline" or "network error" => Loc.Get("status.probe.reason.failed"),
+            _ when reasonOrKey.StartsWith("network error", StringComparison.Ordinal) =>
+                Loc.Get("status.probe.reason.failed"),
+            _ => reasonOrKey,
+        };
     }
 
     private static string? FormatAge(DateTimeOffset? checkedAt)

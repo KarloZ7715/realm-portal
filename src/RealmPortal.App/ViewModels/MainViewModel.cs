@@ -9,6 +9,7 @@ using RealmPortal.Core.Network;
 using RealmPortal.App.Platform;
 using RealmPortal.App.Settings;
 using RealmPortal.Core;
+using RealmPortal.Core.Service;
 using RealmPortal.Core.ClientFiles;
 
 namespace RealmPortal.App.ViewModels;
@@ -20,7 +21,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly PortalSession? _session;
     private readonly IConnectionProbe? _probe;
     private readonly INetworkSettingsStore _network;
-    private readonly IProbeScheduler _probes;
+    private readonly ProbeScheduler _probes;
     private readonly IUpdateChecker _updates;
     private UpdateOffer? _pendingUpdateOffer;
     private readonly Func<Task<string?>>? _pickFolder;
@@ -39,7 +40,7 @@ public sealed partial class MainViewModel : ObservableObject
         _uriOpener = uriOpener ?? new ShellUriOpener();
         Backend = backend ?? new DemoBackend();
         _network = new MemoryNetworkSettingsStore();
-        _probes = new ProbeScheduler();
+        _probes = new ProbeScheduler(new TcpConnectionProbe());
         _updates = new PersistingUpdateChecker(new NullUpdateChecker(), _network);
         Servers = new ServersViewModel(Backend, autoTick);
         Clients = new ClientsViewModel(Backend);
@@ -61,15 +62,15 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public MainViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool autoTick = true, IConnectionProbe? probe = null, Func<TimeSpan, Task>? delay = null, IUriOpener? uriOpener = null,
-        INetworkSettingsStore? network = null, IProbeScheduler? probes = null, IUpdateChecker? updates = null)
+        INetworkSettingsStore? network = null, ProbeScheduler? probes = null, IUpdateChecker? updates = null)
     {
         _uriOpener = uriOpener ?? new ShellUriOpener();
         _session = session;
         _probe = probe ?? new TcpConnectionProbe();
         _pickFolder = pickFolder;
-        var configDir = PortalPaths.ConfigDirectory(session.GetVariable);
-        _network = network ?? new NetworkSettingsStore(configDir);
-        _probes = probes ?? new ProbeScheduler(_probe);
+        _network = network ?? new PortalNetworkSettingsStore(session.Service);
+        var connectionProbe = _probe ?? new TcpConnectionProbe();
+        _probes = probes ?? new ProbeScheduler(connectionProbe);
         var innerUpdates = updates ?? new NullUpdateChecker();
         _updates = innerUpdates is PersistingUpdateChecker
             ? innerUpdates
@@ -344,6 +345,20 @@ public sealed partial class MainViewModel : ObservableObject
         };
         Settings.PresentUpdateAsync = async offer => await ShowUpdateNoticeAsync(offer).ConfigureAwait(true);
         SyncProbeListVisibility();
+    }
+
+    /// <summary>Cancels in-flight probes and releases the scheduler (call when the main window closes).</summary>
+    public void DisposeNetwork()
+    {
+        try
+        {
+            _probes.NotifyListVisible(false);
+            _probes.SetEnabled(false);
+            _probes.Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     private void SyncProbeListVisibility()
