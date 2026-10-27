@@ -614,7 +614,8 @@ public sealed class CliApp(
         return 0;
     }
 
-    private static void SafeWriteLine(TextWriter writer, string value)
+    /// <summary>Escapes control characters so untrusted text cannot inject terminal lines or escape sequences.</summary>
+    internal static string EscapeForTerminal(string value)
     {
         var safe = new System.Text.StringBuilder(value.Length);
         foreach (var character in value)
@@ -624,6 +625,10 @@ public sealed class CliApp(
             else
                 safe.Append(character);
         }
-        writer.WriteLine(safe.ToString());
+        return safe.ToString();
     }
+
+    /// <summary>Writes one line after escaping control characters. Shared with <see cref="Program"/>.</summary>
+    internal static void SafeWriteLine(TextWriter writer, string value) =>
+        writer.WriteLine(EscapeForTerminal(value));
 }
