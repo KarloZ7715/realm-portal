@@ -11,6 +11,9 @@ public sealed class PortalService : IPortalService
 {
     private readonly string _configDirectory;
     private readonly string _projectionDirectory;
+
+    /// <summary>Config directory this service was constructed with.</summary>
+    public string ConfigDirectory => _configDirectory;
     private readonly IClientVersionReader _versionReader;
     private readonly IGameLaunchService _launchService;
     private readonly IGameProcessProbe _probe;
@@ -24,6 +27,7 @@ public sealed class PortalService : IPortalService
     private readonly ActiveServerManager _active;
     private readonly LastSwitchJournal _journal;
     private readonly PortalSettingsStore _settings;
+    private readonly NetworkSettingsStore _networkSettings;
     private readonly string _activeBackupRoot;
     private Exception? _storageSettingsError;
 
@@ -58,6 +62,7 @@ public sealed class PortalService : IPortalService
         _active = new ActiveServerManager(_servers, configDirectory, projectionDirectory, _writer);
         _journal = new LastSwitchJournal(configDirectory, _writer, directoryLock);
         _settings = new PortalSettingsStore(configDirectory, _writer, _getVariable, directoryLock);
+        _networkSettings = new NetworkSettingsStore(configDirectory, _writer, directoryLock);
         _activeBackupRoot = _settings.ResolveActiveBackupFolder(out _storageSettingsError);
         TryRecoverPendingStateUndo();
     }
@@ -876,6 +881,54 @@ public sealed class PortalService : IPortalService
             _settings.SetStorageSettings(settings);
             _storageSettingsError = null;
             return ServiceResult<Unit>.Ok(default);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<Unit>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<NetworkSettings> GetNetworkSettings()
+    {
+        try
+        {
+            // Startup-safe: missing/corrupt JSON → defaults; unsupported version / IO → fail.
+            var settings = _networkSettings.LoadOrDefault(out var error);
+            if (error is not null && !NetworkSettingsStore.IsCorruptContent(error))
+                return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(error));
+            return ServiceResult<NetworkSettings>.Ok(settings);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<Unit> SetNetworkSettings(NetworkSettings settings)
+    {
+        if (settings is null)
+            throw new ArgumentNullException(nameof(settings));
+
+        try
+        {
+            // Full snapshot write (App PersistNetwork / PersistingUpdateChecker LastAttempt).
+            // Field tweaks that must not clobber concurrent ETag/LastAttempt should use
+            // NetworkSettingsStore.Update(mutate) instead (UpdateChecker already does).
+            _networkSettings.Set(settings);
+            return ServiceResult<Unit>.Ok(default);
+        }
+        catch (Exception ex) when (NetworkSettingsStore.IsCorruptContent(ex))
+        {
+            // Set re-reads and cannot repair; Overwrite moves the bad file aside first.
+            try
+            {
+                _networkSettings.Overwrite(settings);
+                return ServiceResult<Unit>.Ok(default);
+            }
+            catch (Exception overwriteEx)
+            {
+                return ServiceResult<Unit>.Fail(ServiceErrors.FromException(overwriteEx));
+            }
         }
         catch (Exception ex)
         {

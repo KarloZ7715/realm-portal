@@ -1,0 +1,182 @@
+using System.Text.Json;
+using RealmPortal.Core.IO;
+using RealmPortal.Core.Service;
+using RealmPortal.Core.Servers;
+using RealmPortal.Tests.Support;
+
+namespace RealmPortal.Tests;
+
+public class NetworkSettingsStoreTests
+{
+    [Fact]
+    public void MissingFile_ReturnsDefaults_BothOn()
+    {
+        using var env = new TempConfig();
+        var store = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock);
+        var settings = store.Get();
+        Assert.True(settings.UpdatesAutoCheck);
+        Assert.True(settings.StatusProbeEnabled);
+        Assert.Null(settings.UpdatesEtag);
+    }
+
+    [Fact]
+    public void RoundTrip_PersistsFullKeySet_WithPrivateMode()
+    {
+        using var env = new TempConfig();
+        var store = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock);
+        var when = DateTimeOffset.Parse("2026-10-27T12:00:00Z");
+        store.Set(new NetworkSettings(
+            UpdatesAutoCheck: false,
+            UpdatesLastAttemptUtc: when,
+            UpdatesEtag: "\"abc\"",
+            UpdatesSkippedVersion: "1.2.3",
+            UpdatesLaterVersion: "1.2.4",
+            UpdatesLaterUntilUtc: when.AddDays(3),
+            StatusProbeEnabled: false));
+
+        var path = Path.Combine(env.Config, "network-settings.json");
+        Assert.True(File.Exists(path));
+        if (!OperatingSystem.IsWindows())
+        {
+            var mode = File.GetUnixFileMode(path);
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, mode);
+        }
+
+        var json = File.ReadAllText(path);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        Assert.Equal(1, root.GetProperty("version").GetInt32());
+        Assert.False(root.GetProperty("updates").GetProperty("auto_check").GetBoolean());
+        Assert.False(root.GetProperty("status").GetProperty("probe_enabled").GetBoolean());
+        Assert.Equal("\"abc\"", root.GetProperty("updates").GetProperty("etag").GetString());
+
+        var again = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock).Get();
+        Assert.False(again.UpdatesAutoCheck);
+        Assert.False(again.StatusProbeEnabled);
+        Assert.Equal("1.2.3", again.UpdatesSkippedVersion);
+        Assert.Equal("1.2.4", again.UpdatesLaterVersion);
+        Assert.Equal("\"abc\"", again.UpdatesEtag);
+        Assert.Equal(when, again.UpdatesLastAttemptUtc);
+        Assert.Equal(when.AddDays(3), again.UpdatesLaterUntilUtc);
+    }
+
+    [Fact]
+    public void PortalService_GetSetNetworkSettings()
+    {
+        using var env = new ServiceEnv();
+        var got = env.Service.GetNetworkSettings();
+        Assert.True(got.Succeeded);
+        Assert.True(got.Value!.StatusProbeEnabled);
+
+        var set = env.Service.SetNetworkSettings(got.Value with { StatusProbeEnabled = false, UpdatesAutoCheck = false });
+        Assert.True(set.Succeeded);
+        var again = env.Service.GetNetworkSettings().Value!;
+        Assert.False(again.StatusProbeEnabled);
+        Assert.False(again.UpdatesAutoCheck);
+    }
+
+    [Fact]
+    public void Overwrite_RepairsCorruptFile_WithoutReadingIt()
+    {
+        using var env = new TempConfig();
+        var path = Path.Combine(env.Config, "network-settings.json");
+        File.WriteAllText(path, "{ not json");
+        var store = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock);
+        store.Overwrite(new NetworkSettings(UpdatesAutoCheck: false, StatusProbeEnabled: false));
+        Assert.True(File.Exists(path + ".corrupt"));
+        var got = store.Get();
+        Assert.False(got.UpdatesAutoCheck);
+        Assert.False(got.StatusProbeEnabled);
+
+        File.WriteAllText(path, "{ still bad");
+        store.Overwrite(new NetworkSettings(UpdatesAutoCheck: true));
+        Assert.True(File.Exists(path + ".corrupt")); // preserved
+        Assert.True(File.Exists(path + ".corrupt.1"));
+        Assert.True(NetworkSettingsStore.IsCorruptContent(new StoreException("x is not valid: boom", contentCorrupt: true)));
+        Assert.True(NetworkSettingsStore.IsCorruptContent(new StoreException("wrap", new System.Text.Json.JsonException("bad"))));
+        Assert.False(NetworkSettingsStore.IsCorruptContent(new StoreException("x has unsupported format version 99.")));
+        Assert.False(NetworkSettingsStore.IsCorruptContent(new StoreException("path/is not valid/dir has unsupported format version 99.")));
+    }
+
+
+    [Fact]
+    public void PortalService_CorruptNetworkSettings_GetDefaults_SetRepairsViaOverwrite()
+    {
+        using var env = new ServiceEnv();
+        var path = Path.Combine(env.Config, "network-settings.json");
+        File.WriteAllText(path, "{ not json");
+
+        var got = env.Service.GetNetworkSettings();
+        Assert.True(got.Succeeded);
+        Assert.True(got.Value!.UpdatesAutoCheck);
+        Assert.True(got.Value.StatusProbeEnabled);
+
+        var set = env.Service.SetNetworkSettings(got.Value with { UpdatesAutoCheck = false, StatusProbeEnabled = false });
+        Assert.True(set.Succeeded);
+        Assert.True(File.Exists(path + ".corrupt"));
+        var again = env.Service.GetNetworkSettings().Value!;
+        Assert.False(again.UpdatesAutoCheck);
+        Assert.False(again.StatusProbeEnabled);
+    }
+
+
+    [Fact]
+    public void Overwrite_RefusesWhenFileIsNoLongerCorrupt()
+    {
+        using var env = new TempConfig();
+        var store = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock);
+        store.Set(new NetworkSettings(UpdatesAutoCheck: false, UpdatesEtag: "\"keep\""));
+        Assert.Throws<InvalidOperationException>(() =>
+            store.Overwrite(new NetworkSettings(UpdatesAutoCheck: true)));
+        Assert.Equal("\"keep\"", store.Get().UpdatesEtag);
+        Assert.False(store.Get().UpdatesAutoCheck);
+        Assert.False(File.Exists(Path.Combine(env.Config, "network-settings.json.corrupt")));
+    }
+
+    private sealed class TempConfig : IDisposable
+    {
+        private readonly TempDirectory _temp = new();
+        public string Config { get; }
+        public ConfigDirectoryLock Lock { get; }
+
+        public TempConfig()
+        {
+            Config = _temp.Combine("config");
+            Directory.CreateDirectory(Config);
+            Lock = new ConfigDirectoryLock(Config);
+        }
+
+        public void Dispose() => _temp.Dispose();
+    }
+
+    private sealed class ServiceEnv : IDisposable
+    {
+        private readonly TempDirectory _temp = new();
+        public string Config { get; }
+        public PortalService Service { get; }
+
+        public ServiceEnv()
+        {
+            Config = _temp.Combine("config");
+            var projection = _temp.Combine("projection");
+            var backups = _temp.Combine("backups");
+            Directory.CreateDirectory(Config);
+            Directory.CreateDirectory(projection);
+            Directory.CreateDirectory(backups);
+            Service = new PortalService(
+                Config,
+                projection,
+                new RealmPortal.Core.Clients.PeClientVersionReader(),
+                new NoLaunch(),
+                new NeverRunningGameProbe(),
+                _ => backups);
+        }
+
+        public void Dispose() => _temp.Dispose();
+    }
+
+    private sealed class NoLaunch : RealmPortal.Core.Launch.IGameLaunchService
+    {
+        public void Launch(RealmPortal.Core.Launch.GameLaunchSpec spec) { }
+    }
+}

@@ -30,7 +30,7 @@
   <Grid RowDefinitions="*,Auto">
     <Panel Grid.RowSpan="2" Name="MainChrome"
            IsVisible="{Binding !IsWelcomeActive}"
-           IsEnabled="{Binding Dialog, Converter={x:Static ObjectConverters.IsNull}}">
+           IsEnabled="{Binding !HasModal}">
     <Grid RowDefinitions="*,Auto">
     <Grid ColumnDefinitions="Auto,*">
       <!-- Sidebar: icons only below 960 px wide, icons + labels + the non-affiliation note above. -->
@@ -77,6 +77,14 @@
     <ContentControl Grid.RowSpan="2" Name="DialogHost" Content="{Binding Dialog}" IsVisible="{Binding Dialog, Converter={x:Static ObjectConverters.IsNotNull}}">
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:ConfirmDialogViewModel"><v:ConfirmDialogView/></DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+
+    <!-- Update notice (#105). -->
+    <ContentControl Grid.RowSpan="2" Name="UpdateNoticeHost" Content="{Binding UpdateNotice}"
+                    IsVisible="{Binding UpdateNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:UpdateNoticeViewModel"><v:UpdateNoticeView/></DataTemplate>
       </ContentControl.DataTemplates>
     </ContentControl>
   </Grid>

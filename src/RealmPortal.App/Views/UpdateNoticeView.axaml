@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.UpdateNoticeView"
+             x:DataType="vm:UpdateNoticeViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button">
+      <Setter Property="c:ButtonSurface.Surface" Value="Parchment"/>
+    </Style>
+  </UserControl.Styles>
+  <Panel Focusable="True" KeyboardNavigation.TabNavigation="Cycle">
+    <Border Name="Scrim" Background="#99000000"/>
+    <ContentControl Classes="card" Name="Sheet" Width="520" MaxHeight="560"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Padding="28,22">
+      <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="10">
+        <TextBlock Classes="sheet-title" Name="DialogTitle" TextWrapping="Wrap" Text="{Binding Title}"/>
+        <TextBlock Grid.Row="1" Classes="body" Name="DialogBody" TextWrapping="Wrap"
+                   Foreground="{DynamicResource InkBrush}" Text="{Binding Body}"/>
+        <Border Grid.Row="2" Padding="12,10" MaxHeight="220"
+                IsVisible="{Binding HasReleaseNotes}" Background="{DynamicResource ParchmentPaperBrush}">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <TextBlock Name="ReleaseNotes" Classes="body-sm" FontSize="14" TextWrapping="Wrap"
+                       Foreground="{DynamicResource InkBrush}" Text="{Binding ReleaseNotes}"/>
+          </ScrollViewer>
+        </Border>
+        <Button Grid.Row="3" Name="OpenGitHubButton" Classes="link caps" HorizontalAlignment="Left"
+                IsVisible="{Binding CanOpenGitHub}" Command="{Binding OpenGitHubCommand}">
+          <TextBlock Text="{Binding OpenGitHubText}"/>
+        </Button>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
+          <Button Name="SkipButton" Classes="secondary" MinWidth="130" Command="{Binding SkipCommand}">
+            <TextBlock Text="{Binding SkipText}"/>
+          </Button>
+          <Button Name="LaterButton" Classes="secondary" MinWidth="130" IsCancel="True" Command="{Binding LaterCommand}">
+            <TextBlock Text="{Binding LaterText}"/>
+          </Button>
+          <Button Name="UpdateButton" Classes="primary" MinWidth="160" Command="{Binding UpdateCommand}">
+            <TextBlock Text="{Binding UpdateText}"/>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </ContentControl>
+  </Panel>
+</UserControl>

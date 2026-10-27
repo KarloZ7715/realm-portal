@@ -1,6 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
+using Avalonia.Threading;
+using RealmPortal.App.Network;
+using RealmPortal.Core;
+using RealmPortal.Core.Service;
 using RealmPortal.App.Settings;
 
 namespace RealmPortal.App.ViewModels;
@@ -13,16 +17,26 @@ namespace RealmPortal.App.ViewModels;
 public sealed partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsStore _store;
+    private readonly INetworkSettingsStore _network;
+    private readonly IUpdateChecker _updates;
     private readonly Func<Task<string?>>? _pickFolder;
     private SettingsModel _saved;
     private bool _justSaved;
+    private bool _networkHydrating;
 
-    public SettingsViewModel(ISettingsStore store, Func<Task<string?>>? pickFolder = null)
+    public SettingsViewModel(
+        ISettingsStore store,
+        Func<Task<string?>>? pickFolder = null,
+        INetworkSettingsStore? network = null,
+        IUpdateChecker? updates = null)
     {
         _store = store;
         _pickFolder = pickFolder;
+        _network = network ?? new MemoryNetworkSettingsStore();
+        _updates = updates ?? new NullUpdateChecker();
         _saved = store.Load();
         Reset();
+        LoadNetwork();
     }
 
     /// <summary>Switches the UI to the saved language; the app calls it once at startup.</summary>
@@ -73,6 +87,27 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDirty), nameof(StatusText))]
     private bool _clearCacheOnSwitch;
+
+    /// <summary>Daily automatic GitHub Releases check (<c>updates.auto_check</c>). Persists immediately.</summary>
+    [ObservableProperty]
+    private bool _autoCheckUpdates = true;
+
+    /// <summary>Login-port status dots (<c>status.probe_enabled</c>). Persists immediately.</summary>
+    [ObservableProperty]
+    private bool _statusProbeEnabled = true;
+
+    /// <summary>Soft status after a manual Check for updates (null when idle).</summary>
+    [ObservableProperty]
+    private string? _updateCheckStatus;
+
+    /// <summary>Raised when the user toggles <see cref="StatusProbeEnabled"/> so the probe scheduler can follow.</summary>
+    public event Action<bool>? StatusProbeEnabledChanged;
+
+    /// <summary>
+    /// Main sets this to present an <see cref="UpdateOffer"/> (Update / Later / Skip).
+    /// Returns the user's choice; null means the dialog could not be shown.
+    /// </summary>
+    public Func<UpdateOffer, Task<ConfirmDialogChoice?>>? PresentUpdateAsync { get; set; }
 
     /// <summary>Which field the last failed save blamed: "template", "backup" or null.</summary>
     [ObservableProperty]
@@ -195,6 +230,53 @@ public sealed partial class SettingsViewModel : ViewModelBase
         && template.Contains("{exe}", StringComparison.Ordinal);
 
     [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        UpdateCheckStatus = Loc.Get("settings.updates.status.checking");
+        try
+        {
+            var result = await _updates.CheckAsync(UpdateCheckKind.Manual).ConfigureAwait(true);
+            switch (result.Kind)
+            {
+                case UpdateCheckResultKind.Offer when result.Offer is { } offer && PresentUpdateAsync is { } present:
+                    UpdateCheckStatus = null;
+                    var choice = await present(offer).ConfigureAwait(true);
+                    if (choice == ConfirmDialogChoice.Confirm)
+                        await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+                    else if (choice == ConfirmDialogChoice.Secondary)
+                        _updates.RemindLater(offer);
+                    else if (choice == ConfirmDialogChoice.Cancel)
+                        _updates.SkipThisVersion(offer);
+                    break;
+                case UpdateCheckResultKind.Offer when result.Offer is { } offer:
+                    UpdateCheckStatus = Loc.Format("update.title", offer.Version);
+                    break;
+                case UpdateCheckResultKind.UpToDate:
+                    UpdateCheckStatus = Loc.Get("settings.updates.status.uptodate");
+                    break;
+                case UpdateCheckResultKind.RateLimited:
+                    UpdateCheckStatus = Loc.Get("settings.updates.status.ratelimited");
+                    break;
+                case UpdateCheckResultKind.Failed:
+                    UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
+                    break;
+                default:
+                    UpdateCheckStatus = null;
+                    break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateCheckStatus = null;
+        }
+        catch (Exception ex)
+        {
+            ExceptionLog.Default.Write(ex, "Settings.CheckForUpdates");
+            UpdateCheckStatus = Loc.Get("settings.updates.status.failed");
+        }
+    }
+
+    [RelayCommand]
     private async Task BrowseAsync()
     {
         if (_pickFolder is null)
@@ -228,6 +310,133 @@ public sealed partial class SettingsViewModel : ViewModelBase
         BackupFolder = _saved.BackupFolder;
         ClearCacheOnSwitch = _saved.ClearCacheOnSwitch;
         ServiceErrorField = null;
+    }
+
+    private void LoadNetwork()
+    {
+        // Memory store is sync (tests). Portal store takes ConfigDirectoryLock — keep it off the UI thread.
+        if (_network is MemoryNetworkSettingsStore)
+        {
+            ApplyNetworkLoad(_network.Load());
+            return;
+        }
+
+        _networkHydrating = true;
+        AutoCheckUpdates = false;
+        StatusProbeEnabled = false;
+        ExceptionLog.Observe(LoadNetworkOffUiAsync());
+    }
+
+    private async Task LoadNetworkOffUiAsync()
+    {
+        ServiceResult<NetworkSettings> loaded;
+        try
+        {
+            loaded = await Task.Run(_network.Load).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            ExceptionLog.Default.Write(ex, "Settings.LoadNetwork");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                _networkHydrating = true;
+                try
+                {
+                    AutoCheckUpdates = false;
+                    StatusProbeEnabled = false;
+                    UpdateCheckStatus = null;
+                }
+                finally
+                {
+                    _networkHydrating = false;
+                }
+            });
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(() => ApplyNetworkLoad(loaded));
+    }
+
+    private void ApplyNetworkLoad(ServiceResult<NetworkSettings> loaded)
+    {
+        _networkHydrating = true;
+        try
+        {
+            if (!loaded.Succeeded)
+            {
+                ExceptionLog.Default.WriteMessage(
+                    $"LoadNetwork failed: {loaded.Error}",
+                    "Settings.LoadNetwork");
+                // Privacy-safe fallback when prefs cannot be read: leave network features off.
+                AutoCheckUpdates = false;
+                StatusProbeEnabled = false;
+            }
+            else
+            {
+                var net = loaded.Value!;
+                AutoCheckUpdates = net.UpdatesAutoCheck;
+                StatusProbeEnabled = net.StatusProbeEnabled;
+            }
+            UpdateCheckStatus = null;
+        }
+        finally
+        {
+            _networkHydrating = false;
+        }
+    }
+
+    private readonly object _networkWriteGate = new();
+
+    private void PersistNetwork()
+    {
+        void Write()
+        {
+            lock (_networkWriteGate)
+            {
+                // Read generated properties inside the lock so a later toggle cannot be
+                // overwritten by an older queued Task.Run snapshot.
+                var auto = AutoCheckUpdates;
+                var probe = StatusProbeEnabled;
+                var loaded = _network.Load();
+                if (!loaded.Succeeded)
+                {
+                    ExceptionLog.Default.WriteMessage(
+                        $"PersistNetwork load failed: {loaded.Error}",
+                        "Settings.PersistNetwork");
+                    return;
+                }
+
+                var saved = _network.Save(loaded.Value! with { UpdatesAutoCheck = auto, StatusProbeEnabled = probe });
+                if (!saved.Succeeded)
+                {
+                    ExceptionLog.Default.WriteMessage(
+                        $"PersistNetwork save failed: {saved.Error}",
+                        "Settings.PersistNetwork");
+                }
+            }
+        }
+
+        // Memory store is sync. PortalNetworkSettingsStore hits Core ConfigDirectoryLock —
+        // never block the Avalonia UI thread for that.
+        if (_network is MemoryNetworkSettingsStore)
+            Write();
+        else
+            _ = Task.Run(Write);
+    }
+
+    partial void OnAutoCheckUpdatesChanged(bool value)
+    {
+        if (_networkHydrating)
+            return;
+        PersistNetwork();
+    }
+
+    partial void OnStatusProbeEnabledChanged(bool value)
+    {
+        if (_networkHydrating)
+            return;
+        PersistNetwork();
+        StatusProbeEnabledChanged?.Invoke(value);
     }
 
     private void Changed()
