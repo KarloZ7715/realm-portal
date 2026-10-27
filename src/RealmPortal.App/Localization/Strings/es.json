@@ -416,5 +416,7 @@
   "update.install.appimage.chmod": "Haz ejecutable el nuevo AppImage, ábrelo y luego elimina el anterior. No se muestra ningún comando apt.\n\nArchivo:\n{0}\n\n{1}",
   "update.install.deb": "Abre la carpeta Descargas e instala el .deb con el comando indicado. La aplicación nunca ejecuta sudo.\n\nArchivo:\n{0}\n\n{1}",
   "update.install.windows": "Extrae el zip sobre la carpeta actual de Realm Portal.\n\nArchivo:\n{0}",
-  "update.install.command_and_path": "Archivo:\n{0}\n\n{1}"
+  "update.install.command_and_path": "Archivo:\n{0}\n\n{1}",
+  "update.install.failed.title": "Error al actualizar",
+  "update.install.failed.body": "No se pudo descargar o verificar la actualización. Inténtalo de nuevo o abre la página de la versión."
 }

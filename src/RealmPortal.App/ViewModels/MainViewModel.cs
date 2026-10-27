@@ -448,13 +448,24 @@ public sealed partial class MainViewModel : ObservableObject
         _pendingUpdateOffer = null;
         if (choice == ConfirmDialogChoice.Confirm)
         {
-            var outcome = await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
-            await HandleInstallOutcomeAsync(outcome, offer).ConfigureAwait(true);
+            try
+            {
+                var outcome = await _updates.InstallUpdateAsync(offer).ConfigureAwait(true);
+                await HandleInstallOutcomeAsync(outcome, offer).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                ExceptionLog.Default.Write(ex, "Main.InstallUpdate");
+                await ConfirmAsync(new ConfirmDialogViewModel(
+                    "update.install.failed.title",
+                    "update.install.failed.body",
+                    "dialog.ok")).ConfigureAwait(true);
+            }
         }
         else if (choice == ConfirmDialogChoice.Secondary)
-            _updates.RemindLater(offer);
+            await Task.Run(() => _updates.RemindLater(offer)).ConfigureAwait(true);
         else if (choice == ConfirmDialogChoice.Cancel)
-            _updates.SkipThisVersion(offer);
+            await Task.Run(() => _updates.SkipThisVersion(offer)).ConfigureAwait(true);
     }
 
     private async Task HandleInstallOutcomeAsync(UpdateInstallOutcome? outcome, UpdateOffer offer)

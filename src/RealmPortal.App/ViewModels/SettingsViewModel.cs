@@ -245,12 +245,22 @@ public sealed partial class SettingsViewModel : ViewModelBase
                     UpdateCheckStatus = null;
                     var choice = await present(offer).ConfigureAwait(true);
                     if (choice == ConfirmDialogChoice.Confirm)
-                        UpdateCheckStatus = FormatInstallOutcome(
-                            await _updates.InstallUpdateAsync(offer).ConfigureAwait(true));
+                    {
+                        try
+                        {
+                            UpdateCheckStatus = FormatInstallOutcome(
+                                await _updates.InstallUpdateAsync(offer).ConfigureAwait(true));
+                        }
+                        catch (Exception ex)
+                        {
+                            ExceptionLog.Default.Write(ex, "Settings.InstallUpdate");
+                            UpdateCheckStatus = Loc.Get("update.install.failed.body");
+                        }
+                    }
                     else if (choice == ConfirmDialogChoice.Secondary)
-                        _updates.RemindLater(offer);
+                        await Task.Run(() => _updates.RemindLater(offer)).ConfigureAwait(true);
                     else if (choice == ConfirmDialogChoice.Cancel)
-                        _updates.SkipThisVersion(offer);
+                        await Task.Run(() => _updates.SkipThisVersion(offer)).ConfigureAwait(true);
                     break;
                 case UpdateCheckResultKind.Offer when result.Offer is { } offer:
                     UpdateCheckStatus = Loc.Format("update.title", offer.Version);
