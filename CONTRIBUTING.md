@@ -101,9 +101,12 @@ dotnet restore RealmPortal.sln --locked-mode   # must succeed before you push
 
 Commit any updated `**/packages.lock.json` files with the version bump.
 
-On Dependabot PRs, `.github/workflows/dependabot-lockfiles.yml` runs the same restore for
-`dependabot[bot]` on `dependabot/**` branches of this repository only (never forks) and
-pushes lock updates when needed.
+A ready-to-enable workflow lives at
+[`.github/workflow-proposals/dependabot-lockfiles.yml`](.github/workflow-proposals/dependabot-lockfiles.yml).
+Copy it to `.github/workflows/dependabot-lockfiles.yml` (requires a GitHub credential with the
+`workflow` scope) to have Actions regenerate lock files automatically on Dependabot PRs:
+`dependabot[bot]` only, `dependabot/**` branches of this repository only (never forks), with
+`contents: write` scoped to that job.
 
 ## Secret scanning (gitleaks)
 
