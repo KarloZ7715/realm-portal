@@ -217,24 +217,65 @@ public class WelcomeTests
     }
 
     [AvaloniaFact]
-    public void ServersStep_AddServer_FinishesAndOpensForm()
+    public void ServersStep_AddServer_DisabledWithoutClients()
     {
         using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
-        // Force welcome even though first scan is done.
         env.Session.UiPreferences.Save(new UiPreferences("en", [], FirstScanCompleted: true, WelcomeCompleted: false));
         var main = new MainViewModel(env.Session, autoTick: false);
-        // IsWelcomeDone = false ?? true wait: WelcomeCompleted false means IsWelcomeDone = false (not null).
         Assert.True(main.IsWelcomeActive);
         var welcome = main.Welcome!;
         welcome.ContinueLanguageCommand.Execute(null);
-        // Clients step may try to scan; first scan already completed so it reloads only.
         welcome.ContinueClientsCommand.Execute(null);
         Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        Assert.False(welcome.AddServerCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public void ServersStep_AddServer_FinishesAndOpensForm()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var folder = env.CreateClient("for-add");
+        var added = env.Session.Service.AddClient(folder).Value!;
+        env.Session.UiPreferences.Save(new UiPreferences(
+            "en",
+            [added.Id],
+            FirstScanCompleted: true,
+            WelcomeCompleted: false));
+        var main = new MainViewModel(env.Session, autoTick: false);
+        Assert.True(main.IsWelcomeActive);
+        var welcome = main.Welcome!;
+        welcome.ContinueLanguageCommand.Execute(null);
+        welcome.ContinueClientsCommand.Execute(null);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        Assert.True(welcome.AddServerCommand.CanExecute(null));
 
         welcome.AddServerCommand.Execute(null);
 
         Assert.False(main.IsWelcomeActive);
         Assert.True(env.Session.UiPreferences.Load().WelcomeCompleted);
         Assert.IsType<AddServerViewModel>(main.Content);
+    }
+
+    [AvaloniaFact]
+    public async Task SkipDuringClientsScan_DoesNotStartSecondScan()
+    {
+        using var temp = new TempDirectory();
+        var scanRoot = temp.Combine("scan");
+        var game = Path.Combine(scanRoot, "game");
+        Directory.CreateDirectory(Path.Combine(game, "Data", "enUS"));
+        File.WriteAllBytes(Path.Combine(game, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+
+        using var env = new Env(additionalRoots: [scanRoot]);
+        var welcome = env.Main.Welcome!;
+        welcome.ContinueLanguageCommand.Execute(null);
+        await WaitUntil(() => welcome.Step == WelcomeViewModel.WelcomeStep.Clients);
+
+        // Skip while discovery may still be active (or right after); FinishWelcome must not stack a second scan.
+        env.Main.Welcome!.SkipCommand.Execute(null);
+        Assert.False(env.Main.IsWelcomeActive);
+
+        await WaitUntil(() => !env.Main.Clients.IsScanning);
+        Assert.False(env.Main.Clients.IsScanning);
+        Assert.True(env.Session.UiPreferences.Load().WelcomeCompleted);
     }
 }

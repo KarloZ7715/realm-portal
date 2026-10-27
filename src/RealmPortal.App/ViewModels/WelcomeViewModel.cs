@@ -243,6 +243,7 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));
         ContinueClientsCommand.NotifyCanExecuteChanged();
+        AddServerCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnStepChanged(WelcomeStep value)
@@ -256,6 +257,7 @@ public sealed partial class WelcomeViewModel : ViewModelBase
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(Subtitle));
             OnPropertyChanged(nameof(HasServers));
+            AddServerCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -341,13 +343,15 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         OnClientsChanged();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAddServer))]
     private async Task AddServerAsync()
     {
         CompleteWelcome();
         if (_openAddServer is not null)
             await _openAddServer().ConfigureAwait(true);
     }
+
+    private bool CanAddServer() => _clients.Items.Count > 0;
 
     [RelayCommand]
     private void Finish() => CompleteWelcome();

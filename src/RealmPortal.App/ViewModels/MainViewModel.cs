@@ -142,7 +142,10 @@ public sealed partial class MainViewModel : ObservableObject
     private void FinishWelcome()
     {
         Welcome = null;
-        Clients.StartFirstScanIfNeeded();
+        // Skip must not start a second scan while the welcome-driven discovery is still running;
+        // that in-flight scan will persist FirstScanCompleted when it finishes.
+        if (!Clients.IsScanning)
+            Clients.StartFirstScanIfNeeded();
         Servers.ReloadFromService();
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(Content));

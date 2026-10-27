@@ -103,6 +103,11 @@
           </ContentControl>
 
           <TextBlock Classes="body-sm" IsVisible="{Binding IsScanningClients}" Foreground="{DynamicResource BoneSoftBrush}" Text="{loc:T status.scanning}"/>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,4,0,0" IsVisible="{Binding HasClientNotice}">
+            <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0"
+                    Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+            <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding ClientNotice}"/>
+          </Grid>
         </StackPanel>
 
         <!-- Servers -->

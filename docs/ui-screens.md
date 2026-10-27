@@ -27,7 +27,7 @@ a pretend game process). For `1.0.0`, the UI screens and flows below connect to 
 | Client backups manager (`BackupsView`) | Follows `compact-01` + `compact-07` sub-sheet layout — *New (1.0.0)* | "Gestionar respaldos…" / "Manage backups…" inside the `BACKUP` card in Settings |
 | Confirm delete backup | Reuses `07b-confirm-incompatible-switch@2x.png` modal — *New (1.0.0)* | inline `✕` ("Eliminar respaldo") button on a backup row |
 | Backup restore conflict (`Restore anyway`) | `compact-09-backup-conflict@2x.png` & `compact-09b-backup-conflict-restore-anyway@2x.png` — *Exists in Figma* | "Restaurar" / "Restore" on an older backup while a recent switch has a pending Undo |
-| First-run welcome | `01-first-run@2x.png`, `02-detection-*.png` — *Implemented (1.1.0 #107)* | Shown once when `WelcomeCompleted` is unset/false (and first scan not already done); language → clients → servers; Skip/Finish persist the flag |
+| First-run welcome | `01-first-run@2x.png`, `02-detection-*.png` — *Implemented (1.1.0 #107)* | Shown when `IsWelcomeDone` is false: unset `WelcomeCompleted` uses `FirstScanCompleted` (upgrades skip); explicit `false` still shows the wizard; Skip/Finish persist `WelcomeCompleted=true`. Flow: language → clients → servers |
 
 The language toggle in the status bar ("ES · v1.0.0"; the version comes from `Directory.Build.props` through `AppInfo.Version`) switches Spanish and English at run time. The first language follows the system language.
 

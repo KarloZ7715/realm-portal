@@ -103,8 +103,12 @@ public sealed record UiPreferences(
     public HashSet<string> InUseSet => ClientsInUse?.ToHashSet(StringComparer.Ordinal) ?? [];
 
     /// <summary>
-    /// True when the first-run welcome was finished or skipped, or when an older install already
-    /// completed its first client scan (so the welcome is not re-shown after upgrading).
+    /// Whether the first-run welcome should stay hidden.
+    /// <list type="bullet">
+    /// <item><description><c>WelcomeCompleted == true</c>: finished or skipped — done.</description></item>
+    /// <item><description><c>WelcomeCompleted == false</c>: explicit reopen — not done (ignores first-scan).</description></item>
+    /// <item><description><c>WelcomeCompleted == null</c> (legacy/missing): done only when <see cref="FirstScanCompleted"/> is true.</description></item>
+    /// </list>
     /// </summary>
     public bool IsWelcomeDone => WelcomeCompleted ?? FirstScanCompleted;
 }
