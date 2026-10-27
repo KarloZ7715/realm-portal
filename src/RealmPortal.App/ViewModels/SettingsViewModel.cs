@@ -146,7 +146,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         : Loc.Get(_justSaved ? "settings.status.saved" : "nav.settings");
 
     [RelayCommand(CanExecute = nameof(CanSave))]
-    private void Save()
+    private async Task SaveAsync()
     {
         ServiceErrorField = null;
         if (EnvironmentError is not null)
@@ -181,7 +181,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
             ClearCacheOnSwitch,
             AutoCheckUpdates);
 
-        var error = _store.Save(model);
+        // Store save does config-lock + disk I/O; keep it off the UI thread.
+        var error = await Task.Run(() => _store.Save(model)).ConfigureAwait(true);
         if (error is not null)
         {
             ServiceErrorField = error.Code switch

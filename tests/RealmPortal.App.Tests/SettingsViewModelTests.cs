@@ -60,15 +60,15 @@ public class SettingsViewModelTests
     }
 
     [AvaloniaFact]
-    public void Save_RejectsEmptyOrMissingExeTemplate()
+    public async Task Save_RejectsEmptyOrMissingExeTemplate()
     {
         var vm = new SettingsViewModel(new MemoryStore());
         vm.Template = "   ";
-        vm.SaveCommand.Execute(null);
+        await vm.SaveCommand.ExecuteAsync(null);
         Assert.NotNull(vm.TemplateError);
 
         vm.Template = "wine";
-        vm.SaveCommand.Execute(null);
+        await vm.SaveCommand.ExecuteAsync(null);
         Assert.NotNull(vm.TemplateError);
     }
 

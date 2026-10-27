@@ -805,7 +805,7 @@ public class PortalViewModelTests
     }
 
     [AvaloniaFact]
-    public void Settings_PersistsBackupFolder()
+    public async Task Settings_PersistsBackupFolder()
     {
         using var env = new Env();
         var settings = (SettingsViewModel)env.Main.Settings;
@@ -813,7 +813,7 @@ public class PortalViewModelTests
         Directory.CreateDirectory(other);
         settings.Template = "wine {exe}";
         settings.BackupFolder = other;
-        settings.SaveCommand.Execute(null);
+        await settings.SaveCommand.ExecuteAsync(null);
         Assert.Equal(settings.BackupFolder, env.Session.Service.GetStorageSettings().Value!.BackupFolder);
     }
 

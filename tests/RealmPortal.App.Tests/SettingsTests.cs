@@ -108,7 +108,7 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
-    public void EditingMarksUnsavedAndSaveClearsIt()
+    public async Task EditingMarksUnsavedAndSaveClearsIt()
     {
         var (shell, settings) = Open();
         settings.Arguments = "-windowed";
@@ -117,7 +117,7 @@ public class SettingsScreenTests
         Assert.True(settings.SaveCommand.CanExecute(null));
         shell.Snap("settings-dirty", 1.0);
 
-        settings.SaveCommand.Execute(null);
+        await settings.SaveCommand.ExecuteAsync(null);
         Assert.False(settings.IsDirty);
         Assert.Equal("Ajustes · guardado", shell.Model.StatusText);
         Assert.False(settings.SaveCommand.CanExecute(null));
@@ -136,11 +136,11 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
-    public void TemplateWithoutExeIsRefusedByTheStoreAndShownOnTheField()
+    public async Task TemplateWithoutExeIsRefusedByTheStoreAndShownOnTheField()
     {
         var (shell, settings) = Open();
         settings.Template = "wine";
-        settings.SaveCommand.Execute(null);
+        await settings.SaveCommand.ExecuteAsync(null);
         Assert.Equal("La plantilla debe incluir {exe}.", settings.TemplateError);
         Assert.True(settings.IsDirty);
         Screenshots.Settle();
@@ -150,12 +150,12 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
-    public void MalformedEnvironmentLineBlocksSaveWithItsNumber()
+    public async Task MalformedEnvironmentLineBlocksSaveWithItsNumber()
     {
         var (_, settings) = Open();
         settings.Environment = "A=1\noops";
         Assert.Equal("Línea 2: usa el formato CLAVE=valor.", settings.EnvironmentError);
-        settings.SaveCommand.Execute(null);
+        await settings.SaveCommand.ExecuteAsync(null);
         Assert.True(settings.IsDirty);
     }
 
@@ -359,11 +359,11 @@ public class SettingsScreenTests
     }
 
     [AvaloniaFact]
-    public void SavedSettingsSurviveLeavingTheScreen()
+    public async Task SavedSettingsSurviveLeavingTheScreen()
     {
         var (shell, settings) = Open();
         settings.Prefix = "gamemoderun mangohud";
-        settings.SaveCommand.Execute(null);
+        await settings.SaveCommand.ExecuteAsync(null);
         shell.Model.SectionIndex = 0;
         shell.Model.SectionIndex = 2;
         Assert.Equal("gamemoderun mangohud", shell.Model.Settings.Prefix);

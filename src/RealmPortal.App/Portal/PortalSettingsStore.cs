@@ -35,14 +35,18 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
 
     public SettingsError? Save(SettingsModel settings)
     {
-        // Network settings first so a failure commits nothing else. Use Save (overwrite) rather than
-        // Update when the file is corrupt, so a bad network-settings.json does not block every save forever.
+        // Network settings first so a failure commits nothing else.
+        // Valid file: Update only AutoCheckUpdates so concurrent LastAttemptUtc / ETag are preserved.
+        // Corrupt file: overwrite with Save to repair, then continue.
         var currentNetwork = session.NetworkSettings.LoadOrDefault(out var networkError);
         if (networkError is not null || currentNetwork.AutoCheckUpdates != settings.AutoCheckUpdates)
         {
             try
             {
-                session.NetworkSettings.Save(currentNetwork with { AutoCheckUpdates = settings.AutoCheckUpdates });
+                if (networkError is not null)
+                    session.NetworkSettings.Save(currentNetwork with { AutoCheckUpdates = settings.AutoCheckUpdates });
+                else
+                    session.NetworkSettings.Update(s => s with { AutoCheckUpdates = settings.AutoCheckUpdates });
             }
             catch (Exception)
             {
