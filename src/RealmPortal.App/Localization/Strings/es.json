@@ -156,6 +156,8 @@
   "edit.cache.clear": "Vaciar Cache/WDB al cambiar",
   "edit.cache.hint": "Déjalo indeterminado para usar Ajustes. Marcado siempre vacía; desmarcado nunca vacía para este servidor.",
   "clients.pick.unavailable": "El selector de carpetas no está disponible aquí.",
+  "banner.warning.title": "Aviso",
+  "switch.cache.clear.warning": "Cambio hecho, pero no se pudo vaciar Cache/WDB.",
   "error.banner.title": "No se pudo completar la acción",
   "error.noclient.body": "Añade un cliente en Clientes antes de cambiar de servidor.",
   "error.gamerunning.title": "El juego está abierto",

@@ -216,6 +216,15 @@ public static class ClientPaths
             return null;
 
         var combined = Path.Combine(canonicalRoot, realName);
+        // Only a real directory named Cache/WDB is cleared. A symlink/junction — even one that stays
+        // under the client (e.g. Cache → WTF) — must not expand deletion to non-cache paths (#106 review).
+        if (new DirectoryInfo(combined).LinkTarget is not null
+            || (File.GetAttributes(combined) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new ClientFilesException(ClientFilesErrorCode.PathEscapesClient, childName,
+                $"'{childName}' is a symbolic link or junction; cache clear only deletes a real Cache/WDB folder inside the client.");
+        }
+
         var hops = 0;
         string realRoot, realChild;
         try

@@ -98,6 +98,21 @@ public sealed class ClientCacheClear106Tests
     }
 
     [UnixFact]
+    public void Clearer_CacheSymlinkToWtfInsideClient_Refused_LeavesWtfIntact()
+    {
+        using var env = new Env();
+        Directory.CreateDirectory(Path.Combine(env.Client, "WTF"));
+        File.WriteAllText(Path.Combine(env.Client, "WTF", "Config.wtf"), "SET realmName \"Keep\"\r\n");
+        Directory.CreateSymbolicLink(Path.Combine(env.Client, "Cache"), Path.Combine(env.Client, "WTF"));
+
+        var ex = Assert.Throws<ClientFilesException>(() => ClientCacheClearer.Clear(env.Client));
+
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+        Assert.True(File.Exists(Path.Combine(env.Client, "WTF", "Config.wtf")));
+        Assert.Contains("Keep", File.ReadAllText(Path.Combine(env.Client, "WTF", "Config.wtf")));
+    }
+
+    [UnixFact]
     public void Clearer_SymlinkInsideCache_DeletesLinkOnly_NotOutsideTarget()
     {
         using var env = new Env();
