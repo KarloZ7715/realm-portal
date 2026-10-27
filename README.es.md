@@ -80,8 +80,8 @@ Realm Portal escribe una copia de seguridad antes de cambiar cualquier archivo d
 
 Realm Portal no envía telemetría. Las únicas conexiones de red que hace son las dos funciones opcionales siguientes. Ambas están activadas por defecto y se pueden desactivar en **Ajustes**.
 
-- **Comprobación de actualizaciones.** Comprueba en GitHub una vez al día si hay una versión nueva (envía tu dirección IP y la versión de la aplicación a GitHub). Desactiva la comprobación automática en Ajustes para detener esas peticiones. El botón **Buscar actualizaciones** sigue funcionando con la comprobación automática desactivada, porque es una acción explícita tuya.
-- **Indicador de estado del servidor.** Muestra si el puerto de inicio de sesión de cada servidor responde (tu dirección IP es visible para ese servidor cada 5 minutos mientras la lista está abierta). Resolver un nombre de host también puede consultar el resolvedor DNS del sistema. Desactiva la sonda de estado en Ajustes para ocultar el indicador y no programar sondas.
+- **Buscar actualizaciones automáticamente.** Consulta GitHub una vez al día por una versión nueva (envía tu IP y la versión de la app a GitHub). Desactiva esta opción en Ajustes para detener las peticiones automáticas. El botón **Buscar actualizaciones** sigue funcionando con la comprobación automática desactivada, porque es una acción explícita tuya.
+- **Mostrar estado del login del servidor.** Muestra si el puerto de login de cada servidor responde (tu IP es visible para ese servidor cada 5 minutos mientras la lista está abierta). Resolver un nombre de host también puede consultar el resolvedor DNS del sistema. Desactiva esta opción en Ajustes para ocultar el indicador y no programar sondas.
 
 ## Alcance y avisos legales
 
