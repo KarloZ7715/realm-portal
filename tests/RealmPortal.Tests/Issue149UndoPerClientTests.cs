@@ -29,6 +29,7 @@ public sealed class Issue149UndoPerClientTests
         public string Projection => _dir.Combine("projection");
         public string ClientW => _dir.Combine("client-w");
         public string ClientX => _dir.Combine("client-x");
+        public TempDirectory Dir => _dir;
 
         public Box()
         {
@@ -41,13 +42,19 @@ public sealed class Issue149UndoPerClientTests
             File.WriteAllBytes(Path.Combine(ClientX, "Data", "enUS", "realmlist.wtf"), Encoding.Latin1.GetBytes(OldX));
         }
 
-        public (int Code, string Out, string Err) Run(params string[] args)
+        public (int Code, string Out, string Err) Run(params string[] args) =>
+            RunWithEnv(null, args);
+
+        public (int Code, string Out, string Err) RunWithEnv(Func<string, string?>? extraEnv, params string[] args)
         {
             var o = new StringWriter();
             var e = new StringWriter();
+            var variables = extraEnv is null
+                ? TestBackupDir.Variables(_dir)
+                : TestBackupDir.Variables(_dir, extraEnv);
             var code = Program.Run(
                 args, o, e, new PeClientVersionReader(), new FakeLauncher(),
-                TestBackupDir.Variables(_dir), new NeverRunningGameProbe());
+                variables, new NeverRunningGameProbe());
             return (code, o.ToString(), e.ToString());
         }
 
@@ -88,12 +95,12 @@ public sealed class Issue149UndoPerClientTests
         Assert.Equal(0, box.Run("switch", "A", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientW).Code);
         Assert.Equal(0, box.Run("switch", "B", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientX).Code);
 
-        // Global undo (no --client-dir) undoes the latest switch B@X.
+        // Global undo (no --client-dir) undoes the latest switch B@X; W must be byte-identical.
+        var wBeforeUndo = box.Read(box.ClientW);
         var undo = box.Run("undo", "--config-dir", box.Config, "--projection-dir", box.Projection);
         Assert.Equal(0, undo.Code);
         Assert.Equal(OldX, box.Read(box.ClientX));
-        // W stays on A
-        Assert.Contains(HostA, box.Read(box.ClientW), StringComparison.Ordinal);
+        Assert.Equal(wBeforeUndo, box.Read(box.ClientW));
     }
 
     [Fact]
@@ -111,5 +118,44 @@ public sealed class Issue149UndoPerClientTests
         Assert.Equal(0, undo.Code);
         Assert.Equal(xBefore, box.Read(box.ClientX));
         Assert.Equal(OldW, box.Read(box.ClientW));
+    }
+
+    [Fact]
+    public void Undo_WithoutClientDir_StaysGlobalEvenWhenClientDirEnvIsSet()
+    {
+        using var box = new Box();
+        Assert.Equal(0, box.Run("add", "A", HostA, "--config-dir", box.Config, "--projection-dir", box.Projection).Code);
+        Assert.Equal(0, box.Run("add", "B", HostB, "--config-dir", box.Config, "--projection-dir", box.Projection).Code);
+
+        Assert.Equal(0, box.Run("switch", "A", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientW).Code);
+        Assert.Equal(0, box.Run("switch", "B", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientX).Code);
+
+        var wBefore = box.Read(box.ClientW);
+        // REALM_PORTAL_CLIENT_DIR alone must not scope undo — still undoes global latest (B@X).
+        var undo = box.RunWithEnv(
+            name => name == CliApp.ClientDirVariable ? box.ClientW : null,
+            "undo", "--config-dir", box.Config, "--projection-dir", box.Projection);
+        Assert.Equal(0, undo.Code);
+        Assert.Equal(OldX, box.Read(box.ClientX));
+        Assert.Equal(wBefore, box.Read(box.ClientW));
+    }
+
+    [Fact]
+    public void Undo_ClientDir_WorksWhenWowExeIsMissing()
+    {
+        using var box = new Box();
+        Assert.Equal(0, box.Run("add", "A", HostA, "--config-dir", box.Config, "--projection-dir", box.Projection).Code);
+        Assert.Equal(0, box.Run("add", "B", HostB, "--config-dir", box.Config, "--projection-dir", box.Projection).Code);
+
+        Assert.Equal(0, box.Run("switch", "A", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientW).Code);
+        Assert.Equal(0, box.Run("switch", "B", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientX).Code);
+
+        File.Delete(Path.Combine(box.ClientW, "Wow.exe"));
+
+        var xBefore = box.Read(box.ClientX);
+        var undo = box.Run("undo", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientW);
+        Assert.Equal(0, undo.Code);
+        Assert.Equal(OldW, box.Read(box.ClientW));
+        Assert.Equal(xBefore, box.Read(box.ClientX));
     }
 }
