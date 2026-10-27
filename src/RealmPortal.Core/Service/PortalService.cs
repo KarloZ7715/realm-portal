@@ -27,6 +27,7 @@ public sealed class PortalService : IPortalService
     private readonly ActiveServerManager _active;
     private readonly LastSwitchJournal _journal;
     private readonly PortalSettingsStore _settings;
+    private readonly NetworkSettingsStore _networkSettings;
     private readonly string _activeBackupRoot;
     private Exception? _storageSettingsError;
 
@@ -61,6 +62,7 @@ public sealed class PortalService : IPortalService
         _active = new ActiveServerManager(_servers, configDirectory, projectionDirectory, _writer);
         _journal = new LastSwitchJournal(configDirectory, _writer, directoryLock);
         _settings = new PortalSettingsStore(configDirectory, _writer, _getVariable, directoryLock);
+        _networkSettings = new NetworkSettingsStore(configDirectory, _writer, directoryLock);
         _activeBackupRoot = _settings.ResolveActiveBackupFolder(out _storageSettingsError);
         TryRecoverPendingStateUndo();
     }
@@ -878,6 +880,34 @@ public sealed class PortalService : IPortalService
         {
             _settings.SetStorageSettings(settings);
             _storageSettingsError = null;
+            return ServiceResult<Unit>.Ok(default);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<Unit>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<NetworkSettings> GetNetworkSettings()
+    {
+        try
+        {
+            return ServiceResult<NetworkSettings>.Ok(_networkSettings.Get());
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<NetworkSettings>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<Unit> SetNetworkSettings(NetworkSettings settings)
+    {
+        if (settings is null)
+            throw new ArgumentNullException(nameof(settings));
+
+        try
+        {
+            _networkSettings.Set(settings);
             return ServiceResult<Unit>.Ok(default);
         }
         catch (Exception ex)

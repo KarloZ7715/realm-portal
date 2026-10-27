@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace RealmPortal.App.Portal;
+namespace RealmPortal.Core.Network;
 
 /// <summary>Outcome of a connect-only check. Nothing is sent or read.</summary>
 public enum ProbeResult
@@ -11,27 +11,53 @@ public enum ProbeResult
     TimedOut,
 }
 
-/// <summary>Opens a TCP connection and closes it. Used by the add-server form in portal mode.</summary>
+/// <summary>
+/// Result of <see cref="IConnectionProbe.ProbeAsync"/>, including the <see cref="SocketError"/> when the
+/// failure came from DNS or connect so callers can map HostNotFound/NoData to "unknown" instead of offline.
+/// </summary>
+public readonly record struct ConnectionProbeResult(ProbeResult Outcome, SocketError? SocketError = null)
+{
+    public static ConnectionProbeResult Ok { get; } = new(ProbeResult.Ok);
+
+    public static ConnectionProbeResult TimedOut { get; } = new(ProbeResult.TimedOut);
+
+    public static ConnectionProbeResult Failed(SocketError? error = null) => new(ProbeResult.Failed, error);
+
+    public static implicit operator ConnectionProbeResult(ProbeResult outcome) =>
+        outcome switch
+        {
+            ProbeResult.Ok => Ok,
+            ProbeResult.TimedOut => TimedOut,
+            _ => Failed(),
+        };
+}
+
+/// <summary>Opens a TCP connection and closes it. Used by the add-server form and the status-dot scheduler.</summary>
 public interface IConnectionProbe
 {
-    Task<ProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken);
+    Task<ConnectionProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken);
 }
 
 /// <summary>
 /// Resolves <paramref name="host"/> and connects to each address until one accepts a TCP connection, then closes it.
 /// DNS and the connects share one timeout. A resolver that ignores cancellation still ends as <see cref="ProbeResult.TimedOut"/>
-/// and does not open a socket after that. A DNS failure or a refused connection is <see cref="ProbeResult.Failed"/>.
+/// and does not open a socket after that. DNS <see cref="SocketError.HostNotFound"/> / <see cref="SocketError.NoData"/>
+/// and connection errors surface as <see cref="ProbeResult.Failed"/> with the <see cref="SocketError"/> filled in.
 /// </summary>
 public sealed class TcpConnectionProbe : IConnectionProbe
 {
     private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolve;
+    private readonly Func<IPAddress, int, CancellationToken, Task>? _connect;
 
-    public TcpConnectionProbe(Func<string, CancellationToken, Task<IPAddress[]>>? resolve = null)
+    public TcpConnectionProbe(
+        Func<string, CancellationToken, Task<IPAddress[]>>? resolve = null,
+        Func<IPAddress, int, CancellationToken, Task>? connect = null)
     {
         _resolve = resolve ?? ((host, token) => Dns.GetHostAddressesAsync(host, token));
+        _connect = connect;
     }
 
-    public async Task<ProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
+    public async Task<ConnectionProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
@@ -45,7 +71,7 @@ public sealed class TcpConnectionProbe : IConnectionProbe
             }
             catch (TimeoutException)
             {
-                return ProbeResult.TimedOut;
+                return ConnectionProbeResult.TimedOut;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -53,15 +79,15 @@ public sealed class TcpConnectionProbe : IConnectionProbe
             }
             catch (OperationCanceledException)
             {
-                return ProbeResult.TimedOut;
+                return ConnectionProbeResult.TimedOut;
             }
             catch (SocketException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                return ProbeResult.TimedOut;
+                return ConnectionProbeResult.TimedOut;
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
-                return ProbeResult.Failed;
+                return ConnectionProbeResult.Failed(ex.SocketErrorCode);
             }
         }
         finally
@@ -79,7 +105,7 @@ public sealed class TcpConnectionProbe : IConnectionProbe
         }
     }
 
-    private async Task<ProbeResult> ConnectAnyAsync(string host, int port, CancellationToken token)
+    private async Task<ConnectionProbeResult> ConnectAnyAsync(string host, int port, CancellationToken token)
     {
         IPAddress[] addresses;
         try
@@ -90,9 +116,9 @@ public sealed class TcpConnectionProbe : IConnectionProbe
         {
             throw;
         }
-        catch (SocketException)
+        catch (SocketException ex)
         {
-            return ProbeResult.Failed;
+            return ConnectionProbeResult.Failed(ex.SocketErrorCode);
         }
 
         // The resolver may ignore the token and return after the probe has already timed out.
@@ -100,18 +126,27 @@ public sealed class TcpConnectionProbe : IConnectionProbe
 
         if (addresses is null || addresses.Length == 0)
         {
-            return ProbeResult.Failed;
+            return ConnectionProbeResult.Failed(SocketError.NoData);
         }
 
+        SocketError? lastError = null;
         foreach (var address in addresses)
         {
             token.ThrowIfCancellationRequested();
             try
             {
-                using var client = new TcpClient(address.AddressFamily);
-                await client.ConnectAsync(address, port, token).ConfigureAwait(false);
-                client.Close();
-                return ProbeResult.Ok;
+                if (_connect is not null)
+                {
+                    await _connect(address, port, token).ConfigureAwait(false);
+                }
+                else
+                {
+                    using var client = new TcpClient(address.AddressFamily);
+                    await client.ConnectAsync(address, port, token).ConfigureAwait(false);
+                    client.Close();
+                }
+
+                return ConnectionProbeResult.Ok;
             }
             catch (OperationCanceledException)
             {
@@ -121,13 +156,14 @@ public sealed class TcpConnectionProbe : IConnectionProbe
             {
                 throw new OperationCanceledException("The connection check timed out.", token);
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
                 // Refused or unreachable. Try the next resolved address.
+                lastError = ex.SocketErrorCode;
             }
         }
 
-        return ProbeResult.Failed;
+        return ConnectionProbeResult.Failed(lastError);
     }
 
     /// <summary>

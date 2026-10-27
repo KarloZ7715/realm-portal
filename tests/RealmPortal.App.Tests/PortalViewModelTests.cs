@@ -7,6 +7,7 @@ using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Tests.Support;
 using RealmPortal.App.Portal;
+using RealmPortal.Core.Network;
 using RealmPortal.App.Settings;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.ClientFiles;
@@ -37,7 +38,7 @@ public class PortalViewModelTests
     /// <summary>Returns a fixed probe result and never opens a socket.</summary>
     private sealed class LateProbe : IConnectionProbe
     {
-        private readonly TaskCompletionSource<ProbeResult> _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<ConnectionProbeResult> _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public int Calls { get; private set; }
 
@@ -45,7 +46,7 @@ public class PortalViewModelTests
 
         public bool SawCancellation { get; private set; }
 
-        public async Task<ProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
+        public async Task<ConnectionProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
         {
             Calls++;
             Token = cancellationToken;
@@ -82,7 +83,7 @@ public class PortalViewModelTests
 
         public void Release() => _gate.TrySetResult();
 
-        public async Task<ProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
+        public async Task<ConnectionProbeResult> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
         {
             Calls++;
             Host = host;
