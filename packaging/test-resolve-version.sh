@@ -33,7 +33,9 @@ expect_fail() {
 
 expect_ok 2.3.4 EVENT_NAME=push REF_NAME=v2.3.4
 expect_fail EVENT_NAME=push REF_NAME=v2.3.5
-expect_fail EVENT_NAME=push REF_NAME=v2.3.4-rc.1
+expect_ok 2.3.4-rc.1 EVENT_NAME=push REF_NAME=v2.3.4-rc.1
+expect_ok 2.3.4-rc.2 EVENT_NAME=push REF_NAME=v2.3.4-rc.2
+expect_fail EVENT_NAME=push REF_NAME=v2.3.5-rc.1
 expect_fail EVENT_NAME=push REF_NAME=main
 expect_ok 0.0.0-pr.17 EVENT_NAME=pull_request PR_NUMBER=17
 expect_fail EVENT_NAME=pull_request PR_NUMBER=
