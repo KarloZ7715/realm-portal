@@ -177,6 +177,29 @@ public sealed record PortalStatus(
 public sealed record StorageSettings(string BackupFolder, bool ClearCacheOnSwitch = false);
 
 /// <summary>
+/// Update-check and status-probe settings persisted in <c>network-settings.json</c>
+/// (docs/updates-and-status.md). Defaults match the product decision: both features on.
+/// </summary>
+/// <param name="UpdatesAutoCheck">Daily automatic GitHub release check; false means zero automatic network requests.</param>
+/// <param name="UpdatesLastAttemptUtc">Last automatic check attempt (success or failure); future values are treated as now by the checker.</param>
+/// <param name="UpdatesEtag">ETag from the last 200 releases/latest response.</param>
+/// <param name="UpdatesSkippedVersion">Version the user chose to skip.</param>
+/// <param name="UpdatesLaterVersion">Version postponed with Later.</param>
+/// <param name="UpdatesLaterUntilUtc">Do not offer <paramref name="UpdatesLaterVersion"/> again before this time.</param>
+/// <param name="StatusProbeEnabled">Server status dot; false hides the dot and schedules no probes.</param>
+public sealed record NetworkSettings(
+    bool UpdatesAutoCheck = true,
+    DateTimeOffset? UpdatesLastAttemptUtc = null,
+    string? UpdatesEtag = null,
+    string? UpdatesSkippedVersion = null,
+    string? UpdatesLaterVersion = null,
+    DateTimeOffset? UpdatesLaterUntilUtc = null,
+    bool StatusProbeEnabled = true)
+{
+    public static NetworkSettings Default { get; } = new();
+}
+
+/// <summary>
 /// How to start the game, set from the Settings screen. Everything of a <see cref="GameLaunchSpec"/> except the
 /// executable path and working directory, which come from the selected client.
 /// </summary>
