@@ -377,5 +377,6 @@
   "settings.updates.check": "Buscar actualizaciones ahora",
   "settings.updates.checking": "Buscando…",
   "settings.status.probe": "Puntos de estado del servidor",
-  "settings.status.probe.hint": "Muestra si el puerto de login de cada servidor responde (tu IP es visible para ese servidor cada 5 minutos mientras la lista está abierta)."
+  "settings.status.probe.hint": "Muestra si el puerto de login de cada servidor responde (tu IP es visible para ese servidor cada 5 minutos mientras la lista está abierta).",
+  "settings.error.network": "No se pudieron guardar los ajustes de red. Revisa la carpeta de configuración."
 }

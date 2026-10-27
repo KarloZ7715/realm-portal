@@ -377,5 +377,6 @@
   "settings.updates.check": "Check for updates now",
   "settings.updates.checking": "Checking…",
   "settings.status.probe": "Server status dots",
-  "settings.status.probe.hint": "Shows whether each server's login port answers (your IP address is visible to that server every 5 minutes while the list is open)."
+  "settings.status.probe.hint": "Shows whether each server's login port answers (your IP address is visible to that server every 5 minutes while the list is open).",
+  "settings.error.network": "Could not save network settings. Check the config folder."
 }

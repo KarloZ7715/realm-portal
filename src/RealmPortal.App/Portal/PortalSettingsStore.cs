@@ -35,6 +35,21 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
 
     public SettingsError? Save(SettingsModel settings)
     {
+        // Network settings first so a failure commits nothing else. Use Save (overwrite) rather than
+        // Update when the file is corrupt, so a bad network-settings.json does not block every save forever.
+        var currentNetwork = session.NetworkSettings.LoadOrDefault(out var networkError);
+        if (networkError is not null || currentNetwork.AutoCheckUpdates != settings.AutoCheckUpdates)
+        {
+            try
+            {
+                session.NetworkSettings.Save(currentNetwork with { AutoCheckUpdates = settings.AutoCheckUpdates });
+            }
+            catch (Exception)
+            {
+                return new SettingsError("StoreCorrupt");
+            }
+        }
+
         var launcher = new LauncherSettings(
             settings.CommandTemplate,
             settings.Arguments,
@@ -58,15 +73,6 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
                     _ => "PathNotFound",
                 },
                 settings.BackupFolder);
-        }
-
-        try
-        {
-            session.NetworkSettings.Update(s => s with { AutoCheckUpdates = settings.AutoCheckUpdates });
-        }
-        catch (Exception)
-        {
-            return new SettingsError("StoreCorrupt");
         }
 
         session.UiPreferences.SetLanguage(settings.Language);

@@ -92,7 +92,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     /// <summary>Which field the last failed save blamed: "template", "backup" or null.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TemplateError), nameof(BackupError))]
+    [NotifyPropertyChangedFor(nameof(TemplateError), nameof(BackupError), nameof(NetworkError))]
     private string? _serviceErrorField;
 
     public bool IsSpanish
@@ -139,6 +139,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public string? BackupError => ServiceErrorField == "backup" ? Loc.Get("settings.error.backup") : null;
 
+    public string? NetworkError => ServiceErrorField == "network" ? Loc.Get("settings.error.network") : null;
+
     public override string StatusText => IsDirty
         ? Loc.Get("settings.status.dirty")
         : Loc.Get(_justSaved ? "settings.status.saved" : "nav.settings");
@@ -182,7 +184,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
         var error = _store.Save(model);
         if (error is not null)
         {
-            ServiceErrorField = error.Code == "InvalidLauncherSettings" ? "template" : "backup";
+            ServiceErrorField = error.Code switch
+            {
+                "InvalidLauncherSettings" => "template",
+                "StoreCorrupt" => "network",
+                _ => "backup",
+            };
             return;
         }
 
@@ -258,6 +265,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(EnvironmentError));
         OnPropertyChanged(nameof(TemplateError));
         OnPropertyChanged(nameof(BackupError));
+        OnPropertyChanged(nameof(NetworkError));
         SaveCommand.NotifyCanExecuteChanged();
     }
 
@@ -301,7 +309,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         CheckForUpdatesCommand.NotifyCanExecuteChanged();
         try
         {
-            LastUpdateCheck = await _updateChecker.CheckAsync(UpdateCheckMode.Manual).ConfigureAwait(true);
+            var checker = _updateChecker;
+            LastUpdateCheck = await Task.Run(() => checker.CheckAsync(UpdateCheckMode.Manual)).ConfigureAwait(true);
         }
         finally
         {
