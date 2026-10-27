@@ -12,23 +12,26 @@ public sealed partial class AboutViewModel : ViewModelBase
     private readonly IUriOpener _uriOpener;
     private readonly Action _back;
 
-    public AboutViewModel(IUriOpener uriOpener, Action backRequested, Func<Stream>? openThirdPartyLicenses = null)
+    public AboutViewModel(IUriOpener uriOpener, Action backRequested, string thirdPartyLicenses)
     {
         _uriOpener = uriOpener;
         _back = backRequested;
         AppName = AppInfo.Name;
         Version = AppInfo.Version;
-        Copyright = AppInfo.Copyright;
         RepositoryUrl = AppInfo.RepositoryUrl;
-        ThirdPartyLicenses = AboutDocuments.LoadThirdPartyLicenses(openThirdPartyLicenses);
+        ThirdPartyLicenses = thirdPartyLicenses ?? string.Empty;
         RefreshText();
+    }
+
+    /// <summary>Test convenience: loads licenses from an injected stream (no UI-thread I/O).</summary>
+    public AboutViewModel(IUriOpener uriOpener, Action backRequested, Func<Stream> openThirdPartyLicenses)
+        : this(uriOpener, backRequested, AboutDocuments.LoadThirdPartyLicenses(openThirdPartyLicenses))
+    {
     }
 
     public string AppName { get; }
 
     public string Version { get; }
-
-    public string Copyright { get; }
 
     public string RepositoryUrl { get; }
 
@@ -40,9 +43,11 @@ public sealed partial class AboutViewModel : ViewModelBase
 
     public string CreditsText => Loc.Get("about.credits");
 
+    public string CopyrightText => Loc.Get("about.copyright");
+
     public string MitNote => Loc.Get("about.mit");
 
-    public string Disclaimer => Loc.Instance.Current == Language.Es ? AppInfo.DisclaimerEs : AppInfo.DisclaimerEn;
+    public string Disclaimer => Loc.Get("about.disclaimer");
 
     [ObservableProperty]
     private string? _openError;
@@ -53,6 +58,7 @@ public sealed partial class AboutViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(VersionLabel));
         OnPropertyChanged(nameof(CreditsText));
+        OnPropertyChanged(nameof(CopyrightText));
         OnPropertyChanged(nameof(MitNote));
         OnPropertyChanged(nameof(Disclaimer));
         OnPropertyChanged(nameof(StatusText));

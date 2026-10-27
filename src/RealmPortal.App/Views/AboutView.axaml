@@ -31,7 +31,7 @@
               <StackPanel Spacing="4" VerticalAlignment="Center">
                 <TextBlock Name="AppName" Classes="body-bold" FontSize="18" Foreground="{DynamicResource InkBrush}" Text="{Binding AppName}"/>
                 <TextBlock Name="VersionLabel" Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding VersionLabel}"/>
-                <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding Copyright}"/>
+                <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding CopyrightText}"/>
               </StackPanel>
             </StackPanel>
             <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding Disclaimer}" Margin="0,4,0,0"/>

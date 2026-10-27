@@ -310,10 +310,12 @@
   "about.status": "About",
   "about.identity": "Application",
   "about.version": "Version {0}",
-  "about.credits": "Created by Carlos Canabal Cordero and contributors.",
+  "about.credits": "Created by the Realm Portal contributors.",
   "about.mit": "Realm Portal is free software released under the MIT License.",
   "about.github": "Open on GitHub",
   "about.open.failed": "Could not open the link in your browser.",
   "about.thirdparty": "Third-party licenses",
-  "about.thirdparty.hint": "NuGet packages, fonts and other components shipped with the app."
+  "about.thirdparty.hint": "NuGet packages, fonts and other components shipped with the app.",
+  "about.copyright": "Copyright (c) 2026 Realm Portal contributors.",
+  "about.disclaimer": "Not affiliated with or endorsed by Blizzard Entertainment."
 }

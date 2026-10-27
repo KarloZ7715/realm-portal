@@ -9,9 +9,13 @@ public static class AboutDocuments
 {
     public const string ThirdPartyAssetPath = "avares://RealmPortal.App/Assets/THIRD_PARTY_LICENSES.md";
 
+    private static readonly object CacheGate = new();
+    private static string? _cachedThirdParty;
+
     /// <summary>
-    /// Reads third-party license notices: first from an injected stream factory (tests), then the embedded asset,
-    /// then <c>THIRD_PARTY_LICENSES.md</c> next to the entry assembly (release packages).
+    /// Reads third-party license notices off the caller's thread: first from an injected stream factory (tests),
+    /// then a process-wide cache, then the embedded asset, then <c>THIRD_PARTY_LICENSES.md</c> next to the app.
+    /// Callers that run on the UI thread should use <see cref="LoadThirdPartyLicensesAsync"/>.
     /// </summary>
     public static string LoadThirdPartyLicenses(Func<Stream>? openEmbedded = null)
     {
@@ -22,6 +26,37 @@ public static class AboutDocuments
             return reader.ReadToEnd();
         }
 
+        lock (CacheGate)
+        {
+            if (_cachedThirdParty is not null)
+            {
+                return _cachedThirdParty;
+            }
+        }
+
+        var text = ReadThirdPartyUncached();
+        lock (CacheGate)
+        {
+            _cachedThirdParty ??= text;
+            return _cachedThirdParty;
+        }
+    }
+
+    /// <summary>Loads third-party licenses on a thread-pool thread and caches the result.</summary>
+    public static Task<string> LoadThirdPartyLicensesAsync(CancellationToken cancellationToken = default) =>
+        Task.Run(() => LoadThirdPartyLicenses(), cancellationToken);
+
+    /// <summary>Test helper: clears the process-wide cache.</summary>
+    internal static void ClearCache()
+    {
+        lock (CacheGate)
+        {
+            _cachedThirdParty = null;
+        }
+    }
+
+    private static string ReadThirdPartyUncached()
+    {
         try
         {
             using var stream = AssetLoader.Open(new Uri(ThirdPartyAssetPath));

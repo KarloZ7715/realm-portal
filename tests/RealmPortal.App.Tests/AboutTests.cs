@@ -34,7 +34,6 @@ public class AboutTests
         Assert.Equal(AppInfo.Name, about.AppName);
         Assert.Equal(AppInfo.Version, about.Version);
         Assert.Equal(AppInfo.RepositoryUrl, about.RepositoryUrl);
-        Assert.Equal(AppInfo.Copyright, about.Copyright);
         Assert.True(about.HasThirdPartyLicenses);
         Assert.Contains("Licenses", about.ThirdPartyLicenses);
     }
@@ -74,7 +73,12 @@ public class AboutTests
 
         Assert.True(shell.Model.Settings.OpenAboutCommand.CanExecute(null));
         shell.Model.Settings.OpenAboutCommand.Execute(null);
-        Screenshots.Settle();
+        // ShowAbout loads licenses off-thread before swapping Content.
+        for (var i = 0; i < 50 && shell.Model.Content is not AboutViewModel; i++)
+        {
+            await Task.Delay(20);
+            Screenshots.Settle();
+        }
 
         Assert.IsType<AboutViewModel>(shell.Model.Content);
         var about = (AboutViewModel)shell.Model.Content;
@@ -100,8 +104,8 @@ public class AboutTests
         foreach (var key in new[]
                  {
                      "settings.about", "settings.about.open", "settings.about.hint",
-                     "about.title", "about.back", "about.version", "about.credits", "about.mit",
-                     "about.github", "about.thirdparty", "about.open.failed",
+                     "about.title", "about.back", "about.version", "about.credits", "about.copyright",
+                     "about.disclaimer", "about.mit", "about.github", "about.thirdparty", "about.open.failed",
                  })
         {
             Assert.False(string.IsNullOrWhiteSpace(Loc.Load(Language.En)[key]));

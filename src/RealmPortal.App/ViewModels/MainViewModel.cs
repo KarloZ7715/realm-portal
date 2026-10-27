@@ -383,10 +383,24 @@ public sealed partial class MainViewModel : ObservableObject
     private void ShowAbout()
     {
         if (_about is not null)
+        {
             return;
+        }
 
         CloseBackupsManager();
-        _about = new AboutViewModel(_uriOpener, CloseAbout);
+        _ = ShowAboutAsync();
+    }
+
+    private async Task ShowAboutAsync()
+    {
+        // License file/asset I/O stays off the UI thread; the result is cached for later opens.
+        var licenses = await AboutDocuments.LoadThirdPartyLicensesAsync().ConfigureAwait(true);
+        if (_about is not null || SectionIndex != 2)
+        {
+            return;
+        }
+
+        _about = new AboutViewModel(_uriOpener, CloseAbout, licenses);
         _about.PropertyChanged += OnSectionChanged;
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));

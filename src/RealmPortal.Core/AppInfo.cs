@@ -10,9 +10,6 @@ public static class AppInfo
     /// <summary>Public source repository (opens in the system browser from About).</summary>
     public const string RepositoryUrl = "https://github.com/KarloZ7715/realm-portal";
 
-    /// <summary>Copyright line shown in About (matches LICENSE).</summary>
-    public const string Copyright = "Copyright (c) 2026 Carlos Canabal Cordero";
-
     public const string DisclaimerEs = "No afiliado ni respaldado por Blizzard Entertainment.";
 
     public const string DisclaimerEn = "Not affiliated with or endorsed by Blizzard Entertainment.";

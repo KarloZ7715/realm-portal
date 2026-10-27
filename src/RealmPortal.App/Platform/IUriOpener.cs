@@ -10,26 +10,53 @@ public interface IUriOpener
 /// <summary>Uses <see cref="System.Diagnostics.Process"/> with shell execute (xdg-open / default browser).</summary>
 public sealed class ShellUriOpener : IUriOpener
 {
-    public Task<bool> OpenAsync(Uri uri)
+    private static readonly TimeSpan HandlerWait = TimeSpan.FromSeconds(5);
+
+    public async Task<bool> OpenAsync(Uri uri)
     {
         ArgumentNullException.ThrowIfNull(uri);
         if (uri.Scheme is not ("http" or "https"))
         {
-            return Task.FromResult(false);
+            return false;
         }
 
         try
         {
-            var started = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = uri.AbsoluteUri,
                 UseShellExecute = true,
             });
-            return Task.FromResult(started is not null);
+            if (process is null)
+            {
+                return false;
+            }
+
+            // Windows UseShellExecute often returns a handle that is not a useful exit code for "browser opened".
+            if (OperatingSystem.IsWindows())
+            {
+                return true;
+            }
+
+            // Linux/macOS helpers (xdg-open, open) exit after handing off; non-zero means the handler failed.
+            using (process)
+            {
+                using var cts = new CancellationTokenSource(HandlerWait);
+                try
+                {
+                    await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+                    return process.ExitCode == 0;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Still running after the bound: treat as handed off to a browser.
+                    return true;
+                }
+            }
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or PlatformNotSupportedException or InvalidOperationException)
         {
-            return Task.FromResult(false);
+            return false;
         }
     }
 }
