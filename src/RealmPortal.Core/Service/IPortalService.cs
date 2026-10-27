@@ -117,4 +117,11 @@ public interface IPortalService
 
     /// <summary>Validates and saves the launcher settings; an unusable combination fails with <see cref="ServiceErrorCode.InvalidLauncherSettings"/> and nothing is saved.</summary>
     ServiceResult<Unit> SetLauncherSettings(LauncherSettings settings);
+
+    /// <summary>Update-check and status-probe settings (<c>network-settings.json</c>).</summary>
+    ServiceResult<NetworkSettings> GetNetworkSettings();
+
+    /// <summary>Saves update-check and status-probe settings. Both features default to on; see docs/updates-and-status.md.</summary>
+    ServiceResult<Unit> SetNetworkSettings(NetworkSettings settings);
 }
+
