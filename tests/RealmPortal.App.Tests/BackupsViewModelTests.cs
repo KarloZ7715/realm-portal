@@ -3,6 +3,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Tests.Support;
 using RealmPortal.App.Portal;
 using RealmPortal.App.ViewModels;
 using RealmPortal.Core.ClientFiles;
@@ -10,6 +11,7 @@ using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
 using RealmPortal.Tests.Support;
+using TempDirectory = RealmPortal.Tests.Support.TempDirectory;
 
 namespace RealmPortal.App.Tests;
 
@@ -42,16 +44,25 @@ public sealed class BackupsViewModelTests
             File.WriteAllText(Realmlist, "set realmlist original.example\r\n");
             File.WriteAllText(ConfigFile, "SET realmName \"Original\"\r\n");
             Probe.Running = running;
-            var getVariable = (string name) => name == ClientFilesApplier.BackupDirectoryVariable ? Backups : null;
-            var service = new PortalService(Config, Projection, new PeClientVersionReader(), new FakeLaunch(), Probe, getVariable);
-            Session = new PortalSession(service, new UiPreferencesStore(Config), getVariable);
+            Home = _temp.Combine("home");
+            Directory.CreateDirectory(Home);
+            Session = TestSessions.Create(
+                Config,
+                Projection,
+                Backups,
+                Home,
+                new FakeLaunch(),
+                Probe,
+                seedPreferences: false);
             ClientId = Session.Service.AddClient(Client, "Test client").Value!.Id;
+            Session.UiPreferences.Save(new UiPreferences("en", [ClientId], FirstScanCompleted: true));
             Loc.Instance.SetLanguage(Language.En);
         }
 
         public string Config { get; }
         public string Projection { get; }
         public string Backups { get; }
+        public string Home { get; }
         public string Client { get; }
         public string Realmlist => Path.Combine(Client, "Data", "enUS", "realmlist.wtf");
         public string ConfigFile => Path.Combine(Client, "WTF", "Config.wtf");

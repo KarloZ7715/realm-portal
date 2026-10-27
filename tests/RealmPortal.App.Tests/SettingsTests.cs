@@ -3,6 +3,8 @@ using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.App.Tests.Support;
+using TempDirectory = RealmPortal.Tests.Support.TempDirectory;
 using RealmPortal.App.Settings;
 using RealmPortal.App.ViewModels;
 
@@ -242,17 +244,14 @@ public class SettingsScreenTests
     [AvaloniaFact]
     public void StatusBarToggle_IsSavedRightAwayAndIsNotAnUnsavedSettingsChange()
     {
-        using var temp = new RealmPortal.Tests.Support.TempDirectory();
-        var config = temp.Combine("config");
-        Directory.CreateDirectory(config);
-        var session = RealmPortal.App.Portal.PortalSession.CreateForPaths(config, temp.Combine("projection"), temp.Combine("backups"));
-        session.UiPreferences.SetLanguage(Language.Es);
-        var main = new MainViewModel(session, autoTick: false);
+        using var env = new IsolatedAppSession(languageCode: "es");
+        env.Session.UiPreferences.SetLanguage(Language.Es);
+        var main = new MainViewModel(env.Session, autoTick: false);
         try
         {
             // Without entering Settings: the toggle must not make Settings dirty (closing would ask otherwise).
             main.ToggleLanguageCommand.Execute(null);
-            Assert.Equal("en", session.UiPreferences.Load().LanguageCode);
+            Assert.Equal("en", env.Session.UiPreferences.Load().LanguageCode);
             Assert.False(main.Settings.IsDirty);
 
             // Inside Settings with a pending edit: the edit stays pending, the language does not become one.
@@ -269,7 +268,7 @@ public class SettingsScreenTests
             Assert.Equal(0, main.SectionIndex);
             Assert.False(main.Settings.IsDirty);
             Assert.Equal(Language.Es, Loc.Instance.Current);
-            Assert.Equal("es", session.UiPreferences.Load().LanguageCode);
+            Assert.Equal("es", env.Session.UiPreferences.Load().LanguageCode);
         }
         finally
         {
