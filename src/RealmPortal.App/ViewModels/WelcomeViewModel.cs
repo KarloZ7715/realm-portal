@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
@@ -26,6 +27,7 @@ public sealed partial class WelcomeViewModel : ViewModelBase
     private readonly SettingsViewModel _settings;
     private readonly Action _onFinished;
     private readonly Func<Task>? _openAddServer;
+    private readonly PropertyChangedEventHandler _clientsPropertyChanged;
     private bool _clientsScanStarted;
 
     public WelcomeViewModel(
@@ -53,27 +55,30 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         _isEnglish = !_isSpanish;
 
         _clients.ClientsChanged += OnClientsChanged;
-        _clients.PropertyChanged += (_, e) =>
+        _clientsPropertyChanged = OnClientsPropertyChanged;
+        _clients.PropertyChanged += _clientsPropertyChanged;
+    }
+
+    private void OnClientsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(ClientsViewModel.IsScanning)
+            or nameof(ClientsViewModel.Summary)
+            or nameof(ClientsViewModel.Notice)
+            or nameof(ClientsViewModel.HasNotice)
+            or nameof(ClientsViewModel.StatusText))
         {
-            if (e.PropertyName is nameof(ClientsViewModel.IsScanning)
-                or nameof(ClientsViewModel.Summary)
-                or nameof(ClientsViewModel.Notice)
-                or nameof(ClientsViewModel.HasNotice)
-                or nameof(ClientsViewModel.StatusText))
-            {
-                OnPropertyChanged(nameof(ClientsSummary));
-                OnPropertyChanged(nameof(IsScanningClients));
-                OnPropertyChanged(nameof(HasClientNotice));
-                OnPropertyChanged(nameof(ClientNotice));
-                OnPropertyChanged(nameof(HasClients));
-                OnPropertyChanged(nameof(NoClients));
-                OnPropertyChanged(nameof(ContinueClientsLabel));
-                OnPropertyChanged(nameof(StatusText));
-                ContinueClientsCommand.NotifyCanExecuteChanged();
-                RescanClientsCommand.NotifyCanExecuteChanged();
-                PickClientFolderCommand.NotifyCanExecuteChanged();
-            }
-        };
+            OnPropertyChanged(nameof(ClientsSummary));
+            OnPropertyChanged(nameof(IsScanningClients));
+            OnPropertyChanged(nameof(HasClientNotice));
+            OnPropertyChanged(nameof(ClientNotice));
+            OnPropertyChanged(nameof(HasClients));
+            OnPropertyChanged(nameof(NoClients));
+            OnPropertyChanged(nameof(ContinueClientsLabel));
+            OnPropertyChanged(nameof(StatusText));
+            ContinueClientsCommand.NotifyCanExecuteChanged();
+            RescanClientsCommand.NotifyCanExecuteChanged();
+            PickClientFolderCommand.NotifyCanExecuteChanged();
+        }
     }
 
     public ObservableCollection<WelcomeProgressStep> ProgressSteps { get; }
@@ -364,6 +369,8 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         var prefs = _session.UiPreferences.Load();
         _session.UiPreferences.Save(prefs with { WelcomeCompleted = true });
         _clients.FirstScanFoundNoClients -= IgnoreEmptyScanNavigation;
+        _clients.ClientsChanged -= OnClientsChanged;
+        _clients.PropertyChanged -= _clientsPropertyChanged;
         _onFinished();
     }
 }
