@@ -91,10 +91,12 @@ public sealed class WindowPlacementPersistence
 
     private void OnWindowStateChanged(WindowState oldState, WindowState newState)
     {
-        if (oldState == WindowState.Normal && newState != WindowState.Normal)
+        if (oldState == WindowState.Normal
+            && newState is (WindowState.Maximized or WindowState.FullScreen))
         {
             // Keep a move or resize that happened just before maximizing, unless what was seen is already the
-            // maximized size (the size notification can arrive before the state change).
+            // maximized size (the size notification can arrive before the state change). Ignore tiny
+            // position-only frame nudges from the window manager.
             if (_pending is { } pending
                 && !LooksMaximized(pending.Size)
                 && WindowPlacementFit.IsMeaningfulNormalUpdate(
@@ -106,6 +108,16 @@ public sealed class WindowPlacementPersistence
                     pending.Position.Y,
                     pending.Size.Width,
                     pending.Size.Height))
+            {
+                (_normalPosition, _normalSize) = pending;
+            }
+
+            _pending = null;
+        }
+        else if (oldState == WindowState.Normal && newState == WindowState.Minimized)
+        {
+            // A move/resize just before minimize must still be saved; do not apply the maximize filter.
+            if (_pending is { } pending)
             {
                 (_normalPosition, _normalSize) = pending;
             }

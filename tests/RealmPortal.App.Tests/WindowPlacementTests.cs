@@ -300,6 +300,28 @@ public class WindowPlacementPersistenceTests
     }
 
     [AvaloniaFact]
+    public void AMoveRightBeforeMinimizingIsNotLost()
+    {
+        using var temp = new TempDirectory();
+        var store = new UiPreferencesStore(temp.Path);
+        store.SetWindowPlacement(new WindowPlacement(40, 30, 900, 560, Maximized: false));
+        var window = new MainWindow(MainViewModel.ForDemo(autoTick: false));
+        WindowPlacementPersistence.Attach(window, store);
+        window.Show();
+        Screenshots.Settle();
+
+        // Move, then minimize before the deferred capture has run.
+        window.Position = new PixelPoint(120, 90);
+        window.WindowState = WindowState.Minimized;
+        window.Close();
+
+        var saved = store.Load().Window!;
+        Assert.False(saved.Maximized);
+        Assert.Equal((120, 90), (saved.X, saved.Y));
+        Assert.Equal((900.0, 560.0), (saved.Width, saved.Height));
+    }
+
+    [AvaloniaFact]
     public void MinimizedIsNeverSavedAsMinimized()
     {
         using var temp = new TempDirectory();
