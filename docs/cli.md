@@ -23,6 +23,7 @@ Write the command, then its arguments and options: `realm-portal <command> [argu
 ```text
 realm-portal --version
 realm-portal --help
+realm-portal -h
 realm-portal client-version <client-directory>
 realm-portal add <name> <host> [--realm <realm>] [--line <realmlist line>]... [--build <n>] [--account <name>]
 realm-portal remove <server>
