@@ -99,7 +99,7 @@ public sealed class CliApp(
             var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher),
                 probe, getVariable: getVariable, scanOptions: scanOptions);
             string? clientId = null;
-            if (clientDir is not null && command is "list" or "switch" or "status" or "launch")
+            if (clientDir is not null && command is "list" or "switch" or "status" or "launch" or "undo")
             {
                 var reg = service.AddClient(clientDir);
                 if (!reg.Succeeded)
@@ -113,7 +113,7 @@ public sealed class CliApp(
                 "remove" => Remove(parsed, service),
                 "list" => List(parsed, service, clientId, clientDir),
                 "switch" => SwitchCommand(parsed, service, clientId, clientDir),
-                "undo" => Undo(parsed, service),
+                "undo" => Undo(parsed, service, clientId, clientDir),
                 "status" => Status(parsed, service, clientId, clientDir),
                 "launch" => Launch(parsed, service, clientId, clientDir, parsed.Flags.Contains("--dry-run")),
                 "client" => ClientCommand(parsed, service),
@@ -441,10 +441,13 @@ public sealed class CliApp(
         return 0;
     }
 
-    private int Undo(Parsed parsed, PortalService service)
+    private int Undo(Parsed parsed, PortalService service, string? clientId, string? clientDir)
     {
         Expect(parsed, 0, 0, "no arguments");
-        var result = service.Undo();
+        // --client-dir scopes undo to that client's last switch (#149). Without it, undo uses the global record.
+        if (clientDir is not null && clientId is null)
+            throw new UsageException("could not register --client-dir for undo");
+        var result = service.Undo(clientId);
         if (!result.Succeeded)
             return Fail(result.Error!);
         var restored = result.Value!.Active;
