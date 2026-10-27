@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using RealmPortal.Core.IO;
 using RealmPortal.Core.Servers;
+using RealmPortal.Core.Service;
 using RealmPortal.Core.Updates;
 using RealmPortal.Tests.Support;
 
@@ -85,7 +86,7 @@ public class UpdateNotice105Tests
         var (settings, cache, dir) = Stores();
         using (dir)
         {
-            settings.Save(new NetworkSettings(AutoCheckUpdates: false));
+            settings.Set(new NetworkSettings(UpdatesAutoCheck: false));
             var feed = new FakeFeed
             {
                 Handler = (_, _) => throw new InvalidOperationException("should not be called"),
@@ -104,7 +105,7 @@ public class UpdateNotice105Tests
         using (dir)
         {
             var now = DateTimeOffset.Parse("2026-10-27T12:00:00Z");
-            settings.Save(new NetworkSettings(AutoCheckUpdates: true, LastAttemptUtc: now.AddHours(-1)));
+            settings.Set(new NetworkSettings(UpdatesAutoCheck: true, UpdatesLastAttemptUtc: now.AddHours(-1)));
             var feed = new FakeFeed { Handler = (_, _) => throw new InvalidOperationException("no") };
             var checker = new UpdateChecker(settings, cache, feed, runningVersion: () => "1.0.1", clock: () => now);
             var result = await checker.CheckAsync(UpdateCheckMode.Automatic);
@@ -119,7 +120,7 @@ public class UpdateNotice105Tests
         var (settings, cache, dir) = Stores();
         using (dir)
         {
-            settings.Save(new NetworkSettings(AutoCheckUpdates: false));
+            settings.Set(new NetworkSettings(UpdatesAutoCheck: false));
             var now = DateTimeOffset.Parse("2026-10-27T12:00:00Z");
             var clock = now;
             var json = ReleaseJson("v1.1.0");
@@ -159,7 +160,7 @@ public class UpdateNotice105Tests
             };
             var checker = new UpdateChecker(settings, cache, feed, runningVersion: () => running,
                 clock: () => DateTimeOffset.Parse("2026-10-27T12:00:00Z"));
-            settings.Save(new NetworkSettings(AutoCheckUpdates: true, LastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
+            settings.Set(new NetworkSettings(UpdatesAutoCheck: true, UpdatesLastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
             var result = await checker.CheckAsync(UpdateCheckMode.Automatic);
             Assert.Equal(expected, result.Outcome);
         }
@@ -171,8 +172,8 @@ public class UpdateNotice105Tests
         var (settings, cache, dir) = Stores();
         using (dir)
         {
-            settings.Save(new NetworkSettings(AutoCheckUpdates: true, SkippedVersion: "1.1.0",
-                LastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
+            settings.Set(new NetworkSettings(UpdatesAutoCheck: true, UpdatesSkippedVersion: "1.1.0",
+                UpdatesLastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
             var feed = new FakeFeed
             {
                 Handler = (_, _) => Task.FromResult(new ReleaseFeedResponse(200, null, ReleaseJson("v1.1.0"), false)),
@@ -197,12 +198,12 @@ public class UpdateNotice105Tests
             };
             var checker = new UpdateChecker(settings, cache, feed, runningVersion: () => "1.0.1", clock: () => now);
             checker.RemindLater("1.1.0");
-            settings.Save(settings.Load() with { LastAttemptUtc = now.AddDays(-2), AutoCheckUpdates = true });
+            settings.Set(settings.Get() with { UpdatesLastAttemptUtc = now.AddDays(-2), UpdatesAutoCheck = true });
             var postponed = await checker.CheckAsync(UpdateCheckMode.Automatic);
             Assert.Equal(UpdateCheckOutcome.NoNotice, postponed.Outcome);
 
             feed.Handler = (_, _) => Task.FromResult(new ReleaseFeedResponse(200, null, ReleaseJson("v1.2.0"), false));
-            settings.Update(s => s with { LastAttemptUtc = now.AddDays(-2) });
+            settings.Update(s => s with { UpdatesLastAttemptUtc = now.AddDays(-2) });
             var newer = await checker.CheckAsync(UpdateCheckMode.Automatic);
             Assert.Equal(UpdateCheckOutcome.Offer, newer.Outcome);
             Assert.Equal("1.2.0", newer.Offer!.Version);
@@ -219,7 +220,7 @@ public class UpdateNotice105Tests
         var (settings, cache, dir) = Stores();
         using (dir)
         {
-            settings.Save(new NetworkSettings(LastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
+            settings.Set(new NetworkSettings(UpdatesLastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
             var feed = new FakeFeed
             {
                 Handler = (_, _) => Task.FromResult(new ReleaseFeedResponse(200, null, ReleaseJson(tag, draft, pre), false)),
@@ -239,7 +240,7 @@ public class UpdateNotice105Tests
         {
             var json = ReleaseJson("v1.1.0");
             cache.Save("\"abc\"", json);
-            settings.Save(new NetworkSettings(ETag: "\"abc\"", LastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
+            settings.Set(new NetworkSettings(UpdatesEtag: "\"abc\"", UpdatesLastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
             var feed = new FakeFeed
             {
                 Handler = (etag, _) =>
@@ -255,11 +256,11 @@ public class UpdateNotice105Tests
 
             // Without cache → 304 fails
             cache.Clear();
-            settings.Save(settings.Load() with { LastAttemptUtc = DateTimeOffset.Parse("2026-10-20T12:00:00Z"), ETag = "\"abc\"" });
+            settings.Set(settings.Get() with { UpdatesLastAttemptUtc = DateTimeOffset.Parse("2026-10-20T12:00:00Z"), UpdatesEtag = "\"abc\"" });
             feed.Handler = (_, _) => Task.FromResult(new ReleaseFeedResponse(304, "\"abc\"", null, true));
             var fail = await checker.CheckAsync(UpdateCheckMode.Automatic);
             Assert.Equal(UpdateCheckOutcome.Failed, fail.Outcome);
-            Assert.Null(settings.Load().ETag);
+            Assert.Null(settings.Get().UpdatesEtag);
         }
     }
 
@@ -271,7 +272,7 @@ public class UpdateNotice105Tests
         {
             var now = DateTimeOffset.Parse("2026-10-27T12:00:00Z");
             var clock = now;
-            settings.Save(new NetworkSettings(LastAttemptUtc: now.AddDays(-2)));
+            settings.Set(new NetworkSettings(UpdatesLastAttemptUtc: now.AddDays(-2)));
             var feed = new FakeFeed
             {
                 Handler = (_, _) => throw new UpdateException(UpdateErrorCode.RateLimited, "limited")
@@ -285,7 +286,7 @@ public class UpdateNotice105Tests
             Assert.Equal(UpdateCheckOutcome.RateLimited, result.Outcome);
 
             clock = now.AddMinutes(1);
-            settings.Update(s => s with { LastAttemptUtc = now.AddDays(-2) });
+            settings.Update(s => s with { UpdatesLastAttemptUtc = now.AddDays(-2) });
             var again = await checker.CheckAsync(UpdateCheckMode.Automatic);
             Assert.Equal(UpdateCheckOutcome.RateLimited, again.Outcome);
             Assert.Equal(1, feed.Calls); // second call blocked by local gate
@@ -298,7 +299,7 @@ public class UpdateNotice105Tests
         var (settings, cache, dir) = Stores();
         using (dir)
         {
-            settings.Save(new NetworkSettings(LastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
+            settings.Set(new NetworkSettings(UpdatesLastAttemptUtc: DateTimeOffset.Parse("2026-10-20T12:00:00Z")));
             var feed = new FakeFeed
             {
                 Handler = (_, _) => throw new UpdateException(UpdateErrorCode.DownloadTooLarge, "too big"),
@@ -394,14 +395,14 @@ public class UpdateNotice105Tests
         var (settings, _, dir) = Stores();
         using (dir)
         {
-            var d = settings.Load();
-            Assert.True(d.AutoCheckUpdates);
-            Assert.True(d.ProbeEnabled);
-            settings.Save(d with { AutoCheckUpdates = false, ProbeEnabled = false, SkippedVersion = "1.2.0" });
-            var loaded = settings.Load();
-            Assert.False(loaded.AutoCheckUpdates);
-            Assert.False(loaded.ProbeEnabled);
-            Assert.Equal("1.2.0", loaded.SkippedVersion);
+            var d = settings.Get();
+            Assert.True(d.UpdatesAutoCheck);
+            Assert.True(d.StatusProbeEnabled);
+            settings.Set(d with { UpdatesAutoCheck = false, StatusProbeEnabled = false, UpdatesSkippedVersion = "1.2.0" });
+            var loaded = settings.Get();
+            Assert.False(loaded.UpdatesAutoCheck);
+            Assert.False(loaded.StatusProbeEnabled);
+            Assert.Equal("1.2.0", loaded.UpdatesSkippedVersion);
             if (!OperatingSystem.IsWindows())
             {
                 var mode = File.GetUnixFileMode(settings.FilePath);
@@ -567,12 +568,12 @@ public class UpdateNotice105Tests
             var checker = new UpdateChecker(settings, cache, feed, runningVersion: () => "1.0.1",
                 clock: () => DateTimeOffset.Parse("2026-10-27T12:00:00Z"));
             checker.SkipThisVersion("1.1.0");
-            Assert.Equal("1.1.0", settings.Load().SkippedVersion);
+            Assert.Equal("1.1.0", settings.Get().UpdatesSkippedVersion);
             checker.RemindLater("v1.2.0");
-            var s = settings.Load();
-            Assert.Equal("1.2.0", s.LaterVersion);
-            Assert.NotNull(s.LaterUntilUtc);
-            Assert.True(s.LaterUntilUtc > DateTimeOffset.Parse("2026-10-29T12:00:00Z"));
+            var s = settings.Get();
+            Assert.Equal("1.2.0", s.UpdatesLaterVersion);
+            Assert.NotNull(s.UpdatesLaterUntilUtc);
+            Assert.True(s.UpdatesLaterUntilUtc > DateTimeOffset.Parse("2026-10-29T12:00:00Z"));
         }
     }
 }

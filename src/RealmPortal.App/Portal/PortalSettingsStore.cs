@@ -21,7 +21,7 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
                 : string.Empty;
 
         var clearCache = backup.Succeeded && backup.Value!.ClearCacheOnSwitch;
-        var autoCheck = session.NetworkSettings.LoadOrDefault(out _).AutoCheckUpdates;
+        var autoCheck = session.NetworkSettings.LoadOrDefault(out _).UpdatesAutoCheck;
         return new SettingsModel(
             language,
             launcherValue.CommandTemplate,
@@ -36,17 +36,17 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
     public SettingsError? Save(SettingsModel settings)
     {
         // Network settings first so a failure commits nothing else.
-        // Valid file: Update only AutoCheckUpdates so concurrent LastAttemptUtc / ETag are preserved.
-        // Corrupt file: overwrite with Save to repair, then continue.
+        // Valid file: Update only UpdatesAutoCheck so concurrent LastAttemptUtc / ETag are preserved.
+        // Corrupt file: overwrite with Set to repair, then continue.
         var currentNetwork = session.NetworkSettings.LoadOrDefault(out var networkError);
-        if (networkError is not null || currentNetwork.AutoCheckUpdates != settings.AutoCheckUpdates)
+        if (networkError is not null || currentNetwork.UpdatesAutoCheck != settings.AutoCheckUpdates)
         {
             try
             {
                 if (networkError is not null)
-                    session.NetworkSettings.Save(currentNetwork with { AutoCheckUpdates = settings.AutoCheckUpdates });
+                    session.NetworkSettings.Set(currentNetwork with { UpdatesAutoCheck = settings.AutoCheckUpdates });
                 else
-                    session.NetworkSettings.Update(s => s with { AutoCheckUpdates = settings.AutoCheckUpdates });
+                    session.NetworkSettings.Update(s => s with { UpdatesAutoCheck = settings.AutoCheckUpdates });
             }
             catch (Exception)
             {

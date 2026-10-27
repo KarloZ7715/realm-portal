@@ -1,17 +1,5 @@
 namespace RealmPortal.Core.Updates;
 
-/// <summary>
-/// Persisted network preferences (<c>network-settings.json</c>). Defaults: auto-check and status probe both on.
-/// </summary>
-public sealed record NetworkSettings(
-    bool AutoCheckUpdates = true,
-    DateTimeOffset? LastAttemptUtc = null,
-    string? ETag = null,
-    string? SkippedVersion = null,
-    string? LaterVersion = null,
-    DateTimeOffset? LaterUntilUtc = null,
-    bool ProbeEnabled = true);
-
 /// <summary>How an update check was triggered.</summary>
 public enum UpdateCheckMode
 {

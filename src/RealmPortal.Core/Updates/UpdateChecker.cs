@@ -1,3 +1,4 @@
+using RealmPortal.Core.Service;
 namespace RealmPortal.Core.Updates;
 
 /// <summary>Orchestrates policy, feed fetch, version comparison and postpone/skip.</summary>
@@ -41,7 +42,7 @@ public sealed class UpdateChecker : IUpdateChecker
         NetworkSettings settings;
         try
         {
-            settings = _settings.Load();
+            settings = _settings.Get();
         }
         catch (Exception ex)
         {
@@ -50,17 +51,17 @@ public sealed class UpdateChecker : IUpdateChecker
 
         if (mode == UpdateCheckMode.Automatic)
         {
-            if (!settings.AutoCheckUpdates)
+            if (!settings.UpdatesAutoCheck)
                 return new UpdateCheckResult(UpdateCheckOutcome.SkippedByPolicy);
 
-            var last = NormalizeAttempt(settings.LastAttemptUtc, now);
+            var last = NormalizeAttempt(settings.UpdatesLastAttemptUtc, now);
             if (last is not null && now - last.Value < AutoCheckInterval)
                 return new UpdateCheckResult(UpdateCheckOutcome.SkippedByPolicy);
 
             // Write attempt time at the start so a failed check also waits 24 h.
             try
             {
-                _settings.Update(s => s with { LastAttemptUtc = now });
+                _settings.Update(s => s with { UpdatesLastAttemptUtc = now });
             }
             catch (Exception ex)
             {
@@ -90,13 +91,13 @@ public sealed class UpdateChecker : IUpdateChecker
 
         string? ifNoneMatch = null;
         var hasCache = _cache.TryLoad(out var cachedEtag, out var cachedBody);
-        if (hasCache && !string.IsNullOrWhiteSpace(settings.ETag) && settings.ETag == cachedEtag)
+        if (hasCache && !string.IsNullOrWhiteSpace(settings.UpdatesEtag) && settings.UpdatesEtag == cachedEtag)
             ifNoneMatch = cachedEtag;
-        else if (!hasCache && !string.IsNullOrWhiteSpace(settings.ETag))
+        else if (!hasCache && !string.IsNullOrWhiteSpace(settings.UpdatesEtag))
         {
             // Cache missing: drop ETag and make an unconditional request.
-            try { _settings.Update(s => s with { ETag = null }); } catch { /* best effort */ }
-            settings = settings with { ETag = null };
+            try { _settings.Update(s => s with { UpdatesEtag = null }); } catch { /* best effort */ }
+            settings = settings with { UpdatesEtag = null };
         }
 
         ReleaseFeedResponse response;
@@ -129,7 +130,7 @@ public sealed class UpdateChecker : IUpdateChecker
             if (!hasCache)
             {
                 // 304 without a body we can use — drop ETag and treat as failure for this attempt.
-                try { _settings.Update(s => s with { ETag = null }); } catch { /* ignore */ }
+                try { _settings.Update(s => s with { UpdatesEtag = null }); } catch { /* ignore */ }
                 return Fail(UpdateErrorCode.UpdateCheckFailed, "304 without cached body.");
             }
 
@@ -143,8 +144,8 @@ public sealed class UpdateChecker : IUpdateChecker
                 try
                 {
                     _cache.Save(response.ETag, body);
-                    _settings.Update(s => s with { ETag = response.ETag });
-                    settings = settings with { ETag = response.ETag };
+                    _settings.Update(s => s with { UpdatesEtag = response.ETag });
+                    settings = settings with { UpdatesEtag = response.ETag };
                 }
                 catch (Exception ex)
                 {
@@ -167,8 +168,8 @@ public sealed class UpdateChecker : IUpdateChecker
         var until = _clock() + LaterDuration;
         _settings.Update(s => s with
         {
-            LaterVersion = parsed.WithoutPrefix,
-            LaterUntilUtc = until,
+            UpdatesLaterVersion = parsed.WithoutPrefix,
+            UpdatesLaterUntilUtc = until,
         });
     }
 
@@ -179,7 +180,7 @@ public sealed class UpdateChecker : IUpdateChecker
             && !ReleaseVersion.TryParseTag(version.StartsWith('v') ? version : "v" + version, out parsed))
             throw new ArgumentException("Version is not a valid release version.", nameof(version));
 
-        _settings.Update(s => s with { SkippedVersion = parsed.WithoutPrefix });
+        _settings.Update(s => s with { UpdatesSkippedVersion = parsed.WithoutPrefix });
     }
 
     public Task<UpdateInstallResult> InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default)
@@ -216,15 +217,15 @@ public sealed class UpdateChecker : IUpdateChecker
         if (release.Version <= running)
             return new UpdateCheckResult(UpdateCheckOutcome.UpToDate);
 
-        if (settings.SkippedVersion is { } skipped
+        if (settings.UpdatesSkippedVersion is { } skipped
             && ReleaseVersion.TryParseInformational(skipped, out var skippedVer)
             && skippedVer == release.Version)
         {
             return new UpdateCheckResult(UpdateCheckOutcome.NoNotice, Diagnostic: "Version skipped by user.");
         }
 
-        if (settings.LaterVersion is { } later
-            && settings.LaterUntilUtc is { } until
+        if (settings.UpdatesLaterVersion is { } later
+            && settings.UpdatesLaterUntilUtc is { } until
             && ReleaseVersion.TryParseInformational(later, out var laterVer)
             && laterVer == release.Version)
         {
