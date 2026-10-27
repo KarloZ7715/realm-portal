@@ -77,8 +77,9 @@ public sealed class NetworkSettingsStore
     }
 
     /// <summary>
-    /// Replaces the file without reading the old content (corrupt-file repair).
-    /// Moves any existing file aside as <c>network-settings.json.corrupt</c> first.
+    /// Replaces the file without reading the old content (corrupt-file repair only).
+    /// Moves any existing file aside first (never deletes an existing <c>.corrupt*</c> backup);
+    /// if the move fails, nothing is written.
     /// </summary>
     public void Overwrite(NetworkSettings settings)
     {
@@ -87,23 +88,37 @@ public sealed class NetworkSettingsStore
         {
             if (File.Exists(_path))
             {
-                var backup = _path + ".corrupt";
-                try
-                {
-                    if (File.Exists(backup))
-                        File.Delete(backup);
-                    File.Move(_path, backup);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    // Best effort: still attempt the overwrite write below.
-                }
+                var backup = AllocateCorruptBackupPath(_path);
+                File.Move(_path, backup);
             }
 
             var file = Apply(new NetworkFile { Version = FormatVersion }, settings);
             file.Version = FormatVersion;
             Write(file);
         }
+    }
+
+    /// <summary>True when <paramref name="error"/> is empty/invalid JSON content (safe to repair by overwrite).</summary>
+    public static bool IsCorruptContent(Exception? error) =>
+        error is JsonException
+        || (error is StoreException se
+            && (se.Message.Contains("is empty", StringComparison.Ordinal)
+                || se.Message.Contains("is not valid", StringComparison.Ordinal)
+                || se.InnerException is JsonException));
+
+    private static string AllocateCorruptBackupPath(string path)
+    {
+        var candidate = path + ".corrupt";
+        if (!File.Exists(candidate) && !Directory.Exists(candidate))
+            return candidate;
+        for (var i = 1; i < 10_000; i++)
+        {
+            candidate = path + ".corrupt." + i.ToString(CultureInfo.InvariantCulture);
+            if (!File.Exists(candidate) && !Directory.Exists(candidate))
+                return candidate;
+        }
+
+        throw new IOException("Could not allocate a network-settings corrupt backup path.");
     }
 
     /// <summary>Read-modify-write under the config lock so concurrent ETag / LastAttempt updates are preserved.</summary>

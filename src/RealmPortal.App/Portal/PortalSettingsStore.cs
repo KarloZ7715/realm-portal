@@ -37,16 +37,27 @@ public sealed class PortalSettingsStore(PortalSession session) : ISettingsStore
     {
         // Network settings first so a failure commits nothing else.
         // Valid file: Update only UpdatesAutoCheck so concurrent LastAttemptUtc / ETag are preserved.
-        // Corrupt file: Overwrite (no read) after moving the bad file aside, then continue.
+        // Corrupt JSON/empty: Overwrite after moving the bad file aside.
+        // Unsupported version / unreadable: preserve the file and fail the save (do not reset toggles).
         var currentNetwork = session.NetworkSettings.LoadOrDefault(out var networkError);
-        if (networkError is not null || currentNetwork.UpdatesAutoCheck != settings.AutoCheckUpdates)
+        if (networkError is not null)
+        {
+            if (!NetworkSettingsStore.IsCorruptContent(networkError))
+                return new SettingsError("StoreCorrupt");
+            try
+            {
+                session.NetworkSettings.Overwrite(currentNetwork with { UpdatesAutoCheck = settings.AutoCheckUpdates });
+            }
+            catch (Exception)
+            {
+                return new SettingsError("StoreCorrupt");
+            }
+        }
+        else if (currentNetwork.UpdatesAutoCheck != settings.AutoCheckUpdates)
         {
             try
             {
-                if (networkError is not null)
-                    session.NetworkSettings.Overwrite(currentNetwork with { UpdatesAutoCheck = settings.AutoCheckUpdates });
-                else
-                    session.NetworkSettings.Update(s => s with { UpdatesAutoCheck = settings.AutoCheckUpdates });
+                session.NetworkSettings.Update(s => s with { UpdatesAutoCheck = settings.AutoCheckUpdates });
             }
             catch (Exception)
             {

@@ -87,6 +87,13 @@ public class NetworkSettingsStoreTests
         var got = store.Get();
         Assert.False(got.UpdatesAutoCheck);
         Assert.False(got.StatusProbeEnabled);
+
+        File.WriteAllText(path, "{ still bad");
+        store.Overwrite(new NetworkSettings(UpdatesAutoCheck: true));
+        Assert.True(File.Exists(path + ".corrupt")); // preserved
+        Assert.True(File.Exists(path + ".corrupt.1"));
+        Assert.True(NetworkSettingsStore.IsCorruptContent(new StoreException("x is not valid: boom")));
+        Assert.False(NetworkSettingsStore.IsCorruptContent(new StoreException("x has unsupported format version 99.")));
     }
 
     private sealed class TempConfig : IDisposable
