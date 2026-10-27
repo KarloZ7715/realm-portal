@@ -98,6 +98,34 @@
           </StackPanel>
         </ContentControl>
 
+
+        <!-- Network & privacy (#104 / #105) -->
+        <ContentControl Classes="card thin" Padding="26,12,26,16">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="sheet-title" Text="{loc:T settings.network}"/>
+            <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+            <CheckBox Name="AutoCheckUpdatesOption" Classes="parchment" Margin="0,4,0,0"
+                      IsChecked="{Binding AutoCheckUpdates, Mode=TwoWay}"
+                      Content="{loc:T settings.updates.auto}"/>
+            <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}"
+                       Text="{loc:T settings.updates.auto.hint}"/>
+            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
+              <Button Name="CheckUpdatesButton" Classes="secondary compact" MinWidth="172"
+                      c:ButtonSurface.Surface="Parchment" Command="{Binding CheckForUpdatesCommand}">
+                <TextBlock Text="{loc:T settings.updates.check}"/>
+              </Button>
+              <TextBlock Name="UpdateCheckStatus" Classes="footnote" VerticalAlignment="Center"
+                         Foreground="{DynamicResource InkSoftBrush}" Text="{Binding UpdateCheckStatus}"
+                         IsVisible="{Binding UpdateCheckStatus, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+            </StackPanel>
+            <CheckBox Name="StatusProbeOption" Classes="parchment" Margin="0,8,0,0"
+                      IsChecked="{Binding StatusProbeEnabled, Mode=TwoWay}"
+                      Content="{loc:T settings.status.probe}"/>
+            <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}"
+                       Text="{loc:T settings.status.probe.hint}"/>
+          </StackPanel>
+        </ContentControl>
+
         <!-- About -->
         <ContentControl Classes="card thin" Padding="26,12,26,16">
           <StackPanel Spacing="8">

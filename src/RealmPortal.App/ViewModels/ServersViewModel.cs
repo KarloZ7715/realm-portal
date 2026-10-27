@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.Core.Network;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Service;
 using RealmPortal.Core;
@@ -60,6 +61,10 @@ public sealed partial class ServersViewModel : ViewModelBase
     private bool _canUndoPending;
     private ServiceError? _bannerError;
     private string? _bannerMessageKey;
+    private ProbeScheduler? _probes;
+    private bool _statusDotsVisible;
+    private readonly Dictionary<string, ServerProbeSnapshot> _probeCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _probeEndpoints = new(StringComparer.Ordinal);
 
     public ServersViewModel(DemoBackend backend, bool autoTick = true)
     {
@@ -94,6 +99,100 @@ public sealed partial class ServersViewModel : ViewModelBase
     }
 
     public bool IsPortal => _session is not null;
+
+    /// <summary>Wires the login-port probe scheduler (#104). Safe to call once from Main.</summary>
+    public void AttachProbeScheduler(ProbeScheduler scheduler, bool dotsVisible)
+    {
+        ArgumentNullException.ThrowIfNull(scheduler);
+        if (_probes is not null)
+            _probes.StatusChanged -= OnProbeStatusChanged;
+        _probes = scheduler;
+        _probes.StatusChanged += OnProbeStatusChanged;
+        SetStatusDotsVisible(dotsVisible);
+        PushServersToProbe();
+    }
+
+    public void SetStatusDotsVisible(bool visible)
+    {
+        _statusDotsVisible = visible;
+        foreach (var card in _all)
+            card.SetStatusDotVisible(visible);
+        if (!visible)
+        {
+            foreach (var card in _all)
+                card.ClearProbeStatus();
+        }
+        else
+        {
+            foreach (var card in _all)
+            {
+                if (card.ServerId is { } id && _probeCache.TryGetValue(id, out var snap))
+                    card.ApplyProbeSnapshot(snap);
+            }
+        }
+    }
+
+    private void OnProbeStatusChanged(ServerProbeSnapshot snapshot)
+    {
+        // Probe callbacks arrive off the UI thread; touch cache + cards only on the UI thread.
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            ApplyProbeStatusOnUi(snapshot);
+        else
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyProbeStatusOnUi(snapshot));
+    }
+
+    private void ApplyProbeStatusOnUi(ServerProbeSnapshot snapshot)
+    {
+        _probeCache[snapshot.ServerId] = snapshot;
+        if (!_statusDotsVisible)
+            return;
+        var card = _all.FirstOrDefault(c => c.ServerId == snapshot.ServerId);
+        card?.ApplyProbeSnapshot(snapshot);
+    }
+
+    private void PushServersToProbe()
+    {
+        if (_probes is null)
+            return;
+
+        var servers = new List<ProbeServerTarget>();
+        var keepIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var card in _all)
+        {
+            if (card.ServerId is null)
+                continue;
+            // Core ProbeScheduler parses host:port (default 3724) from the stored realmlist host.
+            var token = string.IsNullOrWhiteSpace(card.Address) ? card.Host : card.Address;
+            if (string.IsNullOrWhiteSpace(token))
+                continue;
+            if (!RealmlistAddress.TryParseHostAddress(token, out _, out _))
+                continue;
+            var host = token.Trim();
+            keepIds.Add(card.ServerId);
+            if (_probeEndpoints.TryGetValue(card.ServerId, out var previous)
+                && !string.Equals(previous, host, StringComparison.OrdinalIgnoreCase))
+            {
+                _probeCache.Remove(card.ServerId);
+            }
+            _probeEndpoints[card.ServerId] = host;
+            servers.Add(new ProbeServerTarget(card.ServerId, host));
+        }
+        foreach (var id in _probeEndpoints.Keys.Where(id => !keepIds.Contains(id)).ToArray())
+        {
+            _probeEndpoints.Remove(id);
+            _probeCache.Remove(id);
+        }
+        _probes.SetServers(servers);
+
+        foreach (var card in _all)
+        {
+            card.SetStatusDotVisible(_statusDotsVisible);
+            if (_statusDotsVisible && card.ServerId is { } id && _probeCache.TryGetValue(id, out var snap))
+                card.ApplyProbeSnapshot(snap);
+            else if (!_statusDotsVisible)
+                card.ClearProbeStatus();
+        }
+    }
 
     /// <summary>When undo conflicts, asks before <see cref="IPortalService.DiscardUndo"/> via <see cref="ConfirmDialogViewModel"/>.</summary>
     public Func<Task<bool>>? ConfirmDiscardAsync { get; set; }
@@ -503,6 +602,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasMultipleClients));
         Refresh();
         RefreshUndoAvailability();
+        PushServersToProbe();
     }
 
     private static string ClientDisplayName(ClientEntry client) =>

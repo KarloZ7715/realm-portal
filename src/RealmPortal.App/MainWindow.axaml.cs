@@ -34,6 +34,7 @@ public partial class MainWindow : Window
         Opened += (_, _) => Platform.X11WindowIcon.TrySet(this);
         SizeChanged += (_, e) => UpdateSidebar(e.NewSize.Width);
         Closing += (_, e) => OnClosingWithUnsavedSettings(viewModel, e);
+        Closed += (_, _) => viewModel.DisposeNetwork();
     }
 
     /// <summary>

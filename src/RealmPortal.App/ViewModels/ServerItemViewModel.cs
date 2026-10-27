@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
+using RealmPortal.Core.Network;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Servers;
 using RealmPortal.Core.Service;
@@ -327,5 +328,125 @@ public sealed partial class ServerItemViewModel : ObservableObject
         OnPropertyChanged(nameof(ClientLabel));
         OnPropertyChanged(nameof(MenuDisabledHint));
         OnPropertyChanged(nameof(ShowMenuDisabledHint));
+        OnPropertyChanged(nameof(StatusTooltip));
+        OnPropertyChanged(nameof(StatusAccessibleName));
+    }
+
+    // --- Login reachability status dot (#104) ---
+
+    private ServerProbeStatus _loginStatus = ServerProbeStatus.Unknown;
+    private string? _statusReason;
+    private DateTimeOffset? _statusCheckedAt;
+    private bool _showStatusDot;
+
+    /// <summary>When false the status dot is hidden (probes disabled in Settings).</summary>
+    public bool ShowStatusDot
+    {
+        get => _showStatusDot;
+        private set
+        {
+            if (SetProperty(ref _showStatusDot, value))
+                NotifyStatusDot();
+        }
+    }
+
+    public ServerProbeStatus LoginStatus => _loginStatus;
+
+    public bool IsStatusOnline => _showStatusDot && _loginStatus == ServerProbeStatus.Online;
+    public bool IsStatusOffline => _showStatusDot && _loginStatus == ServerProbeStatus.Offline;
+    public bool IsStatusNeutral => _showStatusDot
+        && (_loginStatus is ServerProbeStatus.Unknown or ServerProbeStatus.Checking);
+
+    public string StatusTooltip => BuildStatusTooltip();
+
+    public string StatusAccessibleName => StatusTooltip;
+
+    public void SetStatusDotVisible(bool visible) => ShowStatusDot = visible;
+
+    public void ApplyProbeSnapshot(ServerProbeSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        _loginStatus = snapshot.Status;
+        _statusReason = snapshot.Reason;
+        _statusCheckedAt = snapshot.CheckedAtUtc;
+        NotifyStatusDot();
+    }
+
+    public void ClearProbeStatus()
+    {
+        _loginStatus = ServerProbeStatus.Unknown;
+        _statusReason = null;
+        _statusCheckedAt = null;
+        NotifyStatusDot();
+    }
+
+    private void NotifyStatusDot()
+    {
+        OnPropertyChanged(nameof(LoginStatus));
+        OnPropertyChanged(nameof(IsStatusOnline));
+        OnPropertyChanged(nameof(IsStatusOffline));
+        OnPropertyChanged(nameof(IsStatusNeutral));
+        OnPropertyChanged(nameof(StatusTooltip));
+        OnPropertyChanged(nameof(StatusAccessibleName));
+        OnPropertyChanged(nameof(ShowStatusDot));
+    }
+
+    private string BuildStatusTooltip()
+    {
+        var age = FormatAge(_statusCheckedAt);
+        var reason = ResolveReason(_statusReason);
+        return _loginStatus switch
+        {
+            ServerProbeStatus.Online when age is not null =>
+                Loc.Format("status.probe.online.age", age),
+            ServerProbeStatus.Online =>
+                Loc.Get("status.probe.online"),
+            ServerProbeStatus.Offline when reason is { Length: > 0 } && age is not null =>
+                Loc.Format("status.probe.offline.age", reason, age),
+            ServerProbeStatus.Offline when reason is { Length: > 0 } =>
+                Loc.Format("status.probe.offline.reason", reason),
+            ServerProbeStatus.Offline =>
+                Loc.Get("status.probe.offline"),
+            ServerProbeStatus.Checking =>
+                Loc.Get("status.probe.checking"),
+            _ when reason is { Length: > 0 } =>
+                Loc.Format("status.probe.unknown.reason", reason),
+            _ =>
+                Loc.Get("status.probe.unknown"),
+        };
+    }
+
+    /// <summary>Maps Core English probe reasons (and optional Loc keys) to the UI language.</summary>
+    private static string? ResolveReason(string? reasonOrKey)
+    {
+        if (string.IsNullOrEmpty(reasonOrKey))
+            return null;
+        if (reasonOrKey.StartsWith("status.probe.reason.", StringComparison.Ordinal))
+            return Loc.Get(reasonOrKey);
+        // Core ProbeScheduler.Reason* constants (English).
+        return reasonOrKey switch
+        {
+            ProbeScheduler.ReasonTimedOut => Loc.Get("status.probe.reason.timeout"),
+            ProbeScheduler.ReasonDns => Loc.Get("status.probe.reason.dns"),
+            ProbeScheduler.ReasonConnectionRefused => Loc.Get("status.probe.reason.refused"),
+            ProbeScheduler.ReasonLoginReachable => Loc.Get("status.probe.online"),
+            "invalid realmlist host" => Loc.Get("status.probe.reason.invalidhost"),
+            "connection failed" or "offline" or "network error" => Loc.Get("status.probe.reason.failed"),
+            _ when reasonOrKey.StartsWith("network error", StringComparison.Ordinal) =>
+                Loc.Get("status.probe.reason.failed"),
+            _ => reasonOrKey,
+        };
+    }
+
+    private static string? FormatAge(DateTimeOffset? checkedAt)
+    {
+        if (checkedAt is null)
+            return null;
+        var elapsed = DateTimeOffset.UtcNow - checkedAt.Value;
+        if (elapsed < TimeSpan.FromSeconds(45))
+            return Loc.Get("status.probe.age.justnow");
+        if (elapsed < TimeSpan.FromHours(1))
+            return Loc.Format("status.probe.age.minutes", Math.Max(1, (int)elapsed.TotalMinutes));
+        return Loc.Format("status.probe.age.hours", Math.Max(1, (int)elapsed.TotalHours));
     }
 }
