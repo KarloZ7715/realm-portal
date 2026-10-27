@@ -175,4 +175,36 @@ public sealed class Issue149UndoPerClientTests
         Assert.Contains("--client-dir", undo.Err, StringComparison.Ordinal);
         Assert.Equal(wBefore, box.Read(box.ClientW));
     }
+
+    [Fact]
+    public void Undo_ClientDir_ThenOtherClient_DoesNotRewriteGlobalActiveId()
+    {
+        // W must own the last-switch journal when undoing so Clear promotes X while state.Undo is null.
+        // A@W then B@X then A@W skips journal save (sameServerActive); use B@W so W's switch updates the journal.
+        using var box = new Box();
+        Assert.Equal(0, box.Run("add", "A", HostA, "--config-dir", box.Config, "--projection-dir", box.Projection).Code);
+        Assert.Equal(0, box.Run("add", "B", HostB, "--config-dir", box.Config, "--projection-dir", box.Projection).Code);
+
+        Assert.Equal(0, box.Run("switch", "A", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientW).Code);
+        Assert.Equal(0, box.Run("switch", "B", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientX).Code);
+        Assert.Equal(0, box.Run("switch", "B", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientW).Code);
+
+        var undoW = box.Run("undo", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientW);
+        Assert.Equal(0, undoW.Code);
+
+        var statusBefore = box.Run("status", "--config-dir", box.Config, "--projection-dir", box.Projection);
+        Assert.Equal(0, statusBefore.Code);
+        Assert.Contains("Active server: A", statusBefore.Out, StringComparison.Ordinal);
+        Assert.Contains("Can undo: no", statusBefore.Out, StringComparison.Ordinal); // state.Undo consumed
+
+        Assert.Equal(0, box.Run("undo", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientX).Code);
+
+        var statusAfter = box.Run("status", "--config-dir", box.Config, "--projection-dir", box.Projection);
+        Assert.Equal(0, statusAfter.Code);
+        // Promoted journal owner X must not rewrite global ActiveId.
+        Assert.Contains("Active server: A", statusAfter.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("Active server: none", statusAfter.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("Active server: B", statusAfter.Out, StringComparison.Ordinal);
+        Assert.Equal(OldX, box.Read(box.ClientX));
+    }
 }

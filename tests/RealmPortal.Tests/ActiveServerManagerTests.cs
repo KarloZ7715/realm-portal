@@ -473,4 +473,31 @@ public class ActiveServerManagerTests
         Assert.False(env.Manager.HasPendingUndo("clientb"));
         Assert.False(env.Manager.HasPendingUndo());
     }
+
+    [Fact]
+    public void Undo_ClientScoped_AfterGlobalOwnerCleared_DoesNotRewriteActiveIdWhenStateUndoNull()
+    {
+        // After undo of the global owner, state.Undo is null. Journal promotion may still report the
+        // other client as top-level owner; scoped undo must not rewrite ActiveId (CodeRabbit #176).
+        using var env = new Env();
+        var a = env.Add("Alpha");
+        var b = env.Add("Beta");
+        env.Manager.Switch(a, "clienta");
+        env.Manager.Switch(b, "clientb");
+        env.Manager.Switch(a, "clienta"); // clienta owns global again
+
+        env.Manager.Undo("clienta", "clienta"); // consumes global; state.Undo cleared; ActiveId -> Beta
+        Assert.Equal(b, env.Manager.GetActive());
+        Assert.False(env.Manager.HasPendingUndo());
+        Assert.True(env.Manager.HasPendingUndo("clientb"));
+
+        var globalBefore = env.Manager.GetActive()!.Id;
+        // Simulate LastSwitchJournal.Clear promoting clientb into the top-level journal.
+        env.Manager.Undo("clientb", "clientb");
+
+        Assert.Equal(globalBefore, env.Manager.GetActive()!.Id);
+        Assert.Equal(b, env.Manager.GetActive());
+        Assert.Equal(ActiveProjection.Serialize(b), File.ReadAllBytes(env.ActivoPath));
+        Assert.False(env.Manager.HasPendingUndo("clientb"));
+    }
 }
