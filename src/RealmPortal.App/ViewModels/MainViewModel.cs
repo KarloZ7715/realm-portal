@@ -5,6 +5,7 @@ using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Network;
 using RealmPortal.App.Portal;
+using RealmPortal.Core.Network;
 using RealmPortal.App.Platform;
 using RealmPortal.App.Settings;
 using RealmPortal.Core;

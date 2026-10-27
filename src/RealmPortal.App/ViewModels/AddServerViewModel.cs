@@ -4,6 +4,7 @@ using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
+using RealmPortal.Core.Network;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
@@ -293,7 +294,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
             _probeCts = cts;
             TestState = ConnectionTest.Testing;
             var testedAddress = Address;
-            ProbeResult result;
+            ConnectionProbeResult result;
             try
             {
                 // TryParseHostAddress keeps the brackets on an IPv6 literal ("[::1]"). The probe resolves a host, not that token.
@@ -325,7 +326,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
                 return;
             }
 
-            TestState = result switch
+            TestState = result.Outcome switch
             {
                 ProbeResult.Ok => ConnectionTest.Ok,
                 ProbeResult.TimedOut => ConnectionTest.TimedOut,
