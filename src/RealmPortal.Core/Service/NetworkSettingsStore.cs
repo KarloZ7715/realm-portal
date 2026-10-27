@@ -76,6 +76,36 @@ public sealed class NetworkSettingsStore
         }
     }
 
+    /// <summary>
+    /// Replaces the file without reading the old content (corrupt-file repair).
+    /// Moves any existing file aside as <c>network-settings.json.corrupt</c> first.
+    /// </summary>
+    public void Overwrite(NetworkSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        using (_directoryLock.Acquire())
+        {
+            if (File.Exists(_path))
+            {
+                var backup = _path + ".corrupt";
+                try
+                {
+                    if (File.Exists(backup))
+                        File.Delete(backup);
+                    File.Move(_path, backup);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Best effort: still attempt the overwrite write below.
+                }
+            }
+
+            var file = Apply(new NetworkFile { Version = FormatVersion }, settings);
+            file.Version = FormatVersion;
+            Write(file);
+        }
+    }
+
     /// <summary>Read-modify-write under the config lock so concurrent ETag / LastAttempt updates are preserved.</summary>
     public NetworkSettings Update(Func<NetworkSettings, NetworkSettings> mutate)
     {

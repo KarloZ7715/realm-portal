@@ -75,6 +75,20 @@ public class NetworkSettingsStoreTests
         Assert.False(again.UpdatesAutoCheck);
     }
 
+    [Fact]
+    public void Overwrite_RepairsCorruptFile_WithoutReadingIt()
+    {
+        using var env = new TempConfig();
+        var path = Path.Combine(env.Config, "network-settings.json");
+        File.WriteAllText(path, "{ not json");
+        var store = new NetworkSettingsStore(env.Config, new AtomicFileWriter(), env.Lock);
+        store.Overwrite(new NetworkSettings(UpdatesAutoCheck: false, StatusProbeEnabled: false));
+        Assert.True(File.Exists(path + ".corrupt"));
+        var got = store.Get();
+        Assert.False(got.UpdatesAutoCheck);
+        Assert.False(got.StatusProbeEnabled);
+    }
+
     private sealed class TempConfig : IDisposable
     {
         private readonly TempDirectory _temp = new();
