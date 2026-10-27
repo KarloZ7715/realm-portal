@@ -30,19 +30,15 @@ public static class Program
             return 0;
         }
 
-        if (args.Length == 2 && args[0] == "client-version")
+        if (args.Length == 1 && args[0] is "--help" or "-h")
         {
-            try
-            {
-                output.WriteLine(versionReader.Read(args[1]));
-                return 0;
-            }
-            catch (ClientVersionException ex)
-            {
-                CliApp.SafeWriteLine(error, $"error: {ex.Message}");
-                return 2;
-            }
+            output.WriteLine($"{AppInfo.Name} {AppInfo.Version}");
+            output.WriteLine(CliApp.Usage);
+            return 0;
         }
+
+        if (args.Length >= 1 && args[0] == "client-version")
+            return RunClientVersion(args.AsSpan(1), output, error, versionReader);
 
         var app = new CliApp(output, error, versionReader, launcher ?? new ProcessGameLauncher(), getVariable ?? Environment.GetEnvironmentVariable, probe: probe);
         if (args.Length >= 1 && app.IsCommand(args[0]))
@@ -78,6 +74,62 @@ public static class Program
         output.WriteLine($"{AppInfo.Name} {AppInfo.Version}");
         output.WriteLine(CliApp.Usage);
         return args.Length == 0 ? 0 : 1;
+    }
+
+    /// <summary>
+    /// <c>client-version</c> takes one directory and no options (#151). Rejected options are named
+    /// on one escaped line so tokens like <c>--config-dir</c> are not dropped silently.
+    /// </summary>
+    private static int RunClientVersion(
+        ReadOnlySpan<string> args,
+        TextWriter output,
+        TextWriter error,
+        IClientVersionReader versionReader)
+    {
+        string? directory = null;
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg is "--help" or "-h")
+            {
+                output.WriteLine(CliApp.Usage);
+                return 0;
+            }
+
+            if (arg.StartsWith('-'))
+            {
+                CliApp.SafeWriteLine(error, $"error: unknown option {arg}");
+                error.WriteLine(CliApp.Usage);
+                return 1;
+            }
+
+            if (directory is not null)
+            {
+                CliApp.SafeWriteLine(error, $"error: unexpected argument {arg}");
+                error.WriteLine(CliApp.Usage);
+                return 1;
+            }
+
+            directory = arg;
+        }
+
+        if (directory is null)
+        {
+            CliApp.SafeWriteLine(error, "error: client-version needs a client directory");
+            error.WriteLine(CliApp.Usage);
+            return 1;
+        }
+
+        try
+        {
+            output.WriteLine(versionReader.Read(directory));
+            return 0;
+        }
+        catch (ClientVersionException ex)
+        {
+            CliApp.SafeWriteLine(error, $"error: {ex.Message}");
+            return 2;
+        }
     }
 
     private static string[] StripGlobalOptions(string[] args, out bool verbose)
