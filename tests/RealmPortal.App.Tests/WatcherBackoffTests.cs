@@ -75,7 +75,8 @@ public class WatcherBackoffTests
             for (var i = 0; i < count; i++)
             {
                 TaskCompletionSource? tcs = null;
-                var deadline = DateTime.UtcNow.AddSeconds(5);
+                // CI runners can be slower to schedule the Avalonia UI continuation than a local box.
+                var deadline = DateTime.UtcNow.AddSeconds(30);
                 while (!_waiters.TryDequeue(out tcs) && DateTime.UtcNow < deadline)
                 {
                     // The watcher continues on the UI thread after Task.Run; pump so it can reach _delay.
@@ -92,7 +93,7 @@ public class WatcherBackoffTests
         /// <summary>Pumps until the watcher has requested a delay that is still waiting.</summary>
         public async Task WaitUntilPendingAsync()
         {
-            var deadline = DateTime.UtcNow.AddSeconds(5);
+            var deadline = DateTime.UtcNow.AddSeconds(30);
             while (_waiters.IsEmpty && DateTime.UtcNow < deadline)
             {
                 Dispatcher.UIThread.RunJobs();
@@ -201,6 +202,7 @@ public class WatcherBackoffTests
         // Stop the watcher: in-flight delay + two miss delays; the third miss closes with no further delay.
         probe.Running = false;
         var beforeClose = delay.Requested.Count;
+        await delay.WaitUntilPendingAsync();
         await delay.AdvanceAsync(3);
         await PumpUntilAsync(() => env.Main.Servers.GameClosed, TimeSpan.FromSeconds(2));
         Assert.True(env.Main.Servers.GameClosed);
