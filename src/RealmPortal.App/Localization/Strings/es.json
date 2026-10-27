@@ -101,6 +101,8 @@
   "add.name": "Nombre",
   "add.name.help": "Cómo lo verás en la lista.",
   "add.address": "Dirección (realmlist)",
+  "add.address.willuse": "Se usará: {0}",
+  "add.address.willuse.ignored": "Se usará: {0} (se ignoraron el resto de líneas pegadas).",
   "add.address.help": "Con el puerto si hace falta.",
   "add.client": "Cliente",
   "add.client.help": "Elige uno de los clientes detectados.",

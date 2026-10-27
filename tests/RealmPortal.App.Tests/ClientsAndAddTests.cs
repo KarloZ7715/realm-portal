@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Demo;
+using RealmPortal.App.Localization;
 using RealmPortal.App.ViewModels;
 
 namespace RealmPortal.App.Tests;
@@ -228,11 +229,32 @@ public class AddServerScreenTests
     [InlineData("host:70000", false, "", 3724)]
     [InlineData("host:", false, "", 3724)]
     [InlineData("-host.com", false, "", 3724)]
+    [InlineData("set realmlist logon.ejemplo.com", true, "logon.ejemplo.com", 3724)]
+    [InlineData("SET REALMLIST logon.ejemplo.com:8085", true, "logon.ejemplo.com", 8085)]
+    [InlineData("set realmlist \"logon.ejemplo.com\";", true, "logon.ejemplo.com", 3724)]
+    [InlineData("set realmlist 'logon.ejemplo.com'", true, "logon.ejemplo.com", 3724)]
+    [InlineData("set realmlist logon.ejemplo.com\nset patchlist patch.ejemplo.com", true, "logon.ejemplo.com", 3724)]
+    [InlineData("set realmlist [::1]:8085", true, "[::1]", 8085)]
+    [InlineData("set realmlist bad host", false, "", 3724)]
+    [InlineData("set realmlist host;rm", false, "", 3724)]
     public void AddressParsing(string text, bool valid, string host, int port)
     {
         Assert.Equal(valid, AddServerViewModel.TryParseAddress(text, out var parsedHost, out var parsedPort));
         Assert.Equal(host, parsedHost);
         Assert.Equal(port, parsedPort);
+    }
+
+    [AvaloniaFact]
+    public void PastedRealmlist_ShowsInterpretedAddressAndIgnoresExtraLines()
+    {
+        Loc.Instance.SetLanguage(Language.En);
+        var form = new AddServerViewModel(new ClientsViewModel(new DemoBackend()), new DemoBackend(), _ => { }, () => { });
+        form.Address = "set realmlist logon.example.org\nset patchlist patch.example.org";
+        Assert.Equal("Will use: logon.example.org (other pasted lines were ignored).", form.AddressInterpretation);
+        Assert.True(form.HasAddressInterpretation);
+
+        form.Address = "logon.example.org";
+        Assert.Null(form.AddressInterpretation);
     }
 
     [AvaloniaFact]
