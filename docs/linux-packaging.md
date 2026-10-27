@@ -89,8 +89,10 @@ When a package is added or bumped:
 | AppImage | `usr/share/doc/realm-portal/` inside the image |
 | Windows ZIP | next to `RealmPortal.App.exe` |
 
-`build-packages.sh` fails if the `.deb` or the AppDir lacks `LICENSE`, `THIRD_PARTY_LICENSES.md`, the two runtime files or `licenses/nuget/PACKAGES.txt`, and the
+`build-packages.sh` fails if the `.deb` or the AppDir lacks `LICENSE`, the machine-readable Debian `copyright` file, `THIRD_PARTY_LICENSES.md`, the two runtime files or `licenses/nuget/PACKAGES.txt`, and the
 Windows job checks the publish folder before zipping.
+
+The `.deb` (and the AppImage AppDir) ships a DEP-5 / copyright-format 1.0 file at `/usr/share/doc/realm-portal/copyright` (`packaging/linux/copyright`). It covers Realm Portal (MIT), branding/icons art (MIT; see `assets/branding/LICENSE-ART.md`), and the bundled fonts (SIL OFL-1.1, with full texts under `licenses/fonts/`). Self-contained third-party notices for the .NET runtime and NuGet deps live under `/usr/share/doc/realm-portal/licenses/` and are inventoried in `THIRD_PARTY_LICENSES.md` / `licenses/nuget/PACKAGES.txt`.
 
 ### `.deb` dependencies
 
