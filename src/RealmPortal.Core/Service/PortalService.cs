@@ -651,7 +651,10 @@ public sealed class PortalService : IPortalService
         {
             using (_servers.DirectoryLock.Acquire())
             {
-                var ownsGlobal = clientId is not null && _journal.Load()?.ClientId == clientId;
+                // Journal top-level ClientId can lag behind state.Undo after Clear promotes a survivor.
+                var ownsGlobal = clientId is not null
+                    && _active.HasPendingUndo(null)
+                    && string.Equals(_journal.Load()?.ClientId, clientId, StringComparison.Ordinal);
                 _active.DiscardPendingUndo(clientId);
                 if (ownsGlobal)
                     _active.DiscardPendingUndo(null);
@@ -750,7 +753,8 @@ public sealed class PortalService : IPortalService
                         _active.Undo(clientId, globalJournal?.ClientId);
                     else
                     {
-                        var ownsGlobal = string.Equals(globalJournal?.ClientId, clientId, StringComparison.Ordinal);
+                        var ownsGlobal = _active.HasPendingUndo(null)
+                            && string.Equals(globalJournal?.ClientId, clientId, StringComparison.Ordinal);
                         _active.DiscardPendingUndo(clientId);
                         if (ownsGlobal)
                             _active.DiscardPendingUndo(null);
@@ -792,7 +796,8 @@ public sealed class PortalService : IPortalService
 
                 if (journal?.BackupId == backupId)
                 {
-                    var ownsGlobal = string.Equals(globalJournal?.ClientId, clientId, StringComparison.Ordinal);
+                    var ownsGlobal = _active.HasPendingUndo(null)
+                        && string.Equals(globalJournal?.ClientId, clientId, StringComparison.Ordinal);
                     _active.DiscardPendingUndo(clientId);
                     if (ownsGlobal)
                         _active.DiscardPendingUndo(null);
@@ -1256,13 +1261,28 @@ public sealed class PortalService : IPortalService
         try
         {
             var journal = _journal.Load();
-            if (journal is not { FilesUndone: true } || !_active.Status().CanUndo)
+            if (journal is not { FilesUndone: true })
                 return;
 
             if (!ClientFilesMatchFileUndoSnapshot(journal))
                 return;
 
-            _active.Undo(null, journal.ClientId);
+            // Prefer global recovery when state.Undo is pending. When Clear promoted another client into the
+            // top-level journal after a scoped undo cleared state.Undo, recover that client's pending
+            // UndoByClient entry without treating the promotion as global ownership.
+            if (_active.Status().CanUndo)
+            {
+                _active.Undo(null, journal.ClientId);
+            }
+            else if (journal.ClientId is not null && _active.HasPendingUndo(journal.ClientId))
+            {
+                _active.Undo(journal.ClientId, journal.ClientId);
+            }
+            else
+            {
+                return;
+            }
+
             if (journal.BackupId is not null && journal.ClientId is not null)
                 CreateApplier().MarkBackupUndone(journal.ClientId, journal.BackupId);
             _journal.Clear(journal.ClientId);
