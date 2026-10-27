@@ -96,7 +96,11 @@ public sealed class CliApp(
             var configDir = parsed.Get("--config-dir") ?? PortalPaths.ConfigDirectory(getVariable);
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
             // Explicit --client-dir only (not REALM_PORTAL_CLIENT_DIR) scopes undo (#149).
-            var explicitClientDir = Blank(parsed.Get("--client-dir"));
+            // A supplied but blank --client-dir is a usage error (do not fall back to the env var).
+            var rawClientDirOption = parsed.Get("--client-dir");
+            if (rawClientDirOption is not null && string.IsNullOrWhiteSpace(rawClientDirOption))
+                throw new UsageException("option --client-dir needs a value");
+            var explicitClientDir = Blank(rawClientDirOption);
             var clientDir = explicitClientDir ?? Blank(getVariable(ClientDirVariable));
             var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher),
                 probe, getVariable: getVariable, scanOptions: scanOptions);
