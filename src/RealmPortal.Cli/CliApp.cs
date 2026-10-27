@@ -57,7 +57,7 @@ public sealed class CliApp(
         Common options (before or after the command; they override the environment variables):
           --config-dir <dir>      app config (env REALM_PORTAL_CONFIG_DIR)
           --projection-dir <dir>  where activo.json is written (env REALM_PORTAL_PROJECTION_DIR)
-          --client-dir <dir>      game client folder (env REALM_PORTAL_CLIENT_DIR); list/switch/status/launch filter, or scopes undo
+          --client-dir <dir>      game client folder (env REALM_PORTAL_CLIENT_DIR); filters list/switch/status/launch; explicit values scope undo for a registered client, while omission or the env variable alone keeps undo global
         <server> is an id, a unique id prefix or a name (case-insensitive).
         """;
 

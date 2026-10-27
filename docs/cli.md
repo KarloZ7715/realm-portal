@@ -85,7 +85,7 @@ These options may go before or after the command (see [Commands](#commands)).
 | --- | --- |
 | `--config-dir <dir>` | Realm Portal's config folder (`servers.json`, `state.json`, `clients.json`). Overrides `REALM_PORTAL_CONFIG_DIR`. |
 | `--projection-dir <dir>` | Folder where `activo.json` is written. Overrides `REALM_PORTAL_PROJECTION_DIR`. |
-| `--client-dir <dir>` | Game client folder. Overrides `REALM_PORTAL_CLIENT_DIR`. Used by `list`, `switch`, `status`, `launch`, and `undo`. For `list`/`switch`/`status`/`launch`: registers the client if needed and enables the compatibility filter. For `undo`: scopes restoration to that client's last switch (must already be registered; does not register or read `Wow.exe`). The environment variable alone does not scope `undo`. |
+| `--client-dir <dir>` | Game client folder. Overrides `REALM_PORTAL_CLIENT_DIR`. Used by `list`, `switch`, `status`, `launch`, and `undo`. For `list`/`switch`/`status`/`launch`: registers the client if needed and enables the compatibility filter. For `undo`: scopes restoration to that client's last switch (must already be registered; does not register or read `Wow.exe`). Omitting `--client-dir` or setting only `REALM_PORTAL_CLIENT_DIR` keeps `undo` global (the latest switch across all clients). |
 | `--verbose` | Prints detailed error messages (paths, parse errors). |
 
 ## Environment variables
