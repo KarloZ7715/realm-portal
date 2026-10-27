@@ -5,6 +5,7 @@ using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Service;
+using RealmPortal.Core;
 
 namespace RealmPortal.App.ViewModels;
 
@@ -236,7 +237,7 @@ public sealed partial class BackupsViewModel : ViewModelBase
 
     partial void OnSelectedClientChanged(BackupClientOption? value)
     {
-        _ = LoadBackupsAsync();
+        ExceptionLog.Observe(LoadBackupsAsync());
         CreateBackupCommand.NotifyCanExecuteChanged();
     }
 
