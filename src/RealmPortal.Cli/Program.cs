@@ -56,6 +56,13 @@ public static class Program
             }
             leading += 2;
         }
+        // client-version is not a CliApp command and takes no common options (#151).
+        if (leading > 0 && leading < args.Length && args[leading] == "client-version")
+        {
+            CliApp.SafeWriteLine(error, $"error: unknown option {args[0]}");
+            error.WriteLine(CliApp.Usage);
+            return 1;
+        }
         if (leading > 0 && leading < args.Length && app.IsCommand(args[leading]))
             return app.Run(args[leading], [.. args[..leading], .. args[(leading + 1)..]], verbose);
 

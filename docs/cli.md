@@ -18,10 +18,11 @@ In the examples below, `realm-portal` stands for `dotnet run --project src/Realm
 
 Write the command, then its arguments and options: `realm-portal <command> [arguments] [options]`. The common options (`--config-dir`, `--projection-dir`, `--client-dir`) and `--verbose` may also come before the command: `realm-portal --config-dir /tmp/rp list` is the same as `realm-portal list --config-dir /tmp/rp`. When one of these three directory options is given twice, the last one wins. Any other option before the command is reported as an unknown option (exit code `1`).
 
-There is no `--help` option: `realm-portal --help` reports an unknown option. To see the usage text, run `realm-portal` with no arguments.
+`realm-portal --help` or `realm-portal -h` prints the version and usage text and exits 0. Running `realm-portal` with no arguments does the same (exit 0).
 
 ```text
 realm-portal --version
+realm-portal --help
 realm-portal client-version <client-directory>
 realm-portal add <name> <host> [--realm <realm>] [--line <realmlist line>]... [--build <n>] [--account <name>]
 realm-portal remove <server>
@@ -46,7 +47,7 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | Command | What it does |
 | --- | --- |
 | `--version` (`-v`) | Prints the version. |
-| `client-version <dir>` | Prints the game version and build of the client in `<dir>`. |
+| `client-version <dir>` | Prints the game version and build of the client in `<dir>`. Takes no options (including the common `--config-dir` / `--projection-dir` / `--client-dir`); a rejected option is named on stderr. `--help` / `-h` after `client-version` print usage and exit 0. |
 | `add` | Adds a server. `<host>` is `host` or `host:port`. `--line` adds an extra `realmlist.wtf` line (repeatable, e.g. `--line "set patchlist patch.example.org"`). `--build` is optional: the client build the server requires (a positive integer). Without it, the server works with any client. |
 | `remove` | Removes a server. |
 | `edit` | Changes a server. Only the options you pass change; everything else (including the required build and extra realmlist lines such as `patchlist`) is kept. `--build <n>` sets the required client build; `--build any` clears it, so the server works with any client. `--client none` unlinks the server from its client. |

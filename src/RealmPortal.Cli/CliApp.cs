@@ -34,6 +34,7 @@ public sealed class CliApp(
     public const string Usage = """
         Usage:
           realm-portal --version
+          realm-portal --help
           realm-portal client-version <client-directory>
           realm-portal add <name> <host> [--realm <realm>] [--line <realmlist line>]... [--build <n>] [--account <name>]
           realm-portal remove <server>

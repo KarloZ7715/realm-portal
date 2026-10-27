@@ -84,4 +84,18 @@ public sealed class CliClientVersionOptionsTests
         Assert.Contains("Usage:", result.Out);
         Assert.Equal(string.Empty, result.Err);
     }
+
+    [Fact]
+    public void OptionsBeforeClientVersion_PrintEscapedUnknownOptionError()
+    {
+        using var client = new TempDirectory();
+        File.WriteAllBytes(client.Combine("Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+
+        var result = Run("--config-dir", "/tmp/config", "client-version", client.Path);
+
+        Assert.Equal(1, result.Code);
+        Assert.Contains("error: unknown option --config-dir", result.Err);
+        Assert.Contains("Usage:", result.Err);
+        Assert.DoesNotContain("3.3.5a", result.Out);
+    }
 }
