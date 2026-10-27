@@ -335,5 +335,22 @@
   "welcome.status.language": "First run",
   "welcome.status.clients": "Client detection",
   "welcome.status.noclients": "No clients",
-  "welcome.status.servers": "Servers"
+  "welcome.status.servers": "Servers",
+  "settings.about": "About",
+  "settings.about.open": "About Realm Portal…",
+  "settings.about.hint": "Version, credits, license and the project on GitHub.",
+  "about.title": "About",
+  "about.subtitle": "Realm Portal",
+  "about.back": "Back",
+  "about.status": "About",
+  "about.identity": "Application",
+  "about.version": "Version {0}",
+  "about.credits": "Created by the Realm Portal contributors.",
+  "about.mit": "Realm Portal is free software released under the MIT License.",
+  "about.github": "Open on GitHub",
+  "about.open.failed": "Could not open the link in your browser.",
+  "about.thirdparty": "Third-party licenses",
+  "about.thirdparty.hint": "NuGet packages, fonts and other components shipped with the app.",
+  "about.copyright": "Copyright (c) 2026 Realm Portal contributors.",
+  "about.disclaimer": "Not affiliated with or endorsed by Blizzard Entertainment."
 }

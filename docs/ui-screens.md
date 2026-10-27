@@ -371,6 +371,10 @@ All keys below are specified for `src/RealmPortal.App/Localization/Strings/en.js
 
 See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
 
+## About
+
+Opened from Settings (**About Realm Portal…**). Shows `AppInfo.Name` and `AppInfo.Version` (same value as the status-bar `v…` label), credits, a short MIT note, the Blizzard disclaimer, a scrollable copy of `THIRD_PARTY_LICENSES.md`, and **Open on GitHub** which launches `AppInfo.RepositoryUrl` in the system browser (`IUriOpener` / shell execute). Available in demo and real sessions. Strings: `about.*` and `settings.about*`.
+
 ## Window size and position
 
 The main window remembers its last normal size and position and whether it was maximized (`ui-preferences.json` in the app's own config directory, key `Window`; `WindowPlacementPersistence`). It is saved on close and restored at start, before the window is shown:

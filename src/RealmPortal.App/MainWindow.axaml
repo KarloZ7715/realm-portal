@@ -25,6 +25,7 @@
     <DataTemplate DataType="vm:SettingsViewModel"><v:SettingsView/></DataTemplate>
     <DataTemplate DataType="vm:BackupsViewModel"><v:BackupsView/></DataTemplate>
     <DataTemplate DataType="vm:WelcomeViewModel"><v:WelcomeView/></DataTemplate>
+    <DataTemplate DataType="vm:AboutViewModel"><v:AboutView/></DataTemplate>
   </Window.DataTemplates>
   <Grid RowDefinitions="*,Auto">
     <Panel Grid.RowSpan="2" Name="MainChrome"
