@@ -113,70 +113,61 @@ public class ClientFilesSymlinkTests
     }
 
     [UnixFact]
-    public void Undo_AbsoluteLinkOutsideClient_RestoresRegularFile()
+    public void Plan_AbsoluteLinkOutsideClient_IsPathEscapesClient()
     {
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
         var backups = temp.Combine("backups");
         Directory.CreateDirectory(Path.Combine(client, "Data", "enUS"));
         var outside = temp.Combine("outside.wtf");
-        File.WriteAllText(outside, Original);
+        const string secret = "TOP-SECRET-OUTSIDE\r\n";
+        File.WriteAllText(outside, secret);
         var linkPath = Path.Combine(client, "Data", "enUS", "realmlist.wtf");
         File.CreateSymbolicLink(linkPath, outside);
 
         var applier = new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new NeverRunning(), backups);
-        applier.Apply(applier.Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, "")));
-        var undo = applier.Undo("install-1", client);
+        var ex = Assert.Throws<ClientFilesException>(() =>
+            applier.Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, "")));
 
-        Assert.Equal(UndoFileStatus.Restored, undo.Files.Single(f => f.RelativePath == "Data/enUS/realmlist.wtf").Status);
-        Assert.Null(new FileInfo(linkPath).LinkTarget);
-        Assert.Equal(Original, File.ReadAllText(linkPath));
-        Assert.Equal(Original, File.ReadAllText(outside));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
+        Assert.Equal(secret, File.ReadAllText(outside));
+        Assert.False(Directory.Exists(backups));
     }
 
     [UnixFact]
-    public void Undo_RelativeLinkEscapingClient_RestoresRegularFile()
+    public void Plan_RelativeLinkEscapingClient_IsPathEscapesClient()
     {
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
-        var backups = temp.Combine("backups");
         Directory.CreateDirectory(Path.Combine(client, "Data", "enUS"));
         var outside = temp.Combine("outside.wtf");
         File.WriteAllText(outside, Original);
-        var linkPath = Path.Combine(client, "Data", "enUS", "realmlist.wtf");
-        File.CreateSymbolicLink(linkPath, "../../../outside.wtf");
+        File.CreateSymbolicLink(Path.Combine(client, "Data", "enUS", "realmlist.wtf"), "../../../outside.wtf");
 
-        var applier = new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new NeverRunning(), backups);
-        applier.Apply(applier.Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, "")));
-        var undo = applier.Undo("install-1", client);
+        var planner = new ClientFilesPlanner();
+        var ex = Assert.Throws<ClientFilesException>(() =>
+            planner.Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, "")));
 
-        Assert.Equal(UndoFileStatus.Restored, undo.Files.Single(f => f.RelativePath == "Data/enUS/realmlist.wtf").Status);
-        Assert.Null(new FileInfo(linkPath).LinkTarget);
-        Assert.Equal(Original, File.ReadAllText(linkPath));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
         Assert.Equal(Original, File.ReadAllText(outside));
     }
 
     [UnixFact]
-    public void Undo_TwoHopChainLeavingClient_RestoresRegularFile()
+    public void Plan_TwoHopChainLeavingClient_IsPathEscapesClient()
     {
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
-        var backups = temp.Combine("backups");
         Directory.CreateDirectory(Path.Combine(client, "Data", "enUS"));
         var outside = temp.Combine("outside.wtf");
         File.WriteAllText(outside, Original);
         var hop = Path.Combine(client, "hop");
         File.CreateSymbolicLink(hop, outside);
-        var linkPath = Path.Combine(client, "Data", "enUS", "realmlist.wtf");
-        File.CreateSymbolicLink(linkPath, "../../hop");
+        File.CreateSymbolicLink(Path.Combine(client, "Data", "enUS", "realmlist.wtf"), "../../hop");
 
-        var applier = new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new NeverRunning(), backups);
-        applier.Apply(applier.Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, "")));
-        var undo = applier.Undo("install-1", client);
+        var ex = Assert.Throws<ClientFilesException>(() =>
+            new ClientFilesPlanner().Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, "")));
 
-        Assert.Equal(UndoFileStatus.Restored, undo.Files.Single(f => f.RelativePath == "Data/enUS/realmlist.wtf").Status);
-        Assert.Null(new FileInfo(linkPath).LinkTarget);
-        Assert.Equal(Original, File.ReadAllText(linkPath));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
         Assert.Equal(outside, new FileInfo(hop).LinkTarget);
         Assert.Equal(Original, File.ReadAllText(outside));
     }
@@ -410,26 +401,21 @@ public class ClientFilesSymlinkTests
     }
 
     [UnixFact]
-    public void Undo_AbsoluteLinkToClientPrefixLookalike_RestoresRegularFile()
+    public void Plan_AbsoluteLinkToClientPrefixLookalike_IsPathEscapesClient()
     {
         using var temp = new TempDirectory();
         var client = temp.Combine("client");
-        var backups = temp.Combine("backups");
         Directory.CreateDirectory(Path.Combine(client, "Data", "enUS"));
         var evilDir = temp.Combine("client-evil");
         Directory.CreateDirectory(evilDir);
         var evilFile = Path.Combine(evilDir, "x");
         File.WriteAllText(evilFile, Original);
-        var linkPath = Path.Combine(client, "Data", "enUS", "realmlist.wtf");
-        File.CreateSymbolicLink(linkPath, evilFile);
+        File.CreateSymbolicLink(Path.Combine(client, "Data", "enUS", "realmlist.wtf"), evilFile);
 
-        var applier = new ClientFilesApplier(new ClientFilesPlanner(), new AtomicFileWriter(), new NeverRunning(), backups);
-        applier.Apply(applier.Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, "")));
-        var undo = applier.Undo("install-1", client);
+        var ex = Assert.Throws<ClientFilesException>(() =>
+            new ClientFilesPlanner().Plan(new ClientFilesRequest("install-1", "profile-1", client, V3, BlobA, "")));
 
-        Assert.Equal(UndoFileStatus.Restored, undo.Files.Single(f => f.RelativePath == "Data/enUS/realmlist.wtf").Status);
-        Assert.Null(new FileInfo(linkPath).LinkTarget);
-        Assert.Equal(Original, File.ReadAllText(linkPath));
+        Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
         Assert.Equal(Original, File.ReadAllText(evilFile));
     }
 

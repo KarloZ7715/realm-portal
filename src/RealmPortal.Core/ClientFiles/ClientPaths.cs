@@ -25,11 +25,11 @@ public static class ClientPaths
                 $"The backup to undo belongs to a different client folder ('{manifestCanonical}'), not '{trustedRoot}'; undo stopped before changing any file.");
     }
 
-    public static string ResolveManagedPath(string canonicalRoot, string relativePath)
+    public static string ResolveManagedPath(string canonicalRoot, string relativePath, bool rejectAmbiguousMatches = true)
     {
         ValidateManagedRelativePath(relativePath);
         var segments = relativePath.Split('/');
-        var (realSegments, _) = CaseInsensitivePath.Resolve(canonicalRoot, segments, rejectAmbiguousMatches: true);
+        var (realSegments, _) = CaseInsensitivePath.Resolve(canonicalRoot, segments, rejectAmbiguousMatches);
         var normalized = string.Join('/', realSegments);
         var combined = ResolveInside(canonicalRoot, normalized);
         RequireParentInsideThroughLinks(canonicalRoot, normalized, combined);

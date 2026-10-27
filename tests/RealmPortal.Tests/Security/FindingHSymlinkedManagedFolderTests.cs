@@ -63,8 +63,7 @@ public class FindingHSymlinkedManagedFolderTests
         Directory.CreateSymbolicLink(env.InClient("Data", "enUS"), env.InOutside("enUS"));
         var outsideBefore = Snapshot(env.Outside);
 
-        var plan = env.Plan();
-        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Apply(plan));
+        var ex = Assert.Throws<ClientFilesException>(() => env.Plan());
 
         Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
         Assert.Equal(outsideBefore, Snapshot(env.Outside));
@@ -82,9 +81,7 @@ public class FindingHSymlinkedManagedFolderTests
         var outsideBefore = Snapshot(env.Outside);
         var realmlistBefore = File.ReadAllText(env.InClient("Data", "enUS", "realmlist.wtf"));
 
-        var plan = env.Plan("Realm");
-        Assert.Contains(plan.Edits, e => e.RelativePath.EndsWith("Config.wtf", StringComparison.Ordinal));
-        var ex = Assert.Throws<ClientFilesException>(() => env.Applier.Apply(plan));
+        var ex = Assert.Throws<ClientFilesException>(() => env.Plan("Realm"));
 
         Assert.Equal(ClientFilesErrorCode.PathEscapesClient, ex.Code);
         Assert.Equal(outsideBefore, Snapshot(env.Outside));

@@ -697,19 +697,10 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         return bytes;
     }
 
-    private static byte[] ReadExistingForBackup(string root, string path, SymlinkSnapshot? link)
-    {
-        if (link?.IsSymlink != true)
-            return ReadBoundedNoFollow(path, MaxManagedConfigBytes);
-        // Existing apply/undo semantics preserve even links that point outside the client, but their payload read
-        // remains non-blocking and capped. Undo recreates a link only when its chain is proved to stay inside root.
-        var bytes = ReadCurrentForUndo(path, out var invalid);
-        if (invalid || bytes is null)
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, "Managed config symlink does not resolve to a readable regular file.");
-        if (bytes.Length > MaxManagedConfigBytes)
-            throw new ClientFilesException(ClientFilesErrorCode.VerifyFailed, path, $"Managed config file is larger than {MaxManagedConfigBytes} bytes.");
-        return bytes;
-    }
+    private static byte[] ReadExistingForBackup(string root, string path, SymlinkSnapshot? link) =>
+        // Same rule as Plan (#44): follow a managed-file symlink only when its chain stays inside the client.
+        // Escaping targets must not be copied into the backup.
+        ReadManagedBounded(root, path, link);
 
     private static byte[] ReadBoundedNoFollow(string path, int maxBytes)
     {

@@ -145,8 +145,10 @@ public sealed class ClientFilesPlanner : IClientFilesPlanner
         if (edits.Any(e => string.Equals(e.RelativePath, relative, StringComparison.OrdinalIgnoreCase)))
             return;
 
-        var fullPath = Path.Combine([root, .. segments]);
-        var existing = exists ? File.ReadAllBytes(fullPath) : null;
+        // Same allow-list and symlink-escape checks Apply uses (#44 / #58): refuse directory or file links
+        // whose final target leaves the client before we read bytes into the plan (or backup).
+        var fullPath = ClientPaths.ResolveManagedPath(ClientPaths.CanonicalRoot(root), relative, rejectAmbiguousMatches: false);
+        var existing = exists ? ReadExistingManagedBytes(root, fullPath) : null;
         var updated = build(existing);
         var after = ClientFilesIo.Sha256Hex(updated);
         var before = existing is null ? null : ClientFilesIo.Sha256Hex(existing);
@@ -154,5 +156,27 @@ public sealed class ClientFilesPlanner : IClientFilesPlanner
             return; // Already up to date.
 
         edits.Add(new ClientFileEdit(relative, exists ? ClientEditKind.Replace : ClientEditKind.Create, updated, before, after));
+    }
+
+    /// <summary>
+    /// Reads a managed config file for planning. A symlink is followed only when its chain stays inside
+    /// <paramref name="clientRoot"/>; otherwise <see cref="ClientFilesErrorCode.PathEscapesClient"/>.
+    /// </summary>
+    private static byte[] ReadExistingManagedBytes(string clientRoot, string fullPath)
+    {
+        var link = SymlinkSnapshot.Capture(fullPath);
+        if (link?.IsSymlink == true)
+        {
+            if (string.IsNullOrEmpty(link.Value.Target)
+                || !SymlinkSnapshot.ChainStaysInsideClient(clientRoot, fullPath, link.Value.Target))
+            {
+                throw new ClientFilesException(
+                    ClientFilesErrorCode.PathEscapesClient,
+                    fullPath,
+                    "Managed config symlink does not resolve to a regular file inside the client.");
+            }
+        }
+
+        return File.ReadAllBytes(fullPath);
     }
 }
