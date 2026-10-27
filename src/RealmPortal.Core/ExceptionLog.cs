@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.IO;
 
 namespace RealmPortal.Core;
@@ -13,6 +14,7 @@ public sealed class ExceptionLog
     public const long MaxBytes = 1L << 20; // 1 MiB
     public const string FileName = "realm-portal.log";
     public const string RotatedSuffix = ".1";
+    private const string ClientPathToken = "[client-path]";
 
     private static readonly object DefaultGate = new();
     private static ExceptionLog? _default;
@@ -86,7 +88,9 @@ public sealed class ExceptionLog
             return;
         if (task.IsFaulted)
         {
-            (log ?? Default).Write(task.Exception!, "BackgroundTask");
+            var target = log ?? Default;
+            var exception = task.Exception!;
+            _ = Task.Run(() => target.Write(exception, "BackgroundTask"));
             return;
         }
 
@@ -108,15 +112,18 @@ public sealed class ExceptionLog
     public void Write(Exception exception, string? source = null)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        WriteMessage(FormatException(exception), source);
+        WriteMessage(FormatException(exception), source, CollectClientPaths(exception));
     }
 
     public void WriteMessage(string message, string? source = null)
+        => WriteMessage(message, source, extraPaths: null);
+
+    private void WriteMessage(string message, string? source, IReadOnlyList<string>? extraPaths)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         try
         {
-            var entry = FormatEntry(Redact(message), source);
+            var entry = FormatEntry(Redact(message, extraPaths), source);
             lock (_gate)
                 AppendEntry(entry);
         }
@@ -126,7 +133,7 @@ public sealed class ExceptionLog
         }
     }
 
-    internal string Redact(string text)
+    internal string Redact(string text, IReadOnlyList<string>? extraPaths = null)
     {
         if (string.IsNullOrEmpty(text))
             return text;
@@ -150,7 +157,71 @@ public sealed class ExceptionLog
         if (!string.IsNullOrWhiteSpace(appImage))
             result = ReplacePath(result, appImage, Path.GetFileName(appImage));
 
+        if (extraPaths is not null)
+        {
+            foreach (var path in extraPaths)
+                result = RedactClientPath(result, path);
+        }
+
         return result;
+    }
+
+    private static string RedactClientPath(string text, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length < 2)
+            return text;
+
+        var result = text;
+        if (Path.IsPathRooted(path))
+        {
+            try
+            {
+                var full = Path.GetFullPath(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                result = ReplacePath(result, full, ClientPathToken);
+                result = ReplacePath(result, full + Path.DirectorySeparatorChar, ClientPathToken + Path.DirectorySeparatorChar);
+                if (Path.DirectorySeparatorChar != '/')
+                {
+                    var slash = full.Replace(Path.DirectorySeparatorChar, '/');
+                    result = ReplacePath(result, slash, ClientPathToken);
+                    result = ReplacePath(result, slash + "/", ClientPathToken + "/");
+                }
+            }
+            catch
+            {
+                // Fall through to the literal path form below.
+            }
+        }
+
+        return ReplacePath(result, path, ClientPathToken);
+    }
+
+    private static IReadOnlyList<string> CollectClientPaths(Exception exception)
+    {
+        var paths = new List<string>();
+        var seen = new HashSet<Exception>();
+        var stack = new Stack<Exception>();
+        stack.Push(exception);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (!seen.Add(current))
+                continue;
+
+            if (current is ClientFilesException clientFiles && !string.IsNullOrWhiteSpace(clientFiles.Path))
+                paths.Add(clientFiles.Path);
+
+            if (current is AggregateException aggregate)
+            {
+                foreach (var inner in aggregate.InnerExceptions)
+                    stack.Push(inner);
+            }
+            else if (current.InnerException is not null)
+            {
+                stack.Push(current.InnerException);
+            }
+        }
+
+        return paths;
     }
 
     private static string ReplacePath(string text, string path, string replacement)
@@ -166,7 +237,44 @@ public sealed class ExceptionLog
         var header = source is null
             ? $"[{stamp}] {AppInfo.Name} {_version()}"
             : $"[{stamp}] {AppInfo.Name} {_version()} ({source})";
-        return header + Environment.NewLine + body.TrimEnd() + Environment.NewLine + Environment.NewLine;
+        return header + Environment.NewLine + EscapeControls(body.TrimEnd()) + Environment.NewLine + Environment.NewLine;
+    }
+
+    private static string EscapeControls(string text)
+    {
+        var result = new StringBuilder(text.Length);
+        foreach (var character in text)
+        {
+            switch (character)
+            {
+                case '\r':
+                    result.Append("\\r");
+                    break;
+                case '\n':
+                    result.Append("\\n");
+                    break;
+                case '\t':
+                    result.Append("\\t");
+                    break;
+                case (char)0x1B:
+                    result.Append("\\x1B");
+                    break;
+                case '\u2028':
+                    result.Append("\\u2028");
+                    break;
+                case '\u2029':
+                    result.Append("\\u2029");
+                    break;
+                default:
+                    if (char.IsControl(character))
+                        result.Append($"\\u{(int)character:X4}");
+                    else
+                        result.Append(character);
+                    break;
+            }
+        }
+
+        return result.ToString();
     }
 
     private static string FormatException(Exception exception)
@@ -184,6 +292,9 @@ public sealed class ExceptionLog
             PrivateStorage.CreatePrivateDirectory(directory);
 
         var bytes = Encoding.UTF8.GetBytes(entry);
+        if (bytes.LongLength > _maxBytes)
+            bytes = TruncateUtf8(bytes, _maxBytes);
+
         if (File.Exists(path))
         {
             var length = new FileInfo(path).Length;
@@ -193,6 +304,24 @@ public sealed class ExceptionLog
 
         WriteAppend(path, bytes);
         EnsurePrivateFileMode(path);
+    }
+
+    /// <summary>Shortens <paramref name="bytes"/> to at most <paramref name="maxBytes"/> without splitting a UTF-8 code unit.</summary>
+    private static byte[] TruncateUtf8(byte[] bytes, long maxBytes)
+    {
+        if (bytes.LongLength <= maxBytes)
+            return bytes;
+
+        var limit = (int)maxBytes;
+        while (limit > 0 && (bytes[limit] & 0xC0) == 0x80)
+            limit--;
+
+        if (limit == bytes.Length)
+            return bytes;
+
+        var truncated = new byte[limit];
+        Buffer.BlockCopy(bytes, 0, truncated, 0, limit);
+        return truncated;
     }
 
     private static void Rotate(string path)
