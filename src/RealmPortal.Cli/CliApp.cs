@@ -57,7 +57,7 @@ public sealed class CliApp(
         Common options (before or after the command; they override the environment variables):
           --config-dir <dir>      app config (env REALM_PORTAL_CONFIG_DIR)
           --projection-dir <dir>  where activo.json is written (env REALM_PORTAL_PROJECTION_DIR)
-          --client-dir <dir>      game client folder (env REALM_PORTAL_CLIENT_DIR); enables the compatibility filter
+          --client-dir <dir>      game client folder (env REALM_PORTAL_CLIENT_DIR); filters list/switch/status/launch; explicit values scope undo for a registered client, while omission or the env variable alone keeps undo global
         <server> is an id, a unique id prefix or a name (case-insensitive).
         """;
 
@@ -95,7 +95,13 @@ public sealed class CliApp(
             _verbose = globalVerbose || parsed.Flags.Contains("--verbose");
             var configDir = parsed.Get("--config-dir") ?? PortalPaths.ConfigDirectory(getVariable);
             var projectionDir = parsed.Get("--projection-dir") ?? PortalPaths.ProjectionDirectory(getVariable);
-            var clientDir = parsed.Get("--client-dir") ?? Blank(getVariable(ClientDirVariable));
+            // Explicit --client-dir only (not REALM_PORTAL_CLIENT_DIR) scopes undo (#149).
+            // A supplied but blank --client-dir is a usage error (do not fall back to the env var).
+            var rawClientDirOption = parsed.Get("--client-dir");
+            if (rawClientDirOption is not null && string.IsNullOrWhiteSpace(rawClientDirOption))
+                throw new UsageException("option --client-dir needs a value");
+            var explicitClientDir = Blank(rawClientDirOption);
+            var clientDir = explicitClientDir ?? Blank(getVariable(ClientDirVariable));
             var service = new PortalService(configDir, projectionDir, versionReader, new GameLauncherAdapter(launcher),
                 probe, getVariable: getVariable, scanOptions: scanOptions);
             string? clientId = null;
@@ -113,7 +119,7 @@ public sealed class CliApp(
                 "remove" => Remove(parsed, service),
                 "list" => List(parsed, service, clientId, clientDir),
                 "switch" => SwitchCommand(parsed, service, clientId, clientDir),
-                "undo" => Undo(parsed, service),
+                "undo" => Undo(parsed, service, explicitClientDir),
                 "status" => Status(parsed, service, clientId, clientDir),
                 "launch" => Launch(parsed, service, clientId, clientDir, parsed.Flags.Contains("--dry-run")),
                 "client" => ClientCommand(parsed, service),
@@ -458,10 +464,21 @@ public sealed class CliApp(
         return 0;
     }
 
-    private int Undo(Parsed parsed, PortalService service)
+    private int Undo(Parsed parsed, PortalService service, string? explicitClientDir)
     {
         Expect(parsed, 0, 0, "no arguments");
-        var result = service.Undo();
+        // Only an explicit --client-dir scopes undo to that client's last switch (#149).
+        // REALM_PORTAL_CLIENT_DIR alone keeps option-free undo on the global record.
+        // Resolve the stored id from the trusted path without AddClient / reading Wow.exe.
+        string? clientId = null;
+        if (explicitClientDir is not null)
+        {
+            clientId = ResolveRegisteredClientId(service, explicitClientDir);
+            if (clientId is null)
+                return Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+        }
+
+        var result = service.Undo(clientId);
         if (!result.Succeeded)
             return Fail(result.Error!);
         var restored = result.Value!.Active;
@@ -471,6 +488,28 @@ public sealed class CliApp(
             foreach (var line in lines)
                 SafeWriteLine(output, line);
         return 0;
+    }
+
+    /// <summary>
+    /// Maps a client folder to its already-registered id without calling <see cref="PortalService.AddClient"/>
+    /// (no Wow.exe / version read). Returns null when no stored client matches the path.
+    /// </summary>
+    private static string? ResolveRegisteredClientId(PortalService service, string clientDir)
+    {
+        string id;
+        try
+        {
+            id = ClientIds.FromFolderPath(clientDir);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+
+        var listed = service.ListClients();
+        if (!listed.Succeeded)
+            return null;
+        return listed.Value!.Any(c => string.Equals(c.Id, id, StringComparison.Ordinal)) ? id : null;
     }
 
     private int Status(Parsed parsed, PortalService service, string? clientId, string? clientDir)

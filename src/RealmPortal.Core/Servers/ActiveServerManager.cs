@@ -302,10 +302,15 @@ public sealed class ActiveServerManager(
                 throw new StoreException("Nothing to undo.");
 
             // A client-scoped undo owns the global selection only when it is the client that made the most recent
-            // switch; a global undo always does. The client-scoped target and the global target are resolved and
-            // validated independently so a scoped undo never rewrites the global selection and a global undo never
-            // borrows a client's previous server.
-            var ownsGlobal = clientId is null || string.Equals(clientId, globalJournalClientId, StringComparison.Ordinal);
+            // switch AND a global undo record is still pending in state.json. After a scoped undo of the previous
+            // global owner, LastSwitchJournal.Clear may promote another client into the top-level journal while
+            // state.Undo is already null — journal ClientId alone must not rewrite ActiveId. A global undo always
+            // owns the selection. The client-scoped target and the global target are resolved and validated
+            // independently so a scoped undo never rewrites the global selection and a global undo never borrows a
+            // client's previous server.
+            var ownsGlobal = clientId is null
+                || (state.Undo is not null
+                    && string.Equals(clientId, globalJournalClientId, StringComparison.Ordinal));
             var affectedClient = clientId ?? globalJournalClientId;
 
             var clientRecord = clientId is null

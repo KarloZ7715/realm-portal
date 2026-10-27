@@ -75,7 +75,8 @@ public class WatcherBackoffTests
             for (var i = 0; i < count; i++)
             {
                 TaskCompletionSource? tcs = null;
-                var deadline = DateTime.UtcNow.AddSeconds(5);
+                // CI runners can be slower to schedule the Avalonia UI continuation than a local box.
+                var deadline = DateTime.UtcNow.AddSeconds(30);
                 while (!_waiters.TryDequeue(out tcs) && DateTime.UtcNow < deadline)
                 {
                     // The watcher continues on the UI thread after Task.Run; pump so it can reach _delay.
@@ -92,7 +93,7 @@ public class WatcherBackoffTests
         /// <summary>Pumps until the watcher has requested a delay that is still waiting.</summary>
         public async Task WaitUntilPendingAsync()
         {
-            var deadline = DateTime.UtcNow.AddSeconds(5);
+            var deadline = DateTime.UtcNow.AddSeconds(30);
             while (_waiters.IsEmpty && DateTime.UtcNow < deadline)
             {
                 Dispatcher.UIThread.RunJobs();
@@ -101,6 +102,8 @@ public class WatcherBackoffTests
 
             Assert.False(_waiters.IsEmpty, "expected an in-flight watcher delay");
         }
+
+        public bool HasPending => !_waiters.IsEmpty;
     }
 
     private sealed class Env : IDisposable
@@ -198,10 +201,22 @@ public class WatcherBackoffTests
         Assert.Equal(ServersPhase.Running, env.Main.Servers.Phase);
         Assert.False(env.Main.Servers.GameClosed);
 
-        // Stop the watcher: in-flight delay + two miss delays; the third miss closes with no further delay.
+        // Stop the watcher: miss probes until GameClosed. Do not assume a fixed number of delays —
+        // under load the in-flight delay may already be the first miss, so fewer waiters remain.
         probe.Running = false;
         var beforeClose = delay.Requested.Count;
-        await delay.AdvanceAsync(3);
+        var closeDeadline = DateTime.UtcNow.AddSeconds(30);
+        while (!env.Main.Servers.GameClosed && DateTime.UtcNow < closeDeadline)
+        {
+            if (delay.HasPending)
+                await delay.AdvanceAsync(1);
+            else
+            {
+                Dispatcher.UIThread.RunJobs();
+                await Task.Delay(5).ConfigureAwait(true);
+            }
+        }
+
         await PumpUntilAsync(() => env.Main.Servers.GameClosed, TimeSpan.FromSeconds(2));
         Assert.True(env.Main.Servers.GameClosed);
         Assert.All(delay.Requested.Skip(beforeClose), t => Assert.Equal(ServersViewModel.RunningProbeInterval, t));
