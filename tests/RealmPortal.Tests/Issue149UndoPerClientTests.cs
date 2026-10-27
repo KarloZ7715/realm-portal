@@ -83,6 +83,7 @@ public sealed class Issue149UndoPerClientTests
         Assert.Equal(0, undo.Code);
         Assert.Equal(xBeforeUndo, box.Read(box.ClientX));
         Assert.Contains(HostB, box.Read(box.ClientX), StringComparison.Ordinal);
+        Assert.Equal(OldW, box.Read(box.ClientW));
     }
 
     [Fact]
@@ -157,5 +158,21 @@ public sealed class Issue149UndoPerClientTests
         Assert.Equal(0, undo.Code);
         Assert.Equal(OldW, box.Read(box.ClientW));
         Assert.Equal(xBefore, box.Read(box.ClientX));
+    }
+
+    [Fact]
+    public void Undo_BlankClientDirOption_IsUsageErrorAndDoesNotUseEnv()
+    {
+        using var box = new Box();
+        Assert.Equal(0, box.Run("add", "A", HostA, "--config-dir", box.Config, "--projection-dir", box.Projection).Code);
+        Assert.Equal(0, box.Run("switch", "A", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", box.ClientW).Code);
+
+        var wBefore = box.Read(box.ClientW);
+        var undo = box.RunWithEnv(
+            name => name == CliApp.ClientDirVariable ? box.ClientW : null,
+            "undo", "--config-dir", box.Config, "--projection-dir", box.Projection, "--client-dir", "");
+        Assert.Equal(1, undo.Code);
+        Assert.Contains("--client-dir", undo.Err, StringComparison.Ordinal);
+        Assert.Equal(wBefore, box.Read(box.ClientW));
     }
 }
