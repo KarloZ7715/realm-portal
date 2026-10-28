@@ -411,11 +411,25 @@ jobs:
               echo "::error::Size mismatch for ${name}: remote=${remote_size} local=${local_size}"
               exit 1
             }
-            expect_url="https://github.com/${owner_repo}/releases/download/${TAG}/${name}"
-            [[ "$browser_url" == "$expect_url" ]] || {
-              echo "::error::browser_download_url mismatch for ${name}: got ${browser_url} want ${expect_url}"
+            # Draft releases expose untagged-<id>/ download URLs until published.
+            # Accept that shape here; final /download/${TAG}/ is asserted after publish.
+            final_url="https://github.com/${owner_repo}/releases/download/${TAG}/${name}"
+            untagged_prefix="https://github.com/${owner_repo}/releases/download/untagged-"
+            untagged_suffix="/${name}"
+            if [[ "$browser_url" == "$final_url" ]]; then
+              :
+            elif [[ "$browser_url" == "$untagged_prefix"*"$untagged_suffix" ]]; then
+              mid="${browser_url#"$untagged_prefix"}"
+              mid="${mid%"$untagged_suffix"}"
+              if [[ -z "$mid" || "$mid" == */* || "$browser_url" != "${untagged_prefix}${mid}${untagged_suffix}" ]]; then
+                echo "::error::browser_download_url mismatch for ${name}: got ${browser_url} (want ${final_url} or untagged-*/${name})"
+                exit 1
+              fi
+              echo "ok (draft): ${name} still on untagged download URL"
+            else
+              echo "::error::browser_download_url mismatch for ${name}: got ${browser_url} (want ${final_url} or untagged-*/${name})"
               exit 1
-            }
+            fi
             if [[ "$name" == *"~"* ]]; then
               [[ "$browser_url" == *"~"* ]] || {
                 echo "::error::GitHub renamed tilde out of ${name}"
@@ -424,23 +438,7 @@ jobs:
             fi
             echo "ok: ${name} size=${local_size} url=${browser_url}"
           done < artifacts/release/SHA256SUMS
-
-          if [[ "$IS_PRERELEASE" != "true" ]]; then
-            for kind_name in \
-              "realm-portal_${ver}_amd64.deb" \
-              "RealmPortal-${ver}-x86_64.AppImage" \
-              "RealmPortal-${ver}-win-x64.zip"; do
-              expect_url="https://github.com/${owner_repo}/releases/download/v${ver}/${kind_name}"
-              browser_url="$(jq -r --arg n "$kind_name" '.assets[] | select(.name==$n) | .browser_download_url' <<<"$release_json")"
-              [[ "$browser_url" == "$expect_url" ]] || {
-                echo "::error::Updater URL shape mismatch: ${browser_url} != ${expect_url}"
-                exit 1
-              }
-            done
-            echo "ok: stable updater URL shapes"
-          else
-            echo "ok: prerelease — updater ignores via GitHub prerelease flag (/releases/latest)"
-          fi
+          echo "ok: draft asset digests/sizes/names verified (final URL shape checked after publish)"
 
       - name: Publish release
         env:
@@ -454,6 +452,70 @@ jobs:
           else
             gh release edit "$TAG" --draft=false --latest=true
             echo "Published ${TAG} as latest"
+          fi
+
+      - name: Verify published download URLs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEB_VERSION: ${{ steps.assets.outputs.deb_version }}
+          IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          ver="$PACKAGE_VERSION"
+          deb_ver="$DEB_VERSION"
+          owner_repo="${GITHUB_REPOSITORY}"
+          # After publish, GET .../releases/tags/{tag} returns the release (including assets).
+          release_json="$(gh api "repos/${owner_repo}/releases/tags/${TAG}")"
+          draft="$(jq -r '.draft' <<<"$release_json")"
+          if [[ "$draft" != "false" ]]; then
+            echo "::error::Release ${TAG} is still draft after publish"
+            exit 1
+          fi
+          expected=(
+            "realm-portal_${deb_ver}_amd64.deb"
+            "RealmPortal-${ver}-x86_64.AppImage"
+            "RealmPortal-${ver}-win-x64.zip"
+            "SHA256SUMS"
+          )
+          for name in "${expected[@]}"; do
+            browser_url="$(jq -r --arg n "$name" '.assets[] | select(.name==$n) | .browser_download_url' <<<"$release_json")"
+            [[ -n "$browser_url" && "$browser_url" != "null" ]] || {
+              echo "::error::Missing published asset ${name}"
+              gh release edit "$TAG" --draft=true
+              exit 1
+            }
+            expect_url="https://github.com/${owner_repo}/releases/download/${TAG}/${name}"
+            [[ "$browser_url" == "$expect_url" ]] || {
+              echo "::error::Published browser_download_url mismatch for ${name}: got ${browser_url} want ${expect_url}"
+              gh release edit "$TAG" --draft=true
+              exit 1
+            }
+            if [[ "$name" == *"~"* ]]; then
+              [[ "$browser_url" == *"~"* ]] || {
+                echo "::error::GitHub renamed tilde out of published ${name}"
+                gh release edit "$TAG" --draft=true
+                exit 1
+              }
+            fi
+            echo "ok: published ${name} url=${browser_url}"
+          done
+
+          if [[ "$IS_PRERELEASE" != "true" ]]; then
+            for kind_name in \
+              "realm-portal_${ver}_amd64.deb" \
+              "RealmPortal-${ver}-x86_64.AppImage" \
+              "RealmPortal-${ver}-win-x64.zip"; do
+              expect_url="https://github.com/${owner_repo}/releases/download/v${ver}/${kind_name}"
+              browser_url="$(jq -r --arg n "$kind_name" '.assets[] | select(.name==$n) | .browser_download_url' <<<"$release_json")"
+              [[ "$browser_url" == "$expect_url" ]] || {
+                echo "::error::Updater URL shape mismatch after publish: ${browser_url} != ${expect_url}"
+                gh release edit "$TAG" --draft=true
+                exit 1
+              }
+            done
+            echo "ok: stable updater URL shapes after publish"
+          else
+            echo "ok: prerelease — updater ignores via GitHub prerelease flag (/releases/latest)"
           fi
 
       - name: Require immutable releases
