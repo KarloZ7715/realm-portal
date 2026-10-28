@@ -399,6 +399,11 @@ jobs:
               echo "::error::Missing API asset ${name}"
               exit 1
             }
+            remote_digest="$(jq -r '.digest // empty' <<<"$api_asset")"
+            [[ "$remote_digest" == "sha256:$digest" ]] || {
+              echo "::error::Remote digest mismatch for ${name}: remote=${remote_digest} want=sha256:${digest}"
+              exit 1
+            }
             browser_url="$(jq -r '.browser_download_url' <<<"$api_asset")"
             remote_size="$(jq -r '.size' <<<"$api_asset")"
             local_size="$(stat -c%s "$local_path")"
