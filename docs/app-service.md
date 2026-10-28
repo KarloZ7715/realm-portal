@@ -1,4 +1,4 @@
-# Application service (F4 / 1.0.0 v2)
+# Application service (1.0.0 v2)
 
 `RealmPortal.Core.Service.IPortalService` is the **only** thing the UI calls. The UI holds no logic: it passes ids, shows data, and maps
 error codes to localized text. This page is the `1.0.0` (v2) service contract covering client/server discovery (`Scan`), full client and

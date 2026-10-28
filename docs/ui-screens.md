@@ -1,9 +1,9 @@
-# UI screens (`F3b`–`F4` & `1.0.0` flows)
+# UI screens (early prototype & 1.0.0 flows)
 
 The window keeps the system title bar. Its client area is 720×440, which is the compact 720×480 mockups (`figma-exports/compact-*.png`) without their drawn
 title bar. From 960 px wide the sidebar shows labels and the non-affiliation note instead of icons only.
 
-Everything in the `F3b`/`F4` prototype runs on **simulated data**: `Demo/DemoData.cs` (made-up servers, clients and `/home/demo/...` paths) and `Demo/DemoBackend.cs` (timed steps,
+The early UI prototype (Avalonia demo with `DemoData`/`DemoBackend`) runs on **simulated data**: `Demo/DemoData.cs` (made-up servers, clients and `/home/demo/...` paths) and `Demo/DemoBackend.cs` (timed steps,
 a pretend game process). For `1.0.0`, the UI screens and flows below connect to `IPortalService` while keeping the exact **Style B ("Pergamino y bronce")** visual language and WCAG 1.4.11 parchment button surface rules.
 
 ## Screens and states
@@ -46,13 +46,13 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 ---
 
-## 1.0.0 UI/UX Specification (Step 7 Deliverables)
+## 1.0.0 UI/UX Specification
 
 ### Style B & WCAG 1.4.11 Surface Invariants (Mandatory Across All 1.0.0 Views)
 
 1. **Parchment Button Surface Rule (WCAG 1.4.11 Non-Text Contrast):**
    - Every `Button` (`primary`, `secondary`, `ghost`) and `SplitButton` placed on a parchment card, sheet, or modal (`ParchmentPanel` `Variant="Tile"` or `Variant="Thin"`) **must** set `c:ButtonSurface.Surface="Parchment"`.
-   - This applies `button-{primary,secondary}-parchment-*` with the `#5A3D22` (`1.5 px`) inner border (`5.55:1` contrast against `#D8BF92` parchment) and `focus-ring-parchment` (`#0F5561` inner ring + `#120C08` outer ring).
+   - This applies `button-{primary,secondary}-parchment-*` with the `#5A3D22` (`1.5 px`) inner border (`5.55:1` contrast against `#D8BF92` parchment) and `focus-ring-parchment` (`#0f5561` inner ring + `#120C08` outer ring).
    - Buttons placed directly on the dark leather background (`#120C08`..`#25190F`, such as the Servers header `+ Add`, Clients header `Pick a folder by hand`, and Settings footer `Cancel` / `Save`) keep the default `Leather` surface (`c:ButtonSurface.Surface="Leather"`).
 2. **9-Slice Width Snapping:**
    - Plain `Button.primary` / `Button.secondary`: snap `Width` or `MinWidth` to `160 + 6k` px (`130`, `148`, `166`, `172`, `208`, `214`) so the 6 px middle tile repeats cleanly.
@@ -62,7 +62,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 ---
 
-### Deliverable 1 — Server Card Edit & Delete UX (Req #2)
+### Server card edit & delete
 
 #### 1.1 `Play ▾` (`Jugar ▾`) SplitButton Flyout Menu (`ServersView.axaml`)
 - **Figma reference:** `compact-play-menu@2x.png` (`49:5882`) and `compact-play-menu-disabled@2x.png` (`49:6127`).
@@ -119,7 +119,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 ---
 
-### Deliverable 2 — Client List CRUD, Per-Client Launcher Overrides & Scan Summary UX (Req #1 & Req #2)
+### Clients & launcher overrides
 
 #### 2.1 First-Launch Auto-Scan & Manual Rescan Summary (`Discover`)
 - **Figma reference:** `02-detection-found@2x.png`, `02b-detection-searching@2x.png`, `02c-detection-none@2x.png`, and `compact-01-clients@2x.png`.
@@ -185,7 +185,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 ---
 
-### Deliverable 3 — Multi-Client Selector & Per-Client Concurrent Running State UX (Req #4 & Req #6)
+### Multi-client selector
 
 - **Backend contract:** `IPortalService.ListRunningSessions()` returns `IReadOnlyList<RunningSessionInfo>` (`ClientId`, `ServerId`, `ProcessId`, `StartedAt`).
   - A single client (`ClientId`) can run at most **one** game session at a time (`ServiceErrorCode.GameRunning`).
@@ -211,7 +211,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 ---
 
-### Deliverable 4 — Settings Backup Retention, Backups Manager Sub-Sheet & "Restore Anyway" Dialog (Req #7)
+### Settings backups
 
 #### 4.1 Settings Screen (`SettingsView.axaml` — `compact-07`)
 - **Figma reference:** `compact-07-settings-no-cleanup@2x.png` (`48:5882`) and `compact-07-settings-no-cleanup-scrolled@2x.png` (`48:6144`).
@@ -274,7 +274,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
   - **Title:** `IconWarning` (`#8C5214`) + `A recent change hasn't been confirmed` (`Hay un cambio reciente sin confirmar`, `confirm.backupconflict.title`).
   - **Body (`confirm.backupconflict.body`):**
     `"You switched to “{0}” at {1} and the Undo option is still active. Restoring this older backup ({2}) will replace the current client files. A safety backup of your current files will be saved first."`
-  - **Footer buttons (right-aligned, `Spacing="8"`, all with `c:ButtonSurface.Surface="Parchment"` — `#5A3D22` 1.5 px inner border and `#0F5561` + `#120C08` focus ring):**
+  - **Footer buttons (right-aligned, `Spacing="8"`, all with `c:ButtonSurface.Surface="Parchment"` — `#5A3D22` 1.5 px inner border and `#0f5561` + `#120C08` focus ring):**
     1. **`Restore anyway`** (`Restaurar de todos modos`, `confirm.backupconflict.restoreanyway`): `Button.primary` (`MinWidth="172"`). Calls `RestoreBackup(clientId, backupId, force: true)` (saves a pre-restore safety snapshot, restores the chosen backup, and clears `PendingUndo`).
     2. **`Discard`** (`Descartar`, `confirm.backupconflict.discard`): `Button.secondary` (`MinWidth="130"`). Calls `DiscardUndo()` (clears the pending Undo state without altering the client files on disk) and closes the dialog.
     3. **`Cancel`** (`Cancelar`, `confirm.cancel`): `Button.secondary` (`MinWidth="130"`, `IsCancel="True"`, **initial keyboard focus**). Closes the dialog with no changes.
