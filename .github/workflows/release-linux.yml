@@ -47,6 +47,8 @@ jobs:
     name: linux-x64 packages
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       EVENT_NAME: ${{ github.event_name }}
       REF_NAME: ${{ github.ref_name }}
@@ -60,6 +62,9 @@ jobs:
 
       - name: Test version resolution
         run: packaging/test-resolve-version.sh
+
+      - name: Test deb version mapping
+        run: packaging/test-deb-version.sh
 
       - name: Test license collection
         run: packaging/test-collect-licenses.sh
@@ -141,6 +146,8 @@ jobs:
     name: win-x64 self-contained artifact
     runs-on: windows-latest
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       EVENT_NAME: ${{ github.event_name }}
       REF_NAME: ${{ github.ref_name }}
@@ -219,3 +226,220 @@ jobs:
             ${{ env.PACKAGE_DIR }}/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
+
+  # Tag-only: create a draft GitHub Release, upload packages + SHA256SUMS, verify, then publish.
+  # rc tags (vX.Y.Z-rc.N) are published with --prerelease --latest=false so /releases/latest
+  # (and the in-app update check) never offers them unless a future opt-in is added.
+  publish:
+    name: publish GitHub release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [linux-packages, windows-package]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    concurrency:
+      group: release-publish-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      PACKAGE_VERSION: ${{ needs.linux-packages.outputs.version }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Download Linux packages
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: realm-portal-linux-${{ env.PACKAGE_VERSION }}
+          path: artifacts/linux
+
+      - name: Download Windows package
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: realm-portal-win-x64-${{ env.PACKAGE_VERSION }}
+          path: artifacts/win
+
+      - name: Assemble release directory
+        id: assets
+        run: |
+          set -euo pipefail
+          ver="$PACKAGE_VERSION"
+          deb_ver="$(packaging/linux/semver-to-deb-version.sh "$ver")"
+          mkdir -p artifacts/release
+          # Linux
+          cp -v "artifacts/linux/realm-portal_${deb_ver}_amd64.deb" artifacts/release/
+          cp -v "artifacts/linux/RealmPortal-${ver}-x86_64.AppImage" artifacts/release/
+          # Windows
+          cp -v "artifacts/win/RealmPortal-${ver}-win-x64.zip" artifacts/release/
+          # Merged SHA256SUMS (one line per binary; same layout as historical releases)
+          (
+            cd artifacts/release
+            sha256sum \
+              "realm-portal_${deb_ver}_amd64.deb" \
+              "RealmPortal-${ver}-win-x64.zip" \
+              "RealmPortal-${ver}-x86_64.AppImage" \
+              > SHA256SUMS
+          )
+          # Confirm a "~" in the .deb name survives (GitHub must not rename it)
+          if [[ "$deb_ver" == *"~"* ]]; then
+            [[ -f "artifacts/release/realm-portal_${deb_ver}_amd64.deb" ]]
+            echo "deb asset keeps tilde: realm-portal_${deb_ver}_amd64.deb"
+          fi
+          echo "deb_version=$deb_ver" >> "$GITHUB_OUTPUT"
+          if [[ "$ver" == *-* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          ls -la artifacts/release
+
+      - name: Create or reuse draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            draft="$(gh release view "$TAG" --json isDraft -q .isDraft)"
+            if [[ "$draft" != "true" ]]; then
+              echo "::error::Release ${TAG} is already published; refusing to modify an immutable release"
+              exit 1
+            fi
+            echo "Reusing existing draft release ${TAG}"
+            # Drop previous assets so re-runs are idempotent
+            mapfile -t names < <(gh release view "$TAG" --json assets -q '.assets[].name')
+            for name in "${names[@]+"${names[@]}"}"; do
+              [[ -n "$name" ]] || continue
+              gh release delete-asset "$TAG" "$name" --yes
+            done
+          else
+            title="Realm Portal ${PACKAGE_VERSION}"
+            gh release create "$TAG" \
+              --draft \
+              --verify-tag \
+              --generate-notes \
+              --title "$title"
+            echo "Created draft release ${TAG}"
+          fi
+
+      - name: Upload assets to draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" artifacts/release/* --clobber
+
+      - name: Verify assets, digests, sizes, and download URLs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEB_VERSION: ${{ steps.assets.outputs.deb_version }}
+          IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          ver="$PACKAGE_VERSION"
+          deb_ver="$DEB_VERSION"
+          owner_repo="${GITHUB_REPOSITORY}"
+          expected=(
+            "realm-portal_${deb_ver}_amd64.deb"
+            "RealmPortal-${ver}-x86_64.AppImage"
+            "RealmPortal-${ver}-win-x64.zip"
+            "SHA256SUMS"
+          )
+          mapfile -t remote < <(gh release view "$TAG" --json assets -q '.assets[].name' | sort)
+          mapfile -t want < <(printf '%s\n' "${expected[@]}" | sort)
+          if [[ "${remote[*]}" != "${want[*]}" ]]; then
+            echo "::error::Asset name mismatch. remote=(${remote[*]}) want=(${want[*]})"
+            exit 1
+          fi
+          mapfile -t sums_names < <(awk '{print $2}' artifacts/release/SHA256SUMS | sort)
+          mapfile -t bin_names < <(printf '%s\n' \
+            "realm-portal_${deb_ver}_amd64.deb" \
+            "RealmPortal-${ver}-x86_64.AppImage" \
+            "RealmPortal-${ver}-win-x64.zip" | sort)
+          if [[ "${sums_names[*]}" != "${bin_names[*]}" ]]; then
+            echo "::error::SHA256SUMS entries mismatch"
+            cat artifacts/release/SHA256SUMS
+            exit 1
+          fi
+          release_json="$(gh api "repos/${owner_repo}/releases/tags/${TAG}")"
+          while read -r digest name; do
+            [[ -n "$name" ]] || continue
+            local_path="artifacts/release/${name}"
+            local_digest="$(sha256sum "$local_path" | awk '{print $1}')"
+            [[ "$local_digest" == "$digest" ]] || {
+              echo "::error::Local digest drift for ${name}"
+              exit 1
+            }
+            api_asset="$(jq -c --arg n "$name" '.assets[] | select(.name==$n)' <<<"$release_json")"
+            [[ -n "$api_asset" ]] || {
+              echo "::error::Missing API asset ${name}"
+              exit 1
+            }
+            browser_url="$(jq -r '.browser_download_url' <<<"$api_asset")"
+            remote_size="$(jq -r '.size' <<<"$api_asset")"
+            local_size="$(stat -c%s "$local_path")"
+            [[ "$remote_size" == "$local_size" ]] || {
+              echo "::error::Size mismatch for ${name}: remote=${remote_size} local=${local_size}"
+              exit 1
+            }
+            expect_url="https://github.com/${owner_repo}/releases/download/${TAG}/${name}"
+            [[ "$browser_url" == "$expect_url" ]] || {
+              echo "::error::browser_download_url mismatch for ${name}: got ${browser_url} want ${expect_url}"
+              exit 1
+            }
+            if [[ "$name" == *"~"* ]]; then
+              [[ "$browser_url" == *"~"* ]] || {
+                echo "::error::GitHub renamed tilde out of ${name}"
+                exit 1
+              }
+            fi
+            echo "ok: ${name} size=${local_size} url=${browser_url}"
+          done < artifacts/release/SHA256SUMS
+
+          if [[ "$IS_PRERELEASE" != "true" ]]; then
+            for kind_name in \
+              "realm-portal_${ver}_amd64.deb" \
+              "RealmPortal-${ver}-x86_64.AppImage" \
+              "RealmPortal-${ver}-win-x64.zip"; do
+              expect_url="https://github.com/${owner_repo}/releases/download/v${ver}/${kind_name}"
+              browser_url="$(jq -r --arg n "$kind_name" '.assets[] | select(.name==$n) | .browser_download_url' <<<"$release_json")"
+              [[ "$browser_url" == "$expect_url" ]] || {
+                echo "::error::Updater URL shape mismatch: ${browser_url} != ${expect_url}"
+                exit 1
+              }
+            done
+            echo "ok: stable updater URL shapes"
+          else
+            echo "ok: prerelease — updater ignores via GitHub prerelease flag (/releases/latest)"
+          fi
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            gh release edit "$TAG" --draft=false --prerelease --latest=false
+            echo "Published ${TAG} as prerelease (not latest)"
+          else
+            gh release edit "$TAG" --draft=false --latest=true
+            echo "Published ${TAG} as latest"
+          fi
+
+      - name: Require immutable releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Immutable releases must be enabled so assets cannot be swapped after publish (docs/updates-and-status.md).
+          immutable="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.immutable')"
+          if [[ "$immutable" != "true" ]]; then
+            echo "::error::Release ${TAG} is not immutable; reverting to draft. Enable immutable releases for the repository."
+            gh release edit "$TAG" --draft=true
+            exit 1
+          fi
+          echo "ok: release is immutable"
