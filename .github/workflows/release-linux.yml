@@ -465,10 +465,15 @@ jobs:
           deb_ver="$DEB_VERSION"
           owner_repo="${GITHUB_REPOSITORY}"
           # After publish, GET .../releases/tags/{tag} returns the release (including assets).
-          release_json="$(gh api "repos/${owner_repo}/releases/tags/${TAG}")"
+          if ! release_json="$(gh api "repos/${owner_repo}/releases/tags/${TAG}")"; then
+            echo "::error::Failed to fetch published release ${TAG}; reverting to draft"
+            gh release edit "$TAG" --draft=true || true
+            exit 1
+          fi
           draft="$(jq -r '.draft' <<<"$release_json")"
           if [[ "$draft" != "false" ]]; then
-            echo "::error::Release ${TAG} is still draft after publish"
+            echo "::error::Release ${TAG} is still draft after publish; reverting to draft"
+            gh release edit "$TAG" --draft=true || true
             exit 1
           fi
           expected=(
