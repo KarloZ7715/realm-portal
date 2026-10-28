@@ -6,8 +6,9 @@ The [Release (Linux and Windows packages)](https://github.com/KarloZ7715/realm-p
 
 The version has a single source: `<Version>` in `Directory.Build.props`. `packaging/resolve-version.sh` reads it (self-tested by
 `packaging/test-resolve-version.sh` in the Linux job) and both jobs pass the result to `dotnet publish` as `-p:Version` /
-`-p:InformationalVersion`, so the package name, the `.deb` `Version:` field, the generated AppStream `<releases>` entry, the
-status bar and `realm-portal --version` all agree.
+`-p:InformationalVersion`, so the generated AppStream `<releases>` entry, the status bar and `realm-portal --version`
+use the product version. The Debian package filename and `.deb` `Version:` field use the Debian-normalized form, where
+prerelease `-` becomes `~`.
 
 | Trigger | Version used |
 | --- | --- |
