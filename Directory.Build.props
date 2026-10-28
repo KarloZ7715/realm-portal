@@ -10,7 +10,7 @@
     <Authors>Realm Portal contributors</Authors>
     <!-- Single source of the product version: AppInfo.Version (status bar, CLI version output) and the release
          packages (packaging/resolve-version.sh) all read it from here. Bump it before tagging a release. -->
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
   </PropertyGroup>
   <!-- Trimmed publish disables JSON reflection by default; the app uses JsonSerializer for config and loc tables. -->
   <PropertyGroup Condition="'$(PublishTrimmed)' == 'true'">
