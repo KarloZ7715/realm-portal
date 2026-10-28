@@ -18,6 +18,13 @@ PACKAGING_DIR="${ROOT_DIR}/packaging/linux"
 OUT_DIR="${3:-"${ROOT_DIR}/artifacts/linux"}"
 APPIMAGETOOL="${APPIMAGETOOL:-}"
 
+# Debian sorts "1.0.0-rc.1" ABOVE "1.0.0" (dash starts the debian revision). Map SemVer
+# prerelease dashes to "~" so an rc .deb upgrades cleanly to the final release.
+# File name and control Version: both use the Debian form; AppImage/zip keep SemVer.
+DEB_VERSION="$("${SCRIPT_DIR}/semver-to-deb-version.sh" "$VERSION")"
+IS_PRERELEASE=0
+[[ "$VERSION" == *-* ]] && IS_PRERELEASE=1
+
 if [[ ! -x "${PUBLISH_DIR}/RealmPortal.App" ]]; then
   echo "error: missing executable ${PUBLISH_DIR}/RealmPortal.App" >&2
   exit 1
@@ -54,21 +61,30 @@ EOF
 }
 
 # The source metainfo has no version; the <releases> entry is generated from VERSION (Directory.Build.props).
+# Prerelease (rc) entries use type="development" per AppStream and issue #131.
 write_metainfo() {
   local dest="$1"
-  local release_date
+  local release_date release_attrs
   release_date="$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%d)"
   if grep -q '<releases' "${PACKAGING_DIR}/com.karloz7715.RealmPortal.metainfo.xml"; then
     echo "error: metainfo must not hardcode <releases>; it is generated from the package version" >&2
     exit 1
   fi
-  sed "s|^</component>|  <releases>\n    <release version=\"${VERSION}\" date=\"${release_date}\"/>\n  </releases>\n</component>|" \
+  release_attrs="version=\"${VERSION}\" date=\"${release_date}\""
+  if [[ "${IS_PRERELEASE}" -eq 1 ]]; then
+    release_attrs="${release_attrs} type=\"development\""
+  fi
+  sed "s|^</component>|  <releases>\n    <release ${release_attrs}/>\n  </releases>\n</component>|" \
     "${PACKAGING_DIR}/com.karloz7715.RealmPortal.metainfo.xml" >"${dest}"
   grep -q "<release version=\"${VERSION}\"" "${dest}" || { echo "error: failed to write <releases> into metainfo" >&2; exit 1; }
+  if [[ "${IS_PRERELEASE}" -eq 1 ]]; then
+    grep -q 'type="development"' "${dest}" || { echo "error: prerelease metainfo must set type=development" >&2; exit 1; }
+  fi
 }
 
 # --- .deb ---
-DEB_STAGING="${ROOT_DIR}/pkg-deb/realm-portal_${VERSION}_amd64"
+# Staging dir and .deb file use DEB_VERSION (~ for prereleases); AppImage keeps SemVer VERSION.
+DEB_STAGING="${ROOT_DIR}/pkg-deb/realm-portal_${DEB_VERSION}_amd64"
 DEB_INSTALL_LIB="/opt/realm-portal"
 rm -rf "${DEB_STAGING}"
 mkdir -p "${DEB_STAGING}/DEBIAN" \
@@ -92,7 +108,7 @@ cp -a "${PACKAGING_DIR}/icons/hicolor/." "${DEB_STAGING}/usr/share/icons/hicolor
 
 cat >"${DEB_STAGING}/DEBIAN/control" <<EOF
 Package: realm-portal
-Version: ${VERSION}
+Version: ${DEB_VERSION}
 Section: games
 Priority: optional
 Architecture: amd64
@@ -102,7 +118,7 @@ Description: Realm Portal desktop launcher
  Switch between game realms with one click.
 EOF
 
-DEB_FILE="${OUT_DIR}/realm-portal_${VERSION}_amd64.deb"
+DEB_FILE="${OUT_DIR}/realm-portal_${DEB_VERSION}_amd64.deb"
 dpkg-deb --build --root-owner-group "${DEB_STAGING}" "${DEB_FILE}"
 
 REQUIRED_DOCS=(

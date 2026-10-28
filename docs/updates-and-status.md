@@ -82,7 +82,11 @@ overwrite an existing file), with no replacement. The dialog then shows instruct
 
 ### Version
 
-- `draft` and `prerelease` must be `false`.
+- `draft` and `prerelease` must be `false`. The check uses `GET …/releases/latest`, which GitHub never points at a
+  prerelease; the parser also rejects `prerelease: true`. Release tags such as `vX.Y.Z-rc.N` are published as GitHub
+  prereleases (`--prerelease --latest=false`, see [linux-packaging.md](linux-packaging.md)), so they are never offered.
+  There is no Settings opt-in to include prereleases in 1.1.0; if one is added later it must use a different API than
+  `/releases/latest` and stay off by default.
 - `tag_name` must match `^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`, with no pre-release or build suffix. Components are
   parsed as integers; overflow means unparseable. An unparseable tag means no notice.
 - The running version is the assembly `InformationalVersion` with any `+metadata` removed. If it is not a valid SemVer, no

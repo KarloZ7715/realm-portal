@@ -6,24 +6,29 @@ The [Release (Linux and Windows packages)](https://github.com/KarloZ7715/realm-p
 
 The version has a single source: `<Version>` in `Directory.Build.props`. `packaging/resolve-version.sh` reads it (self-tested by
 `packaging/test-resolve-version.sh` in the Linux job) and both jobs pass the result to `dotnet publish` as `-p:Version` /
-`-p:InformationalVersion`, so the package name, the `.deb` `Version:` field, the generated AppStream `<releases>` entry, the
-status bar and `realm-portal --version` all agree.
+`-p:InformationalVersion`, so the generated AppStream `<releases>` entry, the status bar and `realm-portal --version`
+use the product version. The Debian package filename and `.deb` `Version:` field use the Debian-normalized form, where
+prerelease `-` becomes `~`.
 
 | Trigger | Version used |
 | --- | --- |
 | `pull_request` (path-filtered) | `0.0.0-pr.<PR number>` (artifacts only; no release; the props version is still read and validated). It stays below every real release so an installed PR `.deb` never blocks an upgrade |
 | `workflow_dispatch` | `<props version>` when the `version` input is empty; otherwise the input, which must be `<props version>` or a prerelease of it (`<props version>-rc.1`) |
-| Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix; it **must equal** `<props version>` (e.g. `v1.0.0` with `<Version>1.0.0</Version>`), otherwise the run fails before building |
+| Push tag matching `v[0-9]+.[0-9]+.[0-9]+*` | Tag without the `v` prefix; it **must be** `<props version>` or `<props version>-<prerelease>` (e.g. `v1.1.0` or `v1.1.0-rc.1` with `<Version>1.1.0</Version>`), otherwise the run fails before building |
 
-To release: bump `<Version>` in `Directory.Build.props` in a PR, merge it, then push the matching `v<version>` tag.
+To release: bump `<Version>` in `Directory.Build.props` in a PR, merge it, then push the matching `v<version>` tag (or `v<version>-rc.N` for a prerelease).
 
-It does **not** create a GitHub Release. Linux outputs are uploaded as a workflow artifact named `realm-portal-linux-<version>` containing:
+On a tag push, after both package jobs succeed, the **publish** job in `.github/workflows/release-linux.yml` creates a **draft** GitHub Release, uploads every package plus a merged `SHA256SUMS`, verifies digests/sizes/download URLs, then publishes. An `rc` tag is published with `--prerelease --latest=false` so GitHub’s `/releases/latest` (and the in-app update check) never offers it. Stable tags become the latest release. The job refuses to modify an already-published release; if the published release is not immutable, it is reverted to draft and the job fails. Pull-request and `workflow_dispatch` runs still only upload workflow artifacts (no GitHub Release).
 
-- `realm-portal_<version>_amd64.deb`
-- `RealmPortal-<version>-x86_64.AppImage`
+Linux outputs are also uploaded as a workflow artifact named `realm-portal-linux-<version>` containing:
+
+- `realm-portal_<deb-version>_amd64.deb` (SemVer prerelease dashes become `~` in the Debian version/filename, e.g. `1.1.0-rc.1` → `realm-portal_1.1.0~rc.1_amd64.deb`, so dpkg sorts the rc below the final release)
+- `RealmPortal-<version>-x86_64.AppImage` (keeps the SemVer form, e.g. `…-1.1.0-rc.1-…`)
 - `SHA256SUMS` (checksums for the `.deb` and AppImage)
 
 Windows output is uploaded as `realm-portal-win-x64-<version>` containing `RealmPortal-<version>-win-x64.zip` and `SHA256SUMS`. The ZIP contains the self-contained `win-x64` publish output, including `RealmPortal.App.exe`.
+
+AppStream metainfo: `build-packages.sh` writes a `<release>` entry for the package version; prerelease versions also set `type="development"`.
 
 ### Build steps (summary)
 
