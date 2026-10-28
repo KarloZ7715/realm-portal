@@ -364,7 +364,28 @@ jobs:
             cat artifacts/release/SHA256SUMS
             exit 1
           fi
-          release_json="$(gh api "repos/${owner_repo}/releases/tags/${TAG}")"
+          # GET .../releases/tags/{tag} only returns published releases; drafts are
+          # invisible there. List releases (auth includes drafts) and select by tag.
+          release_json=""
+          page=1
+          while :; do
+            page_json="$(gh api "repos/${owner_repo}/releases?per_page=100&page=${page}")"
+            count="$(jq 'length' <<<"$page_json")"
+            [[ "$count" -gt 0 ]] || break
+            candidate="$(jq -c --arg t "$TAG" '
+              .[] | select(.tag_name == $t and .draft == true)
+            ' <<<"$page_json" | head -n 1)"
+            if [[ -n "${candidate}" ]]; then
+              release_json="${candidate}"
+              break
+            fi
+            [[ "$count" -lt 100 ]] && break
+            page=$((page + 1))
+          done
+          if [[ -z "${release_json}" ]]; then
+            echo "::error::Draft release for tag ${TAG} not found via releases list"
+            exit 1
+          fi
           while read -r digest name; do
             [[ -n "$name" ]] || continue
             local_path="artifacts/release/${name}"
