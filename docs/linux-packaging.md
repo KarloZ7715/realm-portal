@@ -18,7 +18,7 @@ prerelease `-` becomes `~`.
 
 To release: bump `<Version>` in `Directory.Build.props` in a PR, merge it, then push the matching `v<version>` tag (or `v<version>-rc.N` for a prerelease).
 
-On a tag push, after both package jobs succeed, the **publish** job in `.github/workflows/release-linux.yml` creates a **draft** GitHub Release, uploads every package plus a merged `SHA256SUMS`, verifies digests/sizes/asset names (draft download URLs use `untagged-*` until publish), publishes, then asserts the final `/releases/download/<tag>/…` URL shape. An `rc` tag is published with `--prerelease --latest=false` so GitHub’s `/releases/latest` (and the in-app update check) never offers it. Stable tags become the latest release. The job refuses to modify an already-published release; if the published release is not immutable, it is reverted to draft and the job fails. Pull-request and `workflow_dispatch` runs still only upload workflow artifacts (no GitHub Release).
+On a tag push, after both package jobs succeed, the **draft-release** job in `.github/workflows/release-linux.yml` creates a **draft** GitHub Release (marked prerelease for an `rc` tag), uploads every package plus a merged `SHA256SUMS`, and verifies digests, sizes, asset names and the draft download URLs (`untagged-*` until publish). It then stops: CI never publishes. Signing and publishing are a manual step, described in [Signing and publishing a release](#signing-and-publishing-a-release). The job refuses to modify an already-published release. Pull-request and `workflow_dispatch` runs still only upload workflow artifacts (no GitHub Release).
 
 Linux outputs are also uploaded as a workflow artifact named `realm-portal-linux-<version>` containing:
 
@@ -42,6 +42,59 @@ Local reproduction (after publish):
 export APPIMAGETOOL=/path/to/obsolete-appimagetool-x86_64.AppImage
 packaging/linux/build-packages.sh /path/to/publish "$(EVENT_NAME=workflow_dispatch packaging/resolve-version.sh)" ./artifacts/linux
 ```
+
+## Signing and publishing a release
+
+`SHA256SUMS` is signed with minisign (#116) using a password-protected key that stays on the maintainer's machine and
+never goes to GitHub. The matching public key is committed as `minisign.pub` at the repository root.
+
+### One-time setup
+
+```sh
+minisign -G -p minisign.pub -s ~/.minisign/realm-portal.key
+```
+
+minisign asks for a password; use a strong one. Keep an offline backup of `realm-portal.key` and its password. Commit
+only `minisign.pub` (its first line holds the key ID). Until that file exists, `sign-and-publish.sh` refuses to run.
+
+### Each release
+
+1. Push the tag and wait for the release workflow. It leaves a draft with the three packages and `SHA256SUMS`.
+2. With `gh` logged in to an account that can edit releases, from a checkout of the repository (the script reads `minisign.pub` from its root):
+
+   ```sh
+   packaging/sign-and-publish.sh --dry-run --key ~/.minisign/realm-portal.key v1.2.0   # optional rehearsal
+   packaging/sign-and-publish.sh --key ~/.minisign/realm-portal.key v1.2.0
+   ```
+
+   The script checks that the release is a draft with exactly the expected assets, downloads `SHA256SUMS` and checks it
+   against the digests GitHub reports for the packages, and runs `minisign -S` with the trusted comment
+   `realm-portal v1.2.0` (minisign asks for the key password; the script never sees it). It verifies the signature with
+   `minisign -V -H` against `minisign.pub`, checks that immutable releases are enabled, uploads `SHA256SUMS.minisig`,
+   downloads both files again and re-verifies them, then asks you to type the tag before publishing. `--yes` skips the
+   question; `--signature <file>` uses a signature made elsewhere instead of signing; `--dry-run` stops before uploading.
+3. After publishing, the script checks that the release is immutable, has the prerelease flag the tag calls for, serves
+   every asset from `/releases/download/<tag>/`, and passes `gh release verify` and `gh release verify-asset`.
+
+Stable tags are published as the latest release; `rc` tags with `--prerelease --latest=false`, so the in-app update check
+never offers them. They are signed the same way.
+
+If a post-publish check fails:
+
+- **Not immutable:** the release can still go back to draft, and the script does that and exits with an error. Enable
+  immutable releases, then run the script again.
+- **Anything else:** an immutable release cannot go back to draft and its assets cannot change. Leave it published, say
+  in its notes what is wrong, and cut a new patch release.
+
+To check a release by hand:
+
+```sh
+gh release download v1.2.0 -p SHA256SUMS -p SHA256SUMS.minisig
+minisign -V -H -p minisign.pub -m SHA256SUMS   # prints the trusted comment: realm-portal v1.2.0
+gh release verify v1.2.0
+```
+
+`packaging/test-sign-and-publish.sh` tests the script with throwaway keys and a stub `gh`; the release workflow runs it.
 
 ## Install layout
 
