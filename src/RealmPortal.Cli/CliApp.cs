@@ -375,7 +375,7 @@ public sealed class CliApp(
     {
         var name = Path.GetFileName(status.Path);
         var backup = status.BackupModifiedAt is { } at
-            ? $"{Describe(status.Backup)} ({at.ToLocalTime():yyyy-MM-dd HH:mm:ss})"
+            ? $"{Describe(status.Backup)} ({at.ToLocalTime():yyyy-MM-dd HH:mm:ss} UTC{at.ToLocalTime():zzz})"
             : Describe(status.Backup);
         return $"{name}: current {Describe(status.Current)}, backup {backup}";
 

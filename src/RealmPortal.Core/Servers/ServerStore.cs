@@ -186,7 +186,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
     }
 
     /// <summary>True when <paramref name="bytes"/> would load as a valid <c>servers.json</c>.</summary>
-    internal static bool IsValidContent(byte[] bytes)
+    public static bool IsValidContent(byte[] bytes)
     {
         try
         {
@@ -203,8 +203,8 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
     {
         var file = new StoreFile { Version = FormatVersion, Servers = servers.Select(ToRecord).ToList() };
         var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
-        ConfigFileBackup.KeepPrevious(FilePath, writer, IsValidContent);
-        writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
+        ConfigFileBackup.WriteKeepingPrevious(
+            FilePath, writer, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions, IsValidContent);
     }
 
     private static Server ToServer(ServerRecord r)

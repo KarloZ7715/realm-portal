@@ -23,7 +23,7 @@ public sealed class ConfigBackupTests
         public void Launch(string executablePath, string workingDirectory, string? wrapper) { }
     }
 
-    private sealed class Box : IDisposable
+    internal sealed class Box : IDisposable
     {
         private readonly TempDirectory _dir = new();
         public string Config => _dir.Combine("config");
@@ -31,8 +31,10 @@ public sealed class ConfigBackupTests
         public string ServersPath => Path.Combine(Config, "servers.json");
         public string ClientsPath => Path.Combine(Config, "clients.json");
 
-        public PortalService Service() =>
-            new(Config, Projection, new PeClientVersionReader(), new NoLaunch(), new NeverRunningGameProbe(), TestBackupDir.Variables(_dir));
+        public string StatePath => Path.Combine(Config, "state.json");
+
+        public PortalService Service(IAtomicFileWriter? writer = null) =>
+            new(Config, Projection, new PeClientVersionReader(), new NoLaunch(), new NeverRunningGameProbe(), TestBackupDir.Variables(_dir), writer);
 
         public string NewClient(string name)
         {
@@ -166,16 +168,17 @@ public sealed class ConfigBackupTests
     }
 
     [Fact]
-    public void KeepPrevious_NeverReplacesAGoodBakWithADamagedFile()
+    public void WriteKeepingPrevious_NeverReplacesAGoodBakWithADamagedFile()
     {
         using var dir = new TempDirectory();
         var path = dir.Combine("store.json");
         File.WriteAllText(path + ".bak", "good");
         File.WriteAllText(path, "bad");
 
-        ConfigFileBackup.KeepPrevious(path, new AtomicFileWriter(), bytes => Encoding.UTF8.GetString(bytes) == "good");
+        ConfigFileBackup.WriteKeepingPrevious(path, new AtomicFileWriter(), "new"u8.ToArray(), null, bytes => Encoding.UTF8.GetString(bytes) == "good");
 
         Assert.Equal("good", File.ReadAllText(path + ".bak"));
+        Assert.Equal("new", File.ReadAllText(path));
     }
 
     [Fact]
@@ -220,6 +223,6 @@ public sealed class ConfigBackupTests
         using var box = new Box();
         var result = box.Cli("config", "restore", "clients");
         Assert.Equal(2, result.Code);
-        Assert.Contains("not found", result.Err, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("clients.json has no .bak copy yet", result.Err, StringComparison.Ordinal);
     }
 }

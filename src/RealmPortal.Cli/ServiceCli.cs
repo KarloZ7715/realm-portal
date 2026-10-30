@@ -48,7 +48,7 @@ internal static class ServiceCli
             ServiceErrorCode.PathNotFound => string.IsNullOrEmpty(error.Path)
                 ? "A required path was not found."
                 : $"Path not found: '{error.Path}'.",
-            ServiceErrorCode.BackupNotFound => "The backup was not found.",
+            ServiceErrorCode.BackupNotFound => FormatBackupNotFound(error),
             ServiceErrorCode.PathEscapesClient => string.IsNullOrEmpty(error.Diagnostic)
                 ? "The path is not a managed client file."
                 : error.Diagnostic,
@@ -80,6 +80,19 @@ internal static class ServiceCli
         };
     }
 
+    private static string FormatBackupNotFound(ServiceError error)
+    {
+        // #196: a missing config .bak (servers.json.bak, clients.json.bak) gets its own message.
+        var name = error.Path is { } p ? Path.GetFileName(p) : null;
+        if (name is "servers.json" + ConfigFileBackup.BackupSuffix or "clients.json" + ConfigFileBackup.BackupSuffix)
+        {
+            var store = name[..^ConfigFileBackup.BackupSuffix.Length];
+            return $"{store} has no {ConfigFileBackup.BackupSuffix} copy yet; one is kept on the next save that changes it.";
+        }
+
+        return "The backup was not found.";
+    }
+
     private static string FormatStoreCorrupt(ServiceError error)
     {
         var name = error.Path is { } p ? Path.GetFileName(p) : null;
@@ -88,7 +101,13 @@ internal static class ServiceCli
         var message = $"Config file '{name}' is corrupt or unreadable.";
         // #196: point at the previous valid copy when one exists for a store the CLI can restore.
         var store = name switch { "servers.json" => "servers", "clients.json" => "clients", _ => null };
-        return store is not null && File.Exists(error.Path + ConfigFileBackup.BackupSuffix)
+        Func<byte[], bool>? isValid = store switch
+        {
+            "servers" => ServerStore.IsValidContent,
+            "clients" => RealmPortal.Core.Clients.ClientStore.IsValidContent,
+            _ => null,
+        };
+        return isValid is not null && ConfigFileBackup.Inspect(error.Path + ConfigFileBackup.BackupSuffix, isValid) == ConfigFileState.Valid
             ? $"{message} A previous copy exists; run 'realm-portal config restore {store}' to restore it."
             : message;
     }

@@ -72,8 +72,9 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
         if (!existed && !OperatingSystem.IsWindows())
             File.SetUnixFileMode(directory.FullName, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(preferences, JsonOptions));
-        ConfigFileBackup.KeepPrevious(_path, _writer, IsValidContent);
-        _writer.WriteAllBytes(_path, bytes, new FileReplacementPermissions((int)(UnixFileMode.UserRead | UnixFileMode.UserWrite), null));
+        // #196: an unchanged save (window placement on every close) writes nothing and keeps the real previous .bak.
+        ConfigFileBackup.WriteKeepingPrevious(
+            _path, _writer, bytes, new FileReplacementPermissions((int)(UnixFileMode.UserRead | UnixFileMode.UserWrite), null), IsValidContent);
     }
 
     /// <summary>State of <c>ui-preferences.json.bak</c>, the previous valid preferences kept on every save (#196).</summary>
@@ -85,7 +86,17 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
     /// </summary>
     /// <exception cref="FileNotFoundException">There is no <c>.bak</c>.</exception>
     /// <exception cref="StoreException">The <c>.bak</c> is damaged; nothing was changed.</exception>
-    public void RestoreBackup() => ConfigFileBackup.Restore(_path, _writer, IsValidContent);
+    public void RestoreBackup()
+    {
+        try
+        {
+            ConfigFileBackup.Restore(_path, _writer, IsValidContent);
+        }
+        catch (InvalidDataException ex)
+        {
+            throw new StoreException(ex.Message, ex, contentCorrupt: true);
+        }
+    }
 
     private static bool IsValidContent(byte[] bytes)
     {

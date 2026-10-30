@@ -656,6 +656,11 @@ public sealed class PortalService : IPortalService
     {
         try
         {
+            // Read-only: a config directory that does not exist yet is reported as all missing, without creating it
+            // (or its lock file).
+            if (!Directory.Exists(_configDirectory))
+                return ServiceResult<IReadOnlyList<ConfigBackupStatus>>.Ok(
+                    [InspectConfigFile(ConfigFileKind.Servers), InspectConfigFile(ConfigFileKind.Clients)]);
             using (_servers.DirectoryLock.Acquire())
                 return ServiceResult<IReadOnlyList<ConfigBackupStatus>>.Ok(
                     [InspectConfigFile(ConfigFileKind.Servers), InspectConfigFile(ConfigFileKind.Clients)]);
@@ -682,8 +687,9 @@ public sealed class PortalService : IPortalService
             return ServiceResult<ConfigBackupStatus>.Fail(
                 new ServiceError(ServiceErrorCode.BackupNotFound, Path: path + ConfigFileBackup.BackupSuffix, Consistency: Consistency.Unchanged));
         }
-        catch (StoreException ex) when (!ex.Locked)
+        catch (InvalidDataException ex)
         {
+            // Only a damaged .bak maps here; lock and I/O failures go through ServiceErrors.FromException.
             return ServiceResult<ConfigBackupStatus>.Fail(
                 new ServiceError(ServiceErrorCode.StoreCorrupt, Path: path + ConfigFileBackup.BackupSuffix, Consistency: Consistency.Unchanged, Diagnostic: ex.Message));
         }
