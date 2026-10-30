@@ -23,6 +23,9 @@ All notable changes to Realm Portal are listed here. The format follows
 - The game watcher checks less often once the game process is seen ([#174](https://github.com/KarloZ7715/realm-portal/issues/174))
 - The `.deb` package ships a machine-readable `copyright` file ([#175](https://github.com/KarloZ7715/realm-portal/issues/175))
 - The release pipeline supports prerelease (`rc`) tags, which are never offered as the latest version ([#188](https://github.com/KarloZ7715/realm-portal/issues/188))
+- Privacy section in the README for the two network features ([#182](https://github.com/KarloZ7715/realm-portal/issues/182))
+- Install links and file names point to the 1.0.1 release ([#152](https://github.com/KarloZ7715/realm-portal/issues/152))
+- Docs use feature names instead of internal milestone codes ([#187](https://github.com/KarloZ7715/realm-portal/issues/187))
 
 ### Fixed
 
@@ -36,12 +39,6 @@ All notable changes to Realm Portal are listed here. The format follows
 
 - Switching refuses managed files or folders that are symbolic links pointing outside the client folder ([#173](https://github.com/KarloZ7715/realm-portal/issues/173))
 
-### Documentation
-
-- Privacy section in the README for the two network features ([#182](https://github.com/KarloZ7715/realm-portal/issues/182))
-- Install links and file names point to the 1.0.1 release ([#152](https://github.com/KarloZ7715/realm-portal/issues/152))
-- Docs use feature names instead of internal milestone codes ([#187](https://github.com/KarloZ7715/realm-portal/issues/187))
-
 ## [1.0.1](https://github.com/KarloZ7715/realm-portal/compare/v1.0.0...v1.0.1) - 2026-10-24
 
 ### Added
@@ -52,6 +49,8 @@ All notable changes to Realm Portal are listed here. The format follows
 ### Changed
 
 - The release packages include the license texts of every bundled third-party component, including the .NET runtime ([#126](https://github.com/KarloZ7715/realm-portal/issues/126), [#138](https://github.com/KarloZ7715/realm-portal/issues/138))
+- README install steps, a current screenshot and a CLI reference in `docs/cli.md` ([#110](https://github.com/KarloZ7715/realm-portal/issues/110), [#128](https://github.com/KarloZ7715/realm-portal/issues/128))
+- Personal example paths and names replaced with neutral placeholders ([#109](https://github.com/KarloZ7715/realm-portal/issues/109), [#144](https://github.com/KarloZ7715/realm-portal/issues/144))
 
 ### Fixed
 
@@ -68,14 +67,9 @@ All notable changes to Realm Portal are listed here. The format follows
 - CLI: `--config-dir`, `--projection-dir` and `--client-dir` work before the command ([#132](https://github.com/KarloZ7715/realm-portal/issues/132))
 - CLI: `launch --dry-run` shows the exact command, including the configured wrapper ([#134](https://github.com/KarloZ7715/realm-portal/issues/134))
 
-### Documentation
-
-- README install steps, a current screenshot and a CLI reference in `docs/cli.md` ([#110](https://github.com/KarloZ7715/realm-portal/issues/110), [#128](https://github.com/KarloZ7715/realm-portal/issues/128))
-- Personal example paths and names replaced with neutral placeholders ([#109](https://github.com/KarloZ7715/realm-portal/issues/109), [#144](https://github.com/KarloZ7715/realm-portal/issues/144))
-
 ## [1.0.0](https://github.com/KarloZ7715/realm-portal/releases/tag/v1.0.0) - 2026-10-19
 
-First stable release.
+First stable release. Known limitations at release: symbolic links inside the client folder that point outside it were followed for `realmlist.wtf` and `Config.wtf` ([#44](https://github.com/KarloZ7715/realm-portal/issues/44), fixed in 1.1.0), and the app was built on Avalonia 11.3 ([#48](https://github.com/KarloZ7715/realm-portal/issues/48)).
 
 ### Added
 
@@ -89,8 +83,3 @@ First stable release.
 - `activo.json` with the active server, for companion tools
 - Command-line tool, run from source
 - `.deb`, AppImage and Windows `.zip` packages, with a `SHA256SUMS` file
-
-### Known limitations
-
-- Symbolic links inside the client folder that point outside it are followed for `realmlist.wtf` and `Config.wtf` ([#44](https://github.com/KarloZ7715/realm-portal/issues/44), fixed in 1.1.0)
-- Built on Avalonia 11.3 ([#48](https://github.com/KarloZ7715/realm-portal/issues/48))

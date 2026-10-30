@@ -53,8 +53,7 @@ commit_parsers = [
   { message = "^fix\\((release|ci)\\)", skip = true },
   { message = "^feat", group = "<!-- 0 -->Added" },
   { message = "^(perf|refactor)", group = "<!-- 1 -->Changed" },
-  { message = "^packaging", group = "<!-- 1 -->Changed" },
+  { message = "^(packaging|docs)", group = "<!-- 1 -->Changed" },
   { message = "^fix", group = "<!-- 2 -->Fixed" },
-  { message = "^docs", group = "<!-- 4 -->Documentation" },
   { message = "^(chore|ci|test|build|style)", skip = true },
 ]

@@ -43,8 +43,8 @@ tag that does not match `Directory.Build.props` fails the release run. Bump `<Ve
 ## Changelog
 
 [`CHANGELOG.md`](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Entries come from the
-Conventional Commit subjects of merged PRs: `feat` goes to Added; `perf`, `refactor` and `packaging` to Changed; `fix` to Fixed;
-`docs` to Documentation. `chore`, `ci`, `test`, `build`, `style` and release-pipeline fixes are left out. These rules live in
+Conventional Commit subjects of merged PRs: `feat` goes to Added; `perf`, `refactor`, `packaging` and `docs` to Changed; `fix`
+to Fixed. `chore`, `ci`, `test`, `build`, `style` and release-pipeline fixes are left out. These rules live in
 [`cliff.toml`](cliff.toml) for [git-cliff](https://git-cliff.org) (tested with 2.14.2; install it only if you prepare a release).
 
 In the PR that bumps `<Version>`, add the new section:
@@ -57,12 +57,11 @@ Then review it: reword entries for users, move security fixes to Security, add c
 conventional, and drop changes users do not see. Older sections are never regenerated. If another PR merges before you tag,
 add its entry before tagging, so the section covers everything up to the tagged commit.
 
-The release workflow still publishes GitHub's generated notes. Once the release is published, replace them with the reviewed
-section:
+The release workflow publishes the release with GitHub's generated notes. As part of publishing, the maintainer replaces
+those notes with the reviewed section. This prints one version's section:
 
 ```bash
-awk '/^## \[1\.2\.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > /tmp/notes.md
-gh release edit v1.2.0 --notes-file /tmp/notes.md
+awk '/^## \[1\.2\.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md
 ```
 
 ## Command line
