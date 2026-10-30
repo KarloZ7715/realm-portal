@@ -40,6 +40,33 @@ reads the assembly informational version (without the `+<commit>` suffix), so a 
 tag that does not match `Directory.Build.props` fails the release run. Bump `<Version>` in a PR before tagging a release.
 `AppInfoTests` checks that the app and CLI report the props version.
 
+## Changelog
+
+[`CHANGELOG.md`](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Entries come from the
+Conventional Commit subjects of merged PRs: `feat` goes to Added; `perf`, `refactor`, `packaging` and `docs` to Changed; `fix`
+to Fixed. `chore`, `ci`, `test`, `build`, `style` and release-pipeline fixes are left out. These rules live in
+[`cliff.toml`](cliff.toml) for [git-cliff](https://git-cliff.org) (tested with 2.14.2; install it only if you prepare a release).
+
+In the PR that bumps `<Version>`, add the new section:
+
+```bash
+git cliff --unreleased --tag v1.2.0 --prepend CHANGELOG.md
+```
+
+Then review it: reword entries for users, move security fixes to Security, add changes whose commit subject is not
+conventional, and drop changes users do not see. Older sections are never regenerated. If another PR merges before you tag,
+add its entry before tagging, so the section covers everything up to the tagged commit. git-cliff dates the section with
+the UTC date of the moment it runs, not the tag date; check the date and change it to the tag's UTC date if they differ.
+
+Use a version's reviewed `CHANGELOG.md` section, generated with git-cliff as above, as the notes of its GitHub release.
+Whoever prepares the release copies it there; nothing does it automatically.
+
+To write one version's section to a file:
+
+```bash
+awk '/^## \[1\.2\.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > /tmp/notes-1.2.0.md
+```
+
 ## Command line
 
 `src/RealmPortal.Cli` builds the `realm-portal` command-line tool. Run it from source with
