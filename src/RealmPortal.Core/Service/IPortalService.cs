@@ -51,6 +51,19 @@ public interface IPortalService
     /// <summary>Updates a stored server without changing its id.</summary>
     ServiceResult<ServerEntry> UpdateServer(UpdateServerRequest request);
 
+    /// <summary>
+    /// Adds a copy of a stored server with a new id (#191): same host, realm, extra realmlist lines (<c>set patchlist</c>, ...),
+    /// required client build, remembered account name, linked client and Cache/WDB override. The account is only the
+    /// remembered name; Realm Portal stores no password or other credential, so none is copied. The copy is not made active
+    /// and no client file is touched.
+    /// </summary>
+    /// <param name="serverId">Id of the server to copy.</param>
+    /// <param name="newName">Name of the copy; <c>null</c> uses <c>"&lt;name&gt; (copy)"</c>, then <c>"&lt;name&gt; (copy 2)"</c>, ...
+    /// when taken, shortened by whole text elements to fit <see cref="Servers.Server.MaxNameLength"/>.</param>
+    /// <returns>The new server. Errors: <see cref="ServiceErrorCode.ServerNotFound"/>, <see cref="ServiceErrorCode.ServerNameTaken"/>
+    /// (a given <paramref name="newName"/> is in use), <see cref="ServiceErrorCode.InvalidServerInput"/> with <c>Field = "name"</c>.</returns>
+    ServiceResult<ServerEntry> DuplicateServer(string serverId, string? newName = null);
+
     /// <summary>Removes a server; when it was active it is deactivated and <c>activo.json</c> is deleted.</summary>
     ServiceResult<Unit> RemoveServer(string serverId);
 

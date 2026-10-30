@@ -442,6 +442,37 @@ public sealed class PortalService : IPortalService
         }
     }
 
+    public ServiceResult<ServerEntry> DuplicateServer(string serverId, string? newName = null)
+    {
+        ArgumentNullException.ThrowIfNull(serverId);
+
+        try
+        {
+            using var configLock = _servers.DirectoryLock.Acquire();
+            var servers = _servers.List();
+            var source = servers.FirstOrDefault(s => s.Id == serverId);
+            if (source is null)
+                return ServiceResult<ServerEntry>.Fail(new ServiceError(ServiceErrorCode.ServerNotFound));
+
+            var copy = Server.Create(
+                newName ?? CreateDuplicateServerName(source.Name, servers),
+                source.Host,
+                source.Realm,
+                StoredExtraRealmlistLines(source),
+                source.RequiredClientBuild,
+                source.Account,
+                clientId: source.ClientId,
+                clearCacheOnSwitch: source.ClearCacheOnSwitch);
+            _servers.Add(copy);
+            var activeId = _active.GetActive(copy.ClientId)?.Id;
+            return ServiceResult<ServerEntry>.Ok(ToServerEntry(copy, activeId, copy.ClientId, null));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ServerEntry>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
     public ServiceResult<Unit> RemoveServer(string serverId)
     {
         if (serverId is null)
@@ -1309,6 +1340,24 @@ public sealed class PortalService : IPortalService
             candidate = (prefix.Length > 0 ? prefix : "Imported server") + tail;
         }
         return candidate;
+    }
+
+    /// <summary>
+    /// Default name of a duplicated server (#191): <c>"&lt;name&gt; (copy)"</c>, then <c>" (copy 2)"</c>, <c>" (copy 3)"</c>, ...
+    /// while the name is taken (case-insensitive). The original name is shortened by whole text elements so the result fits
+    /// <see cref="Server.MaxNameLength"/>, as for imported names.
+    /// </summary>
+    internal static string CreateDuplicateServerName(string name, IReadOnlyList<Server> existing)
+    {
+        var basis = name.Trim();
+        for (var number = 1; ; number++)
+        {
+            var tail = number == 1 ? " (copy)" : $" (copy {number})";
+            var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
+            var candidate = prefix + tail;
+            if (!existing.Any(server => string.Equals(server.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+                return candidate;
+        }
     }
 
     /// <summary>

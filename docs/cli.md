@@ -37,6 +37,7 @@ realm-portal client list
 realm-portal client add <path> [--name <name>]
 realm-portal client edit <client> [--name <name>] [--path <path>]
 realm-portal client remove <client>
+realm-portal duplicate <server> [--name <name>]
 realm-portal scan [--root <folder>]...
 ```
 
@@ -57,6 +58,7 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | `undo` | Restores the server that was active before the last switch. It remembers one step. With `--client-dir`, restores that client's last switch (and its realm files from the backup when that switch rewrote them), even if another client has a more recent global switch. Without `--client-dir`, undoes the globally latest switch. `REALM_PORTAL_CLIENT_DIR` alone does not scope undo. |
 | `status` | Shows the active server, whether `activo.json` is in sync, clients whose files do not match the active server, and whether undo is available. With `--client-dir`, also shows that client's version and whether it is compatible. |
 | `launch` | Needs `--client-dir` (or `REALM_PORTAL_CLIENT_DIR`). With `<server>`, switches to it and starts the game; without it, starts the game for the active server. `--force` skips the compatibility check. `--dry-run` prints the exact command a real launch would start (the saved launcher prefix such as `gamemoderun`, or `--wrapper` when given, then the executable; tokens with spaces are quoted; environment changes, if any, on following `env NAME=value` / `unset NAME` lines) without switching or starting the game, and fails the same way a real launch would when a saved launcher setting cannot be applied by the CLI; it still registers the `--client-dir` folder if it is new, and with `<server>` it does not check compatibility. `--wrapper <command>` runs the game through a command such as `wine` and saves it as the launcher prefix in Realm Portal's settings (with `--dry-run` it is only printed, not saved). |
+| `duplicate` | Adds a copy of a server with a new id: same host, realm, extra realmlist lines, required build, account name and linked client (only the account name is copied; Realm Portal never stores passwords). The name is `--name` when given, otherwise `<name> (copy)`, or `<name> (copy 2)`, `(copy 3)`, ... when that is taken, shortened to fit 64 characters. The copy does not become the active server, and no game file changes. |
 | `client list` / `add` / `edit` / `remove` | Manages registered game clients. Removing a client leaves the game folder and its backups on disk. |
 | `scan` | Searches for game clients and imports the servers found in their realm files. See [What `scan` searches](#what-scan-searches). |
 
