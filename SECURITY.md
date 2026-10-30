@@ -19,11 +19,13 @@ workflow builds the packages and leaves a draft release. The maintainer then sig
 immutable once published, and GitHub attests them. The process is described in
 [docs/linux-packaging.md](docs/linux-packaging.md#signing-and-publishing-a-release).
 
-Release key:
+The release key has the ID `A71D9203F538E296`. Its fingerprint is the base64 line of the public key:
 
-- Key ID: `A71D9203F538E296`
-- Public key (fingerprint): `RWSW4jj1A5Idp08WKXT16AwD21ICuzdEz0CoIx39Wji6Zsffoqkq96Sl`
-- File: [`minisign.pub`](minisign.pub) at the repository root. The app has the same key built in.
+```text
+RWSW4jj1A5Idp08WKXT16AwD21ICuzdEz0CoIx39Wji6Zsffoqkq96Sl
+```
+
+The public key is in [`minisign.pub`](minisign.pub) at the repository root, and the app has the same key built in.
 
 The trusted comment of each signature is `realm-portal <tag>`, for example `realm-portal v1.2.0`.
 
