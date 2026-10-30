@@ -27,7 +27,7 @@ a pretend game process). For `1.0.0`, the UI screens and flows below connect to 
 | Client backups manager (`BackupsView`) | Follows `compact-01` + `compact-07` sub-sheet layout — *New (1.0.0)* | "Gestionar respaldos…" / "Manage backups…" inside the `BACKUP` card in Settings |
 | Confirm delete backup | Reuses `07b-confirm-incompatible-switch@2x.png` modal — *New (1.0.0)* | inline `✕` ("Eliminar respaldo") button on a backup row |
 | Backup restore conflict (`Restore anyway`) | `compact-09-backup-conflict@2x.png` & `compact-09b-backup-conflict-restore-anyway@2x.png` — *Exists in Figma* | "Restaurar" / "Restore" on an older backup while a recent switch has a pending Undo |
-| First-run welcome | `01-first-run@2x.png`, `02-detection-*.png` — *Implemented (1.1.0 #107)* | Shown when `IsWelcomeDone` is false: unset `WelcomeCompleted` uses `FirstScanCompleted` (upgrades skip); explicit `false` still shows the wizard; Skip/Finish persist `WelcomeCompleted=true`. Flow: language → clients → servers |
+| First-run welcome | `01-first-run@2x.png`, `02-detection-*.png` — *Implemented (1.1.0 #107)* | Shown when `IsWelcomeDone` is false: unset `WelcomeCompleted` uses `FirstScanCompleted` (upgrades skip); explicit `false` still shows the wizard; Skip/Finish persist `WelcomeCompleted=true`. Flow: language → clients → servers, with Back on steps 2–3 and the add-server form inside the welcome (1.2.0 #202, #203; see [First-run welcome](#first-run-welcome)) |
 
 The language toggle in the status bar ("ES · v1.0.0"; the version comes from `Directory.Build.props` through `AppInfo.Version`) switches Spanish and English at run time. The first language follows the system language.
 
@@ -156,7 +156,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
     - **`Remove client` (`Quitar cliente`):** `Button.ghost.surface-parchment` (`Width="28"`, `Height="28"`, `Padding="6"`, `Margin="4,0,0,0"`, `c:ButtonSurface.Surface="Parchment"`), icon `IconClose` (`14×14`, `#7A1F19`), tooltip `clients.action.remove`. Disabled while this client is running.
 
 #### 2.3 Edit Client & Per-Client Launcher Overrides Sheet (`EditClientView.axaml` / `EditClientViewModel.cs`)
-- **Placement (Approved):** Clicking `✎` on a client row opens the `EditClientView` sheet in the main content area (with a chevron + `Back` / `Volver` header button returning to `ClientsView`).
+- **Placement (Approved):** Clicking `✎` on a client row opens the `EditClientView` sheet in the main content area (with a chevron + `Back` / `Atrás` header button returning to `ClientsView`).
 - **Backend contract:** `IPortalService.UpdateClient(UpdateClientRequest)` (`ClientId`, `Name`, `Path`, `IsInUse`, and optional per-client `LauncherOverrides`: `CommandTemplate`, `Prefix`, `Arguments`, `Environment`).
 - **Sheet sections (inside a `ParchmentPanel` `Variant="Tile"`, all buttons with `c:ButtonSurface.Surface="Parchment"`):**
   1. **Client identity & folder:**
@@ -223,7 +223,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
      - Right (`Auto`): **`Manage backups…`** (`Gestionar respaldos…`, `settings.backup.manage`) `Button.secondary.compact` (`c:ButtonSurface.Surface="Parchment"`, `MinWidth="172"`, `Command="{Binding OpenBackupsManagerCommand}"`).
 
 #### 4.2 Client Backups Manager Sub-Sheet (`BackupsView.axaml` / `BackupsViewModel.cs`)
-- **Placement (Approved):** Dedicated sub-sheet opened from the **`Manage backups…`** (`Gestionar respaldos…`) button inside the `BACKUP` card in `SettingsView`. Clicking the chevron + `Back` (`Volver`) button in the sub-sheet header returns to `SettingsView`.
+- **Placement (Approved):** Dedicated sub-sheet opened from the **`Manage backups…`** (`Gestionar respaldos…`) button inside the `BACKUP` card in `SettingsView`. Clicking the chevron + `Back` (`Atrás`) button in the sub-sheet header returns to `SettingsView`.
 - **Backend contract:** `ListBackups(clientId)`, `CreateBackup(clientId)`, `RestoreBackup(clientId, backupId, force)`, `DeleteBackup(clientId, backupId)`.
 - **Sub-sheet layout:**
 
@@ -364,12 +364,31 @@ All keys below are specified for `src/RealmPortal.App/Localization/Strings/en.js
 | `scan.outcome.clientsonly` | `Found {0} client(s). Add a server to start playing.` | `Se encontraron {0} cliente(s). Añade un servidor para empezar a jugar.` |
 | `scan.outcome.nochange` | `Scan complete: no new clients or servers found.` | `Búsqueda completada: no se encontraron clientes ni servidores nuevos.` |
 | `error.storelocked` | `Another Realm Portal operation is updating the configuration. Try again in a moment.` | `Otra operación de Realm Portal está actualizando la configuración. Inténtalo de nuevo en un momento.` |
+| `welcome.back` | `Back` | `Atrás` |
+| `welcome.step.announce` | `Step {0} of 3, {1}` | `Paso {0} de 3, {1}` |
+| `welcome.servers.list` | `Servers` | `Servidores` |
+| `welcome.save.error` | `Your choices could not be saved. Check that the settings folder can be written to, then try again.` | `No se pudieron guardar tus elecciones. Comprueba que se puede escribir en la carpeta de configuración y vuelve a intentarlo.` |
 
 ---
 
 ## Art used without a Figma reference
 
 See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
+
+## First-run welcome
+
+`WelcomeView` / `WelcomeViewModel` (1.1.0 #107; 1.2.0 #202, #203). Steps: 1 Language, 2 Clients, 3 Servers.
+
+- **Layout:** steps in the top row (centred from 960 px, left-aligned below), **Skip for now** top right on every step. Footer row (min 44 px): **Back** on the left (steps 2 and 3 only; hidden, so not focusable, on step 1), then on the right the secondary action (step 2 **Pick a folder by hand**, with **Search again** before it; step 3 **Add**) and the primary (**Continue** / **Continue with N** / **Finish**). Side margins 48 px from 960 px wide, 24 px below.
+- **Back:** text button (`Button.link caps`, chevron left, min 36 px high), the same pattern as Back in About and Backups; accessible name = visible text (`welcome.back`). It keeps every choice: language, clients in use, servers already added.
+- **Add server (step 3):** opens the regular add-server form inside the welcome. Save or Cancel returns to the Servers step with the list refreshed, so several servers can be added in one session. Only **Finish** and **Skip for now** set `WelcomeCompleted=true`; closing the window mid-flow does not, so the welcome shows again on the next launch.
+- **Keyboard:** Esc = Back on steps 2 and 3 (no action on step 1; Skip needs an explicit click or Enter on the button); Alt+Left = Back too. **Enter** runs the step's primary (Continue / Finish) from anywhere in the step, including a client checkbox (Enter does not toggle it; Space does) and a language card (Enter picks that card, then continues; Space only picks it). A held Enter acts once per key press (auto-repeat is ignored until the key is released), so it cannot run through the steps. Exceptions: inside a text field, and when another button (Back, Search again, Pick a folder, Add, Skip, or the primary itself) has focus, Enter activates that button. While the add-server form is open inside the welcome, Esc = Cancel only if nothing was typed or changed; with input, Esc is ignored and **Cancel** stays the explicit way to discard it. Tab order: step content → Back → secondary → primary → Skip. The radio dots inside the language cards are not tab stops (the card is).
+- **Focus:** when the add-server form opens inside the welcome, focus goes to its Name field. On each step change (and when the form closes): the selected language card (step 1), the first client checkbox (step 2, or the primary when there are no clients), the primary (step 3; server rows have no controls yet). The last focused element is not remembered.
+- **Step 2 primary label:** `Continue with N` when N clients are ticked; plain `Continue` / `Continuar` when clients were found but none is ticked (never "with 0"); `Continue without clients` when none was found.
+- **Save error:** if Finish or Skip cannot write `ui-preferences.json` (I/O or permission error), the welcome stays open and the footer shows `welcome.save.error` (assertive live region); Finish or Skip can be retried.
+- **Server list (step 3):** read-only rows; the list has the accessible name `welcome.servers.list` (`Servers` / `Servidores`; it also lists servers added by hand).
+- **Back label:** `Back` / `Atrás` everywhere (`welcome.back`, `about.back`, `backups.back`, `clients.edit.back`).
+- **Announcement:** the step strip's accessible name is `welcome.step.announce` ("Step 2 of 3, Clients") with a polite live setting, updated on each step change and language switch.
 
 ## About
 

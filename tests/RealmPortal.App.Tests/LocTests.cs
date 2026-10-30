@@ -54,6 +54,21 @@ public partial class LocTests
     }
 
     [AvaloniaFact]
+    public void BackLabelsAreTheSameOnEveryScreen()
+    {
+        // Welcome, About, Backups (Settings) and Edit client share one Back label per language.
+        foreach (var (language, expected) in new[] { (Language.En, "Back"), (Language.Es, "Atrás") })
+        {
+            var backs = Loc.Load(language).Where(p => p.Key.EndsWith(".back", StringComparison.Ordinal)).ToList();
+            Assert.Contains(backs, p => p.Key == "welcome.back");
+            Assert.Contains(backs, p => p.Key == "about.back");
+            Assert.Contains(backs, p => p.Key == "backups.back");
+            Assert.Contains(backs, p => p.Key == "clients.edit.back");
+            Assert.All(backs, pair => Assert.Equal(expected, pair.Value));
+        }
+    }
+
+    [AvaloniaFact]
     public void MissingKeyShowsAMarker()
     {
         Assert.Equal("!missing.key!", Loc.Get("missing.key"));

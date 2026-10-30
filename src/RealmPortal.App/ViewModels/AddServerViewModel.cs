@@ -47,6 +47,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _cancel = cancel;
         Clients = clients;
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
+        _initialInput = CurrentInput();
     }
 
     public AddServerViewModel(ClientsViewModel clients, PortalSession session, Action save, Action cancel, IConnectionProbe? probe = null)
@@ -57,6 +58,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _cancel = cancel;
         Clients = clients;
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
+        _initialInput = CurrentInput();
     }
 
     /// <summary>Edit mode: prefills the form from <paramref name="entry"/> and saves with <see cref="IPortalService.UpdateServer"/>.</summary>
@@ -85,7 +87,16 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _initialBuild = BuildOptions.First(o => o.Build == entry.RequiredClientBuild);
         SelectedBuild = _initialBuild;
         ClearCacheOnSwitch = entry.ClearCacheOnSwitch;
+        _initialInput = CurrentInput();
     }
+
+    private (string Name, string Address, string Realm, string Account, ClientItemViewModel? Client, ServerBuildOption? Build, bool? ClearCache) _initialInput;
+
+    private (string, string, string, string, ClientItemViewModel?, ServerBuildOption?, bool?) CurrentInput() =>
+        (Name, Address, Realm, Account, SelectedClient, SelectedBuild, ClearCacheOnSwitch);
+
+    /// <summary>True while every field still holds the value the form opened with (nothing typed or picked).</summary>
+    public bool IsPristine => CurrentInput() == _initialInput;
 
     /// <summary>Edit mode only: which client builds the server accepts ("Any client" or one build).</summary>
     public IReadOnlyList<ServerBuildOption> BuildOptions { get; } = [];

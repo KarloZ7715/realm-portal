@@ -219,7 +219,7 @@ public sealed class BackupsViewModelTests
 
         try
         {
-            foreach (var (language, label) in new[] { (Language.En, "Back"), (Language.Es, "Volver") })
+            foreach (var (language, label) in new[] { (Language.En, "Back"), (Language.Es, "Atrás") })
             {
                 Loc.Instance.SetLanguage(language);
                 Screenshots.Settle();

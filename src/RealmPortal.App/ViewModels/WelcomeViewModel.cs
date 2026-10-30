@@ -26,9 +26,10 @@ public sealed partial class WelcomeViewModel : ViewModelBase
     private readonly ServersViewModel _servers;
     private readonly SettingsViewModel _settings;
     private readonly Action _onFinished;
-    private readonly Func<Task>? _openAddServer;
+    private readonly Func<Action, AddServerViewModel>? _createServerForm;
     private readonly PropertyChangedEventHandler _clientsPropertyChanged;
     private bool _clientsScanStarted;
+    private bool _completed;
 
     public WelcomeViewModel(
         PortalSession session,
@@ -36,14 +37,14 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         ServersViewModel servers,
         SettingsViewModel settings,
         Action onFinished,
-        Func<Task>? openAddServer = null)
+        Func<Action, AddServerViewModel>? createServerForm = null)
     {
         _session = session;
         _clients = clients;
         _servers = servers;
         _settings = settings;
         _onFinished = onFinished;
-        _openAddServer = openAddServer;
+        _createServerForm = createServerForm;
 
         LanguageStep = new WelcomeProgressStep(1, "welcome.step.language", AppStepState.Current, isLast: false);
         ClientsStep = new WelcomeProgressStep(2, "welcome.step.clients", AppStepState.Pending, isLast: false);
@@ -103,8 +104,23 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         nameof(Title),
         nameof(Subtitle),
         nameof(StatusText),
-        nameof(ContinueClientsLabel))]
+        nameof(ContinueClientsLabel),
+        nameof(HasBack),
+        nameof(StepAnnouncement))]
+    [NotifyCanExecuteChangedFor(nameof(BackCommand))]
     private WelcomeStep _step = WelcomeStep.Language;
+
+    /// <summary>
+    /// The add-server form opened from the Servers step, shown inside the welcome; null when closed.
+    /// Saving or cancelling it returns to the Servers step without completing the welcome.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsServerFormOpen), nameof(IsStepVisible), nameof(StatusText))]
+    [NotifyCanExecuteChangedFor(nameof(BackCommand), nameof(AddServerCommand))]
+    private AddServerViewModel? _serverForm;
+
+    /// <summary>Raised when focus should move to the main element of the current step (step change, form opened or closed).</summary>
+    public event Action? StepFocusRequested;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEnglish))]
@@ -119,6 +135,32 @@ public sealed partial class WelcomeViewModel : ViewModelBase
     public bool IsClientsStep => Step == WelcomeStep.Clients;
 
     public bool IsServersStep => Step == WelcomeStep.Servers;
+
+    public bool IsServerFormOpen => ServerForm is not null;
+
+    /// <summary>Finish or Skip could not save the preferences; the welcome stays open so the user can retry.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SaveErrorText))]
+    private bool _hasSaveError;
+
+    public string SaveErrorText => HasSaveError ? Loc.Get("welcome.save.error") : string.Empty;
+
+    /// <summary>The steps, body and footer are hidden while the add-server form is open.</summary>
+    public bool IsStepVisible => ServerForm is null;
+
+    /// <summary>Back is shown on the Clients and Servers steps only.</summary>
+    public bool HasBack => Step != WelcomeStep.Language;
+
+    /// <summary>Accessible name of the step area, e.g. "Step 2 of 3, Clients"; announced on each step change.</summary>
+    public string StepAnnouncement => Loc.Format(
+        "welcome.step.announce",
+        (int)Step + 1,
+        Loc.Get(Step switch
+        {
+            WelcomeStep.Clients => "welcome.step.clients",
+            WelcomeStep.Servers => "welcome.step.servers",
+            _ => "welcome.step.language",
+        }));
 
     public bool IsScanningClients => _clients.IsScanning;
 
@@ -159,12 +201,18 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         _ => string.Empty,
     };
 
+    /// <summary>
+    /// "Continue with N" when clients are ticked; plain "Continue" when clients were found but none is ticked
+    /// (never "Continue with 0"); "Continue without clients" when none was found.
+    /// </summary>
     public string ContinueClientsLabel =>
-        _clients.InUseCount <= 0
-            ? Loc.Get("welcome.clients.continue.empty")
-            : Loc.Format("welcome.clients.continue", _clients.InUseCount);
+        _clients.InUseCount > 0
+            ? Loc.Format("welcome.clients.continue", _clients.InUseCount)
+            : _clients.Items.Count > 0
+                ? Loc.Get("welcome.continue")
+                : Loc.Get("welcome.clients.continue.empty");
 
-    public override string StatusText => Step switch
+    public override string StatusText => ServerForm?.StatusText ?? Step switch
     {
         WelcomeStep.Language => Loc.Get("welcome.status.language"),
         WelcomeStep.Clients when IsScanningClients => Loc.Get("status.scanning"),
@@ -193,6 +241,9 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         OnPropertyChanged(nameof(EnglishTitle));
         OnPropertyChanged(nameof(EnglishBody));
         OnPropertyChanged(nameof(LanguageLabel));
+        OnPropertyChanged(nameof(StepAnnouncement));
+        OnPropertyChanged(nameof(SaveErrorText));
+        ServerForm?.RefreshText();
     }
 
     public string LanguageFootnote => Loc.Get("welcome.language.footnote");
@@ -266,6 +317,8 @@ public sealed partial class WelcomeViewModel : ViewModelBase
             OnPropertyChanged(nameof(HasServers));
             AddServerCommand.NotifyCanExecuteChanged();
         }
+
+        StepFocusRequested?.Invoke();
     }
 
     private void UpdateProgress()
@@ -350,15 +403,49 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         OnClientsChanged();
     }
 
-    [RelayCommand(CanExecute = nameof(CanAddServer))]
-    private async Task AddServerAsync()
+    [RelayCommand(CanExecute = nameof(CanGoBack))]
+    private void Back()
     {
-        CompleteWelcome();
-        if (_openAddServer is not null)
-            await _openAddServer().ConfigureAwait(true);
+        if (Step > WelcomeStep.Language)
+            Step--;
     }
 
-    private bool CanAddServer() => _clients.Items.Count > 0;
+    private bool CanGoBack() => Step != WelcomeStep.Language && ServerForm is null;
+
+    [RelayCommand(CanExecute = nameof(CanAddServer))]
+    private void AddServer()
+    {
+        if (_createServerForm is null || ServerForm is not null)
+            return;
+        var form = _createServerForm(CloseServerForm);
+        form.PropertyChanged += OnServerFormPropertyChanged;
+        ServerForm = form;
+        StepFocusRequested?.Invoke();
+    }
+
+    private bool CanAddServer() => _clients.Items.Count > 0 && ServerForm is null;
+
+    private void OnServerFormPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(StatusText))
+            OnPropertyChanged(nameof(StatusText));
+    }
+
+    /// <summary>Save or Cancel in the add-server form: back to the Servers step with the list refreshed.</summary>
+    private void CloseServerForm()
+    {
+        var form = ServerForm;
+        if (form is null)
+            return;
+        form.PropertyChanged -= OnServerFormPropertyChanged;
+        form.OnFormClosed();
+        ServerForm = null;
+        _servers.ReloadFromService();
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(Subtitle));
+        OnPropertyChanged(nameof(HasServers));
+        StepFocusRequested?.Invoke();
+    }
 
     [RelayCommand]
     private void Finish() => CompleteWelcome();
@@ -368,8 +455,31 @@ public sealed partial class WelcomeViewModel : ViewModelBase
 
     private void CompleteWelcome()
     {
-        var prefs = _session.UiPreferences.Load();
-        _session.UiPreferences.Save(prefs with { WelcomeCompleted = true });
+        // Finish and Skip may both fire (double click, Enter plus click): finish once.
+        if (_completed)
+            return;
+        if (ServerForm is { } form)
+        {
+            form.PropertyChanged -= OnServerFormPropertyChanged;
+            form.OnFormClosed();
+            ServerForm = null;
+        }
+
+        try
+        {
+            var prefs = _session.UiPreferences.Load();
+            _session.UiPreferences.Save(prefs with { WelcomeCompleted = true });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Keep the welcome open: the user can fix the folder and press Finish or Skip again.
+            HasSaveError = true;
+            return;
+        }
+
+        HasSaveError = false;
+        // Set after the save: if writing the preferences throws, Finish/Skip can be retried.
+        _completed = true;
         _clients.FirstScanFoundNoClients -= IgnoreEmptyScanNavigation;
         _clients.ClientsChanged -= OnClientsChanged;
         _clients.PropertyChanged -= _clientsPropertyChanged;
