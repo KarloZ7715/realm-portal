@@ -263,7 +263,7 @@
       "realm-portal": {
         "type": "Project",
         "dependencies": {
-          "RealmPortal.Core": "[1.0.1, )"
+          "RealmPortal.Core": "[1.1.0, )"
         }
       },
       "realmportal.app": {
@@ -273,12 +273,13 @@
           "Avalonia.Desktop": "[11.3.22, )",
           "Avalonia.Themes.Simple": "[11.3.22, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "RealmPortal.Core": "[1.0.1, )"
+          "RealmPortal.Core": "[1.1.0, )"
         }
       },
       "realmportal.core": {
         "type": "Project",
         "dependencies": {
+          "BouncyCastle.Cryptography": "[2.7.0, )",
           "PeNet": "[5.1.0, )"
         }
       },
@@ -287,8 +288,8 @@
         "dependencies": {
           "FsCheck.Xunit": "[3.6.0, )",
           "Microsoft.NET.Test.Sdk": "[18.11.0, )",
-          "RealmPortal.Core": "[1.0.1, )",
-          "realm-portal": "[1.0.1, )",
+          "RealmPortal.Core": "[1.1.0, )",
+          "realm-portal": "[1.1.0, )",
           "xunit": "[2.9.3, )",
           "xunit.runner.visualstudio": "[4.0.1, )"
         }
@@ -334,6 +335,12 @@
         "dependencies": {
           "Avalonia": "11.3.22"
         }
+      },
+      "BouncyCastle.Cryptography": {
+        "type": "CentralTransitive",
+        "requested": "[2.7.0, )",
+        "resolved": "2.7.0",
+        "contentHash": "U+12df8UEWHgBi04YVf/Lgi2dy3SItlIYvHjjEVa/BngCQIzDCDRBk50DDByCfDvSbe5pRNFr3b7UrVK2kMcLw=="
       },
       "CommunityToolkit.Mvvm": {
         "type": "CentralTransitive",

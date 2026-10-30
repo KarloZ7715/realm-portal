@@ -16,6 +16,10 @@
     <PackageReference Include="Avalonia.Themes.Simple" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
+  <ItemGroup Label="BouncyCastle (release signature checks in Core) is used for two primitives only">
+    <!-- ReadyToRun more than doubles this 5 MB assembly; the few methods used are cheap to JIT. -->
+    <PublishReadyToRunExclude Include="BouncyCastle.Cryptography.dll" />
+  </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="RealmPortal.App.Tests" />
   </ItemGroup>
@@ -55,4 +59,14 @@
   <ItemGroup Label="About: third-party license notices shown in the About screen">
     <AvaloniaResource Include="../../THIRD_PARTY_LICENSES.md" Link="Assets/THIRD_PARTY_LICENSES.md" />
   </ItemGroup>
+  <!-- BouncyCastle is not marked trimmable, so TrimMode=partial would keep all of it. Trim it like the framework
+       assemblies; Core only calls Blake2bDigest and Rfc8032.Ed25519 directly, with no reflection. -->
+  <Target Name="TrimBouncyCastle" AfterTargets="PrepareForILLink">
+    <ItemGroup>
+      <ManagedAssemblyToLink Condition="'%(Filename)' == 'BouncyCastle.Cryptography'">
+        <IsTrimmable>true</IsTrimmable>
+        <TrimMode>link</TrimMode>
+      </ManagedAssemblyToLink>
+    </ItemGroup>
+  </Target>
 </Project>
