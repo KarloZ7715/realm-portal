@@ -10,22 +10,28 @@ locks of [#39](https://github.com/KarloZ7715/realm-portal/issues/39); the CLI is
 - One app window **per config directory** (`PortalPaths.ConfigDirectory`, so `REALM_PORTAL_CONFIG_DIR` gives a
   separate instance; tests rely on this).
 - `--demo` and `--gallery` (developer modes without real data) skip the guard.
-- The CLI (`realm-portal-cli`) never takes this lock and can run next to the app as before.
+- The CLI (`realm-portal`) never takes this lock and can run next to the app as before.
 
 ## How it works
 
 Code: `src/RealmPortal.Core/Instances/` (no Avalonia dependency), wired in `Program.cs` through
-`src/RealmPortal.App/Platform/AppInstance.cs`, and `InstanceActivation.cs` for the window.
+`src/RealmPortal.App/Platform/AppInstance.cs`, and `InstanceActivation.cs` for the window. `Program.Run` keeps the
+startup order fixed: crash log handlers ([#178](https://github.com/KarloZ7715/realm-portal/issues/178)) first, then the
+instance claim, then the UI (`StartupTests` checks it).
 
 1. **Lock.** At startup the app opens `<config dir>/.realm-portal-app.lock` with `FileShare.None` and does not wait.
    On Linux this is an `flock` on the open file; on Windows it is the file sharing lock. Both are released by the OS
    when the process ends, however it ends (crash, `kill -9`, power loss), so a leftover lock file never blocks a start.
    The file is `0600` and the config directory `0700` on Unix.
 2. **Primary.** The process that gets the lock listens on a channel:
-   - Linux: Unix domain socket `<config dir>/.realm-portal-app.sock`, mode `0600`. Any file left at that path by a
-     process that died is stale by definition (we hold the lock) and is removed before binding. On exit (window closed,
-     or `SIGTERM`) the
-     socket is removed before the lock is released.
+   - Linux: Unix domain socket `<config dir>/.realm-portal-app.sock`, mode `0600`. Whatever is left at that path is
+     stale by definition (we hold the lock): a socket, a regular file or a symlink is unlinked (a symlink is removed
+     itself; its target is never touched), and an empty directory is removed. A **non-empty directory** is left alone:
+     the bind fails, the app runs without the channel and writes a line to stderr, and later launches open a second
+     window after 3 s until that directory is removed by hand. On exit (window closed, or `SIGTERM`) the socket is
+     removed before the lock is released.
+   - Both ends check the other side on Linux with `SO_PEERCRED`: a primary only answers clients of the same user, and
+     a second launch only talks to a primary of the same user.
    - Windows: named pipe `RealmPortal-app-<hash>`, where the hash covers the config directory (case-insensitive) and
      the user name. The pipe is created with `PipeOptions.CurrentUserOnly`, so other users can neither connect nor
      impersonate the server (the client also requires the server to belong to the current user).
@@ -37,11 +43,23 @@ alive after the app exits.
 
 ### Long paths
 
-A socket path is limited to about 108 bytes on Linux (104 on macOS). When `<config dir>/.realm-portal-app.sock` is
-longer than 100 bytes, the socket moves to `$XDG_RUNTIME_DIR/realm-portal-app-<hash>.sock` (a per-user `0700`
-directory by spec). Without `XDG_RUNTIME_DIR` it goes to `<temp>/realm-portal-<user hash>/app-<hash>.sock`; that folder
-is created `0700`, a symlink there is refused, and if its mode cannot be set (it belongs to someone else) the channel
-is not opened. The hash is derived from the config directory, so different directories never share a socket.
+`sun_path` holds 108 bytes on Linux and 104 on macOS, including the terminating NUL. Every candidate socket path must be
+at most **100 UTF-8 bytes** (a margin on both); the first candidate that fits is used:
+
+1. `<config dir>/.realm-portal-app.sock`
+2. `$XDG_RUNTIME_DIR/realm-portal-app-<hash>.sock` (a per-user `0700` directory by spec), when `XDG_RUNTIME_DIR` is set
+3. `<temp>/realm-portal-<user hash>/app-<hash>.sock`, where `<temp>` is `$TMPDIR` or `/tmp`
+
+If none fits, there is no channel: the lock still works, and a second launch opens a second window after 3 s.
+The hash is derived from the config directory, so different directories never share a socket.
+
+The temp folder is shared with other users, and its name is predictable, so it is treated with care:
+
+- The primary creates it `0700`, refuses a symlink, and sets the mode explicitly. Setting the mode only works for the
+  owner, so a folder pre-created by another user makes the primary run without a channel.
+- A second launch refuses to connect unless the folder is a real directory (not a symlink) with mode `0700`. A `0700`
+  folder of another user cannot be entered at all. On Linux the peer credential check above also rules out a socket
+  planted by another user, even if the folder is swapped after the mode check.
 
 ### Protocol
 
@@ -54,8 +72,10 @@ reply:   {"protocol":1,"reply":"ok"}          (or "unsupported", "invalid")
 
 The verb is generic (lowercase letters, digits and `-`, up to 32 characters, up to 16 string arguments) so a later
 quick play (`--play`) can reuse the channel. Today the app handles `focus` only and answers `unsupported` to anything
-else. Malformed, oversized (no newline within 4 KiB) or slow requests (nothing within 2 s) are answered `invalid` or
-dropped; they never reach the handler and never stop the listener. Connections are served one at a time.
+else. Malformed, oversized (no newline within 4 KiB) or slow requests (no full line within 1 s) are answered `invalid`
+or dropped; they never reach the handler and never stop the listener. Up to 8 connections are served at the same
+time, so a few silent connections cannot use up a second launch's 3 s budget; more wait in the backlog for at most
+1 s per slot.
 
 ## Timeouts and failure behavior
 
@@ -65,6 +85,7 @@ dropped; they never reach the handler and never stop the listener. Connections a
 | Running instance answers | The new launch exits (code 0). |
 | Running instance holds the lock but does not answer within 3 s (stopped with `SIGSTOP`, deadlocked, or its channel could not be opened) | The new launch **starts anyway** as a second window and writes a line to stderr. It does not listen; #39 keeps the data consistent. A hung window must not lock the user out. |
 | The lock cannot be created (read-only or invalid config directory) | The app starts normally without the guard and writes a line to stderr. |
+| The channel is refused (socket folder not private, primary or pipe owned by another user) | Like "does not answer": the new launch starts as a second window, without sending anything. |
 
 The 3 s budget covers connecting (retried every 100 ms, because the primary takes the lock a moment before it binds),
 sending and reading the reply. The listener runs on a background thread, so a busy UI thread does not make the primary
@@ -88,6 +109,17 @@ maximized if it was maximized before), then `Window.Activate()`. What `Activate(
   application raise itself without an activation token (`xdg-activation`), which Avalonia does not pass. Expect the
   window to be marked as demanding attention rather than raised. The guard itself (one window, second launch exits)
   works the same.
+
+## Known limitations
+
+- **Windows** is covered by CI (`windows-latest`) but has not been tried on a real desktop: focus with another app in
+  the foreground, a minimized window, "End task" followed by a relaunch, and two user accounts on one machine.
+- **Pipe name squatting (Windows):** the pipe name is predictable. Another local user could create it first. Because of
+  `CurrentUserOnly` the victim never talks to that pipe, so the only effect is that the victim's second launches open
+  second windows (no data reaches the other user). Not hardened further.
+- **Focus** depends on the window manager: see above for focus-stealing prevention and Wayland.
+- A primary whose UI thread is hung but whose listener runs answers `ok`, so the second launch exits and nothing
+  visible happens.
 
 ## Testing
 
