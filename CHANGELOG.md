@@ -39,7 +39,7 @@ All notable changes to Realm Portal are listed here. The format follows
 ### Documentation
 
 - Privacy section in the README for the two network features ([#182](https://github.com/KarloZ7715/realm-portal/issues/182))
-- Install links point to the latest release ([#152](https://github.com/KarloZ7715/realm-portal/issues/152))
+- Install links and file names point to the 1.0.1 release ([#152](https://github.com/KarloZ7715/realm-portal/issues/152))
 - Docs use feature names instead of internal milestone codes ([#187](https://github.com/KarloZ7715/realm-portal/issues/187))
 
 ## [1.0.1](https://github.com/KarloZ7715/realm-portal/compare/v1.0.0...v1.0.1) - 2026-10-24

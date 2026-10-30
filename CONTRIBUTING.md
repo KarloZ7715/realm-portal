@@ -54,11 +54,15 @@ git cliff --unreleased --tag v1.2.0 --prepend CHANGELOG.md
 ```
 
 Then review it: reword entries for users, move security fixes to Security, add changes whose commit subject is not
-conventional, and drop changes users do not see. Older sections are never regenerated. Use the reviewed section as the body
-of the GitHub release:
+conventional, and drop changes users do not see. Older sections are never regenerated. If another PR merges before you tag,
+add its entry before tagging, so the section covers everything up to the tagged commit.
+
+The release workflow still publishes GitHub's generated notes. Once the release is published, replace them with the reviewed
+section:
 
 ```bash
-awk '/^## \[1\.2\.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md
+awk '/^## \[1\.2\.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > /tmp/notes.md
+gh release edit v1.2.0 --notes-file /tmp/notes.md
 ```
 
 ## Command line
