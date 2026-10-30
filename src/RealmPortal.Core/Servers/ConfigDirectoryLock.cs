@@ -110,7 +110,7 @@ public sealed class ConfigDirectoryLock
     /// errno that .NET reports as an <see cref="IOException"/> (EAGAIN/EWOULDBLOCK: 11 on Linux, 35 on macOS
     /// and the BSDs). Permission and other I/O failures are not contention.
     /// </summary>
-    private static bool IsLockContention(IOException ex)
+    internal static bool IsLockContention(IOException ex)
     {
         const int SharingViolation = unchecked((int)0x80070020); // ERROR_SHARING_VIOLATION
         const int LockViolation = unchecked((int)0x80070021);    // ERROR_LOCK_VIOLATION
