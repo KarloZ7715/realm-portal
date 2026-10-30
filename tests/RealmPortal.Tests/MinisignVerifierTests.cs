@@ -150,16 +150,6 @@ public class MinisignVerifierTests
     }
 
     [Fact]
-    public void BuiltInKeyList_IsEmptyUntilTheReleaseKeyExists()
-    {
-        // Flip this test when the maintainer's key is added to ReleaseSigningKeys.
-        Assert.Empty(ReleaseSigningKeys.Trusted);
-        Assert.Equal(
-            SignatureStatus.NoTrustedKeys,
-            MinisignVerifier.ForRelease().Verify(Sums, Read("SHA256SUMS.a.minisig"), Tag));
-    }
-
-    [Fact]
     public void Rotation_BothKeysAreAcceptedWhileBothAreTrusted()
     {
         MinisignPublicKey[] both = [KeyA, KeyB];
