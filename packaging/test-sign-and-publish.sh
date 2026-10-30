@@ -27,6 +27,12 @@ minisign -G -W -f -p "${tmp}/other.pub" -s "${tmp}/other.key" >/dev/null
 #   STUB_IMMUTABLE_SETTING=false     immutable releases are off for the repository
 #   STUB_IMMUTABLE_ON_PUBLISH=false  the published release is not immutable
 #   STUB_VERIFY_RC=1                 `gh release verify` / `verify-asset` fail
+#   STUB_VERIFY_ASSET_FAILS=<n>      the first n `gh release verify-asset` calls fail
+#   STUB_UPLOADER_ON_PUBLISH=<login> publishing also changes the zip's uploader
+#   STUB_URL_ON_PUBLISH=1            publishing leaves the zip on its untagged download URL
+#   STUB_SUMS_AFTER_UPLOAD=1         uploading the signature also replaces SHA256SUMS (with a matching digest and size)
+#   STUB_DOWNLOAD_FAILS_PUBLISHED=<n>  the first n asset downloads from the published release fail
+#   STUB_ASSETS_FAIL_PUBLISHED=1     reading the published release's assets fails
 mkdir -p "${tmp}/bin"
 cat >"${tmp}/bin/gh" <<'STUB'
 #!/usr/bin/env bash
@@ -82,6 +88,13 @@ done
 out() { if [[ -n "$jqf" ]]; then jq -r "$jqf"; else cat; fi; }
 update() { jq "$@" "$rel" >"${rel}.new" && mv "${rel}.new" "$rel"; }
 digest_of() { echo "sha256:$(sha256sum "$1" | cut -d' ' -f1)"; }
+# countdown <name> <n>: true (and counts) for the first n calls with this name.
+countdown() {
+  local file="${state}/count.$1" used=0
+  [[ -f "$file" ]] && used="$(cat "$file")"
+  [[ "$used" -lt "$2" ]] || return 1
+  echo $((used + 1)) >"$file"
+}
 
 case "${pos[0]} ${pos[1]:-}" in
   "api "* | "api --paginate")
@@ -90,9 +103,19 @@ case "${pos[0]} ${pos[1]:-}" in
       repos/*/releases\?per_page=100)
         [[ "${STUB_FAIL_LIST:-}" != "1" ]] || { echo "error connecting to api.github.com" >&2; exit 1; }
         jq '[.]' "$rel" | out ;;
-      repos/*/releases/assets/*) [[ "$accept" == *octet-stream* ]] || exit 1; cat "${state}/assets/${path##*/}" ;;
+      repos/*/releases/assets/*)
+        [[ "$accept" == *octet-stream* ]] || exit 1
+        if [[ "$(jq -r .draft "$rel")" == "false" ]] && countdown download_fails "${STUB_DOWNLOAD_FAILS_PUBLISHED:-0}"; then
+          echo "error connecting to api.github.com" >&2
+          exit 1
+        fi
+        cat "${state}/assets/${path##*/}" ;;
       repos/*/releases/tags/*)
         [[ "$(jq -r .draft "$rel")" == "false" ]] || { echo "HTTP 404" >&2; exit 1; }
+        if [[ "${STUB_ASSETS_FAIL_PUBLISHED:-}" == "1" && "$jqf" == *".assets[]"* ]]; then
+          echo "error connecting to api.github.com" >&2
+          exit 1
+        fi
         out <"$rel" ;;
       repos/*/releases/*) out <"$rel" ;;
       repos/*/immutable-releases) printf '{"enabled":%s}' "${STUB_IMMUTABLE_SETTING:-true}" | out ;;
@@ -106,7 +129,14 @@ case "${pos[0]} ${pos[1]:-}" in
     [[ "${STUB_NO_DIGEST:-}" != "1" ]] || digest=""
     update --arg n "$name" --arg d "$digest" --argjson id "$id" --argjson size "$(stat -c %s "$file")" \
       '.assets = ([.assets[] | select(.name != $n)] + [{id: $id, name: $n, size: $size, uploader: {login: "maintainer"},
-        browser_download_url: ("https://github.com/x/untagged-1/" + $n)} + (if $d == "" then {} else {digest: $d} end)])' ;;
+        browser_download_url: ("https://github.com/x/untagged-1/" + $n)} + (if $d == "" then {} else {digest: $d} end)])'
+    if [[ "${STUB_SUMS_AFTER_UPLOAD:-}" == "1" ]]; then
+      sums_id="$(jq -r '.assets[] | select(.name == "SHA256SUMS") | .id' "$rel")"
+      printf 'x\n' >>"${state}/assets/${sums_id}"
+      update --argjson id "$sums_id" --arg d "$(digest_of "${state}/assets/${sums_id}")" \
+        --argjson size "$(stat -c %s "${state}/assets/${sums_id}")" \
+        '.assets |= map(if .id == $id then (.digest = $d | .size = $size) else . end)'
+    fi ;;
   "release edit")
     if [[ " $* " == *" --draft=true "* ]]; then
       update '.draft = true'
@@ -124,10 +154,20 @@ case "${pos[0]} ${pos[1]:-}" in
         '.draft = false | .prerelease = $pre | .immutable = $imm
          | .assets |= map(.browser_download_url = ("https://github.com/" + $repo + "/releases/download/" + $tag + "/" + .name))' \
         --arg tag "${pos[2]}"
+      if [[ -n "${STUB_UPLOADER_ON_PUBLISH:-}" ]]; then
+        update --arg u "$STUB_UPLOADER_ON_PUBLISH" \
+          '.assets |= map(if (.name | endswith("-win-x64.zip")) then .uploader.login = $u else . end)'
+      fi
+      if [[ "${STUB_URL_ON_PUBLISH:-}" == "1" ]]; then
+        update '.assets |= map(if (.name | endswith("-win-x64.zip")) then .browser_download_url = ("https://github.com/x/untagged-1/" + .name) else . end)'
+      fi
       [[ "${STUB_FAIL_EDIT_AFTER:-}" != "1" ]] || { echo "error: connection reset" >&2; exit 1; }
     fi ;;
   "release verify" | "release verify-asset")
     [[ "${STUB_OLD_GH:-}" != "1" ]] || { release_help; exit 0; }
+    if [[ "${pos[1]}" == "verify-asset" ]] && countdown verify_asset_fails "${STUB_VERIFY_ASSET_FAILS:-0}"; then
+      exit 1
+    fi
     exit "${STUB_VERIFY_RC:-0}" ;;
   *) echo "stub: unexpected gh $*" >&2; exit 1 ;;
 esac
@@ -328,6 +368,11 @@ if command -v script >/dev/null 2>&1; then
   if tty_run v1.2.1 "${GOOD[@]}" v1.2.0; then fail "wrong answer is refused (should have failed)"; else pass "wrong answer is refused"; fi
   check "  wrong answer: not signed" not signed
   check "  wrong answer: nothing uploaded" not uploaded
+  new_release v1.2.0
+  if tty_run $'\004' "${GOOD[@]}" v1.2.0; then fail "Ctrl-D is refused (should have failed)"; else pass "Ctrl-D is refused"; fi
+  check "  Ctrl-D: says not confirmed" said "not confirmed (no answer)"
+  check "  Ctrl-D: not signed" not signed
+  check "  Ctrl-D: nothing uploaded" not uploaded
 else
   echo "skip: interactive prompt tests (no 'script' command)"
 fi
@@ -428,6 +473,49 @@ expect_fail "asset changed while publishing is caught" "published RealmPortal-1.
   "${GOOD[@]}" --yes v1.2.0
 check "  changed on publish: irreversible guidance" said "cannot be reverted"
 check "  changed on publish: not reported as published" not said "Published v1.2.0"
+extra_env=()
+
+new_release v1.2.0
+extra_env=(STUB_UPLOADER_ON_PUBLISH=someone)
+expect_fail "uploader changed while publishing is caught" "RealmPortal-1.2.0-win-x64.zip was uploaded by 'someone'" \
+  "${GOOD[@]}" --yes v1.2.0
+check "  uploader on publish: not reported as published" not said "Published v1.2.0"
+extra_env=()
+
+new_release v1.2.0
+extra_env=(STUB_URL_ON_PUBLISH=1)
+expect_fail "untagged download URL after publishing is caught" "download URL for RealmPortal-1.2.0-win-x64.zip is" \
+  "${GOOD[@]}" --yes v1.2.0
+check "  URL on publish: not reported as published" not said "Published v1.2.0"
+extra_env=()
+
+new_release v1.2.0
+extra_env=(STUB_SUMS_AFTER_UPLOAD=1)
+expect_fail "SHA256SUMS replaced after the upload is caught by the byte comparison" \
+  "SHA256SUMS on the draft changed during signing" "${GOOD[@]}" --yes v1.2.0
+check "  SUMS after upload: not published" not published
+extra_env=()
+
+# Network errors after publishing are retried, and when they persist they are not reported as irreversible.
+new_release v1.2.0
+extra_env=(STUB_DOWNLOAD_FAILS_PUBLISHED=2 STUB_VERIFY_ASSET_FAILS=2)
+expect_ok "transient download and verify-asset errors after publishing are retried" "${GOOD[@]}" --yes v1.2.0
+check "  transient: published" said "Published v1.2.0"
+extra_env=()
+
+new_release v1.2.0
+extra_env=(STUB_DOWNLOAD_FAILS_PUBLISHED=99)
+expect_fail "persistent download error after publishing points to --verify-published" \
+  "could not download published .*--verify-published v1.2.0" "${GOOD[@]}" --yes v1.2.0
+check "  download error: not reported as irreversible" not said "cannot be reverted"
+extra_env=()
+expect_ok "--verify-published passes once downloads work again" --pubkey "${tmp}/good.pub" --verify-published v1.2.0
+
+new_release v1.2.0
+extra_env=(STUB_ASSETS_FAIL_PUBLISHED=1)
+expect_fail "failed asset read after publishing points to --verify-published" \
+  "may already be published; check it again with: .*--verify-published v1.2.0" "${GOOD[@]}" --yes v1.2.0
+check "  asset read: does not say nothing was changed" not said "nothing was changed"
 extra_env=()
 
 # --verify-published

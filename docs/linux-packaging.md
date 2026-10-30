@@ -117,7 +117,9 @@ already, check it with:
 packaging/sign-and-publish.sh --verify-published v1.2.0
 ```
 
-That runs only the post-publish checks, changes nothing, and needs no secret key.
+That runs only the post-publish checks, changes nothing, and needs no secret key. Downloads and GitHub API calls after publishing
+are retried a few times. If they keep failing, the script stops with a network error and points to
+`--verify-published` instead of treating the release as broken.
 
 If a post-publish check fails:
 
