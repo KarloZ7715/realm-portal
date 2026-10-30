@@ -91,6 +91,10 @@ Realm Portal no envía telemetría. Las únicas conexiones de red que hace son l
 - Admite **solo servidores privados**.
 - Solo escribe los archivos de reino gestionados del cliente (`realmlist.wtf` cuando la versión del cliente lo usa, y `WTF/Config.wtf`); el resto de archivos del juego no se toca.
 
+## Ayuda
+
+Los problemas más comunes y cómo resolverlos están en [Preguntas frecuentes y solución de problemas](docs/faq.es.md). Para reportar un fallo, usa el [formulario de reporte](https://github.com/KarloZ7715/realm-portal/issues/new?template=bug_report.yml).
+
 ## Compilación y desarrollo
 
 ¿Prefieres la terminal? La herramienta de línea de comandos está documentada (en inglés) en [docs/cli.md](docs/cli.md). Las instrucciones de compilación, las pruebas y la estructura del proyecto están en [CONTRIBUTING.md](CONTRIBUTING.md).

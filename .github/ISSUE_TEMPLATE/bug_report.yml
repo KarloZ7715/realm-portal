@@ -5,7 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Search existing issues first. Everything here is public: do not paste passwords, account names,
+        Check the [FAQ and troubleshooting page](https://github.com/KarloZ7715/realm-portal/blob/main/docs/faq.md)
+        ([Español](https://github.com/KarloZ7715/realm-portal/blob/main/docs/faq.es.md)) and search existing issues first.
+        Everything here is public: do not paste passwords, account names,
         or paths and logs with personal details you do not want published. Report security problems privately (see SECURITY.md).
   - type: input
     id: version
