@@ -72,7 +72,9 @@ case "${pos[0]} ${pos[1]:-}" in
          | .assets |= map(.browser_download_url = ("https://github.com/" + $repo + "/releases/download/" + $tag + "/" + .name))' \
         --arg tag "${pos[2]}"
     fi ;;
-  "release verify" | "release verify-asset") exit "${STUB_VERIFY_RC:-0}" ;;
+  "release verify" | "release verify-asset")
+    [[ " $* " != *" --help "* ]] || exit 0
+    exit "${STUB_VERIFY_RC:-0}" ;;
   *) echo "stub: unexpected gh $*" >&2; exit 1 ;;
 esac
 STUB

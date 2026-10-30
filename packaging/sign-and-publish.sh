@@ -75,6 +75,11 @@ done
 [[ "$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || die "bad --repo '${repo}'"
 
 command -v gh >/dev/null 2>&1 || die "gh (GitHub CLI) is not installed: https://cli.github.com/"
+# Checked now because these run after publishing, when the release can no longer go back to draft.
+for sub in verify verify-asset; do
+  gh release "$sub" --help >/dev/null 2>&1 \
+    || die "this gh has no 'gh release ${sub}'; upgrade the GitHub CLI: https://cli.github.com/"
+done
 command -v minisign >/dev/null 2>&1 || die "minisign is not installed: https://jedisct1.github.io/minisign/"
 command -v sha256sum >/dev/null 2>&1 || die "sha256sum (coreutils) is not installed"
 

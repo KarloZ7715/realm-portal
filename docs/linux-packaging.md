@@ -60,7 +60,8 @@ only `minisign.pub` (its first line holds the key ID). Until that file exists, `
 ### Each release
 
 1. Push the tag and wait for the release workflow. It leaves a draft with the three packages and `SHA256SUMS`.
-2. With `gh` logged in to an account that can edit releases, from a checkout of the repository (the script reads `minisign.pub` from its root):
+2. With `gh` logged in to an account that can edit releases (a version that has `gh release verify` and
+   `gh release verify-asset`; the script checks this before doing anything; tested with 2.103.0), from a checkout of the repository (the script reads `minisign.pub` from its root):
 
    ```sh
    packaging/sign-and-publish.sh --dry-run --key ~/.minisign/realm-portal.key v1.2.0   # optional rehearsal
