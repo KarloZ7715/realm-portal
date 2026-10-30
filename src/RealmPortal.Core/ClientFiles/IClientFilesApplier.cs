@@ -83,6 +83,13 @@ public interface IClientFilesApplier
     /// content is not what the apply wrote are reported as conflicts and never overwritten.
     /// </summary>
     /// <summary>
+    /// Read-only: true when <paramref name="backupId"/> is still pending for the installation and every one of its files
+    /// is either in the state that backup's apply wrote or already back to its original bytes, so
+    /// <see cref="Undo"/> would restore it without a conflict. Nothing is written.
+    /// </summary>
+    bool CanUndoWithoutConflict(string installationId, string clientRoot, string backupId);
+
+    /// <summary>
     /// Undoes a specific pending backup (or the newest pending one when <paramref name="backupId"/> is null).
     /// <paramref name="clientRoot"/> is the trusted client folder from <see cref="Clients.ClientStore"/> (must match the backup manifest).
     /// When <paramref name="markUndone"/> is false, restored files stay pending in the manifest until <see cref="MarkBackupUndone"/>.

@@ -481,6 +481,9 @@ cases it does **not** replace the pending single-level undo or the `last-switch.
 from the previous real switch to a different server. `ActiveServerManager.Switch` is still called (projection refresh; undo in `state.json` is unchanged when
 the server was already active for that client). In `SwitchOutcome`, `Previous` equals `Active` (the same server). When the re-switch repairs drifted files, the applier may
 create a new backup, but the journal's `backup_id` and `manifest_sha256` are **not** replaced (undo still restores the bytes from the original switch).
+If the re-switch wrote bytes that the pending backup no longer matches (typically after the active server's host or realm was edited, #213), that undo
+could only report a false `UndoConflict`. The service then drops the client's pending undo (as `DiscardUndo(clientId)` does, including the global record
+when this client owns the latest switch), so `Undo` returns `NothingToUndo`. The original files stay available as a regular backup.
 
 **There is no `Account` step.** The applier never writes the account name (`Config.wtf` `accountName` is explicitly left alone, and `ClientFilesRequest` has
 no account). `Server.Account` is only a remembered label.

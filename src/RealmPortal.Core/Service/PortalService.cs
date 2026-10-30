@@ -652,6 +652,22 @@ public sealed class PortalService : IPortalService
         }
     }
 
+    /// <summary>
+    /// Drops <paramref name="clientId"/>'s pending undo (state and journal), and the global undo record when that client
+    /// owns the most recent switch. The caller holds the config directory lock.
+    /// </summary>
+    private void DiscardPendingUndoLocked(string clientId)
+    {
+        if (!_active.HasPendingUndo(clientId) && _journal.Load(clientId) is null)
+            return;
+        var ownsGlobal = _active.HasPendingUndo(null)
+            && string.Equals(_journal.Load()?.ClientId, clientId, StringComparison.Ordinal);
+        _active.DiscardPendingUndo(clientId);
+        if (ownsGlobal)
+            _active.DiscardPendingUndo(null);
+        _journal.Clear(clientId);
+    }
+
     public ServiceResult<PortalStatus> DiscardUndo(string? clientId = null)
     {
         try
@@ -1120,6 +1136,13 @@ public sealed class PortalService : IPortalService
 
                 if (!sameServerActive)
                     _journal.Save(new LastSwitchEntry(request.ClientId, backupId, ManifestSha256: manifestSha256));
+                else if (backupId is not null
+                         && _journal.Load(request.ClientId) is { BackupId: { } pendingBackupId }
+                         && !applier.CanUndoWithoutConflict(request.ClientId, client.Path, pendingBackupId))
+                    // Re-applying the active server after an edit wrote different bytes (#213): the pending undo's
+                    // backup no longer matches the files, so undo would report a false conflict. Drop the pending
+                    // undo (undo then reports nothing to undo); a plain repair that wrote the same bytes keeps it.
+                    DiscardPendingUndoLocked(request.ClientId);
 
                 var activeEntry = ToServerEntry(server, server.Id, request.ClientId, version);
                 var previous = sameServerActive ? activeEntry : previousEntry;
