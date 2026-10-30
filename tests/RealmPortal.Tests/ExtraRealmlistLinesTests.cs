@@ -230,4 +230,109 @@ public sealed class ExtraRealmlistLinesTests
         Assert.Equal(0, box.Cli("switch", "Example", "--client-dir", client).Code);
         Assert.Equal($"set realmlist {Host}\r\n", File.ReadAllText(realmlist, Encoding.ASCII));
     }
+
+    // ------------------------------------------------------------ QA follow-ups (B1-B3)
+
+    /// <summary>A valid host of 253 characters (four labels of at most 63) and a valid patchlist URL of 765 characters:
+    /// each is fine alone, together they exceed the 1024-byte realmlist limit at line 2.</summary>
+    private static (string Host, string Line) OversizedPair()
+    {
+        var label = new string('a', 63);
+        var host = $"{label}.{label}.{label}.{new string('b', 48)}.example.test";
+        Assert.Equal(RealmlistAddress.MaxHostLength, host.Length);
+        const string prefix = "http://patch.example.test/";
+        var url = prefix + new string('c', RealmlistAddress.MaxHostLength + 512 - prefix.Length);
+        RealmlistText.Build(host);
+        RealmlistText.Build(Host, ["set patchlist " + url]);
+        return (host, "set patchlist " + url);
+    }
+
+    [Fact]
+    public void Build_SizeError_NamesTheExtraLineThatGoesOverTheLimit()
+    {
+        var (host, line) = OversizedPair();
+
+        var ex = Assert.Throws<InvalidRealmlistException>(() => RealmlistText.Build(host, ["", line]));
+
+        Assert.Equal(InvalidRealmlistKind.InvalidValue, ex.Kind);
+        Assert.Contains($"at most {RealmlistAddress.MaxRealmlistBytes} bytes", ex.Reason, StringComparison.Ordinal);
+        Assert.Equal(2, ex.LineNumber);
+        Assert.Equal(1, ex.ExtraLineIndex);
+    }
+
+    [Fact]
+    public void Build_PerLineErrorsWinOverTheSizeError()
+    {
+        var lines = Enumerable.Range(0, 50).Select(i => $"set patchlist p{i}.example.test").ToArray();
+        Assert.True(string.Concat(lines.Select(l => l + "\r\n")).Length > RealmlistAddress.MaxRealmlistBytes);
+
+        var ex = Assert.Throws<InvalidRealmlistException>(() => RealmlistText.Build(Host, lines));
+
+        Assert.Equal(InvalidRealmlistKind.DuplicateKey, ex.Kind);
+        Assert.Equal(1, ex.ExtraLineIndex);
+        Assert.Equal(3, ex.LineNumber);
+    }
+
+    [Fact]
+    public void Service_SizeError_CarriesTheExtraLineIndex()
+    {
+        using var box = new Box();
+        var (host, line) = OversizedPair();
+
+        var result = box.Service.AddServer(new NewServer("Example", host, ExtraRealmlistLines: [line]));
+
+        Assert.Equal(ServiceErrorCode.InvalidRealmlist, result.Error!.Code);
+        Assert.Equal(0, result.Error.ExtraLineIndex);
+        Assert.Empty(box.Service.ListServers().Value!);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Cli_BlankLine_IsAUsageErrorAndChangesNothing(string blank)
+    {
+        using var box = new Box();
+        Assert.Equal(0, box.Cli("add", "Example", Host, "--line", PatchA).Code);
+        var before = File.ReadAllBytes(box.ServersPath);
+
+        var edit = box.Cli("edit", "Example", "--line", blank);
+        Assert.Equal(1, edit.Code);
+        Assert.Contains("--line must not be blank; use --clear-lines", edit.Err, StringComparison.Ordinal);
+
+        Assert.Equal(1, box.Cli("edit", "Example", "--line", PatchB, "--line", blank).Code);
+        var add = box.Cli("add", "Other", "other.example.test", "--line", blank);
+        Assert.Equal(1, add.Code);
+        Assert.Contains("--line must not be blank", add.Err, StringComparison.Ordinal);
+
+        Assert.Equal(before, File.ReadAllBytes(box.ServersPath));
+        Assert.Equal([PatchA], box.Single().ExtraRealmlistLines);
+    }
+
+    [Fact]
+    public void Cli_InvalidLine_NamesTheLineOptionAndTheRealmlistLine()
+    {
+        using var box = new Box();
+
+        var add = box.Cli("add", "Example", Host, "--line", PatchA, "--line", "set foo bar");
+        Assert.Equal(2, add.Code);
+        Assert.Contains("at --line #2 (realmlist line 3): the key \"foo\" is not allowed", add.Err, StringComparison.Ordinal);
+
+        Assert.Equal(0, box.Cli("add", "Example", Host).Code);
+        var edit = box.Cli("edit", "Example", "--line", "bogus");
+        Assert.Equal(2, edit.Code);
+        Assert.Contains("at --line #1 (realmlist line 2):", edit.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cli_SizeError_NamesTheLineOption()
+    {
+        using var box = new Box();
+        var (host, line) = OversizedPair();
+
+        var add = box.Cli("add", "Example", host, "--line", line);
+
+        Assert.Equal(2, add.Code);
+        Assert.Contains($"at --line #1 (realmlist line 2): the realmlist must be at most {RealmlistAddress.MaxRealmlistBytes} bytes",
+            add.Err, StringComparison.Ordinal);
+    }
 }

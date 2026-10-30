@@ -87,9 +87,6 @@ public static class RealmlistText
         if (string.IsNullOrEmpty(text))
             throw new InvalidRealmlistException(InvalidRealmlistKind.Empty, "the realmlist is empty");
 
-        if (System.Text.Encoding.UTF8.GetByteCount(text) > RealmlistAddress.MaxRealmlistBytes)
-            throw new InvalidRealmlistException(InvalidRealmlistKind.InvalidValue, $"the realmlist must be at most {RealmlistAddress.MaxRealmlistBytes} bytes");
-
         var bad = text.FirstOrDefault(c => c > '\u007F');
         if (bad != '\0')
             throw new InvalidRealmlistException(
@@ -151,6 +148,20 @@ public static class RealmlistText
                 RealmlistAddress.ValidateRealmlistHost(parts[2], number);
             else
                 RealmlistAddress.ValidatePatchlistValue(parts[2], number);
+        }
+
+        // The total size is checked last so a per-line error (for example a duplicate key) is reported first. The text is
+        // ASCII at this point, so characters are bytes; the error names the line that goes over the limit.
+        if (text.Length > RealmlistAddress.MaxRealmlistBytes)
+        {
+            var size = 0;
+            for (var index = 0; index < lines.Length; index++)
+            {
+                size += lines[index].Length + LineEnding.Length;
+                if (size > RealmlistAddress.MaxRealmlistBytes)
+                    throw new InvalidRealmlistException(
+                        InvalidRealmlistKind.InvalidValue, $"the realmlist must be at most {RealmlistAddress.MaxRealmlistBytes} bytes", index + 1);
+            }
         }
     }
 

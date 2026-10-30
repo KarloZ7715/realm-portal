@@ -241,7 +241,7 @@ public sealed class CliApp(
             build = n;
         }
 
-        var lines = parsed.Options.GetValueOrDefault("--line");
+        var lines = ExtraLineOptions(parsed, "--line must not be blank");
 
         var result = service.AddServer(new NewServer(
             parsed.Positionals[0],
@@ -252,7 +252,7 @@ public sealed class CliApp(
             parsed.Get("--account"),
             ExtraRealmlistLines: lines));
         if (!result.Succeeded)
-            return Fail(result.Error!);
+            return Fail(WithLineOption(result.Error!, lines));
         SafeWriteLine(output, $"Added '{result.Value!.Name}' ({result.Value.Id})");
         return 0;
     }
@@ -272,7 +272,7 @@ public sealed class CliApp(
     private int EditServer(Parsed parsed, PortalService service)
     {
         Expect(parsed, 1, 1, "<server>", "--clear-lines");
-        var newLines = parsed.Options.GetValueOrDefault("--line");
+        var newLines = ExtraLineOptions(parsed, "--line must not be blank; use --clear-lines to remove the extra realmlist lines");
         var clearLines = parsed.Flags.Contains("--clear-lines");
         if (clearLines && newLines is not null)
             throw new UsageException("use either --line or --clear-lines, not both");
@@ -319,7 +319,7 @@ public sealed class CliApp(
             ClearRequiredClientBuild: clearBuild,
             ClearCacheOnSwitch: server.ClearCacheOnSwitch));
         if (!result.Succeeded)
-            return Fail(result.Error!);
+            return Fail(WithLineOption(result.Error!, newLines));
         SafeWriteLine(output, $"Updated '{server.Name}' to '{result.Value!.Name}' ({result.Value.Id})");
         return 0;
     }
@@ -441,6 +441,38 @@ public sealed class CliApp(
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// The <c>--line</c> values, or <c>null</c> when none was given. A blank value is a usage error: the service would drop it,
+    /// so an empty <c>--line "$VAR"</c> in a script would otherwise remove every extra line without notice (#192).
+    /// </summary>
+    private static List<string>? ExtraLineOptions(Parsed parsed, string blankMessage)
+    {
+        var lines = parsed.Options.GetValueOrDefault("--line");
+        if (lines is not null && lines.Any(string.IsNullOrWhiteSpace))
+            throw new UsageException(blankMessage);
+        return lines;
+    }
+
+    /// <summary>
+    /// Names the offending <c>--line</c> (1-based, in the order given) in an invalid-realmlist error, next to the realmlist line
+    /// it became (line 1 is <c>set realmlist &lt;host&gt;</c>).
+    /// </summary>
+    private static ServiceError WithLineOption(ServiceError serviceError, IReadOnlyList<string>? lines)
+    {
+        if (serviceError is not { Code: ServiceErrorCode.InvalidRealmlist, ExtraLineIndex: { } index, LineNumber: { } number }
+            || lines is null || index >= lines.Count)
+            return serviceError;
+        var marker = $"(line {number})";
+        var at = serviceError.Diagnostic.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0)
+            return serviceError;
+        return serviceError with
+        {
+            Diagnostic = string.Concat(serviceError.Diagnostic.AsSpan(0, at), $"at --line #{index + 1} (realmlist line {number})",
+                serviceError.Diagnostic.AsSpan(at + marker.Length)),
+        };
     }
 
     /// <summary>Shows a stored extra realmlist line such as <c>set patchlist patch.example.org</c> as <c>patchlist=patch.example.org</c>.</summary>
