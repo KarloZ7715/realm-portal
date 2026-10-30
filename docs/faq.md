@@ -22,9 +22,9 @@ If your problem is not here, see [Reporting a bug](#reporting-a-bug).
 
 **Wrong client folder.** Realm Portal only changes the client it switched. If you have more than one copy of the game, or you start the game from a shortcut or another launcher, you may be opening a different folder. Check the folder in **Clients**, and use **Play** in Realm Portal so the same client is switched and started.
 
-**The server address was edited after the switch.** Editing the active server does not rewrite the client files by itself. The server shows **Out of sync**. Choose **Play** or **Switch only** on that server to write the new address.
+**The server address was edited after the switch.** Editing the active server does not rewrite the client files by itself, and the server card shows no warning. Choose **Play** on that server to write the new address.
 
-**Old data from the previous server.** If you connect to the right server but see wrong item, quest or creature names, the client's cache is from the previous server. In **Settings → Client cache**, turn on **Clear Cache/WDB when switching servers** (Realm Portal 1.1.0 and later). It is off by default. When it is on, Realm Portal deletes only the `Cache` and `WDB` folders inside the selected client, after a successful switch. To set it for one server only, use **Clear Cache/WDB on switch** in **Edit server** (in the menu next to **Play**).
+**Old data from the previous server.** If you connect to the right server but see wrong item, quest or creature names, the client's cache is from the previous server. In **Settings → Client cache**, turn on **Clear Cache/WDB when switching servers** (Realm Portal 1.1.0 and later). It is off by default. When it is on, Realm Portal deletes only the `Cache` and `WDB` folders inside the selected client, after a successful switch. To set it for one server only, use **Clear Cache/WDB on switch** in **Edit server…** (in the menu next to **Play**).
 
 **The game was open.** Realm Portal does not switch while the game is running and shows **The game is open**. Close the game and switch again.
 
@@ -38,7 +38,7 @@ To add a client the scan missed, open **Clients**, choose **Pick a folder by han
 
 **The client version is not supported.** Supported clients are 1.12.1 (5875), 2.4.3 (8606), 3.3.5a (12340), 4.3.4 (15595), 5.4.8 (18414), 6.x (WoD) and 7.x (Legion). Other versions show **Unsupported client**.
 
-**The client is found but servers are greyed out.** A server can require a client build. Servers that do not match the selected client are disabled. In **Edit server**, set **Compatible clients** to **Any client** if the server works with every version. Also check that the client is marked **In use** in **Clients**.
+**The client is found but servers are greyed out.** A server can require a client build. Servers that do not match the selected client are disabled. In **Edit server…**, set **Compatible clients** to **Any client** if the server works with every version. Also check that the client is marked **In use** in **Clients**.
 
 ## Starting the game through Wine or another wrapper
 
@@ -51,7 +51,7 @@ By default Realm Portal starts `Wow.exe` directly. That works on Windows. On Lin
 
 With these settings, **Play** runs the prefix, then the template (or `Wow.exe`), then the arguments. Nothing is passed through a shell, so `$VAR`, `;` and similar are not interpreted.
 
-If you see **Could not start the game**, check that the command in the template or prefix is installed and in your `PATH` (for example, `command -v wine` in a terminal prints its path). **Invalid launcher settings** means the template is missing `{exe}` or an environment line is not in the `KEY=value` form.
+If you see **Could not start the game**, check that the command in the template or prefix is installed and in your `PATH` (for example, `command -v wine` in a terminal prints its path). **Invalid launcher settings** means the template is missing `{exe}` or has an unclosed quote, or an environment line is not in the `KEY=value` form.
 
 ## "No permission to write" or a read-only `realmlist.wtf`
 

@@ -22,9 +22,9 @@ Si tu problema no aparece aquí, mira [Reportar un fallo](#reportar-un-fallo).
 
 **Carpeta de cliente equivocada.** Realm Portal solo cambia el cliente al que aplicó el cambio. Si tienes más de una copia del juego, o abres el juego desde un acceso directo u otro lanzador, puede que estés abriendo otra carpeta. Revisa la carpeta en **Clientes** y usa **Jugar** en Realm Portal para que se cambie y se abra el mismo cliente.
 
-**Editaste la dirección del servidor después del cambio.** Editar el servidor activo no reescribe por sí solo los archivos del cliente. El servidor aparece como **Desincronizado**. Elige **Jugar** o **Solo cambiar** en ese servidor para escribir la dirección nueva.
+**Editaste la dirección del servidor después del cambio.** Editar el servidor activo no reescribe por sí solo los archivos del cliente, y la tarjeta del servidor no muestra ningún aviso. Elige **Jugar** en ese servidor para escribir la dirección nueva.
 
-**Datos viejos del servidor anterior.** Si entras al servidor correcto pero ves nombres de objetos, misiones o criaturas que no corresponden, la caché del cliente es del servidor anterior. En **Ajustes → Caché del cliente**, activa **Vaciar Cache/WDB al cambiar de servidor** (Realm Portal 1.1.0 o posterior). Viene desactivado. Cuando está activo, Realm Portal borra solo las carpetas `Cache` y `WDB` del cliente seleccionado, después de un cambio correcto. Para aplicarlo a un solo servidor, usa **Vaciar Cache/WDB al cambiar** en **Editar servidor** (en el menú junto a **Jugar**).
+**Datos viejos del servidor anterior.** Si entras al servidor correcto pero ves nombres de objetos, misiones o criaturas que no corresponden, la caché del cliente es del servidor anterior. En **Ajustes → Caché del cliente**, activa **Vaciar Cache/WDB al cambiar de servidor** (Realm Portal 1.1.0 o posterior). Viene desactivado. Cuando está activo, Realm Portal borra solo las carpetas `Cache` y `WDB` del cliente seleccionado, después de un cambio correcto. Para aplicarlo a un solo servidor, usa **Vaciar Cache/WDB al cambiar** en **Editar servidor…** (en el menú junto a **Jugar**).
 
 **El juego estaba abierto.** Realm Portal no cambia de servidor mientras el juego está en marcha y muestra **El juego está abierto**. Cierra el juego y vuelve a cambiar.
 
@@ -38,7 +38,7 @@ Para añadir un cliente que la búsqueda no encontró, abre **Clientes**, elige 
 
 **La versión del cliente no es compatible.** Los clientes compatibles son 1.12.1 (5875), 2.4.3 (8606), 3.3.5a (12340), 4.3.4 (15595), 5.4.8 (18414), 6.x (WoD) y 7.x (Legion). Con otras versiones aparece **Cliente no compatible**.
 
-**El cliente aparece pero los servidores están desactivados.** Un servidor puede exigir una build de cliente. Los servidores que no coinciden con el cliente seleccionado se desactivan. En **Editar servidor**, pon **Clientes compatibles** en **Cualquier cliente** si el servidor funciona con todas las versiones. Comprueba también que el cliente esté marcado como **En uso** en **Clientes**.
+**El cliente aparece pero los servidores están desactivados.** Un servidor puede exigir una build de cliente. Los servidores que no coinciden con el cliente seleccionado se desactivan. En **Editar servidor…**, pon **Clientes compatibles** en **Cualquier cliente** si el servidor funciona con todas las versiones. Comprueba también que el cliente esté marcado como **En uso** en **Clientes**.
 
 ## Abrir el juego con Wine u otro envoltorio
 
@@ -51,7 +51,7 @@ Por defecto, Realm Portal abre `Wow.exe` directamente. Eso funciona en Windows. 
 
 Con estos ajustes, **Jugar** ejecuta el prefijo, luego la plantilla (o `Wow.exe`) y luego los argumentos. Nada pasa por una shell, así que `$VAR`, `;` y similares no se interpretan.
 
-Si ves **No se pudo iniciar el juego**, comprueba que el comando de la plantilla o del prefijo está instalado y en tu `PATH` (por ejemplo, `command -v wine` en una terminal muestra su ruta). **Ajustes del lanzador no válidos** significa que a la plantilla le falta `{exe}` o que una línea de entorno no tiene la forma `CLAVE=valor`.
+Si ves **No se pudo iniciar el juego**, comprueba que el comando de la plantilla o del prefijo está instalado y en tu `PATH` (por ejemplo, `command -v wine` en una terminal muestra su ruta). **Ajustes del lanzador no válidos** significa que a la plantilla le falta `{exe}` o tiene una comilla sin cerrar, o que una línea de entorno no tiene la forma `CLAVE=valor`.
 
 ## «Sin permiso para escribir» o un `realmlist.wtf` de solo lectura
 
