@@ -1,0 +1,2 @@
+# minisign.pub must stay byte-exact (LF) on every checkout, including Windows.
+minisign.pub text eol=lf

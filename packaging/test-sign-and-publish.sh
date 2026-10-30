@@ -404,6 +404,14 @@ expect_fail "key with another algorithm" "not a minisign Ed25519 public key" \
 { echo "untrusted comment: minisign public key"; { printf 'Ed'; head -c 41 /dev/urandom; } | base64 -w0; echo; } >"${tmp}/len.pub"
 expect_fail "key of the wrong length" "not a minisign public key" --pubkey "${tmp}/len.pub" --key "${tmp}/good.key" --dry-run v1.2.0
 
+# The committed release key passes the key checks (the run then stops at the stubbed lookup failure).
+new_release v1.2.0
+extra_env=(STUB_FAIL_LIST=1)
+expect_fail "committed minisign.pub passes the key checks" "could not list the releases" \
+  --key "${tmp}/good.key" --dry-run v1.2.0
+check "  committed key: not refused as a key" not said "minisign.pub"
+extra_env=()
+
 # Refuse to run in GitHub Actions.
 extra_env=(GITHUB_ACTIONS=true)
 expect_fail "refuses to run in GitHub Actions" "refusing to run in GitHub Actions" "${GOOD[@]}" --yes v1.2.0
