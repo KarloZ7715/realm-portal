@@ -6,21 +6,22 @@
              x:Class="RealmPortal.App.Views.AboutView"
              x:DataType="vm:AboutViewModel">
   <Grid RowDefinitions="Auto,*" Margin="20,10,20,0">
-    <Grid ColumnDefinitions="Auto,*" Height="44">
-      <Button Name="BackButton" Classes="link caps" AutomationProperties.Name="{loc:T about.back}" Command="{Binding BackCommand}">
+    <!-- Back + title on the 44 px row, subtitle under the title (shared sheet-subtitle spacing, #200). -->
+    <Grid ColumnDefinitions="Auto,*" RowDefinitions="44,Auto" ColumnSpacing="16">
+      <Button Name="BackButton" VerticalAlignment="Center" Classes="link caps" AutomationProperties.Name="{loc:T about.back}" Command="{Binding BackCommand}">
         <StackPanel Orientation="Horizontal" Spacing="10">
           <c:Icon Data="{DynamicResource IconChevronLeft}" Width="12" Height="12" StrokeThickness="2.6"/>
           <TextBlock Text="{loc:T about.back}"/>
         </StackPanel>
       </Button>
-      <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="16,0,0,0">
-        <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Text="{loc:T about.title}"/>
-        <TextBlock Classes="footnote" Foreground="{DynamicResource BoneSoftBrush}" Text="{loc:T about.subtitle}"/>
-      </StackPanel>
+      <TextBlock Grid.Column="1" Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T about.title}"/>
+      <TextBlock Grid.Row="1" Grid.Column="1" Name="Subtitle" Classes="sheet-subtitle" Text="{loc:T about.subtitle}"/>
     </Grid>
 
-    <ScrollViewer Grid.Row="1" Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,6,14,12">
-      <StackPanel Spacing="18">
+    <ScrollViewer Grid.Row="1" Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <!-- Space around the cards is a margin on the content: ScrollViewer.Padding is not counted in the scroll extent,
+           so the last card ended up partly hidden behind the bottom edge (#198). -->
+      <StackPanel Name="ScrollContent" Spacing="18" Margin="0,0,14,12">
         <ContentControl Classes="card" Padding="26,16,26,18">
           <StackPanel Spacing="10">
             <TextBlock Classes="sheet-title" Text="{loc:T about.identity}"/>
@@ -57,10 +58,11 @@
             <TextBlock Classes="sheet-title" Text="{loc:T about.thirdparty}"/>
             <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
             <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T about.thirdparty.hint}"/>
-            <Border Background="#14000000" CornerRadius="6" Padding="12" MaxHeight="220">
-              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <TextBlock Name="ThirdPartyText" Classes="footnote mono" TextWrapping="Wrap"
-                           Foreground="{DynamicResource InkBrush}" Text="{Binding ThirdPartyLicenses}"/>
+            <Border Background="#14000000" CornerRadius="6" Padding="12,10,4,10" MaxHeight="300">
+              <ScrollViewer Name="ThirdPartyScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <!-- THIRD_PARTY_LICENSES.md rendered as text blocks (#199); no HTML, links stay plain text. -->
+                <c:MarkdownView Name="ThirdPartyText" Margin="0,0,10,0" TextElement.Foreground="{DynamicResource InkBrush}"
+                                Markdown="{Binding ThirdPartyLicenses}"/>
               </ScrollViewer>
             </Border>
           </StackPanel>

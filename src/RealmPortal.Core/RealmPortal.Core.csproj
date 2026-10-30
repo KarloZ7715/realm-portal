@@ -7,6 +7,7 @@
     <InternalsVisibleTo Include="RealmPortal.Tests" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" />
     <PackageReference Include="PeNet" />
   </ItemGroup>
   <ItemGroup>

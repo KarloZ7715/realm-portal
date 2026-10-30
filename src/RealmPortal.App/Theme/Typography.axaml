@@ -16,6 +16,12 @@
   <Style Selector="TextBlock.body-medium"><Setter Property="FontFamily" Value="{StaticResource FontBodyMedium}"/><Setter Property="FontSize" Value="16"/></Style>
   <Style Selector="TextBlock.body-bold"><Setter Property="FontFamily" Value="{StaticResource FontBody}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="15"/></Style>
   <Style Selector="TextBlock.footnote"><Setter Property="FontFamily" Value="{StaticResource FontSansMedium}"/><Setter Property="FontSize" Value="13"/></Style>
+  <!-- Subtitle under a screen or sub-sheet title (Clients, Client backups, About): one style so the gap to the content matches (#200). -->
+  <Style Selector="TextBlock.sheet-subtitle">
+    <Setter Property="FontFamily" Value="{StaticResource FontBody}"/><Setter Property="FontSize" Value="14"/>
+    <Setter Property="Foreground" Value="{DynamicResource BoneSoftBrush}"/><Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="Margin" Value="0,2,0,14"/>
+  </Style>
   <Style Selector="TextBlock.status"><Setter Property="FontFamily" Value="{StaticResource FontSans}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="12"/></Style>
   <Style Selector="TextBlock.address"><Setter Property="FontFamily" Value="{StaticResource FontMono}"/><Setter Property="FontSize" Value="13"/></Style>
   <Style Selector="TextBlock.path"><Setter Property="FontFamily" Value="{StaticResource FontMono}"/><Setter Property="FontSize" Value="12"/></Style>
