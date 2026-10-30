@@ -22,7 +22,7 @@ If your problem is not here, see [Reporting a bug](#reporting-a-bug).
 
 **Wrong client folder.** Realm Portal only changes the client it switched. If you have more than one copy of the game, or you start the game from a shortcut or another launcher, you may be opening a different folder. Check the folder in **Clients**, and use **Play** in Realm Portal so the same client is switched and started.
 
-**The server address was edited after the switch.** Editing the active server does not rewrite the client files by itself, and the server card shows no warning. Choose **Play** on that server to write the new address. This drops the pending undo of the earlier switch; the files from before that switch stay in **Settings → Backup → Manage backups…**.
+**The server address or realm was edited after the switch.** Editing the active server does not rewrite the client files by itself, and the server card shows no warning. Choose **Play** on that server to write the new address or realm. This drops the pending undo of the earlier switch; the files from before that switch stay in **Settings → Backup → Manage backups…**. Changing only the name or the account keeps the undo.
 
 **Old data from the previous server.** If you connect to the right server but see wrong item, quest or creature names, the client's cache is from the previous server. In **Settings → Client cache**, turn on **Clear Cache/WDB when switching servers** (Realm Portal 1.1.0 and later). It is off by default. When it is on, Realm Portal deletes only the `Cache` and `WDB` folders inside the selected client, after a successful switch. To set it for one server only, use **Clear Cache/WDB on switch** in **Edit server…** (in the menu next to **Play**).
 
@@ -70,7 +70,7 @@ The simplest fix is to put a copy of the client in a folder you own, such as `~/
 
 Before a switch changes the client's `realmlist.wtf` or `WTF/Config.wtf`, Realm Portal backs up the files it is about to change. A switch that changes nothing makes no backup.
 
-- **Last switch**: choose **Undo** in the notice that appears after a switch, or **Undo last switch** at the top of **Servers**. That button stays available after you close and reopen the app, until there is nothing left to undo. Undo goes back one step only. Choosing **Play** again on the active server after editing its address drops that undo; restore the earlier files from **Older backups** instead.
+- **Last switch**: choose **Undo** in the notice that appears after a switch, or **Undo last switch** at the top of **Servers**. That button stays available after you close and reopen the app, until there is nothing left to undo. Undo goes back one step only. Choosing **Play** again on the active server after editing its address or realm drops that undo; restore the earlier files from **Older backups** instead. Other edits, such as the name or the account, keep it.
 - **Older backups**: in **Settings → Backup**, choose **Manage backups…**, then **Restore** on the backup you want. By default, Realm Portal keeps the 10 most recent backups per client.
 - **Undo stopped**: the client files were changed by hand after the switch. Put them back, or choose **Discard** to drop the pending undo and leave the files as they are.
 
