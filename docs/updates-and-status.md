@@ -138,6 +138,21 @@ downloading the app checks it:
 - Release process: the published `SHA256SUMS` must list every asset of the release (v1.0.0 and v1.0.1 do). The release workflow
   should check this automatically; otherwise the affected kinds fall back to the release page.
 
+### Release signature (#116, in progress)
+
+Core has a minisign verifier for `SHA256SUMS.minisig` (`RealmPortal.Core.Updates.Signing`), not yet called by
+`UpdateDownloader`:
+
+- Only prehashed `ED` signatures (Ed25519 over the BLAKE2b-512 hash of `SHA256SUMS`) are accepted; legacy `Ed` is
+  rejected. The key ID in the signature picks the key from `ReleaseSigningKeys`, which is empty until the release key
+  exists, so every check currently returns `NoTrustedKeys`.
+- The trusted comment must be exactly `realm-portal <tag>` (e.g. `realm-portal v1.2.0`), which stops an older release's
+  signed `SHA256SUMS` from being replayed. The release is signed with
+  `minisign -S -m SHA256SUMS -t "realm-portal v1.2.0"`.
+- The parser is strict: four lines (LF or CRLF), canonical base64, a 16 KiB cap on the signature file, and nothing after
+  the global signature. Bad input gives a `SignatureStatus`, never an exception.
+- Ed25519 and BLAKE2b come from BouncyCastle (MIT), kept in one adapter (`BouncyCastleEd25519`).
+
 ### Download rules (all kinds)
 
 1. Redirects are followed manually, at most **5** hops, each checked with the URL rule above.

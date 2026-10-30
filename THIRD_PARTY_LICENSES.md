@@ -6,7 +6,7 @@ Realm Portal's own code is MIT (see `LICENSE`). This file lists third-party soft
 
 The list is every `package` entry in `RealmPortal.App.deps.json` of the linux-x64 and win-x64 release publishes (same set on
 both; trimming may drop some assemblies, but the packages are listed as published). Versions match `Directory.Packages.props`
-and `src/RealmPortal.App/packages.lock.json` (checked 2026-10-24). The full license and notice texts are committed under
+and `src/RealmPortal.App/packages.lock.json` (checked 2026-10-29). The full license and notice texts are committed under
 `licenses/nuget/<folder>/`, one folder per license source shared by packages of the same family (index:
 `licenses/nuget/packages.tsv`, with the expected files and the source of each row) and shipped in every package
 under `licenses/nuget/`.
@@ -24,6 +24,7 @@ under `licenses/nuget/`.
 | Avalonia.X11 | 11.3.22 | MIT | `licenses/nuget/avalonia-11.3.22/` | Avalonia UI |
 | Avalonia.BuildServices | 11.3.2 | MIT | `licenses/nuget/avalonia.buildservices-11.3.2/` | Avalonia build-time package (no runtime files) |
 | Avalonia.Angle.Windows.Natives | 2.1.25547.20250602 | BSD-3-Clause | `licenses/nuget/avalonia.angle.windows.natives-2.1.25547.20250602/` | ANGLE OpenGL ES on Direct3D (`av_libglesv2.dll`, win-x64) |
+| BouncyCastle.Cryptography | 2.7.0 | MIT | `licenses/nuget/bouncycastle.cryptography-2.7.0/` | Ed25519 and BLAKE2b for release signature checks (`RealmPortal.Core`) |
 | CommunityToolkit.Mvvm | 8.4.2 | MIT | `licenses/nuget/communitytoolkit.mvvm-8.4.2/` | view-model helpers |
 | SkiaSharp | 2.88.9 | MIT | `licenses/nuget/skiasharp-2.88.9/` | 2D rendering (Skia, native `libSkiaSharp`) |
 | SkiaSharp.NativeAssets.Linux | 2.88.9 | MIT | `licenses/nuget/skiasharp-2.88.9/` | Skia native binaries |

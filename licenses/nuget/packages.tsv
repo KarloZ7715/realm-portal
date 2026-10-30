@@ -12,6 +12,7 @@ Avalonia.Win32	11.3.22	MIT	avalonia-11.3.22	NOTICE.md,licence.md	https://github.
 Avalonia.X11	11.3.22	MIT	avalonia-11.3.22	NOTICE.md,licence.md	https://github.com/AvaloniaUI/Avalonia/tree/11.3.22 (licence.md, NOTICE.md)
 Avalonia.BuildServices	11.3.2	MIT	avalonia.buildservices-11.3.2	LICENSE	https://github.com/AvaloniaUI/Avalonia.BuildServices/blob/777f975b0a0cecf0311273711d56697212c558c0/LICENSE
 Avalonia.Angle.Windows.Natives	2.1.25547.20250602	BSD-3-Clause	avalonia.angle.windows.natives-2.1.25547.20250602	LICENSE	nupkg (LICENSE)
+BouncyCastle.Cryptography	2.7.0	MIT	bouncycastle.cryptography-2.7.0	LICENSE.md	nupkg (LICENSE.md)
 CommunityToolkit.Mvvm	8.4.2	MIT	communitytoolkit.mvvm-8.4.2	License.md,ThirdPartyNotices.txt	nupkg (License.md, ThirdPartyNotices.txt)
 SkiaSharp	2.88.9	MIT	skiasharp-2.88.9	LICENSE.txt,THIRD-PARTY-NOTICES.txt	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
 SkiaSharp.NativeAssets.Linux	2.88.9	MIT	skiasharp-2.88.9	LICENSE.txt,THIRD-PARTY-NOTICES.txt	nupkg (LICENSE.txt, THIRD-PARTY-NOTICES.txt)
