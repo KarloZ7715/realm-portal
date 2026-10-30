@@ -58,10 +58,11 @@
             <TextBlock Classes="sheet-title" Text="{loc:T about.thirdparty}"/>
             <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
             <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T about.thirdparty.hint}"/>
-            <Border Background="#14000000" CornerRadius="6" Padding="12" MaxHeight="220">
-              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <TextBlock Name="ThirdPartyText" Classes="footnote mono" TextWrapping="Wrap"
-                           Foreground="{DynamicResource InkBrush}" Text="{Binding ThirdPartyLicenses}"/>
+            <Border Background="#14000000" CornerRadius="6" Padding="12,10,4,10" MaxHeight="300">
+              <ScrollViewer Name="ThirdPartyScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <!-- THIRD_PARTY_LICENSES.md rendered as text blocks (#199); no HTML, links stay plain text. -->
+                <c:MarkdownView Name="ThirdPartyText" Margin="0,0,10,0" TextElement.Foreground="{DynamicResource InkBrush}"
+                                Markdown="{Binding ThirdPartyLicenses}"/>
               </ScrollViewer>
             </Border>
           </StackPanel>
