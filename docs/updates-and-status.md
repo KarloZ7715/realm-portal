@@ -38,8 +38,10 @@ is debounced to one request per minute.
 
 The update check verifies downloads against the release's `SHA256SUMS`. This detects corrupted or truncated downloads only.
 It does **not** protect against a compromised GitHub account, token or release workflow, because the attacker would control
-both the asset and `SHA256SUMS`. Until [#116](https://github.com/KarloZ7715/realm-portal/issues/116) ships (checksums signed
-with a key embedded in the app, the real authenticity control), the protections are:
+both the asset and `SHA256SUMS`. [#116](https://github.com/KarloZ7715/realm-portal/issues/116) adds the real authenticity
+control: `SHA256SUMS` is signed with a key that stays offline, and the app carries the public key. Releases from 1.2.0 on are
+signed, but **the app does not check the signature yet** (see [Release signature](#release-signature-116-not-enforced-yet)).
+Until it does, the protections are:
 
 - The user always confirms **Update**; nothing updates silently.
 - Releases are immutable once GitHub "immutable releases" is enabled for the repository (pending, see the release gate
@@ -138,14 +140,18 @@ downloading the app checks it:
 - Release process: the published `SHA256SUMS` must list every asset of the release (v1.0.0 and v1.0.1 do). The release workflow
   should check this automatically; otherwise the affected kinds fall back to the release page.
 
-### Release signature (#116, in progress)
+### Release signature (#116, not enforced yet)
 
-Core has a minisign verifier for `SHA256SUMS.minisig` (`RealmPortal.Core.Updates.Signing`), not yet called by
-`UpdateDownloader`:
+Releases from 1.2.0 on ship `SHA256SUMS.minisig`, a minisign signature over `SHA256SUMS` made by the maintainer with the
+release key (key ID `A71D9203F538E296`, public key in [`minisign.pub`](../minisign.pub)). The signing process is in
+[linux-packaging.md](linux-packaging.md#signing-and-publishing-a-release).
+
+Core has a minisign verifier (`RealmPortal.Core.Updates.Signing`) and trusts exactly that key
+(`ReleaseSigningKeys`, checked against `minisign.pub` by `ReleaseSigningKeysTests`). **`UpdateDownloader` does not call
+it yet**, so the app does not download or check `SHA256SUMS.minisig` today. The verifier works like this:
 
 - Only prehashed `ED` signatures (Ed25519 over the BLAKE2b-512 hash of `SHA256SUMS`) are accepted; legacy `Ed` is
-  rejected. The key ID in the signature picks the key from `ReleaseSigningKeys`, which is empty until the release key
-  exists, so every check currently returns `NoTrustedKeys`.
+  rejected. The key ID in the signature picks the key from `ReleaseSigningKeys`. An unknown key ID is rejected.
 - The trusted comment must be exactly `realm-portal <tag>` (e.g. `realm-portal v1.2.0`), which stops an older release's
   signed `SHA256SUMS` from being replayed. The release is signed with
   `minisign -S -m SHA256SUMS -t "realm-portal v1.2.0"`.
@@ -153,6 +159,21 @@ Core has a minisign verifier for `SHA256SUMS.minisig` (`RealmPortal.Core.Updates
   the global signature. Bad input gives a `SignatureStatus`, never an exception; only a null or empty expected trusted
   comment (a caller bug) throws `ArgumentException`.
 - Ed25519 and BLAKE2b come from BouncyCastle (MIT), kept in one adapter (`BouncyCastleEd25519`).
+
+Planned updater policy once it is wired in:
+
+1. Download `SHA256SUMS.minisig` (refused above 16 KiB) next to `SHA256SUMS`, and verify the signature before using any
+   line of `SHA256SUMS`.
+2. Build the expected trusted comment from the tag of the release being installed, including any pre-release suffix.
+   `ReleaseVersion.TagName` has none, so the raw tag must be used.
+3. Anything other than `Valid` (no signature, unknown key, bad signature, wrong trusted comment, too large, malformed)
+   stops the update with an error and offers to open the release page. There is no fallback to unsigned checksums,
+   so releases before 1.2.0 (unsigned) are never installed in-app by a version that enforces the check.
+4. Only strictly newer versions are offered, as today. The trusted comment is shown escaped if it is ever displayed.
+
+Key rotation: a new key is added to `ReleaseSigningKeys` next to the old one and shipped in a release signed with the
+old key. Later releases are signed with the new key, and the old key is dropped once users have had time to update.
+See SECURITY.md.
 
 ### Download rules (all kinds)
 
