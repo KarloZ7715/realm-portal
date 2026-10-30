@@ -668,6 +668,26 @@ public sealed class PortalService : IPortalService
         _journal.Clear(clientId);
     }
 
+    /// <summary>
+    /// Re-applying the active server after an edit wrote different bytes (#213): when the pending undo's backup no longer
+    /// matches the files, undo could only report a false conflict, so the pending undo is dropped (undo then reports
+    /// nothing to undo). A plain repair that wrote the same bytes keeps it. Runs after the files were written and the
+    /// server activated, so it never fails the switch: a backup that cannot be checked is dropped too, and a failure
+    /// while dropping leaves the undo as it was (undo then stops with a conflict and changes nothing).
+    /// </summary>
+    private void DropStaleUndoAfterReapply(IClientFilesApplier applier, string clientId, string clientPath)
+    {
+        try
+        {
+            if (_journal.Load(clientId) is { BackupId: { } pendingBackupId }
+                && !applier.CanUndoWithoutConflict(clientId, clientPath, pendingBackupId))
+                DiscardPendingUndoLocked(clientId);
+        }
+        catch (Exception ex) when (ex is StoreException or ClientFilesException or IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     public ServiceResult<PortalStatus> DiscardUndo(string? clientId = null)
     {
         try
@@ -1136,13 +1156,8 @@ public sealed class PortalService : IPortalService
 
                 if (!sameServerActive)
                     _journal.Save(new LastSwitchEntry(request.ClientId, backupId, ManifestSha256: manifestSha256));
-                else if (backupId is not null
-                         && _journal.Load(request.ClientId) is { BackupId: { } pendingBackupId }
-                         && !applier.CanUndoWithoutConflict(request.ClientId, client.Path, pendingBackupId))
-                    // Re-applying the active server after an edit wrote different bytes (#213): the pending undo's
-                    // backup no longer matches the files, so undo would report a false conflict. Drop the pending
-                    // undo (undo then reports nothing to undo); a plain repair that wrote the same bytes keeps it.
-                    DiscardPendingUndoLocked(request.ClientId);
+                else if (backupId is not null)
+                    DropStaleUndoAfterReapply(applier, request.ClientId, client.Path);
 
                 var activeEntry = ToServerEntry(server, server.Id, request.ClientId, version);
                 var previous = sameServerActive ? activeEntry : previousEntry;
