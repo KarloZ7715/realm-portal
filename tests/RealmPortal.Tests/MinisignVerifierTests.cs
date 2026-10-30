@@ -1,6 +1,7 @@
 using System.Text;
 using RealmPortal.Core.Updates;
 using RealmPortal.Core.Updates.Signing;
+using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
 
@@ -240,8 +241,8 @@ public class MinisignVerifierTests
             "nul-in-comment" => Join([lines[0] + "\0", lines[1], lines[2], lines[3]]),
             "invalid-utf8" => [.. original[..20], 0xFF, 0xFE, .. original[20..]],
             "garbage" => Encoding.ASCII.GetBytes("not a signature at all"),
-            "long-untrusted-comment" => Join([lines[0] + new string('x', 1100), lines[1], lines[2], lines[3]]),
-            "long-trusted-comment" => Join([lines[0], lines[1], lines[2] + new string('x', 8200), lines[3]]),
+            "long-untrusted-comment" => Join(["untrusted comment: " + new string('x', 1004), lines[1], lines[2], lines[3]]),
+            "long-trusted-comment" => Join([lines[0], lines[1], "trusted comment: " + new string('x', 8174), lines[3]]),
             _ => throw new ArgumentOutOfRangeException(nameof(edit)),
         };
 
@@ -271,18 +272,56 @@ public class MinisignVerifierTests
         Assert.Throws<ArgumentException>(() => none.Verify([], [], expected!));
     }
 
-    [Fact]
-    public void LongestCommentsMinisignWrites_AreAccepted()
+    [Theory]
+    [InlineData(1003, SignatureStatus.Valid)]
+    [InlineData(1004, SignatureStatus.Malformed)]
+    public void UntrustedComment_LimitMatchesMinisign(int length, SignatureStatus expected)
     {
-        // minisign 0.12 reads untrusted comments up to 1003 bytes and writes trusted comments up to 4077 bytes.
+        // The untrusted comment is not signed, so the fixture stays valid apart from the length.
         var lines = Lines(Read("SHA256SUMS.a.minisig"));
-        lines[0] = "untrusted comment: " + new string('u', 1003);
-        Assert.Equal(SignatureStatus.Valid, Verify([KeyA], Sums, Join(lines), Tag));
+        lines[0] = "untrusted comment: " + new string('u', length);
+        Assert.Equal(expected, Verify([KeyA], Sums, Join(lines), Tag));
+    }
 
-        lines = Lines(Read("SHA256SUMS.a.minisig"));
-        lines[2] = "trusted comment: " + new string('t', 4077);
-        // Parsed (not Malformed); it fails only because the edited comment no longer matches the global signature.
-        Assert.Equal(SignatureStatus.BadTrustedComment, Verify([KeyA], Sums, Join(lines), Tag));
+    [Fact]
+    public void UntrustedComment_LimitCountsUtf8Bytes()
+    {
+        var lines = Lines(Read("SHA256SUMS.a.minisig"));
+        lines[0] = "untrusted comment: " + new string('u', 1001) + "\u00e9"; // 1003 bytes
+        Assert.Equal(SignatureStatus.Valid, Verify([KeyA], Sums, Join(lines), Tag));
+        lines[0] = "untrusted comment: " + new string('u', 1002) + "\u00e9"; // 1004 bytes
+        Assert.Equal(SignatureStatus.Malformed, Verify([KeyA], Sums, Join(lines), Tag));
+    }
+
+    [Theory]
+    [InlineData(4077)] // longest that `minisign -S` writes
+    [InlineData(8173)] // longest that minisign reads
+    public void TrustedComment_UpToTheReadLimit_IsAccepted(int length)
+    {
+        // minisign cannot write a trusted comment this long, so the signature is made here with a throwaway key.
+        var comment = Tag + " " + new string('t', length - Tag.Length - 1);
+        var (key, sig) = SyntheticSigner.Sign(Sums, comment);
+        Assert.Equal(SignatureStatus.Valid, Verify([key], Sums, sig, comment));
+    }
+
+    [Fact]
+    public void TrustedComment_OneByteOverTheReadLimit_IsMalformed()
+    {
+        var comment = Tag + " " + new string('t', 8174 - Tag.Length - 1);
+        var (key, sig) = SyntheticSigner.Sign(Sums, comment);
+        Assert.Equal(SignatureStatus.Malformed, Verify([key], Sums, sig, comment));
+    }
+
+    [Fact]
+    public void SyntheticSigner_ProducesSignaturesTheVerifierAccepts()
+    {
+        // Guards the helper above on a normal comment.
+        var (key, sig) = SyntheticSigner.Sign(Sums, Tag);
+        Assert.Equal(SignatureStatus.Valid, Verify([key], Sums, sig, Tag));
+        Assert.Equal(SignatureStatus.UnknownKey, Verify([KeyA], Sums, sig, Tag));
+        var tampered = Sums;
+        tampered[0] ^= 1;
+        Assert.Equal(SignatureStatus.BadSignature, Verify([key], tampered, sig, Tag));
     }
 
     [Theory]
