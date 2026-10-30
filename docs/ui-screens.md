@@ -87,7 +87,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
   3. **`<Separator />`:** 1 px `#9A7444` (`BorderDefault`) horizontal divider.
   4. **`Edit server…` (`Editar servidor…`):** `IconPencil`, `Command="{Binding EditCommand}"`, `IsEnabled="{Binding CanEdit}"`.
   5. **`Delete server…` (`Eliminar servidor…`):** `IconClose`, `Command="{Binding DeleteCommand}"`, `IsEnabled="{Binding CanDelete}"`.
-  6. **Disabled-reason caption (`IsVisible="{Binding ShowMenuDisabledHint}"`, `IsEnabled="False"`):**
+  6. **Disabled-reason caption (`MenuItem.note` `MenuDisabledHint`, `IsVisible="{Binding ShowMenuDisabledHint}"`, `IsEnabled="False"`):** a read-only row of its own (not focusable, no hover), so the menu has no empty row when there is nothing to explain. Every child of the flyout is a `MenuItem` or a `Separator`: any other control would get a menu container that stays visible.
      - When the server's resolved target client is running a game session: `menu.disabled.clientrunning` (`"Close the game on {0} to switch or edit"` / `"Cierra el juego en {0} para cambiar o editar"`).
      - When no compatible client is marked `"In use"`: `menu.disabled.noinuse` (`"Mark a compatible client as 'In use' in Clients"` / `"Marca un cliente compatible como «En uso» en Clientes"`).
 
@@ -215,7 +215,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 #### 4.1 Settings Screen (`SettingsView.axaml` — `compact-07`)
 - **Figma reference:** `compact-07-settings-no-cleanup@2x.png` (`48:5882`) and `compact-07-settings-no-cleanup-scrolled@2x.png` (`48:6144`).
--Reached from the sidebar gear. The three `ParchmentPanel` (`Variant="Tile"`) cards (`LANGUAGE`, `LAUNCHER`, `BACKUP`) sit in one column and scroll; the header (title only) and the footer (`Cancel`, `Save`) stay fixed. There is no header `Back` button: the sidebar is the way out. `Cancel` resets the fields (and the language preview) and `Save` stores them; neither leaves the screen. Leaving through the sidebar with unsaved changes asks `Discard unsaved changes?` (`Keep editing` is the default, `Discard changes` reverts the fields and the language preview). Closing the window with unsaved changes asks the same question; a system shutdown is never held.
+-Reached from the sidebar gear. The three `ParchmentPanel` (`Variant="Tile"`) cards (`LANGUAGE`, `LAUNCHER`, `BACKUP`) sit in one column and scroll; the header (title only) and the footer (`Cancel`, `Save`) stay fixed. The space around the cards is a margin on the scrolled content (not `ScrollViewer.Padding`, which the scroll extent ignores), so scrolled to the end the last card (`About`) is fully visible with a 12 px gap above the footer. There is no header `Back` button: the sidebar is the way out. `Cancel` resets the fields (and the language preview) and `Save` stores them; neither leaves the screen. Leaving through the sidebar with unsaved changes asks `Discard unsaved changes?` (`Keep editing` is the default, `Discard changes` reverts the fields and the language preview). Closing the window with unsaved changes asks the same question; a system shutdown is never held.
 - **`BACKUP` (`COPIA DE SEGURIDAD`) Card Extensions for `1.0.0`:**
   1. **Row 1 — `Folder` (`Carpeta`):** `TextBox.parchment` (`FontMono`, bound to `BackupFolder`) + `Browse…` (`Examinar…`, `Button.secondary.compact`, `c:ButtonSurface.Surface="Parchment"`).
   2. **Row 2 — Retention & Sub-Sheet Trigger (`Margin="0,8,0,0"`):**
@@ -390,7 +390,9 @@ See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
 
 ## About
 
-Opened from Settings (**About Realm Portal…**). Shows `AppInfo.Name` and `AppInfo.Version` (same value as the status-bar `v…` label), credits, a short MIT note, the Blizzard disclaimer, a scrollable copy of `THIRD_PARTY_LICENSES.md`, and **Open on GitHub** which launches `AppInfo.RepositoryUrl` in the system browser (`IUriOpener` / shell execute). Available in demo and real sessions. Strings: `about.*` and `settings.about*`.
+Opened from Settings (**About Realm Portal…**). Shows `AppInfo.Name` and `AppInfo.Version` (same value as the status-bar `v…` label), credits, a short MIT note, the Blizzard disclaimer, `THIRD_PARTY_LICENSES.md` rendered in a scrollable box by `Controls/MarkdownView` (headings, paragraphs, bullet items, and each table row as an entry with the first cell in bold and the other cells as `Header: value` lines; `code` in mono; no HTML, links stay plain text), and **Open on GitHub** which launches `AppInfo.RepositoryUrl` in the system browser (`IUriOpener` / shell execute). Available in demo and real sessions. Strings: `about.*` and `settings.about*`.
+
+Sub-sheet headers (About, Client backups) put the chevron + `Back` button and the title on the 44 px row and the subtitle under the title. The subtitle uses the shared `TextBlock.sheet-subtitle` style (Alegreya 14, bone-soft, wraps, 14 px below), the same as the Clients summary line, so the gap to the content is the same on all three screens.
 
 ## Window size and position
 
