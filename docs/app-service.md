@@ -516,6 +516,27 @@ manifest hash, and those journals keep working as before. A value that is presen
 
 ---
 
+## 6b. Config file backups (`GetConfigBackups`, `RestoreConfigBackup`, #196)
+
+```csharp
+public enum ConfigFileKind { Servers, Clients }
+public enum ConfigFileState { Missing, Valid, Damaged }
+public sealed record ConfigBackupStatus(
+    ConfigFileKind File, string Path, ConfigFileState Current,
+    string BackupPath, ConfigFileState Backup, DateTimeOffset? BackupModifiedAt);
+
+ServiceResult<IReadOnlyList<ConfigBackupStatus>> GetConfigBackups();
+ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file);
+```
+
+- **Write side (`ConfigFileBackup.WriteKeepingPrevious`):** `ServerStore.Save` and `ClientStore.Save` (under the config-directory lock, as before) and the app's `UiPreferencesStore.Save` (which has no lock, as before) copy the current file to `<file>.bak` (private permissions, `0600` on Unix) before writing. Only a readable, valid current file is copied, so a damaged file (#141) never replaces a good `.bak`. The first save creates no `.bak`. When the new bytes equal the current file, nothing is written (neither the file nor the `.bak`), so a save without changes (for example the window placement saved on every close) keeps the real previous version. The `.bak` copy is best effort: if it cannot be written (for example `<file>.bak` is a directory), the save still succeeds and `GetConfigBackups` reports the `.bak` as `Damaged`. `AtomicFileWriter` itself is unchanged (it also writes game client files). `ServerStore.IsValidContent` and `ClientStore.IsValidContent` are public so callers can check a file with the same rules as loading.
+- **`ConfigFileState`:** `Missing` (no file), `Valid`, or `Damaged` (unreadable, not a valid store file, or not a regular file, such as a directory).
+- **No automatic restore.** A damaged `servers.json` / `clients.json` still fails with `StoreCorrupt`; the UI can call `GetConfigBackups()` and offer `RestoreConfigBackup` when `Current == Damaged` and `Backup == Valid`.
+- **`GetConfigBackups`** is read-only: when the config directory does not exist yet it reports every file as `Missing` without creating the directory or its lock file. `BackupModifiedAt` is in UTC.
+- **`RestoreConfigBackup`** runs under the config-directory lock. It copies the current file (if any) to `<file>.before-restore` with private permissions (`0600`), overwriting an older one, then replaces `<file>` atomically with the `.bak` bytes, so an unexpected exit never leaves `<file>` missing; the `.bak` stays. When the current file already equals the `.bak`, nothing changes (a second restore keeps the first `.before-restore`). If the write fails, `<file>` is left as it was and the new `.before-restore` copy is removed. A current file that cannot be read is moved aside instead of copied, and moved back if the write fails. No `.bak`: `BackupNotFound` with `Path = <file>.bak`, `Consistency.Unchanged`. Damaged `.bak` (including a directory): `StoreCorrupt` with `Path = <file>.bak`, nothing changed. Lock and I/O failures map like any other operation (`StoreLocked`, `PermissionDenied`, ...), never as a damaged `.bak`.
+- `state.json` is not changed by a restore; if its active id is not in the restored `servers.json`, `GetStatus` reports no active server (and `activo.json` out of sync) until the next switch.
+- **UI preferences (app only):** `UiPreferencesStore.BackupState` (`ConfigFileState` of the `.bak`) and `UiPreferencesStore.RestoreBackup()` (same semantics; throws `FileNotFoundException` without a `.bak`, `StoreException` when the `.bak` is damaged). `Load()` still returns defaults for a damaged file. The API exists; no screen calls it yet (the UI is pending).
+
 ## 7. Errors (`ServiceErrorCode` mapping)
 
 | Source | Codes |

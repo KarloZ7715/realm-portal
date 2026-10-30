@@ -652,6 +652,74 @@ public sealed class PortalService : IPortalService
         }
     }
 
+    public ServiceResult<IReadOnlyList<ConfigBackupStatus>> GetConfigBackups()
+    {
+        try
+        {
+            // Read-only: a config directory that does not exist yet is reported as all missing, without creating it
+            // (or its lock file).
+            if (!Directory.Exists(_configDirectory))
+                return ServiceResult<IReadOnlyList<ConfigBackupStatus>>.Ok(
+                    [InspectConfigFile(ConfigFileKind.Servers), InspectConfigFile(ConfigFileKind.Clients)]);
+            using (_servers.DirectoryLock.Acquire())
+                return ServiceResult<IReadOnlyList<ConfigBackupStatus>>.Ok(
+                    [InspectConfigFile(ConfigFileKind.Servers), InspectConfigFile(ConfigFileKind.Clients)]);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<IReadOnlyList<ConfigBackupStatus>>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file)
+    {
+        var (path, isValid) = ConfigFileOf(file);
+        try
+        {
+            using (_servers.DirectoryLock.Acquire())
+            {
+                PortalConfigFile.WithConfigLock(() => ConfigFileBackup.Restore(path, _writer, isValid));
+                return ServiceResult<ConfigBackupStatus>.Ok(InspectConfigFile(file));
+            }
+        }
+        catch (FileNotFoundException)
+        {
+            return ServiceResult<ConfigBackupStatus>.Fail(
+                new ServiceError(ServiceErrorCode.BackupNotFound, Path: path + ConfigFileBackup.BackupSuffix, Consistency: Consistency.Unchanged));
+        }
+        catch (InvalidDataException ex)
+        {
+            // Only a damaged .bak maps here; lock and I/O failures go through ServiceErrors.FromException.
+            return ServiceResult<ConfigBackupStatus>.Fail(
+                new ServiceError(ServiceErrorCode.StoreCorrupt, Path: path + ConfigFileBackup.BackupSuffix, Consistency: Consistency.Unchanged, Diagnostic: ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ConfigBackupStatus>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    private (string Path, Func<byte[], bool> IsValid) ConfigFileOf(ConfigFileKind file) => file switch
+    {
+        ConfigFileKind.Servers => (_servers.FilePath, ServerStore.IsValidContent),
+        ConfigFileKind.Clients => (_clients.FilePath, ClientStore.IsValidContent),
+        _ => throw new ArgumentOutOfRangeException(nameof(file), file, "Unknown config file."),
+    };
+
+    private ConfigBackupStatus InspectConfigFile(ConfigFileKind file)
+    {
+        var (path, isValid) = ConfigFileOf(file);
+        var backupPath = path + ConfigFileBackup.BackupSuffix;
+        var backup = ConfigFileBackup.Inspect(backupPath, isValid);
+        return new ConfigBackupStatus(
+            file,
+            path,
+            ConfigFileBackup.Inspect(path, isValid),
+            backupPath,
+            backup,
+            backup == ConfigFileState.Missing ? null : new DateTimeOffset(File.GetLastWriteTimeUtc(backupPath), TimeSpan.Zero));
+    }
+
     public ServiceResult<PortalStatus> DiscardUndo(string? clientId = null)
     {
         try

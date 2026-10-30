@@ -109,19 +109,7 @@ public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer
 
         try
         {
-            return PortalConfigFile.WithConfigLock(() =>
-            {
-                var file = JsonSerializer.Deserialize<StoreFile>(PortalConfigFile.ReadBounded(FilePath), JsonOptions)
-                           ?? throw new StoreException($"'{FilePath}' is empty.");
-                if (file.Version != FormatVersion)
-                    throw new StoreException($"'{FilePath}' has unsupported format version {file.Version}.");
-
-                return (file.Clients ?? []).Select(ToClient).ToList();
-            });
-        }
-        catch (JsonException ex)
-        {
-            throw new StoreException($"'{FilePath}' is not valid: {ex.Message}", ex);
+            return PortalConfigFile.WithConfigLock(() => Parse(PortalConfigFile.ReadBounded(FilePath), FilePath));
         }
         catch (IOException ex)
         {
@@ -133,13 +121,47 @@ public sealed class ClientStore(string configDirectory, IAtomicFileWriter writer
         }
     }
 
+    /// <summary>Parses <c>clients.json</c> bytes with the same rules as loading the store.</summary>
+    /// <exception cref="StoreException">The content is not a valid store file.</exception>
+    internal static List<StoredClient> Parse(byte[] bytes, string path)
+    {
+        try
+        {
+            var file = JsonSerializer.Deserialize<StoreFile>(bytes, JsonOptions)
+                       ?? throw new StoreException($"'{path}' is empty.");
+            if (file.Version != FormatVersion)
+                throw new StoreException($"'{path}' has unsupported format version {file.Version}.");
+
+            return (file.Clients ?? []).Select(ToClient).ToList();
+        }
+        catch (JsonException ex)
+        {
+            throw new StoreException($"'{path}' is not valid: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>True when <paramref name="bytes"/> would load as a valid <c>clients.json</c>.</summary>
+    public static bool IsValidContent(byte[] bytes)
+    {
+        try
+        {
+            Parse(bytes, FileName);
+            return true;
+        }
+        catch (StoreException)
+        {
+            return false;
+        }
+    }
+
     private void Save(List<StoredClient> clients)
     {
         PortalConfigFile.WithConfigLock(() =>
         {
             var file = new StoreFile { Version = FormatVersion, Clients = clients.Select(ToRecord).ToList() };
             var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
-            writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
+            ConfigFileBackup.WriteKeepingPrevious(
+                FilePath, writer, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions, IsValidContent);
             PortalConfigFile.AfterWrite(FilePath);
         });
     }
