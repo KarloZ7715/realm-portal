@@ -156,7 +156,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
     - **`Remove client` (`Quitar cliente`):** `Button.ghost.surface-parchment` (`Width="28"`, `Height="28"`, `Padding="6"`, `Margin="4,0,0,0"`, `c:ButtonSurface.Surface="Parchment"`), icon `IconClose` (`14×14`, `#7A1F19`), tooltip `clients.action.remove`. Disabled while this client is running.
 
 #### 2.3 Edit Client & Per-Client Launcher Overrides Sheet (`EditClientView.axaml` / `EditClientViewModel.cs`)
-- **Placement (Approved):** Clicking `✎` on a client row opens the `EditClientView` sheet in the main content area (with a chevron + `Back` / `Volver` header button returning to `ClientsView`).
+- **Placement (Approved):** Clicking `✎` on a client row opens the `EditClientView` sheet in the main content area (with a chevron + `Back` / `Atrás` header button returning to `ClientsView`).
 - **Backend contract:** `IPortalService.UpdateClient(UpdateClientRequest)` (`ClientId`, `Name`, `Path`, `IsInUse`, and optional per-client `LauncherOverrides`: `CommandTemplate`, `Prefix`, `Arguments`, `Environment`).
 - **Sheet sections (inside a `ParchmentPanel` `Variant="Tile"`, all buttons with `c:ButtonSurface.Surface="Parchment"`):**
   1. **Client identity & folder:**
@@ -223,7 +223,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
      - Right (`Auto`): **`Manage backups…`** (`Gestionar respaldos…`, `settings.backup.manage`) `Button.secondary.compact` (`c:ButtonSurface.Surface="Parchment"`, `MinWidth="172"`, `Command="{Binding OpenBackupsManagerCommand}"`).
 
 #### 4.2 Client Backups Manager Sub-Sheet (`BackupsView.axaml` / `BackupsViewModel.cs`)
-- **Placement (Approved):** Dedicated sub-sheet opened from the **`Manage backups…`** (`Gestionar respaldos…`) button inside the `BACKUP` card in `SettingsView`. Clicking the chevron + `Back` (`Volver`) button in the sub-sheet header returns to `SettingsView`.
+- **Placement (Approved):** Dedicated sub-sheet opened from the **`Manage backups…`** (`Gestionar respaldos…`) button inside the `BACKUP` card in `SettingsView`. Clicking the chevron + `Back` (`Atrás`) button in the sub-sheet header returns to `SettingsView`.
 - **Backend contract:** `ListBackups(clientId)`, `CreateBackup(clientId)`, `RestoreBackup(clientId, backupId, force)`, `DeleteBackup(clientId, backupId)`.
 - **Sub-sheet layout:**
 
@@ -366,6 +366,7 @@ All keys below are specified for `src/RealmPortal.App/Localization/Strings/en.js
 | `error.storelocked` | `Another Realm Portal operation is updating the configuration. Try again in a moment.` | `Otra operación de Realm Portal está actualizando la configuración. Inténtalo de nuevo en un momento.` |
 | `welcome.back` | `Back` | `Atrás` |
 | `welcome.step.announce` | `Step {0} of 3, {1}` | `Paso {0} de 3, {1}` |
+| `welcome.servers.list` | `Imported servers` | `Servidores importados` |
 
 ---
 
@@ -382,6 +383,9 @@ See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
 - **Add server (step 3):** opens the regular add-server form inside the welcome. Save or Cancel returns to the Servers step with the list refreshed, so several servers can be added in one session. Only **Finish** and **Skip for now** set `WelcomeCompleted=true`; closing the window mid-flow does not, so the welcome shows again on the next launch.
 - **Keyboard:** Esc = Back on steps 2 and 3 (no action on step 1; Skip needs an explicit click or Enter on the button); Alt+Left = Back too. Enter runs the step's primary unless the focused control handles it (a focused button runs itself; Enter inside a multi-line field never triggers the primary). While the add-server form is open, Esc = Cancel. Tab order: step content → Back → secondary → primary → Skip. The radio dots inside the language cards are not tab stops (the card is).
 - **Focus on each step change (and when the add-server form closes):** the selected language card (step 1), the first client checkbox (step 2, or the primary when there are no clients), the primary (step 3; server rows have no controls yet). The last focused element is not remembered.
+- **Step 2 primary label:** `Continue with N` when N clients are ticked; plain `Continue` / `Continuar` when clients were found but none is ticked (never "with 0"); `Continue without clients` when none was found.
+- **Server list (step 3):** read-only rows; the list has the accessible name `welcome.servers.list` (`Imported servers` / `Servidores importados`).
+- **Back label:** `Back` / `Atrás` everywhere (`welcome.back`, `about.back`, `backups.back`, `clients.edit.back`).
 - **Announcement:** the step strip's accessible name is `welcome.step.announce` ("Step 2 of 3, Clients") with a polite live setting, updated on each step change and language switch.
 
 ## About

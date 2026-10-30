@@ -193,10 +193,16 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         _ => string.Empty,
     };
 
+    /// <summary>
+    /// "Continue with N" when clients are ticked; plain "Continue" when clients were found but none is ticked
+    /// (never "Continue with 0"); "Continue without clients" when none was found.
+    /// </summary>
     public string ContinueClientsLabel =>
-        _clients.InUseCount <= 0
-            ? Loc.Get("welcome.clients.continue.empty")
-            : Loc.Format("welcome.clients.continue", _clients.InUseCount);
+        _clients.InUseCount > 0
+            ? Loc.Format("welcome.clients.continue", _clients.InUseCount)
+            : _clients.Items.Count > 0
+                ? Loc.Get("welcome.continue")
+                : Loc.Get("welcome.clients.continue.empty");
 
     public override string StatusText => ServerForm?.StatusText ?? Step switch
     {

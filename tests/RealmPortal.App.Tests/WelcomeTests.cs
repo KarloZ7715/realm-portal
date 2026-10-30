@@ -316,6 +316,40 @@ public class WelcomeTests
     }
 
     [AvaloniaFact]
+    public void ClientsStep_ContinueLabel_NeverShowsZero()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (main, welcome) = WelcomeOnServersStep(env);
+        welcome.BackCommand.Execute(null);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
+        var client = Assert.Single(main.Clients.Items);
+        Assert.Equal("Continue with 1", welcome.ContinueClientsLabel);
+
+        var changed = new List<string?>();
+        welcome.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        client.IsInUse = false;
+
+        Assert.Contains(nameof(WelcomeViewModel.ContinueClientsLabel), changed);
+        Assert.Equal("Continue", welcome.ContinueClientsLabel);
+        Assert.DoesNotContain("0", welcome.ContinueClientsLabel);
+        Assert.True(welcome.ContinueClientsCommand.CanExecute(null));
+        Loc.Instance.SetLanguage(Language.Es);
+        Assert.Equal("Continuar", welcome.ContinueClientsLabel);
+        Loc.Instance.SetLanguage(Language.En);
+    }
+
+    [AvaloniaFact]
+    public void ClientsStep_ContinueLabel_WithoutClientsFound()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var welcome = env.Main.Welcome!;
+        welcome.ContinueLanguageCommand.Execute(null);
+
+        Assert.True(welcome.NoClients);
+        Assert.Equal("Continue without clients", welcome.ContinueClientsLabel);
+    }
+
+    [AvaloniaFact]
     public void Back_IsUnavailableOnLanguageStep()
     {
         using var env = new Env();
@@ -421,6 +455,7 @@ public class WelcomeTests
         welcome.ContinueLanguageCommand.Execute(null);
         welcome.ContinueClientsCommand.Execute(null);
         Screenshots.Settle();
+        Assert.Equal("Imported servers", AutomationProperties.GetName(view.FindControl<ItemsControl>("ServerList")!));
         view.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Left, KeyModifiers = KeyModifiers.Alt });
         Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
         window.Close();

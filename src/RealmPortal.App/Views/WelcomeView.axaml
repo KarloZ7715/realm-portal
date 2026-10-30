@@ -127,7 +127,7 @@
             <StackPanel Spacing="6">
               <TextBlock Classes="sheet-title" Text="{loc:T welcome.servers.sheet}"/>
               <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
-              <ItemsControl ItemsSource="{Binding ServerItems}">
+              <ItemsControl Name="ServerList" ItemsSource="{Binding ServerItems}" AutomationProperties.Name="{loc:T welcome.servers.list}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:ServerItemViewModel">
                     <Border Padding="0,6">
