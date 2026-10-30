@@ -54,6 +54,7 @@ commit_parsers = [
   { message = "^feat", group = "<!-- 0 -->Added" },
   { message = "^(perf|refactor)", group = "<!-- 1 -->Changed" },
   { message = "^(packaging|docs)", group = "<!-- 1 -->Changed" },
+  { message = "^assets", group = "<!-- 1 -->Changed" },
   { message = "^[Ss]ecurity", group = "<!-- 3 -->Security" },
   { message = "^[Ff]eature", group = "<!-- 0 -->Added" },
   { message = "^fix", group = "<!-- 2 -->Fixed" },

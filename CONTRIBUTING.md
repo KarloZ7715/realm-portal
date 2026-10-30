@@ -58,8 +58,8 @@ conventional, and drop changes users do not see. Older sections are never regene
 add its entry before tagging, so the section covers everything up to the tagged commit. git-cliff dates the section with
 the UTC date of the moment it runs, not the tag date; check the date and change it to the tag's UTC date if they differ.
 
-The release notes for a version are its reviewed `CHANGELOG.md` section, generated with git-cliff as above. The maintainer
-reviews them when preparing the release.
+Use a version's reviewed `CHANGELOG.md` section, generated with git-cliff as above, as the notes of its GitHub release.
+Whoever prepares the release copies it there; nothing does it automatically.
 
 To write one version's section to a file:
 
