@@ -150,7 +150,8 @@ Core has a minisign verifier for `SHA256SUMS.minisig` (`RealmPortal.Core.Updates
   signed `SHA256SUMS` from being replayed. The release is signed with
   `minisign -S -m SHA256SUMS -t "realm-portal v1.2.0"`.
 - The parser is strict: four lines (LF or CRLF), canonical base64, a 16 KiB cap on the signature file, and nothing after
-  the global signature. Bad input gives a `SignatureStatus`, never an exception.
+  the global signature. Bad input gives a `SignatureStatus`, never an exception; only a null or empty expected trusted
+  comment (a caller bug) throws `ArgumentException`.
 - Ed25519 and BLAKE2b come from BouncyCastle (MIT), kept in one adapter (`BouncyCastleEd25519`).
 
 ### Download rules (all kinds)
