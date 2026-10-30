@@ -51,7 +51,14 @@ public sealed record ServerEntry(
     string? ClientId,
     bool IsActive,
     bool IsCompatible,
-    bool? ClearCacheOnSwitch = null);
+    bool? ClearCacheOnSwitch = null)
+{
+    /// <summary>
+    /// The realmlist lines after <c>set realmlist &lt;host&gt;</c> (today at most one <c>set patchlist &lt;value&gt;</c>), without
+    /// line endings; empty when there are none. Passing them back unchanged as <c>ExtraRealmlistLines</c> keeps the realmlist as is.
+    /// </summary>
+    public IReadOnlyList<string> ExtraRealmlistLines => Servers.RealmlistText.ExtraLines(Realmlist);
+}
 
 /// <summary>Data of a server to add by hand.</summary>
 /// <param name="Name">Display name.</param>

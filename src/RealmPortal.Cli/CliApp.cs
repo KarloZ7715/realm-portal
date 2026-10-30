@@ -25,7 +25,7 @@ public sealed class CliApp(
     private static readonly HashSet<string> ValueOptions =
         ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper", "--name", "--path", "--host", "--client", "--root"];
 
-    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose"];
+    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose", "--clear-lines"];
 
     private bool _verbose;
 
@@ -48,7 +48,7 @@ public sealed class CliApp(
           realm-portal client add <path> [--name <name>]
           realm-portal client edit <client> [--name <name>] [--path <path>]
           realm-portal client remove <client>
-          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
+          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--line <realmlist line>]... [--clear-lines] [--build <n|any>] [--account <name>] [--client <client|none>]
           realm-portal scan [--root <folder>]...
 
         Global options (before or after the command):
@@ -271,7 +271,11 @@ public sealed class CliApp(
 
     private int EditServer(Parsed parsed, PortalService service)
     {
-        Expect(parsed, 1, 1, "<server>");
+        Expect(parsed, 1, 1, "<server>", "--clear-lines");
+        var newLines = parsed.Options.GetValueOrDefault("--line");
+        var clearLines = parsed.Flags.Contains("--clear-lines");
+        if (clearLines && newLines is not null)
+            throw new UsageException("use either --line or --clear-lines, not both");
         if (FindServer(service, parsed.Positionals[0], out var server) != 0)
             return 2;
 
@@ -298,7 +302,8 @@ public sealed class CliApp(
                 clientId = selected.Id;
         }
 
-        var extraLines = server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+        // --line replaces every extra realmlist line, --clear-lines removes them; without either they are kept (#93, #192).
+        IReadOnlyList<string> extraLines = clearLines ? [] : newLines ?? server.ExtraRealmlistLines;
         var host = parsed.Get("--host") is { } hostRaw
             ? NormalizeHostArgument(hostRaw)
             : server.Host;
@@ -431,10 +436,18 @@ public sealed class CliApp(
             var build = server.RequiredClientBuild?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "any";
             SafeWriteLine(output,
                 $"{(server.IsActive ? "*" : " ")} {server.Id}  {server.Name}  {server.Host}  build={build}"
+                + string.Concat(server.ExtraRealmlistLines.Select(line => "  " + FormatExtraLine(line)))
                 + (server.IsCompatible ? "" : "  [incompatible]"));
         }
 
         return 0;
+    }
+
+    /// <summary>Shows a stored extra realmlist line such as <c>set patchlist patch.example.org</c> as <c>patchlist=patch.example.org</c>.</summary>
+    private static string FormatExtraLine(string line)
+    {
+        var parts = line.Split(' ', 3);
+        return parts is ["set", var key, var value] ? $"{key}={value}" : line;
     }
 
     private int SwitchCommand(Parsed parsed, PortalService service, string? clientId, string? clientDir)
