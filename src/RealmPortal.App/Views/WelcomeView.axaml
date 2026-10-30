@@ -156,6 +156,11 @@
         </StackPanel>
       </Button>
 
+      <!-- Finish/Skip could not save the preferences: stays until a retry succeeds. -->
+      <TextBlock Grid.Column="1" Name="SaveErrorText" Classes="footnote" Margin="12,0" VerticalAlignment="Center" HorizontalAlignment="Right"
+                 TextAlignment="Right" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
+                 IsVisible="{Binding HasSaveError}" Text="{Binding SaveErrorText}" AutomationProperties.LiveSetting="Assertive"/>
+
       <!-- Language -->
       <Button Grid.Column="2" Name="ContinueLanguageButton" Classes="primary" MinWidth="160" IsVisible="{Binding IsLanguageStep}"
               Command="{Binding ContinueLanguageCommand}">

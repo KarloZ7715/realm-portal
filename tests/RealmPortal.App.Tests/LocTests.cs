@@ -62,6 +62,8 @@ public partial class LocTests
             var backs = Loc.Load(language).Where(p => p.Key.EndsWith(".back", StringComparison.Ordinal)).ToList();
             Assert.Contains(backs, p => p.Key == "welcome.back");
             Assert.Contains(backs, p => p.Key == "about.back");
+            Assert.Contains(backs, p => p.Key == "backups.back");
+            Assert.Contains(backs, p => p.Key == "clients.edit.back");
             Assert.All(backs, pair => Assert.Equal(expected, pair.Value));
         }
     }

@@ -138,6 +138,13 @@ public sealed partial class WelcomeViewModel : ViewModelBase
 
     public bool IsServerFormOpen => ServerForm is not null;
 
+    /// <summary>Finish or Skip could not save the preferences; the welcome stays open so the user can retry.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SaveErrorText))]
+    private bool _hasSaveError;
+
+    public string SaveErrorText => HasSaveError ? Loc.Get("welcome.save.error") : string.Empty;
+
     /// <summary>The steps, body and footer are hidden while the add-server form is open.</summary>
     public bool IsStepVisible => ServerForm is null;
 
@@ -235,6 +242,7 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         OnPropertyChanged(nameof(EnglishBody));
         OnPropertyChanged(nameof(LanguageLabel));
         OnPropertyChanged(nameof(StepAnnouncement));
+        OnPropertyChanged(nameof(SaveErrorText));
         ServerForm?.RefreshText();
     }
 
@@ -457,8 +465,19 @@ public sealed partial class WelcomeViewModel : ViewModelBase
             ServerForm = null;
         }
 
-        var prefs = _session.UiPreferences.Load();
-        _session.UiPreferences.Save(prefs with { WelcomeCompleted = true });
+        try
+        {
+            var prefs = _session.UiPreferences.Load();
+            _session.UiPreferences.Save(prefs with { WelcomeCompleted = true });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Keep the welcome open: the user can fix the folder and press Finish or Skip again.
+            HasSaveError = true;
+            return;
+        }
+
+        HasSaveError = false;
         // Set after the save: if writing the preferences throws, Finish/Skip can be retried.
         _completed = true;
         _clients.FirstScanFoundNoClients -= IgnoreEmptyScanNavigation;

@@ -342,6 +342,7 @@
   "welcome.skip": "Omitir por ahora",
   "welcome.skip.hint": "Podrás completar la configuración más tarde desde la app.",
   "welcome.back": "Atrás",
+  "welcome.save.error": "No se pudieron guardar tus elecciones. Comprueba que se puede escribir en la carpeta de configuración y vuelve a intentarlo.",
   "welcome.status.language": "Primer arranque",
   "welcome.status.clients": "Detección de clientes",
   "welcome.status.noclients": "Sin clientes",

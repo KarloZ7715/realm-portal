@@ -342,6 +342,7 @@
   "welcome.skip": "Skip for now",
   "welcome.skip.hint": "You can finish setup later from the app.",
   "welcome.back": "Back",
+  "welcome.save.error": "Your choices could not be saved. Check that the settings folder can be written to, then try again.",
   "welcome.status.language": "First run",
   "welcome.status.clients": "Client detection",
   "welcome.status.noclients": "No clients",

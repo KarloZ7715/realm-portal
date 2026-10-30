@@ -526,6 +526,58 @@ public class WelcomeTests
     }
 
     [AvaloniaFact]
+    public void HeldEnter_ActsOncePerKeyPress()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (window, _) = ShowWelcome(env.Main);
+        var welcome = env.Main.Welcome!;
+
+        // Auto-repeat: two key-downs without a key-up advance one step only.
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+        Screenshots.Settle();
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+        Screenshots.Settle();
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
+        Assert.True(env.Main.IsWelcomeActive);
+
+        // After the key-up, the next press acts again.
+        window.KeyRelease(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+        Press(window, Key.Enter, PhysicalKey.Enter, "\r");
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        Assert.True(env.Main.IsWelcomeActive);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void FinishOrSkip_WhenPreferencesCannotBeSaved_ShowsNoticeAndStaysRetryable()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var welcome = env.Main.Welcome!;
+        welcome.ContinueLanguageCommand.Execute(null);
+        welcome.ContinueClientsCommand.Execute(null);
+
+        // A directory where ui-preferences.json should be makes the save fail with an I/O error.
+        var prefsPath = Path.Combine(env.Config, "ui-preferences.json");
+        File.Delete(prefsPath);
+        Directory.CreateDirectory(prefsPath);
+
+        welcome.FinishCommand.Execute(null);
+        Assert.True(env.Main.IsWelcomeActive);
+        Assert.True(welcome.HasSaveError);
+        Assert.Equal("Your choices could not be saved. Check that the settings folder can be written to, then try again.", welcome.SaveErrorText);
+        welcome.SkipCommand.Execute(null);
+        Assert.True(env.Main.IsWelcomeActive);
+        Assert.True(welcome.HasSaveError);
+
+        // Fixed: the retry completes the welcome.
+        Directory.Delete(prefsPath);
+        welcome.FinishCommand.Execute(null);
+        Assert.False(welcome.HasSaveError);
+        Assert.False(env.Main.IsWelcomeActive);
+        Assert.True(env.Session.UiPreferences.Load().WelcomeCompleted);
+    }
+
+    [AvaloniaFact]
     public void Enter_OnLanguageCard_PicksItAndContinues()
     {
         using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);

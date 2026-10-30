@@ -19,12 +19,20 @@ public partial class WelcomeView : UserControl
 
     private WelcomeViewModel? _viewModel;
 
+    /// <summary>True from an Enter press the welcome acted on until its key-up: auto-repeat must not run through the steps.</summary>
+    private bool _enterHeld;
+
     public WelcomeView()
     {
         InitializeComponent();
         KeyDown += OnKeyDown;
         // Tunnel: decide about Enter before a focused checkbox or language card handles it.
         AddHandler(KeyDownEvent, OnPreviewEnter, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+                _enterHeld = false;
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
         SizeChanged += (_, e) => ApplyMargins(e.NewSize.Width);
         Loaded += (_, _) => FocusStep();
     }
@@ -130,6 +138,14 @@ public partial class WelcomeView : UserControl
         var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
         if (focused is TextBox)
             return;
+        if (_enterHeld)
+        {
+            // Auto-repeat of a held Enter: one action per key press.
+            e.Handled = true;
+            return;
+        }
+
+        _enterHeld = true;
         if (focused == SpanishCard)
             vm.SelectSpanishCommand.Execute(null);
         else if (focused == EnglishCard)
