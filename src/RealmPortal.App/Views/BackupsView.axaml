@@ -10,20 +10,19 @@
     <Style Selector="Button"><Setter Property="c:ButtonSurface.Surface" Value="Parchment"/></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="20,10,20,0">
-    <Grid ColumnDefinitions="Auto,*" Height="44">
-      <Button Name="BackButton" Classes="link caps" AutomationProperties.Name="{loc:T backups.back}" Command="{Binding BackCommand}">
+    <!-- Back + title on the 44 px row, subtitle under the title (shared sheet-subtitle spacing, #200). -->
+    <Grid ColumnDefinitions="Auto,*" RowDefinitions="44,Auto" ColumnSpacing="16">
+      <Button Name="BackButton" VerticalAlignment="Center" Classes="link caps" AutomationProperties.Name="{loc:T backups.back}" Command="{Binding BackCommand}">
         <StackPanel Orientation="Horizontal" Spacing="10">
           <c:Icon Data="{DynamicResource IconChevronLeft}" Width="12" Height="12" StrokeThickness="2.6"/>
           <TextBlock Text="{loc:T backups.back}"/>
         </StackPanel>
       </Button>
-      <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" Margin="16,0,0,0">
-        <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Text="{loc:T backups.title}"/>
-        <TextBlock Classes="footnote" Foreground="{DynamicResource BoneSoftBrush}" Text="{loc:T backups.subtitle}"/>
-      </StackPanel>
+      <TextBlock Grid.Column="1" Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T backups.title}"/>
+      <TextBlock Grid.Row="1" Grid.Column="1" Name="Subtitle" Classes="sheet-subtitle" Text="{loc:T backups.subtitle}"/>
     </Grid>
 
-    <ContentControl Grid.Row="1" Classes="card thin" Padding="16,12" Margin="0,6,0,8">
+    <ContentControl Grid.Row="1" Name="ClientCard" Classes="card thin" Padding="16,12" Margin="0,0,0,8">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <StackPanel Spacing="4">
           <TextBlock Classes="body-bold" Foreground="{DynamicResource InkBrush}" Text="{loc:T backups.client}"/>
