@@ -79,11 +79,16 @@ public interface IClientFilesApplier
     InstallationLock AcquireInstallationLock(string installationId);
 
     /// <summary>
-    /// Undoes the most recent applied change of the installation that has not been undone yet. Files whose current
-    /// content is not what the apply wrote are reported as conflicts and never overwritten.
+    /// Read-only: true when <paramref name="backupId"/> is still pending for the installation and every one of its files
+    /// is either in the state that backup's apply wrote or already back to its original bytes, so
+    /// <see cref="Undo"/> would restore it without a conflict. Nothing is written. Never throws for an unreadable or
+    /// corrupt backup manifest, an unreadable client file or a backup of another client folder; it returns false.
     /// </summary>
+    bool CanUndoWithoutConflict(string installationId, string clientRoot, string backupId);
+
     /// <summary>
     /// Undoes a specific pending backup (or the newest pending one when <paramref name="backupId"/> is null).
+    /// Files whose current content is not what the apply wrote are reported as conflicts and never overwritten.
     /// <paramref name="clientRoot"/> is the trusted client folder from <see cref="Clients.ClientStore"/> (must match the backup manifest).
     /// When <paramref name="markUndone"/> is false, restored files stay pending in the manifest until <see cref="MarkBackupUndone"/>.
     /// </summary>
