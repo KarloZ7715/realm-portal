@@ -40,6 +40,27 @@ reads the assembly informational version (without the `+<commit>` suffix), so a 
 tag that does not match `Directory.Build.props` fails the release run. Bump `<Version>` in a PR before tagging a release.
 `AppInfoTests` checks that the app and CLI report the props version.
 
+## Changelog
+
+[`CHANGELOG.md`](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Entries come from the
+Conventional Commit subjects of merged PRs: `feat` goes to Added; `perf`, `refactor` and `packaging` to Changed; `fix` to Fixed;
+`docs` to Documentation. `chore`, `ci`, `test`, `build`, `style` and release-pipeline fixes are left out. These rules live in
+[`cliff.toml`](cliff.toml) for [git-cliff](https://git-cliff.org) (tested with 2.14.2; install it only if you prepare a release).
+
+In the PR that bumps `<Version>`, add the new section:
+
+```bash
+git cliff --unreleased --tag v1.2.0 --prepend CHANGELOG.md
+```
+
+Then review it: reword entries for users, move security fixes to Security, add changes whose commit subject is not
+conventional, and drop changes users do not see. Older sections are never regenerated. Use the reviewed section as the body
+of the GitHub release:
+
+```bash
+awk '/^## \[1\.2\.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md
+```
+
 ## Command line
 
 `src/RealmPortal.Cli` builds the `realm-portal` command-line tool. Run it from source with

@@ -1,0 +1,59 @@
+# git-cliff configuration for CHANGELOG.md (https://git-cliff.org).
+# Draft the section for a new release, then review it before tagging:
+#   git cliff --unreleased --tag v1.2.0 --prepend CHANGELOG.md
+# See "Changelog" in CONTRIBUTING.md.
+
+[changelog]
+header = """
+# Changelog
+
+<!-- markdownlint-configure-file { "MD024": { "siblings_only": true } } -->
+
+All notable changes to Realm Portal are listed here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+body = """
+{% if version -%}
+{% if previous.version -%}
+## [{{ version | trim_start_matches(pat="v") }}](https://github.com/KarloZ7715/realm-portal/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [{{ version | trim_start_matches(pat="v") }}](https://github.com/KarloZ7715/realm-portal/releases/tag/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+{% endif -%}
+{% else -%}
+## [Unreleased](https://github.com/KarloZ7715/realm-portal/compare/{{ previous.version }}...HEAD)
+{% endif -%}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+
+{% for commit in commits -%}
+- {{ commit.message | split(pat="\n") | first | upper_first | trim }}
+{% endfor -%}
+{% endfor %}
+
+"""
+footer = ""
+trim = true
+postprocessors = [
+  { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/KarloZ7715/realm-portal/issues/${1}))" },
+]
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+sort_commits = "oldest"
+commit_parsers = [
+  { message = "^Merge ", skip = true },
+  { message = "^fix\\((release|ci)\\)", skip = true },
+  { message = "^feat", group = "<!-- 0 -->Added" },
+  { message = "^(perf|refactor)", group = "<!-- 1 -->Changed" },
+  { message = "^packaging", group = "<!-- 1 -->Changed" },
+  { message = "^fix", group = "<!-- 2 -->Fixed" },
+  { message = "^docs", group = "<!-- 4 -->Documentation" },
+  { message = "^(chore|ci|test|build|style)", skip = true },
+]
