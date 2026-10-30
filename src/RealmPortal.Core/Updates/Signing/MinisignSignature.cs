@@ -17,9 +17,14 @@ internal sealed class MinisignSignature
     public const int MaxFileBytes = 16 * 1024;
     public const int SignatureLength = 64;
 
-    // Same limits as minisign itself (COMMENT_MAXBYTES, TRUSTEDCOMMENT_MAXBYTES).
-    private const int MaxUntrustedCommentBytes = 1024;
-    private const int MaxTrustedCommentBytes = 8192;
+    // Longest comment text (after its prefix) that minisign 0.12 reads. It reads each line with fgets into a fixed buffer
+    // that must also hold the prefix, the LF and the NUL: 1024 bytes for the untrusted comment line (COMMENTMAXBYTES) and
+    // 8192 for the trusted one (TRUSTEDCOMMENTMAXBYTES). Writing is tighter: `minisign -S` fails above 4077 bytes of
+    // trusted comment (4096-byte output buffer), and for an untrusted comment above 1003 bytes it only warns, then cannot
+    // verify its own file. With CRLF line endings minisign's limits are one byte lower; this parser does not try to match
+    // that.
+    internal const int MaxUntrustedCommentBytes = 1024 - 19 - 2; // 1003
+    internal const int MaxTrustedCommentBytes = 8192 - 17 - 2; // 8173
 
     private const string UntrustedPrefix = "untrusted comment: ";
     private const string TrustedPrefix = "trusted comment: ";

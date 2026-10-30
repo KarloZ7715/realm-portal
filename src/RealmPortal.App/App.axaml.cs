@@ -26,6 +26,7 @@ public partial class App : Application
                 : desktop.Args?.Contains("--demo") == true
                     ? new MainWindow(MainViewModel.ForDemo())
                     : CreatePortalWindow();
+            Platform.InstanceActivation.Attach(desktop.MainWindow);
         }
 
         base.OnFrameworkInitializationCompleted();

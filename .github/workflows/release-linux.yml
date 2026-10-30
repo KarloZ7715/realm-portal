@@ -41,6 +41,10 @@ env:
   # AppImageKit release 13 ships appimagetool under the obsolete-* asset names.
   APPIMAGETOOL_VERSION: "13"
   APPIMAGETOOL_SHA256: "df3baf5ca5facbecfc2f3fa6713c29ab9cefa8fd8c1eac5d283b79cab33e4acb"
+  # minisign 0.12 for the sign-and-publish test. SHA256 of minisign-0.12-linux.tar.gz, whose minisign signature was
+  # checked against the upstream key RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3.
+  MINISIGN_VERSION: "0.12"
+  MINISIGN_SHA256: "9a599b48ba6eb7b1e80f12f36b94ceca7c00b7a5173c95c3efc88d9822957e73"
 
 jobs:
   linux-packages:
@@ -68,6 +72,23 @@ jobs:
 
       - name: Test license collection
         run: packaging/test-collect-licenses.sh
+
+      - name: Install minisign (pinned release, checksum verified)
+        run: |
+          set -euo pipefail
+          archive="minisign-${MINISIGN_VERSION}-linux.tar.gz"
+          curl -sSfL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/jedisct1/minisign/releases/download/${MINISIGN_VERSION}/${archive}"
+          echo "${MINISIGN_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/minisign-bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" minisign-linux/x86_64/minisign
+          install -m 755 "$RUNNER_TEMP/minisign-linux/x86_64/minisign" "$RUNNER_TEMP/minisign-bin/minisign"
+          echo "$RUNNER_TEMP/minisign-bin" >> "$GITHUB_PATH"
+
+      - name: Test sign-and-publish script
+        run: |
+          minisign -v
+          packaging/test-sign-and-publish.sh
 
       - name: Resolve package version
         id: version
@@ -227,11 +248,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Tag-only: create a draft GitHub Release, upload packages + SHA256SUMS, verify, then publish.
+  # Tag-only: create a draft GitHub Release, upload packages + SHA256SUMS and verify them, then stop. The release is
+  # signed and published by hand with packaging/sign-and-publish.sh (#116): the signing key never touches GitHub.
   # rc tags (vX.Y.Z-rc.N) are published with --prerelease --latest=false so /releases/latest
   # (and the in-app update check) never offers them unless a future opt-in is added.
-  publish:
-    name: publish GitHub release
+  draft-release:
+    name: draft GitHub release
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: [linux-packages, windows-package]
     runs-on: ubuntu-22.04
@@ -300,6 +322,7 @@ jobs:
       - name: Create or reuse draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -309,18 +332,21 @@ jobs:
               exit 1
             fi
             echo "Reusing existing draft release ${TAG}"
-            # Drop previous assets so re-runs are idempotent
+            # Drop previous assets so re-runs are idempotent. This also drops a SHA256SUMS.minisig from an earlier
+            # signing run, which would not match the rebuilt SHA256SUMS anyway.
             mapfile -t names < <(gh release view "$TAG" --json assets -q '.assets[].name')
             for name in "${names[@]+"${names[@]}"}"; do
               [[ -n "$name" ]] || continue
               gh release delete-asset "$TAG" "$name" --yes
             done
+            gh release edit "$TAG" --prerelease="$IS_PRERELEASE"
           else
             title="Realm Portal ${PACKAGE_VERSION}"
             gh release create "$TAG" \
               --draft \
               --verify-tag \
               --generate-notes \
+              --prerelease="$IS_PRERELEASE" \
               --title "$title"
             echo "Created draft release ${TAG}"
           fi
@@ -438,101 +464,36 @@ jobs:
             fi
             echo "ok: ${name} size=${local_size} url=${browser_url}"
           done < artifacts/release/SHA256SUMS
-          echo "ok: draft asset digests/sizes/names verified (final URL shape checked after publish)"
+          [[ "$(jq -r '.prerelease' <<<"$release_json")" == "$IS_PRERELEASE" ]] || {
+            echo "::error::Draft prerelease flag does not match the tag (want ${IS_PRERELEASE})"
+            exit 1
+          }
+          echo "ok: draft asset digests/sizes/names verified (sign-and-publish.sh checks the final URLs after publishing)"
 
-      - name: Publish release
+      - name: Next step (manual signing and publishing)
         env:
-          GH_TOKEN: ${{ github.token }}
           IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
         run: |
           set -euo pipefail
-          if [[ "$IS_PRERELEASE" == "true" ]]; then
-            gh release edit "$TAG" --draft=false --prerelease --latest=false
-            echo "Published ${TAG} as prerelease (not latest)"
-          else
-            gh release edit "$TAG" --draft=false --latest=true
-            echo "Published ${TAG} as latest"
-          fi
-
-      - name: Verify published download URLs
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DEB_VERSION: ${{ steps.assets.outputs.deb_version }}
-          IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
-        run: |
-          set -euo pipefail
-          ver="$PACKAGE_VERSION"
-          deb_ver="$DEB_VERSION"
-          owner_repo="${GITHUB_REPOSITORY}"
-          # After publish, GET .../releases/tags/{tag} returns the release (including assets).
-          if ! release_json="$(gh api "repos/${owner_repo}/releases/tags/${TAG}")"; then
-            echo "::error::Failed to fetch published release ${TAG}; reverting to draft"
-            gh release edit "$TAG" --draft=true || true
-            exit 1
-          fi
-          draft="$(jq -r '.draft' <<<"$release_json")"
-          if [[ "$draft" != "false" ]]; then
-            echo "::error::Release ${TAG} is still draft after publish; reverting to draft"
-            gh release edit "$TAG" --draft=true || true
-            exit 1
-          fi
-          expected=(
-            "realm-portal_${deb_ver}_amd64.deb"
-            "RealmPortal-${ver}-x86_64.AppImage"
-            "RealmPortal-${ver}-win-x64.zip"
-            "SHA256SUMS"
-          )
-          for name in "${expected[@]}"; do
-            browser_url="$(jq -r --arg n "$name" '.assets[] | select(.name==$n) | .browser_download_url' <<<"$release_json")"
-            [[ -n "$browser_url" && "$browser_url" != "null" ]] || {
-              echo "::error::Missing published asset ${name}"
-              gh release edit "$TAG" --draft=true
-              exit 1
-            }
-            expect_url="https://github.com/${owner_repo}/releases/download/${TAG}/${name}"
-            [[ "$browser_url" == "$expect_url" ]] || {
-              echo "::error::Published browser_download_url mismatch for ${name}: got ${browser_url} want ${expect_url}"
-              gh release edit "$TAG" --draft=true
-              exit 1
-            }
-            if [[ "$name" == *"~"* ]]; then
-              [[ "$browser_url" == *"~"* ]] || {
-                echo "::error::GitHub renamed tilde out of published ${name}"
-                gh release edit "$TAG" --draft=true
-                exit 1
-              }
-            fi
-            echo "ok: published ${name} url=${browser_url}"
-          done
-
-          if [[ "$IS_PRERELEASE" != "true" ]]; then
-            for kind_name in \
-              "realm-portal_${ver}_amd64.deb" \
-              "RealmPortal-${ver}-x86_64.AppImage" \
-              "RealmPortal-${ver}-win-x64.zip"; do
-              expect_url="https://github.com/${owner_repo}/releases/download/v${ver}/${kind_name}"
-              browser_url="$(jq -r --arg n "$kind_name" '.assets[] | select(.name==$n) | .browser_download_url' <<<"$release_json")"
-              [[ "$browser_url" == "$expect_url" ]] || {
-                echo "::error::Updater URL shape mismatch after publish: ${browser_url} != ${expect_url}"
-                gh release edit "$TAG" --draft=true
-                exit 1
-              }
+          {
+            echo "### Draft ${TAG} is ready to sign"
+            echo
+            echo "CI stops at the draft. On the maintainer's machine, with the release key:"
+            echo
+            echo '```'
+            echo "packaging/sign-and-publish.sh --key <path to minisign.key> ${TAG}"
+            echo '```'
+            echo
+            echo "It prints the draft's assets, asks for the tag, signs SHA256SUMS, uploads SHA256SUMS.minisig, verifies it"
+            echo "and publishes (prerelease: ${IS_PRERELEASE}). See docs/linux-packaging.md."
+            echo
+            echo "Assets this run built and uploaded (the script's table must show the same values):"
+            echo
+            echo "| Asset | Size (bytes) | SHA-256 |"
+            echo "| --- | ---: | --- |"
+            for path in artifacts/release/*; do
+              name="$(basename "$path")"
+              echo "| \`${name}\` | $(stat -c %s "$path") | \`$(sha256sum "$path" | cut -d' ' -f1)\` |"
             done
-            echo "ok: stable updater URL shapes after publish"
-          else
-            echo "ok: prerelease — updater ignores via GitHub prerelease flag (/releases/latest)"
-          fi
-
-      - name: Require immutable releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # Immutable releases must be enabled so assets cannot be swapped after publish (docs/updates-and-status.md).
-          immutable="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.immutable')"
-          if [[ "$immutable" != "true" ]]; then
-            echo "::error::Release ${TAG} is not immutable; reverting to draft. Enable immutable releases for the repository."
-            gh release edit "$TAG" --draft=true
-            exit 1
-          fi
-          echo "ok: release is immutable"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Draft ${TAG} left unpublished; run packaging/sign-and-publish.sh to sign and publish it."
