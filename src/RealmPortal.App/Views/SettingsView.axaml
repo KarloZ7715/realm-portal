@@ -11,8 +11,10 @@
       <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T nav.settings}"/>
     </Grid>
 
-    <ScrollViewer Grid.Row="1" Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,6,14,12">
-      <StackPanel Spacing="18">
+    <ScrollViewer Grid.Row="1" Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <!-- Space around the cards is a margin on the content: ScrollViewer.Padding is not counted in the scroll extent,
+           so the last card ended up partly hidden behind the bottom edge (#198). -->
+      <StackPanel Name="ScrollContent" Spacing="18" Margin="0,6,14,12">
         <!-- Language -->
         <ContentControl Classes="card thin" Padding="22,12,22,14">
           <StackPanel Spacing="8">

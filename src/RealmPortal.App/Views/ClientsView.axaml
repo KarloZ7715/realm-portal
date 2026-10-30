@@ -16,12 +16,12 @@
           </StackPanel>
         </Button>
       </Grid>
-      <TextBlock Classes="body-sm" FontSize="14" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,2,0,14" Text="{Binding Summary}"/>
+      <TextBlock Name="Subtitle" Classes="sheet-subtitle" Text="{Binding Summary}"/>
       <TextBlock Name="ScanNotice" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,0,0,12"
                  Text="{Binding Notice}" IsVisible="{Binding HasNotice}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
 
       <!-- The sheet is drawn with the parchment tile art, so it grows with the list. -->
-      <ContentControl Classes="card" Padding="22,14,22,6" Margin="0,0,0,0">
+      <ContentControl Name="ClientsSheet" Classes="card" Padding="22,14,22,6" Margin="0,0,0,0">
         <StackPanel>
           <TextBlock Classes="sheet-title" Text="{loc:T clients.sheet}" Margin="0,2,0,8"/>
           <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,0,0,2"/>

@@ -188,6 +188,12 @@
   <Style Selector="TextBlock.menu-title"><Setter Property="FontFamily" Value="{DynamicResource FontBodyMedium}"/><Setter Property="FontSize" Value="16"/></Style>
   <Style Selector="TextBlock.menu-hint"><Setter Property="FontFamily" Value="{DynamicResource FontBody}"/><Setter Property="FontSize" Value="13"/><Setter Property="Opacity" Value="0.8"/></Style>
   <Style Selector="MenuItem.two-line"><Setter Property="MinHeight" Value="52"/></Style>
+  <!-- Read-only explanation row at the end of a menu: not focusable or clickable, no hover; text lines up with the item titles. -->
+  <Style Selector="MenuItem.note">
+    <Setter Property="MinHeight" Value="0"/><Setter Property="Padding" Value="10,2,10,6"/><Setter Property="Cursor" Value="Arrow"/>
+    <Setter Property="Focusable" Value="False"/><Setter Property="IsHitTestVisible" Value="False"/>
+  </Style>
+  <Style Selector="MenuItem.note:disabled"><Setter Property="Opacity" Value="1"/></Style>
   <Style Selector="Separator">
     <Setter Property="Height" Value="1"/><Setter Property="Margin" Value="8,2"/><Setter Property="Background" Value="#33000000"/>
   </Style>
