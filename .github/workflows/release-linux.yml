@@ -469,6 +469,7 @@ jobs:
             exit 1
           }
           echo "ok: draft asset digests/sizes/names verified (sign-and-publish.sh checks the final URLs after publishing)"
+
       - name: Next step (manual signing and publishing)
         env:
           IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
@@ -483,7 +484,16 @@ jobs:
             echo "packaging/sign-and-publish.sh --key <path to minisign.key> ${TAG}"
             echo '```'
             echo
-            echo "It signs SHA256SUMS, uploads SHA256SUMS.minisig, verifies it and publishes (prerelease: ${IS_PRERELEASE})."
-            echo "See docs/linux-packaging.md."
+            echo "It prints the draft's assets, asks for the tag, signs SHA256SUMS, uploads SHA256SUMS.minisig, verifies it"
+            echo "and publishes (prerelease: ${IS_PRERELEASE}). See docs/linux-packaging.md."
+            echo
+            echo "Assets this run built and uploaded (the script's table must show the same values):"
+            echo
+            echo "| Asset | Size (bytes) | SHA-256 |"
+            echo "| --- | ---: | --- |"
+            for path in artifacts/release/*; do
+              name="$(basename "$path")"
+              echo "| \`${name}\` | $(stat -c %s "$path") | \`$(sha256sum "$path" | cut -d' ' -f1)\` |"
+            done
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Draft ${TAG} left unpublished; run packaging/sign-and-publish.sh to sign and publish it."
