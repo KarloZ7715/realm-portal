@@ -258,10 +258,31 @@ public class MinisignVerifierTests
         Assert.Equal(SignatureStatus.TooLarge, Verify([KeyA], bigContent, Read("SHA256SUMS.a.minisig"), Tag));
     }
 
-    [Fact]
-    public void MissingExpectedComment_IsACallerBug()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void MissingExpectedComment_IsACallerBug(string? expected)
     {
-        Assert.Throws<ArgumentException>(() => Verify([KeyA], Sums, Read("SHA256SUMS.a.minisig"), ""));
+        var ex = Assert.Throws<ArgumentException>(() => Verify([KeyA], Sums, Read("SHA256SUMS.a.minisig"), expected!));
+        Assert.Equal("expectedTrustedComment", ex.ParamName);
+
+        // Also through the interface, and before any key or input check.
+        IReleaseSignatureVerifier none = new MinisignVerifier([]);
+        Assert.Throws<ArgumentException>(() => none.Verify([], [], expected!));
+    }
+
+    [Fact]
+    public void LongestCommentsMinisignWrites_AreAccepted()
+    {
+        // minisign 0.12 reads untrusted comments up to 1003 bytes and writes trusted comments up to 4077 bytes.
+        var lines = Lines(Read("SHA256SUMS.a.minisig"));
+        lines[0] = "untrusted comment: " + new string('u', 1003);
+        Assert.Equal(SignatureStatus.Valid, Verify([KeyA], Sums, Join(lines), Tag));
+
+        lines = Lines(Read("SHA256SUMS.a.minisig"));
+        lines[2] = "trusted comment: " + new string('t', 4077);
+        // Parsed (not Malformed); it fails only because the edited comment no longer matches the global signature.
+        Assert.Equal(SignatureStatus.BadTrustedComment, Verify([KeyA], Sums, Join(lines), Tag));
     }
 
     [Theory]

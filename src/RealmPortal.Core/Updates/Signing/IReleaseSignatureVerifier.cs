@@ -2,7 +2,9 @@ namespace RealmPortal.Core.Updates.Signing;
 
 /// <summary>
 /// Checks the detached signature of a release's <c>SHA256SUMS</c> against the keys built into the app (#116).
-/// Implementations never throw for bad input; every failure is reported as a <see cref="SignatureStatus"/>.
+/// A bad, damaged or hostile signature or content is reported as a <see cref="SignatureStatus"/>, never as an exception.
+/// Only caller mistakes throw: a null or empty <c>expectedTrustedComment</c> throws
+/// <see cref="ArgumentException"/>.
 /// </summary>
 public interface IReleaseSignatureVerifier
 {
@@ -11,6 +13,7 @@ public interface IReleaseSignatureVerifier
     /// <param name="expectedTrustedComment">
     /// The trusted comment the release must carry, from <see cref="ReleaseSignature.TrustedCommentFor(string)"/>.
     /// </param>
+    /// <exception cref="ArgumentException"><paramref name="expectedTrustedComment"/> is null or empty.</exception>
     SignatureStatus Verify(
         ReadOnlySpan<byte> signedContent,
         ReadOnlySpan<byte> signatureFile,

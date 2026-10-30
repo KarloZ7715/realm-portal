@@ -17,7 +17,11 @@ internal sealed class MinisignSignature
     public const int MaxFileBytes = 16 * 1024;
     public const int SignatureLength = 64;
 
-    // Same limits as minisign itself (COMMENT_MAXBYTES, TRUSTEDCOMMENT_MAXBYTES).
+    // Upper bounds on the comment text after its prefix. They are looser than minisign 0.12, which counts the prefix and
+    // line ending inside fixed buffers: it reads untrusted comments of at most 1003 bytes (1024-byte line buffer) and
+    // trusted comments of at most 8173 (8192), and `minisign -S` writes trusted comments of at most 4077 bytes (4096-byte
+    // output buffer). Anything minisign produces fits here; the extra room only accepts hand-made files, whose trusted
+    // comment is still covered by the global signature.
     private const int MaxUntrustedCommentBytes = 1024;
     private const int MaxTrustedCommentBytes = 8192;
 
