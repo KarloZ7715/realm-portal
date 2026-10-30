@@ -32,6 +32,8 @@ public sealed class MinisignVerifier : IReleaseSignatureVerifier
     /// <summary>A verifier for the keys built into this app (<see cref="ReleaseSigningKeys.Trusted"/>).</summary>
     public static MinisignVerifier ForRelease() => new(ReleaseSigningKeys.Trusted);
 
+    /// <inheritdoc />
+    /// <exception cref="ArgumentException"><paramref name="expectedTrustedComment"/> is null or empty.</exception>
     public SignatureStatus Verify(
         ReadOnlySpan<byte> signedContent,
         ReadOnlySpan<byte> signatureFile,

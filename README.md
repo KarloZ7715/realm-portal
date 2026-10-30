@@ -91,6 +91,10 @@ Realm Portal does not send telemetry. The only network connections it makes are 
 - It supports **private servers only**.
 - It writes only the client's managed realm files (`realmlist.wtf` where the client version uses it, and `WTF/Config.wtf`); other game files are left untouched.
 
+## Help
+
+Common problems and their fixes are on the [FAQ and troubleshooting](docs/faq.md) page. To report a bug, use the [bug report form](https://github.com/KarloZ7715/realm-portal/issues/new?template=bug_report.yml).
+
 ## Build and development
 
 Prefer the terminal? The command-line tool is documented in [docs/cli.md](docs/cli.md). Build instructions, tests and the project layout are in [CONTRIBUTING.md](CONTRIBUTING.md).
