@@ -20,8 +20,10 @@ internal sealed class MinisignSignature
     // Upper bounds on the comment text after its prefix. They are looser than minisign 0.12, which counts the prefix and
     // line ending inside fixed buffers: it reads untrusted comments of at most 1003 bytes (1024-byte line buffer) and
     // trusted comments of at most 8173 (8192), and `minisign -S` writes trusted comments of at most 4077 bytes (4096-byte
-    // output buffer). Anything minisign produces fits here; the extra room only accepts hand-made files, whose trusted
-    // comment is still covered by the global signature.
+    // output buffer). `minisign -S -c` only warns about a longer untrusted comment and writes it anyway; minisign then
+    // refuses to verify that file above 1003 bytes, and this parser refuses it above 1024. Every trusted comment minisign
+    // writes fits here. The extra room only lets hand-made files parse, and their trusted comment is still covered by the
+    // global signature.
     private const int MaxUntrustedCommentBytes = 1024;
     private const int MaxTrustedCommentBytes = 8192;
 
