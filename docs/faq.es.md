@@ -68,7 +68,7 @@ La solución más sencilla es poner una copia del cliente en una carpeta tuya, c
 
 ## Deshacer un cambio de servidor
 
-Cada cambio hace antes una copia de respaldo de `realmlist.wtf` y `WTF/Config.wtf` del cliente.
+Antes de que un cambio modifique `realmlist.wtf` o `WTF/Config.wtf` del cliente, Realm Portal respalda los archivos que va a cambiar. Un cambio que no modifica nada no crea respaldo.
 
 - **Último cambio**: elige **Deshacer** en el aviso que aparece tras un cambio, o **Deshacer último cambio** arriba en **Servidores**. Ese botón sigue disponible aunque cierres y vuelvas a abrir la app, hasta que no quede nada por deshacer. Deshacer solo retrocede un paso.
 - **Respaldos anteriores**: en **Ajustes → Copia de respaldo**, elige **Gestionar respaldos…** y luego **Restaurar** en el respaldo que quieras. Por defecto, Realm Portal guarda los 10 respaldos más recientes de cada cliente.

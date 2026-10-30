@@ -68,7 +68,7 @@ The simplest fix is to put a copy of the client in a folder you own, such as `~/
 
 ## Undoing a switch
 
-Every switch makes a backup of the client's `realmlist.wtf` and `WTF/Config.wtf` first.
+Before a switch changes the client's `realmlist.wtf` or `WTF/Config.wtf`, Realm Portal backs up the files it is about to change. A switch that changes nothing makes no backup.
 
 - **Last switch**: choose **Undo** in the notice that appears after a switch, or **Undo last switch** at the top of **Servers**. That button stays available after you close and reopen the app, until there is nothing left to undo. Undo goes back one step only.
 - **Older backups**: in **Settings → Backup**, choose **Manage backups…**, then **Restore** on the backup you want. By default, Realm Portal keeps the 10 most recent backups per client.
