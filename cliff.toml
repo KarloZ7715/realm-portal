@@ -44,7 +44,7 @@ conventional_commits = true
 filter_unconventional = true
 split_commits = false
 protect_breaking_commits = true
-filter_commits = false
+filter_commits = true
 # Stable tags only. Changes first shipped in an -rc tag are listed under the final version.
 tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
 sort_commits = "oldest"
@@ -54,6 +54,8 @@ commit_parsers = [
   { message = "^feat", group = "<!-- 0 -->Added" },
   { message = "^(perf|refactor)", group = "<!-- 1 -->Changed" },
   { message = "^(packaging|docs)", group = "<!-- 1 -->Changed" },
+  { message = "^[Ss]ecurity", group = "<!-- 3 -->Security" },
+  { message = "^[Ff]eature", group = "<!-- 0 -->Added" },
   { message = "^fix", group = "<!-- 2 -->Fixed" },
   { message = "^(chore|ci|test|build|style)", skip = true },
 ]
