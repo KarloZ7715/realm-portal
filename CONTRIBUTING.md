@@ -139,7 +139,8 @@ Copy it to `.github/workflows/dependabot-lockfiles.yml` (requires a GitHub crede
 ## Secret scanning (gitleaks)
 
 Never commit credentials, tokens, private keys or `.env` files. CI scans the full git
-history with [gitleaks](https://github.com/gitleaks/gitleaks); you can catch leaks earlier
+history of the commit under test (for a PR, its merge with `main`; other branches are not
+scanned) with [gitleaks](https://github.com/gitleaks/gitleaks); you can catch leaks earlier
 by enabling the pre-commit hook:
 
 ```bash
