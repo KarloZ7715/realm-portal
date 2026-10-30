@@ -29,7 +29,7 @@ All notable changes to Realm Portal are listed here. The format follows
 
 ### Fixed
 
-- A restored window keeps its title bar and borders on screen, and a damaged saved window position no longer drops the other preferences ([#172](https://github.com/KarloZ7715/realm-portal/issues/172))
+- A maximized window no longer saves an offset position, a restored window keeps its title bar and borders on screen, and a damaged saved window position no longer drops the other preferences ([#172](https://github.com/KarloZ7715/realm-portal/issues/172))
 - CLI: `undo --client-dir` undoes that client's last switch ([#176](https://github.com/KarloZ7715/realm-portal/issues/176))
 - CLI: the undo notice prints its lines instead of an escaped newline ([#153](https://github.com/KarloZ7715/realm-portal/issues/153))
 - CLI: control characters in error messages are escaped, so they cannot add lines to the terminal output ([#167](https://github.com/KarloZ7715/realm-portal/issues/167))
@@ -50,7 +50,7 @@ All notable changes to Realm Portal are listed here. The format follows
 
 - The release packages include the license texts of every bundled third-party component, including the .NET runtime ([#126](https://github.com/KarloZ7715/realm-portal/issues/126), [#138](https://github.com/KarloZ7715/realm-portal/issues/138))
 - README install steps, a current screenshot and a CLI reference in `docs/cli.md` ([#110](https://github.com/KarloZ7715/realm-portal/issues/110), [#128](https://github.com/KarloZ7715/realm-portal/issues/128))
-- Personal example paths and names replaced with neutral placeholders ([#109](https://github.com/KarloZ7715/realm-portal/issues/109), [#144](https://github.com/KarloZ7715/realm-portal/issues/144))
+- Personal example paths and names replaced with neutral placeholders, and a private design link removed ([#109](https://github.com/KarloZ7715/realm-portal/issues/109), [#144](https://github.com/KarloZ7715/realm-portal/issues/144))
 
 ### Fixed
 
@@ -69,7 +69,7 @@ All notable changes to Realm Portal are listed here. The format follows
 
 ## [1.0.0](https://github.com/KarloZ7715/realm-portal/releases/tag/v1.0.0) - 2026-10-19
 
-First stable release. Known limitations at release: symbolic links inside the client folder that point outside it were followed for `realmlist.wtf` and `Config.wtf` ([#44](https://github.com/KarloZ7715/realm-portal/issues/44), fixed in 1.1.0), and the app was built on Avalonia 11.3 ([#48](https://github.com/KarloZ7715/realm-portal/issues/48)).
+First stable release. Known limitations at release: symbolic links inside the client folder that point outside it were followed for `realmlist.wtf` and `Config.wtf` ([#44](https://github.com/KarloZ7715/realm-portal/issues/44), fixed in 1.1.0). The app stays on Avalonia 11.3 until the move to Avalonia 12 and xunit v3 is done ([#48](https://github.com/KarloZ7715/realm-portal/issues/48)).
 
 ### Added
 
