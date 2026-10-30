@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -21,6 +23,8 @@ public partial class WelcomeView : UserControl
     {
         InitializeComponent();
         KeyDown += OnKeyDown;
+        // Tunnel: decide about Enter before a focused checkbox or language card handles it.
+        AddHandler(KeyDownEvent, OnPreviewEnter, RoutingStrategies.Tunnel);
         SizeChanged += (_, e) => ApplyMargins(e.NewSize.Width);
         Loaded += (_, _) => FocusStep();
     }
@@ -64,8 +68,15 @@ public partial class WelcomeView : UserControl
     /// </summary>
     private void FocusStep()
     {
-        if (_viewModel is not { IsStepVisible: true } vm)
+        if (_viewModel is not { } vm)
             return;
+
+        if (vm.IsServerFormOpen)
+        {
+            // The add-server form opened inside the welcome: start in its first field.
+            ServerFormHost.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(t => t.Name == "NameBox")?.Focus(NavigationMethod.Tab);
+            return;
+        }
 
         Control? target = vm.Step switch
         {
@@ -84,7 +95,8 @@ public partial class WelcomeView : UserControl
 
         if (vm.ServerForm is { } form)
         {
-            if (e.Key == Key.Escape && form.CancelCommand.CanExecute(null))
+            // Esc closes an untouched form only; typed input is never discarded silently (Cancel stays explicit).
+            if (e.Key == Key.Escape && form.IsPristine && form.CancelCommand.CanExecute(null))
             {
                 form.CancelCommand.Execute(null);
                 e.Handled = true;
@@ -103,18 +115,36 @@ public partial class WelcomeView : UserControl
             e.Handled = true;
             return;
         }
+    }
 
-        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None && e.Source is not TextBox { AcceptsReturn: true })
+    /// <summary>
+    /// Enter runs the step's primary action, also from a client checkbox (it does not toggle it; Space does) and from a
+    /// language card (it picks that card, then continues). Text fields and other focused buttons keep their own Enter.
+    /// </summary>
+    private void OnPreviewEnter(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || e.KeyModifiers != KeyModifiers.None || e.Handled
+            || _viewModel is not { IsServerFormOpen: false } vm)
+            return;
+
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+        if (focused is TextBox)
+            return;
+        if (focused == SpanishCard)
+            vm.SelectSpanishCommand.Execute(null);
+        else if (focused == EnglishCard)
+            vm.SelectEnglishCommand.Execute(null);
+        else if (focused is Button and not ToggleButton)
+            return;
+
+        var primary = vm.Step switch
         {
-            var primary = vm.Step switch
-            {
-                WelcomeViewModel.WelcomeStep.Language => vm.ContinueLanguageCommand,
-                WelcomeViewModel.WelcomeStep.Clients => vm.ContinueClientsCommand,
-                _ => (System.Windows.Input.ICommand)vm.FinishCommand,
-            };
-            if (primary.CanExecute(null))
-                primary.Execute(null);
-            e.Handled = true;
-        }
+            WelcomeViewModel.WelcomeStep.Language => vm.ContinueLanguageCommand,
+            WelcomeViewModel.WelcomeStep.Clients => vm.ContinueClientsCommand,
+            _ => (System.Windows.Input.ICommand)vm.FinishCommand,
+        };
+        if (primary.CanExecute(null))
+            primary.Execute(null);
+        e.Handled = true;
     }
 }

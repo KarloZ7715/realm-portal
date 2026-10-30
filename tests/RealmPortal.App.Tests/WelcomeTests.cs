@@ -1,5 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -408,18 +409,135 @@ public class WelcomeTests
     }
 
     [AvaloniaFact]
-    public void ClosingMidFlow_DoesNotCompleteWelcome()
+    public void ClosingWindowMidFlow_DoesNotCompleteWelcome()
     {
         using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var window = new MainWindow(env.Main) { Width = 960, Height = 600 };
+        window.Show();
+        Screenshots.Settle();
         var welcome = env.Main.Welcome!;
         welcome.ContinueLanguageCommand.Execute(null);
         welcome.BackCommand.Execute(null);
         welcome.ContinueLanguageCommand.Execute(null);
+        Screenshots.Settle();
 
-        // A new session (next launch) still shows the welcome.
+        window.Close();
+        Screenshots.Settle();
+
+        Assert.False(window.IsVisible);
+        Assert.NotEqual(true, env.Session.UiPreferences.Load().WelcomeCompleted);
+        Assert.False(env.Session.UiPreferences.Load().IsWelcomeDone);
+        // The next launch shows the welcome again.
         var again = new MainViewModel(env.Session, autoTick: false);
         Assert.True(again.IsWelcomeActive);
         Assert.Equal(WelcomeViewModel.WelcomeStep.Language, again.Welcome!.Step);
+    }
+
+    [AvaloniaFact]
+    public void CompleteWelcome_RunsOnce_ForDoubleFinishAndFinishThenSkip()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var finished = 0;
+        var welcome = new WelcomeViewModel(env.Session, env.Main.Clients, env.Main.Servers, env.Main.Settings, () => finished++);
+        welcome.FinishCommand.Execute(null);
+        welcome.FinishCommand.Execute(null);
+        welcome.SkipCommand.Execute(null);
+        Assert.Equal(1, finished);
+        Assert.True(env.Session.UiPreferences.Load().WelcomeCompleted);
+
+        var other = 0;
+        var second = new WelcomeViewModel(env.Session, env.Main.Clients, env.Main.Servers, env.Main.Settings, () => other++);
+        second.SkipCommand.Execute(null);
+        second.FinishCommand.Execute(null);
+        Assert.Equal(1, other);
+    }
+
+    private static (MainWindow Window, WelcomeView View) ShowWelcome(MainViewModel main)
+    {
+        var window = new MainWindow(main) { Width = 960, Height = 600 };
+        window.Show();
+        Screenshots.Settle();
+        return (window, window.GetVisualDescendants().OfType<WelcomeView>().Single());
+    }
+
+    private static void Press(Window window, Key key, PhysicalKey physical, string? symbol = null)
+    {
+        window.KeyPress(key, RawInputModifiers.None, physical, symbol);
+        window.KeyRelease(key, RawInputModifiers.None, physical, symbol);
+        Screenshots.Settle();
+    }
+
+    [AvaloniaFact]
+    public void AddServerForm_InWelcome_FocusesName_EscOnlyClosesUntouchedForm()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (main, welcome) = WelcomeOnServersStep(env);
+        var (window, view) = ShowWelcome(main);
+
+        // Clean form: focus starts in Name, Esc closes it and focus returns to the step.
+        welcome.AddServerCommand.Execute(null);
+        Screenshots.Settle();
+        var name = Assert.IsType<TextBox>(window.FocusManager!.GetFocusedElement());
+        Assert.Equal("NameBox", name.Name);
+        Press(window, Key.Escape, PhysicalKey.Escape);
+        Assert.False(welcome.IsServerFormOpen);
+        Assert.True(main.IsWelcomeActive);
+        Assert.Same(view.FindControl<Button>("FinishButton"), window.FocusManager!.GetFocusedElement());
+
+        // Dirty form: Esc is ignored and the typed values stay; Cancel is the explicit way out.
+        welcome.AddServerCommand.Execute(null);
+        Screenshots.Settle();
+        welcome.ServerForm!.Name = "Demo Realm";
+        welcome.ServerForm.Address = "logon.example.com";
+        Press(window, Key.Escape, PhysicalKey.Escape);
+        Assert.True(welcome.IsServerFormOpen);
+        Assert.Equal("Demo Realm", welcome.ServerForm!.Name);
+        Assert.Empty(welcome.ServerItems);
+
+        welcome.ServerForm.CancelCommand.Execute(null);
+        Screenshots.Settle();
+        Assert.False(welcome.IsServerFormOpen);
+        Assert.Same(view.FindControl<Button>("FinishButton"), window.FocusManager!.GetFocusedElement());
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Enter_OnLanguageCard_PicksItAndContinues()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (window, view) = ShowWelcome(env.Main);
+        var welcome = env.Main.Welcome!;
+        Assert.Same(view.FindControl<Button>("EnglishCard"), window.FocusManager!.GetFocusedElement());
+
+        Press(window, Key.Enter, PhysicalKey.Enter, "\r");
+
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
+        Assert.True(welcome.IsEnglish);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Enter_OnClientCheckbox_ContinuesWithoutToggling_SpaceToggles()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (main, welcome) = WelcomeOnServersStep(env);
+        welcome.BackCommand.Execute(null);
+        var (window, _) = ShowWelcome(main);
+        var client = Assert.Single(main.Clients.Items);
+        var box = Assert.IsType<CheckBox>(window.FocusManager!.GetFocusedElement());
+        Assert.True(client.IsInUse);
+
+        Press(window, Key.Space, PhysicalKey.Space, " ");
+        Assert.False(client.IsInUse);
+        Assert.False(box.IsChecked);
+        Press(window, Key.Space, PhysicalKey.Space, " ");
+        Assert.True(client.IsInUse);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
+
+        Press(window, Key.Enter, PhysicalKey.Enter, "\r");
+        Assert.True(client.IsInUse);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        window.Close();
     }
 
     [AvaloniaFact]
@@ -455,7 +573,7 @@ public class WelcomeTests
         welcome.ContinueLanguageCommand.Execute(null);
         welcome.ContinueClientsCommand.Execute(null);
         Screenshots.Settle();
-        Assert.Equal("Imported servers", AutomationProperties.GetName(view.FindControl<ItemsControl>("ServerList")!));
+        Assert.Equal("Servers", AutomationProperties.GetName(view.FindControl<ItemsControl>("ServerList")!));
         view.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Left, KeyModifiers = KeyModifiers.Alt });
         Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
         window.Close();

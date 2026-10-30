@@ -29,6 +29,7 @@ public sealed partial class WelcomeViewModel : ViewModelBase
     private readonly Func<Action, AddServerViewModel>? _createServerForm;
     private readonly PropertyChangedEventHandler _clientsPropertyChanged;
     private bool _clientsScanStarted;
+    private bool _completed;
 
     public WelcomeViewModel(
         PortalSession session,
@@ -118,7 +119,7 @@ public sealed partial class WelcomeViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(BackCommand), nameof(AddServerCommand))]
     private AddServerViewModel? _serverForm;
 
-    /// <summary>Raised when focus should move to the main element of the current step (step change or form closed).</summary>
+    /// <summary>Raised when focus should move to the main element of the current step (step change, form opened or closed).</summary>
     public event Action? StepFocusRequested;
 
     [ObservableProperty]
@@ -411,6 +412,7 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         var form = _createServerForm(CloseServerForm);
         form.PropertyChanged += OnServerFormPropertyChanged;
         ServerForm = form;
+        StepFocusRequested?.Invoke();
     }
 
     private bool CanAddServer() => _clients.Items.Count > 0 && ServerForm is null;
@@ -445,6 +447,10 @@ public sealed partial class WelcomeViewModel : ViewModelBase
 
     private void CompleteWelcome()
     {
+        // Finish and Skip may both fire (double click, Enter plus click): finish once.
+        if (_completed)
+            return;
+        _completed = true;
         if (ServerForm is { } form)
         {
             form.PropertyChanged -= OnServerFormPropertyChanged;
