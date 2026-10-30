@@ -32,7 +32,7 @@ internal static class AppInstance
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
-            log.WriteLine($"Realm Portal: single-instance check skipped: {ex.Message}");
+            log.WriteLine($"Realm Portal: single-instance check skipped: {OneLine(ex.Message)}");
             return InstanceClaim.None;
         }
 
@@ -41,15 +41,19 @@ internal static class AppInstance
             case ClaimOutcome.PrimaryUnresponsive:
                 // Defined behavior: start anyway. A hung first window must not lock the user out; the config-directory
                 // locks (#39) keep the data consistent between the two processes.
-                log.WriteLine($"Realm Portal: another instance is running but did not respond ({claim.Detail}); starting a second window.");
+                log.WriteLine($"Realm Portal: another instance is running but did not respond ({OneLine(claim.Detail)}); starting a second window.");
                 break;
             case ClaimOutcome.Unavailable:
             case ClaimOutcome.Primary when claim.Detail is not null:
-                log.WriteLine($"Realm Portal: single-instance check incomplete: {claim.Detail}");
+                log.WriteLine($"Realm Portal: single-instance check incomplete: {OneLine(claim.Detail)}");
                 break;
         }
         return claim;
     }
+
+    /// <summary>Keeps a diagnostic on one line (paths and OS messages may contain control characters).</summary>
+    internal static string OneLine(string? text) =>
+        string.Concat((text ?? string.Empty).Select(c => char.IsControl(c) ? ' ' : c));
 
     /// <summary>
     /// Windows only lets the foreground process hand over the foreground. This launch was just started by the user, so
