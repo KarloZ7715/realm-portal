@@ -252,6 +252,13 @@ public sealed record UpdateServerRequest(
   - Under `ConfigDirectoryLock`: removes `clientId` from `clients.json`, clears `ClientId = null` on any server in `servers.json` that referenced `clientId` (servers themselves are not deleted), removes `active_by_client[clientId]` from `state.json`, and clears pending undo if it belonged to `clientId`.
   - When `deleteBackups == false` (default), `<backupRoot>/<clientId>` is kept on disk. When `deleteBackups == true`, acquires `InstallationLock(clientId)` and deletes managed backups under `<backupRoot>/<clientId>`. The real game folder is never touched.
 
+### 2.2b Extra realmlist lines (#192)
+
+- **Read:** `ServerEntry.ExtraRealmlistLines` (`IReadOnlyList<string>`, computed from `Realmlist`) lists the lines after `set realmlist <host>`, without line endings, e.g. `["set patchlist patch.example.org"]`; empty when there are none. `RealmlistText.ExtraLines(string realmlist)` does the same for a raw realmlist. Passing the list back unchanged as `ExtraRealmlistLines` rebuilds the same realmlist.
+- **Write:** `NewServer.ExtraRealmlistLines` / `UpdateServerRequest.ExtraRealmlistLines` (see §2.3 for `null` vs empty on update). Lines go through `RealmlistText.Build`: each is trimmed, blank entries are dropped, and the contract is unchanged (ASCII, CRLF, `set <key> <value>`, only `realmlist` and `patchlist`, each once, so today the only valid extra line is one `set patchlist <value>`). A line that still contains a line break after trimming is rejected (`BadLineEnding`) instead of being split into two lines.
+- **Errors:** an invalid line fails with `InvalidRealmlist` (`RealmlistKind`, `LineNumber` in the built realmlist, where line 1 is `set realmlist <host>`) and **`ExtraLineIndex`**: the 0-based index of the offending entry in the request's `ExtraRealmlistLines`, blank entries included, so the UI can show the error next to that row. `ExtraLineIndex` is `null` for errors not tied to an extra line (e.g. the host). Nothing is saved.
+- The CLI uses the same calls: `add --line`, `edit --line` (replace) and `edit --clear-lines` (empty list), so the app and the CLI store identical data for the same input.
+
 ### 2.3 Server CRUD semantics (`AddServer`, `UpdateServer`, `RemoveServer`)
 
 - **`UpdateServer(UpdateServerRequest request)`:**
@@ -521,7 +528,7 @@ manifest hash, and those journals keep working as before. A value that is presen
 | Source | Codes |
 |---|---|
 | `ClientFilesException.Code` | mapped **by name**: `GameRunning`, `PermissionDenied`, `ReadOnlyFs`, `PathNotFound`, `PathEscapesClient`, `HashMismatch`, `VerifyFailed`, `UnsupportedClient` (with `ClientVersion`), `InvalidRealmlist`, `NothingToUndo`, `BackupNotFound`, `ProcessCheckFailed`. A test fails if the applier gets a code the service lacks. |
-| `InvalidRealmlistException` | `InvalidRealmlist` with `RealmlistKind`, `LineNumber`, `ServerName` |
+| `InvalidRealmlistException` | `InvalidRealmlist` with `RealmlistKind`, `LineNumber`, `ServerName`, `ExtraLineIndex` (§2.2b) |
 | `ClientVersionException.Kind` | `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `ClientUnreadable` (a missing folder: `PathNotFound`), with `Path` |
 | `StoreException` | `StoreCorrupt`, `ServerNameTaken`, `ServerNotFound`, `ClientNotFound`, `ClientAlreadyExists`, `NothingToUndo`, `UndoTargetMissing`, `StoreLocked` (the config-directory lock `.realm-portal.lock` is still held by another process; nothing changed, retry) |
 | undo or restore backup made for another client folder (manifest `client_root` differs from the registered client) | `PathEscapesClient`, `Diagnostic` names both folders; nothing is written |

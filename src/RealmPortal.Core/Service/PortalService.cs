@@ -1283,8 +1283,7 @@ public sealed class PortalService : IPortalService
             && RealmlistIdentity.Create(server.Host, server.Realm, extracted.RequiredClientBuild).Equals(extracted));
 
     /// <summary>The stored realmlist lines after the first <c>set realmlist</c> line (e.g. <c>set patchlist …</c>).</summary>
-    private static string[] StoredExtraRealmlistLines(Server server) =>
-        server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+    private static IReadOnlyList<string> StoredExtraRealmlistLines(Server server) => RealmlistText.ExtraLines(server.Realmlist);
 
     /// <summary>
     /// Name of a server imported from a client (#98): the realm (control characters stripped, trimmed) when there is one,

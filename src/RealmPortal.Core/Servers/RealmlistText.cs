@@ -28,7 +28,9 @@ public static class RealmlistText
     /// Returns <c>set realmlist {host}</c> followed by the extra lines, each line terminated by <c>\r\n</c>
     /// (the last one too). Extra lines are trimmed; blank ones are dropped. The result is validated.
     /// </summary>
-    /// <exception cref="InvalidRealmlistException">The resulting text breaks the contract; nothing is returned.</exception>
+    /// <exception cref="InvalidRealmlistException">The resulting text breaks the contract; nothing is returned. When an extra
+    /// line caused it, <see cref="InvalidRealmlistException.ExtraLineIndex"/> is its index in <paramref name="extraLines"/>
+    /// (an extra line that still contains a line break after trimming is rejected as <see cref="InvalidRealmlistKind.BadLineEnding"/>).</exception>
     public static string Build(string host, IEnumerable<string>? extraLines = null)
     {
         ArgumentNullException.ThrowIfNull(host);
@@ -37,18 +39,45 @@ public static class RealmlistText
 
         var text = new StringBuilder();
         text.Append(Prefix).Append(host).Append(LineEnding);
+        var sourceIndexes = new List<int>(); // sourceIndexes[n - 2] = index in extraLines of realmlist line n
+        var index = -1;
         foreach (var raw in extraLines ?? [])
         {
+            index++;
             var line = raw?.Trim() ?? "";
-            if (line.Length > 0)
-                text.Append(line).Append(LineEnding);
+            if (line.Length == 0)
+                continue;
+            if (line.Contains('\r') || line.Contains('\n'))
+                throw new InvalidRealmlistException(
+                    InvalidRealmlistKind.BadLineEnding, "an extra line must not contain line breaks", sourceIndexes.Count + 2,
+                    extraLineIndex: index);
+            text.Append(line).Append(LineEnding);
+            sourceIndexes.Add(index);
         }
 
         RealmlistAddress.ValidateRealmlistHost(host, 1);
 
         var result = text.ToString();
-        Validate(result);
+        try
+        {
+            Validate(result);
+        }
+        catch (InvalidRealmlistException ex) when (ex.LineNumber is { } number && number >= 2 && number - 2 < sourceIndexes.Count)
+        {
+            throw new InvalidRealmlistException(ex.Kind, ex.Reason, ex.LineNumber, ex.ServerName, sourceIndexes[number - 2]);
+        }
+
         return result;
+    }
+
+    /// <summary>
+    /// The lines of a stored realmlist after the first <c>set realmlist</c> line (for example <c>set patchlist …</c>),
+    /// without line endings. Passing them back to <see cref="Build"/> with the same host rebuilds the same text.
+    /// </summary>
+    public static IReadOnlyList<string> ExtraLines(string realmlist)
+    {
+        ArgumentNullException.ThrowIfNull(realmlist);
+        return realmlist.Split(LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
     }
 
     /// <summary>Checks the realmlist contract; returns normally when the text is valid.</summary>

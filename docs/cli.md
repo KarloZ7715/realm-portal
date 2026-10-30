@@ -27,7 +27,7 @@ realm-portal -h
 realm-portal client-version <client-directory>
 realm-portal add <name> <host> [--realm <realm>] [--line <realmlist line>]... [--build <n>] [--account <name>]
 realm-portal remove <server>
-realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
+realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--line <realmlist line>]... [--clear-lines] [--build <n|any>] [--account <name>] [--client <client|none>]
 realm-portal list [--all]
 realm-portal switch <server> [--force]
 realm-portal undo
@@ -51,8 +51,8 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | `client-version <dir>` | Prints the game version and build of the client in `<dir>`. Takes no options (including the common `--config-dir` / `--projection-dir` / `--client-dir`); a rejected option is named on stderr. `--help` / `-h` after `client-version` print usage and exit 0. |
 | `add` | Adds a server. `<host>` is `host` or `host:port`. `--line` adds an extra `realmlist.wtf` line (repeatable, e.g. `--line "set patchlist patch.example.org"`). `--build` is optional: the client build the server requires (a positive integer). Without it, the server works with any client. |
 | `remove` | Removes a server. |
-| `edit` | Changes a server. Only the options you pass change; everything else (including the required build and extra realmlist lines such as `patchlist`) is kept. `--build <n>` sets the required client build; `--build any` clears it, so the server works with any client. `--client none` unlinks the server from its client. |
-| `list` | Lists servers. The active one is marked with `*`. With `--client-dir`, only servers compatible with that client are shown, unless you add `--all`; incompatible ones are marked `[incompatible]`. |
+| `edit` | Changes a server. Only the options you pass change; everything else (including the required build and extra realmlist lines such as `patchlist`) is kept. `--line` (repeatable) replaces all extra realmlist lines with the ones given; `--clear-lines` removes them; passing both is a usage error (exit `1`). An invalid line (see [Extra realmlist lines](#extra-realmlist-lines)) changes nothing (exit `2`). `--build <n>` sets the required client build; `--build any` clears it, so the server works with any client. `--client none` unlinks the server from its client. |
+| `list` | Lists servers. The active one is marked with `*`. With `--client-dir`, only servers compatible with that client are shown, unless you add `--all`; incompatible ones are marked `[incompatible]`. Extra realmlist lines are shown after the build as `key=value`, e.g. `patchlist=patch.example.org`. |
 | `switch` | Makes a server the active one. With `--client-dir`, it also backs up and rewrites that client's realm files (`realmlist.wtf` where the client uses it, and `WTF/Config.wtf`). Without `--client-dir`, it only updates Realm Portal's own state and `activo.json`. `--force` skips the compatibility check. |
 | `undo` | Restores the server that was active before the last switch. It remembers one step. With `--client-dir`, restores that client's last switch (and its realm files from the backup when that switch rewrote them), even if another client has a more recent global switch. Without `--client-dir`, undoes the globally latest switch. `REALM_PORTAL_CLIENT_DIR` alone does not scope undo. |
 | `status` | Shows the active server, whether `activo.json` is in sync, clients whose files do not match the active server, and whether undo is available. With `--client-dir`, also shows that client's version and whether it is compatible. |
@@ -98,6 +98,14 @@ These options may go before or after the command (see [Commands](#commands)).
 | `REALM_PORTAL_CLIENT_DIR` | none | none |
 
 The config, projection and backup variables are also read by the desktop app. When testing, point them at temporary folders.
+
+## Extra realmlist lines
+
+`add --line` and `edit --line` take whole `realmlist.wtf` lines that are written after `set realmlist <host>` when you switch. The same rules apply in the CLI and the desktop app, and the same input saves the same data:
+
+- Only `set patchlist <value>` is accepted, at most once. Any other key (including `realmlist` again and `portal`) is rejected.
+- The line must be `set <key> <value>` with lowercase `set`, single spaces, ASCII only, and no quotes, spaces or control characters in the value. Leading and trailing spaces and line breaks are trimmed; blank lines are ignored; a line break inside a line is rejected.
+- When a line is rejected, nothing is saved and the error names the realmlist line (line `1` is `set realmlist <host>`).
 
 ## Exit codes
 
