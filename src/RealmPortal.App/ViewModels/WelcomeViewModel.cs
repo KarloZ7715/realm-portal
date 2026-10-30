@@ -307,6 +307,8 @@ public sealed partial class WelcomeViewModel : ViewModelBase
     partial void OnStepChanged(WelcomeStep value)
     {
         UpdateProgress();
+        // The save-error notice belongs to the Finish/Skip attempt; another step starts clean.
+        HasSaveError = false;
         if (value == WelcomeStep.Clients)
             StartClientsScanIfNeeded();
         if (value == WelcomeStep.Servers)

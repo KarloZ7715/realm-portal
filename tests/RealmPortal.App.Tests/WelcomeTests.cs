@@ -548,6 +548,81 @@ public class WelcomeTests
         window.Close();
     }
 
+    [AvaloniaTheory]
+    [InlineData("SaveButton")]
+    [InlineData("CancelButton")]
+    public void HeldEnter_OnServerFormButton_ClosesFormOnce_AndKeepsWelcomeOpen(string buttonName)
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (main, welcome) = WelcomeOnServersStep(env);
+        var (window, view) = ShowWelcome(main);
+        welcome.AddServerCommand.Execute(null);
+        Screenshots.Settle();
+        welcome.ServerForm!.Name = "Demo Realm";
+        welcome.ServerForm.Address = "logon.example.com";
+        var button = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == buttonName);
+        button.Focus();
+        Screenshots.Settle();
+
+        // Auto-repeat: key-downs without a key-up. The first closes the form; the repeats must not press Finish.
+        for (var i = 0; i < 3; i++)
+        {
+            window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+            Screenshots.Settle();
+        }
+
+        Assert.False(welcome.IsServerFormOpen);
+        Assert.True(main.IsWelcomeActive);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        Assert.Equal(buttonName == "SaveButton" ? 1 : 0, welcome.ServerItems.Count);
+        Assert.False(env.Session.UiPreferences.Load().IsWelcomeDone);
+        window.KeyRelease(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void HeldEnter_KeyUpLostWhileInactive_NextEnterStillActs()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (window, _) = ShowWelcome(env.Main);
+        var welcome = env.Main.Welcome!;
+
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, "\r");
+        Screenshots.Settle();
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
+
+        // Enter is released while the window is inactive: the key-up never arrives.
+        var impl = window.PlatformImpl!;
+        var deactivated = (Action?)impl.GetType().GetProperty("Deactivated")!.GetValue(impl);
+        Assert.NotNull(deactivated);
+        deactivated!();
+        Screenshots.Settle();
+
+        Press(window, Key.Enter, PhysicalKey.Enter, "\r");
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SaveErrorNotice_ClearsWhenTheStepChanges()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var welcome = env.Main.Welcome!;
+        welcome.ContinueLanguageCommand.Execute(null);
+        welcome.ContinueClientsCommand.Execute(null);
+        var prefsPath = Path.Combine(env.Config, "ui-preferences.json");
+        File.Delete(prefsPath);
+        Directory.CreateDirectory(prefsPath);
+
+        welcome.FinishCommand.Execute(null);
+        Assert.True(welcome.HasSaveError);
+
+        welcome.BackCommand.Execute(null);
+        Assert.False(welcome.HasSaveError);
+        Assert.Equal(string.Empty, welcome.SaveErrorText);
+        Directory.Delete(prefsPath);
+    }
+
     [AvaloniaFact]
     public void FinishOrSkip_WhenPreferencesCannotBeSaved_ShowsNoticeAndStaysRetryable()
     {

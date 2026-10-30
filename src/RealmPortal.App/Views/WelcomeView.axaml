@@ -156,7 +156,7 @@
         </StackPanel>
       </Button>
 
-      <!-- Finish/Skip could not save the preferences: stays until a retry succeeds. -->
+      <!-- Finish/Skip could not save the preferences: shown until a retry succeeds or the step changes. -->
       <TextBlock Grid.Column="1" Name="SaveErrorText" Classes="footnote" Margin="12,0" VerticalAlignment="Center" HorizontalAlignment="Right"
                  TextAlignment="Right" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
                  IsVisible="{Binding HasSaveError}" Text="{Binding SaveErrorText}" AutomationProperties.LiveSetting="Assertive"/>

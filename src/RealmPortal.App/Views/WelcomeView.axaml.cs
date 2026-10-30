@@ -47,8 +47,20 @@ public partial class WelcomeView : UserControl
             _viewModel.StepFocusRequested += OnStepFocusRequested;
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (e.Root is Window window)
+            window.Deactivated += OnWindowDeactivated;
+    }
+
+    /// <summary>A key-up can be lost while the window is inactive; the next Enter must not be swallowed.</summary>
+    private void OnWindowDeactivated(object? sender, EventArgs e) => _enterHeld = false;
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        if (e.Root is Window window)
+            window.Deactivated -= OnWindowDeactivated;
         base.OnDetachedFromVisualTree(e);
         if (_viewModel is not null)
             _viewModel.StepFocusRequested -= OnStepFocusRequested;
@@ -131,8 +143,7 @@ public partial class WelcomeView : UserControl
     /// </summary>
     private void OnPreviewEnter(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || e.KeyModifiers != KeyModifiers.None || e.Handled
-            || _viewModel is not { IsServerFormOpen: false } vm)
+        if (e.Key != Key.Enter || e.KeyModifiers != KeyModifiers.None || e.Handled || _viewModel is not { } vm)
             return;
 
         var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
@@ -140,12 +151,15 @@ public partial class WelcomeView : UserControl
             return;
         if (_enterHeld)
         {
-            // Auto-repeat of a held Enter: one action per key press.
+            // Auto-repeat of a held Enter: one action per key press. This also covers the add-server form: a held
+            // Enter on Save or Cancel closes the form once and must not go on to press Finish.
             e.Handled = true;
             return;
         }
 
         _enterHeld = true;
+        if (vm.IsServerFormOpen)
+            return; // The form's focused button handles this press itself.
         if (focused == SpanishCard)
             vm.SelectSpanishCommand.Execute(null);
         else if (focused == EnglishCard)
