@@ -335,6 +335,7 @@
   "welcome.servers.found.many": "{0} servidores listos",
   "welcome.servers.hint": "Revisa lo importado de tus clientes. Puedes añadir más ahora o después.",
   "welcome.servers.sheet": "SERVIDORES",
+  "welcome.back": "Atrás",
   "welcome.continue": "Continuar",
   "welcome.finish": "Terminar",
   "welcome.skip": "Omitir por ahora",

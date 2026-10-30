@@ -335,6 +335,7 @@
   "welcome.servers.found.many": "{0} servers ready",
   "welcome.servers.hint": "Review what we imported from your clients. You can add more now or later.",
   "welcome.servers.sheet": "SERVERS",
+  "welcome.back": "Back",
   "welcome.continue": "Continue",
   "welcome.finish": "Finish",
   "welcome.skip": "Skip for now",

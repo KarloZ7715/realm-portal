@@ -166,6 +166,9 @@
         </Button>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsClientsStep}">
+        <Button Classes="link caps" Command="{Binding BackCommand}" VerticalAlignment="Center">
+          <TextBlock Text="{loc:T welcome.back}"/>
+        </Button>
         <Button Classes="link caps" Command="{Binding SkipCommand}" VerticalAlignment="Center">
           <TextBlock Text="{Binding SkipLabel}"/>
         </Button>
@@ -182,6 +185,9 @@
         </StackPanel>
       </Button>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsServersStep}">
+        <Button Classes="link caps" Command="{Binding BackCommand}" VerticalAlignment="Center">
+          <TextBlock Text="{loc:T welcome.back}"/>
+        </Button>
         <Button Classes="link caps" Command="{Binding SkipCommand}" VerticalAlignment="Center">
           <TextBlock Text="{Binding SkipLabel}"/>
         </Button>

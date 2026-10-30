@@ -256,6 +256,7 @@ public sealed partial class WelcomeViewModel : ViewModelBase
     partial void OnStepChanged(WelcomeStep value)
     {
         UpdateProgress();
+        BackCommand.NotifyCanExecuteChanged();
         if (value == WelcomeStep.Clients)
             StartClientsScanIfNeeded();
         if (value == WelcomeStep.Servers)
@@ -319,6 +320,11 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         ApplyLanguage(IsSpanish ? Language.Es : Language.En);
         Step = WelcomeStep.Clients;
     }
+
+    [RelayCommand(CanExecute = nameof(CanGoBack))]
+    private void Back() => Step = Step == WelcomeStep.Servers ? WelcomeStep.Clients : WelcomeStep.Language;
+
+    private bool CanGoBack() => Step != WelcomeStep.Language;
 
     [RelayCommand(CanExecute = nameof(CanContinueClients))]
     private void ContinueClients() => Step = WelcomeStep.Servers;
