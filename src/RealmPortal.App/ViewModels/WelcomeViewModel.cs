@@ -450,7 +450,6 @@ public sealed partial class WelcomeViewModel : ViewModelBase
         // Finish and Skip may both fire (double click, Enter plus click): finish once.
         if (_completed)
             return;
-        _completed = true;
         if (ServerForm is { } form)
         {
             form.PropertyChanged -= OnServerFormPropertyChanged;
@@ -460,6 +459,8 @@ public sealed partial class WelcomeViewModel : ViewModelBase
 
         var prefs = _session.UiPreferences.Load();
         _session.UiPreferences.Save(prefs with { WelcomeCompleted = true });
+        // Set after the save: if writing the preferences throws, Finish/Skip can be retried.
+        _completed = true;
         _clients.FirstScanFoundNoClients -= IgnoreEmptyScanNavigation;
         _clients.ClientsChanged -= OnClientsChanged;
         _clients.PropertyChanged -= _clientsPropertyChanged;
