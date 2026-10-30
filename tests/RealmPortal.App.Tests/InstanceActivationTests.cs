@@ -118,7 +118,7 @@ public class InstanceActivationTests
     public void ASecondLaunchOnTheSameConfigDirectory_IsToldToExit()
     {
         InstanceActivation.Reset();
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var config = dir.Combine("config");
         Func<string, string?> env = name => name == PortalPaths.ConfigDirVariable ? config : null;
         var log = new StringWriter();

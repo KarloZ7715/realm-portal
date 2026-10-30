@@ -25,7 +25,7 @@ public class SingleInstanceTests
     [Fact]
     public void FirstClaim_IsPrimaryAndListens()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
 
         using var claim = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
@@ -42,7 +42,7 @@ public class SingleInstanceTests
     [Fact]
     public void SecondClaim_ForwardsTheMessageToThePrimaryHandler()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var received = new BlockingQueue();
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle, Fast);
@@ -58,7 +58,7 @@ public class SingleInstanceTests
     [Fact]
     public void SeveralForwards_AreAllDeliveredInOrder()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var received = new BlockingQueue();
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle, Fast);
@@ -76,7 +76,7 @@ public class SingleInstanceTests
     [Fact]
     public void AVerbThePrimaryDoesNotHandle_IsReportedAsUnsupported()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus,
             m => m.Verb == InstanceMessage.FocusVerb ? InstanceReply.Ok : InstanceReply.Unsupported, Fast);
@@ -90,7 +90,7 @@ public class SingleInstanceTests
     [Fact]
     public void AThrowingHandler_AnswersInvalid_AndTheListenerKeepsServing()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var calls = 0;
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ =>
@@ -106,7 +106,7 @@ public class SingleInstanceTests
     [Fact]
     public void Dispose_ReleasesTheLockAndRemovesTheSocket()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
         primary.Dispose();
@@ -121,7 +121,7 @@ public class SingleInstanceTests
     [Fact]
     public void DifferentDirectories_AreIndependentInstances()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         using var a = SingleInstance.Claim(InstanceEndpoint.For(dir.Combine("a")), InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
         using var b = SingleInstance.Claim(InstanceEndpoint.For(dir.Combine("b")), InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
         using var other = SingleInstance.Claim(InstanceEndpoint.For(dir.Combine("a"), "other"), InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
@@ -134,7 +134,7 @@ public class SingleInstanceTests
     [Fact]
     public void ALockHeldWithoutAListener_TimesOutAsPrimaryUnresponsive()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         using var foreign = new FileStream(endpoint.LockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var timer = Stopwatch.StartNew();
@@ -151,7 +151,7 @@ public class SingleInstanceTests
     [UnixFact]
     public void APrimaryThatAcceptsButNeverAnswers_TimesOutAsPrimaryUnresponsive()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         using var foreign = new FileStream(endpoint.LockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         using var hung = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
@@ -170,7 +170,7 @@ public class SingleInstanceTests
     [Fact]
     public void ALockDirectoryThatIsAFile_IsUnavailable_NotAnException()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var path = dir.Combine("config");
         File.WriteAllText(path, "not a directory");
 
@@ -185,7 +185,7 @@ public class SingleInstanceTests
     [UnixFact]
     public void AStaleFileAtTheSocketPathWithoutALock_IsReplacedByTheNextPrimary()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         File.WriteAllText(endpoint.ChannelAddress!, "stale");
         Assert.True(File.Exists(endpoint.ChannelAddress));
@@ -205,7 +205,7 @@ public class SingleInstanceTests
     {
         if (OperatingSystem.IsWindows())
             return; // Skipped by the attribute; this guard is for the platform analyzer.
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Combine("config"));
 
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
@@ -219,15 +219,15 @@ public class SingleInstanceTests
     [UnixFact]
     public void ALongDirectory_UsesAShortSocketUnderXdgRuntimeDir_AndStillWorks()
     {
-        using var dir = new TempDirectory();
-        var runtime = dir.Combine("run");
-        Directory.CreateDirectory(runtime);
+        using var dir = ShortTempDirectory.Create();
+        using var runtime = ShortTempDirectory.Create();
         var deep = dir.Combine(new string('d', 60), new string('e', 60));
-        Func<string, string?> env = name => name == "XDG_RUNTIME_DIR" ? runtime : null;
+        Func<string, string?> env = name => name == "XDG_RUNTIME_DIR" ? runtime.Path : null;
         var endpoint = InstanceEndpoint.For(deep, "app", env);
 
-        Assert.StartsWith(runtime + Path.DirectorySeparatorChar, endpoint.ChannelAddress);
-        Assert.True(Encoding.UTF8.GetByteCount(endpoint.ChannelAddress!) <= InstanceEndpoint.MaxSocketPathBytes);
+        Assert.Equal(SocketLocation.RuntimeDirectory, endpoint.Location);
+        Assert.StartsWith(runtime.Path + Path.DirectorySeparatorChar, endpoint.ChannelAddress);
+        Assert.True(InstanceEndpoint.FitsSocketPath(endpoint.ChannelAddress!));
         Assert.NotEqual(endpoint.ChannelAddress, InstanceEndpoint.For(deep + "x", "app", env).ChannelAddress);
 
         var received = new BlockingQueue();
@@ -239,65 +239,275 @@ public class SingleInstanceTests
         Assert.Equal(InstanceMessage.Focus, received.Take());
     }
 
+    [UnixFact]
+    public void AnXdgRuntimeDirThatIsTooLong_FallsBackToThePrivateTempFolder()
+    {
+        using var dir = ShortTempDirectory.Create();
+        using var tmp = ShortTempDirectory.Create();
+        var deep = dir.Combine(new string('d', 60), new string('e', 60));
+        var longRuntime = "/" + new string('r', 90);
+        Func<string, string?> env = name => name switch { "XDG_RUNTIME_DIR" => longRuntime, "TMPDIR" => tmp.Path, _ => null };
+
+        var endpoint = InstanceEndpoint.For(deep, "app", env);
+
+        Assert.Equal(SocketLocation.PrivateTempDirectory, endpoint.Location);
+        Assert.StartsWith(tmp.Path + Path.DirectorySeparatorChar, endpoint.ChannelAddress);
+    }
+
+    [UnixFact]
+    public void WhenNoCandidateFits_ThereIsNoChannel_ButTheLockStillWorks()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var deep = dir.Combine(new string('d', 60), new string('e', 60));
+        var longRoot = "/" + new string('t', 90);
+        Func<string, string?> env = name => name == "TMPDIR" ? longRoot : null;
+        var endpoint = InstanceEndpoint.For(deep, "app", env);
+
+        Assert.Equal(SocketLocation.None, endpoint.Location);
+        Assert.Null(endpoint.ChannelAddress);
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+        using var second = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+        Assert.Equal(ClaimOutcome.Primary, primary.Outcome);
+        Assert.False(primary.IsListening);
+        Assert.Equal(ClaimOutcome.PrimaryUnresponsive, second.Outcome);
+    }
+
+    [Theory]
+    [InlineData(100, true)]
+    [InlineData(101, false)]
+    public void TheSocketPathLimit_CountsUtf8Bytes(int bytes, bool fits)
+    {
+        Assert.Equal(fits, InstanceEndpoint.FitsSocketPath("/" + new string('a', bytes - 1)));
+        // 'ñ' is two UTF-8 bytes: 50 of them are 100 bytes but only 50 characters.
+        Assert.Equal(fits, InstanceEndpoint.FitsSocketPath(new string('ñ', 50) + new string('a', bytes - 100)));
+    }
+
+    [UnixTheory]
+    [InlineData(0, SocketLocation.InstanceDirectory)]   // socket path exactly 100 bytes
+    [InlineData(1, SocketLocation.PrivateTempDirectory)] // 101 bytes: next candidate
+    public void TheInstanceDirectorySocketIsUsedUpToTheLimit(int extra, SocketLocation expected)
+    {
+        using var tmp = ShortTempDirectory.Create();
+        const string socketName = "/.realm-portal-app.sock";
+        var directory = tmp.Path + "/" + new string('c', InstanceEndpoint.MaxSocketPathBytes - socketName.Length - tmp.Path.Length - 1 + extra);
+        Func<string, string?> env = name => name == "TMPDIR" ? tmp.Path : null;
+
+        var endpoint = InstanceEndpoint.For(directory, "app", env);
+
+        Assert.Equal(expected, endpoint.Location);
+        if (expected == SocketLocation.InstanceDirectory)
+            Assert.Equal(InstanceEndpoint.MaxSocketPathBytes, Encoding.UTF8.GetByteCount(endpoint.ChannelAddress!));
+    }
+
     [NonPrivilegedUnixFact]
     public void ALongDirectoryWithoutXdgRuntimeDir_UsesAPrivateTempFolder()
     {
         if (OperatingSystem.IsWindows())
             return; // Skipped by the attribute; this guard is for the platform analyzer.
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
+        using var tmp = ShortTempDirectory.Create();
         var deep = dir.Combine(new string('d', 60), new string('e', 60));
-        var endpoint = InstanceEndpoint.For(deep, "app", _ => null);
+        Func<string, string?> env = name => name == "TMPDIR" ? tmp.Path : null;
+        var endpoint = InstanceEndpoint.For(deep, "app", env);
         var socketDir = Path.GetDirectoryName(endpoint.ChannelAddress)!;
-        try
-        {
-            using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
 
-            Assert.True(primary.IsListening);
-            Assert.Equal(Path.TrimEndingDirectorySeparator(Path.GetTempPath()), Path.GetDirectoryName(socketDir));
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(socketDir));
-        }
-        finally
-        {
-            // The folder is shared by every long-path instance of this user; remove it only when empty.
-            try
-            {
-                Directory.Delete(socketDir);
-            }
-            catch (IOException)
-            {
-            }
-        }
+        var received = new BlockingQueue();
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle, Fast);
+        using var second = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+
+        Assert.True(primary.IsListening);
+        Assert.Equal(tmp.Path, Path.GetDirectoryName(socketDir));
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(socketDir));
+        Assert.Equal(ClaimOutcome.Forwarded, second.Outcome);
+        Assert.Equal(InstanceMessage.Focus, received.Take());
     }
 
     [UnixFact]
     public void AFallbackFolderThatIsASymlink_IsRefused_AndThePrimaryStillStarts()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
+        using var tmp = ShortTempDirectory.Create();
         var deep = dir.Combine(new string('d', 60), new string('e', 60));
-        var endpoint = InstanceEndpoint.For(deep, "app", _ => null);
+        Func<string, string?> env = name => name == "TMPDIR" ? tmp.Path : null;
+        var endpoint = InstanceEndpoint.For(deep, "app", env);
         var socketDir = Path.GetDirectoryName(endpoint.ChannelAddress)!;
-        if (Directory.Exists(socketDir) || File.Exists(socketDir))
-            return; // Another long-path instance of this user exists; the symlink case cannot be staged safely.
-
         Directory.CreateSymbolicLink(socketDir, dir.Path);
+
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+
+        Assert.Equal(ClaimOutcome.Primary, primary.Outcome);
+        Assert.False(primary.IsListening);
+        Assert.Contains("symbolic link", primary.Detail);
+    }
+
+    /// <summary>
+    /// QA finding: another local user can pre-create the predictable fallback folder (mode 0777) and listen there. A
+    /// second launch must not talk to it. Staged here with a folder of our own that is not 0700, plus a listener that
+    /// would answer.
+    /// </summary>
+    [NonPrivilegedUnixFact]
+    public void ASecondLaunch_RefusesAFallbackFolderThatIsNotPrivate()
+    {
+        if (OperatingSystem.IsWindows())
+            return; // Skipped by the attribute; this guard is for the platform analyzer.
+        using var dir = ShortTempDirectory.Create();
+        using var tmp = ShortTempDirectory.Create();
+        var deep = dir.Combine(new string('d', 60), new string('e', 60));
+        Func<string, string?> env = name => name == "TMPDIR" ? tmp.Path : null;
+        var endpoint = InstanceEndpoint.For(deep, "app", env);
+        var socketDir = Path.GetDirectoryName(endpoint.ChannelAddress)!;
+        Directory.CreateDirectory(socketDir);
+        File.SetUnixFileMode(socketDir, (UnixFileMode)0b111_111_111); // 0777, like a planted folder
+        Directory.CreateDirectory(deep);
+        using var foreignLock = new FileStream(endpoint.LockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        using var squatter = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        squatter.Bind(new UnixDomainSocketEndPoint(endpoint.ChannelAddress!));
+        squatter.Listen(4);
+
+        using var claim = SingleInstance.Claim(endpoint, new InstanceMessage("play", ["secret"]), _ => InstanceReply.Ok, Fast);
+
+        Assert.Equal(ClaimOutcome.PrimaryUnresponsive, claim.Outcome);
+        Assert.Contains("not private", claim.Detail);
+        squatter.Blocking = false;
+        Assert.Throws<SocketException>(() => squatter.Accept()); // nobody connected
+    }
+
+    [LinuxFact]
+    public void ASecondLaunch_RefusesAPrimaryRunByAnotherUser()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        var received = new BlockingQueue();
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle, Fast);
+
+        using var claim = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok,
+            Fast with { ExpectedPeerUserId = PeerCredentials.CurrentUserId() + 1 });
+
+        Assert.Equal(ClaimOutcome.PrimaryUnresponsive, claim.Outcome);
+        Assert.Contains("Refused", claim.Detail);
+        Assert.True(received.IsEmpty);
+    }
+
+    [LinuxFact]
+    public void ThePrimary_DropsAClientRunByAnotherUser()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        var received = new BlockingQueue();
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle,
+            Fast with { ExpectedPeerUserId = PeerCredentials.CurrentUserId() + 1 });
+
+        using var claim = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+
+        Assert.Equal(ClaimOutcome.PrimaryUnresponsive, claim.Outcome);
+        Assert.True(received.IsEmpty);
+    }
+
+    [LinuxFact]
+    public void PeerCredentials_ReportThisUserForALocalConnection()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var path = Path.Combine(dir.Path, "s.sock");
+        using var server = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        server.Bind(new UnixDomainSocketEndPoint(path));
+        server.Listen(1);
+        using var client = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        client.Connect(new UnixDomainSocketEndPoint(path));
+        using var accepted = server.Accept();
+
+        Assert.Equal(PeerCredentials.CurrentUserId(), PeerCredentials.PeerUserId(client));
+        Assert.Equal(PeerCredentials.CurrentUserId(), PeerCredentials.PeerUserId(accepted));
+    }
+
+    [UnixFact]
+    public void ASymlinkAtTheSocketPath_IsRemovedWithoutTouchingItsTarget()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var config = dir.Combine("config");
+        Directory.CreateDirectory(config);
+        var endpoint = InstanceEndpoint.For(config);
+        var target = dir.Combine("target.txt");
+        File.WriteAllText(target, "keep me");
+        File.CreateSymbolicLink(endpoint.ChannelAddress!, target);
+
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+        using var second = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+
+        Assert.True(primary.IsListening);
+        Assert.Equal(ClaimOutcome.Forwarded, second.Outcome);
+        Assert.Equal("keep me", File.ReadAllText(target));
+    }
+
+    [UnixFact]
+    public void ADanglingSymlinkAtTheSocketPath_IsRemoved()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        File.CreateSymbolicLink(endpoint.ChannelAddress!, dir.Combine("missing"));
+
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+
+        Assert.True(primary.IsListening);
+    }
+
+    [UnixFact]
+    public void AnEmptyDirectoryAtTheSocketPath_IsRemoved()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        Directory.CreateDirectory(endpoint.ChannelAddress!);
+
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+
+        Assert.True(primary.IsListening);
+    }
+
+    [UnixFact]
+    public void ANonEmptyDirectoryAtTheSocketPath_IsKept_AndThePrimaryRunsWithoutAChannel()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        Directory.CreateDirectory(endpoint.ChannelAddress!);
+        File.WriteAllText(Path.Combine(endpoint.ChannelAddress!, "data.txt"), "keep me");
+
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+
+        Assert.Equal(ClaimOutcome.Primary, primary.Outcome);
+        Assert.False(primary.IsListening);
+        Assert.NotNull(primary.Detail);
+        Assert.Equal("keep me", File.ReadAllText(Path.Combine(endpoint.ChannelAddress!, "data.txt")));
+    }
+
+    /// <summary>QA finding: with one connection served at a time, two or more silent clients used up the 3 s budget.</summary>
+    [Theory]
+    [InlineData(3)]
+    [InlineData(12)] // more than the 8 concurrent slots
+    public void SilentClients_DoNotMakeARealLaunchOpenASecondWindow(int silentClients)
+    {
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        var received = new BlockingQueue();
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle); // default options
+        var silent = Enumerable.Range(0, silentClients).Select(_ => RawConnect(endpoint)).ToList();
         try
         {
-            using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
+            var timer = Stopwatch.StartNew();
+            using var claim = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok); // default 3 s budget
 
-            Assert.Equal(ClaimOutcome.Primary, primary.Outcome);
-            Assert.False(primary.IsListening);
-            Assert.Contains("symbolic link", primary.Detail);
+            Assert.Equal(ClaimOutcome.Forwarded, claim.Outcome);
+            Assert.Equal(InstanceMessage.Focus, received.Take());
+            if (silentClients < new SingleInstanceOptions().MaxConcurrentRequests)
+                Assert.True(timer.Elapsed < TimeSpan.FromSeconds(1), $"a free slot should answer at once, took {timer.Elapsed}");
         }
         finally
         {
-            File.Delete(socketDir);
+            silent.ForEach(s => s.Dispose());
         }
     }
-
     [Fact]
     public void PrimaryProcess_ReceivesTheFocusMessageFromThisProcess()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         using var probe = ProbeProcess.Start("instance-probe", "primary", dir.Path);
         Assert.Equal("outcome Primary listening=True", probe.WaitFor("outcome"));
 
@@ -312,7 +522,7 @@ public class SingleInstanceTests
     [Fact]
     public void SecondLaunchProcess_ForwardsAndExits()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var received = new BlockingQueue();
         using var primary = SingleInstance.Claim(InstanceEndpoint.For(dir.Path), InstanceMessage.Focus,
             m => { received.Handle(m); return m.Verb == "unknown" ? InstanceReply.Unsupported : InstanceReply.Ok; }, Fast);
@@ -333,7 +543,7 @@ public class SingleInstanceTests
     [Fact]
     public void AKilledPrimaryProcess_DoesNotBlockTheNextStart()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         using (var probe = ProbeProcess.Start("instance-probe", "primary", dir.Path))
         {
@@ -357,7 +567,7 @@ public class SingleInstanceTests
     [LinuxFact]
     public void AChildProcessOfTheKilledPrimary_DoesNotKeepTheLock()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         int childId;
         using (var probe = ProbeProcess.Start("instance-probe", "primary-with-child", dir.Path, "/bin/sleep"))
         {
@@ -403,7 +613,7 @@ public class SingleInstanceTests
     [MemberData(nameof(GarbageRequests))]
     public void GarbageRequests_AreAnsweredInvalid_NeverHandled_AndTheListenerKeepsServing(string request)
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var received = new BlockingQueue();
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle, Fast);
@@ -415,7 +625,7 @@ public class SingleInstanceTests
     [Fact]
     public void InvalidUtf8_IsAnsweredInvalid()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var received = new BlockingQueue();
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle, Fast);
@@ -429,7 +639,7 @@ public class SingleInstanceTests
     [Fact]
     public void AnOversizedRequest_IsRejected_AndTheListenerKeepsServing()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var received = new BlockingQueue();
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle, Fast);
@@ -444,7 +654,7 @@ public class SingleInstanceTests
     [Fact]
     public void ASilentClient_IsDroppedAfterTheRequestTimeout_AndTheNextOneIsServed()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var received = new BlockingQueue();
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle,
@@ -457,7 +667,7 @@ public class SingleInstanceTests
     [Fact]
     public void ConnectionsThatCloseImmediately_DoNotStopTheListener()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
         var received = new BlockingQueue();
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle, Fast);
@@ -520,7 +730,7 @@ public class SingleInstanceTests
     [WindowsFact]
     public void OnWindows_TheChannelIsAPerDirectoryNamedPipe()
     {
-        using var dir = new TempDirectory();
+        using var dir = ShortTempDirectory.Create();
         var a = InstanceEndpoint.For(dir.Combine("a"));
 
         Assert.True(a.UsesNamedPipe);

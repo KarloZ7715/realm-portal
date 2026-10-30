@@ -5,54 +5,52 @@ using RealmPortal.Core.IO;
 namespace RealmPortal.Core.Instances;
 
 /// <summary>
-/// The primary instance's side of the channel: accepts one connection at a time, reads one request line (bounded in
-/// size and time), calls the handler and writes one reply. Garbage, oversized or slow requests get
-/// <see cref="InstanceReply.Invalid"/> (when possible) and never stop the loop.
+/// The primary instance's side of the channel: accepts connections and serves up to
+/// <see cref="SingleInstanceOptions.MaxConcurrentRequests"/> at once. Each one gets one request line (bounded in size
+/// and time), one handler call and one reply. Garbage, oversized or slow requests get <see cref="InstanceReply.Invalid"/>
+/// (when possible) and never stop the listener; silent clients cannot block a real one.
 /// </summary>
 internal sealed class InstanceListener : IDisposable
 {
     private readonly InstanceEndpoint _endpoint;
     private readonly Func<InstanceMessage, InstanceReply> _handler;
-    private readonly TimeSpan _requestTimeout;
+    private readonly SingleInstanceOptions _options;
     private readonly CancellationTokenSource _stop = new();
+    private readonly SemaphoreSlim _slots;
     private readonly Socket? _socket;
     private readonly Task _loop;
     private int _disposed;
 
-    private InstanceListener(InstanceEndpoint endpoint, Func<InstanceMessage, InstanceReply> handler, TimeSpan requestTimeout, Socket? socket)
+    private InstanceListener(InstanceEndpoint endpoint, Func<InstanceMessage, InstanceReply> handler, SingleInstanceOptions options, Socket? socket)
     {
         _endpoint = endpoint;
         _handler = handler;
-        _requestTimeout = requestTimeout;
+        _options = options;
+        _slots = new SemaphoreSlim(Math.Max(1, options.MaxConcurrentRequests));
         _socket = socket;
         _loop = Task.Run(socket is null ? PipeLoopAsync : SocketLoopAsync);
     }
 
     /// <summary>Starts listening. Must only be called while holding the instance lock.</summary>
-    public static InstanceListener Start(InstanceEndpoint endpoint, Func<InstanceMessage, InstanceReply> handler, TimeSpan requestTimeout)
+    public static InstanceListener Start(InstanceEndpoint endpoint, Func<InstanceMessage, InstanceReply> handler, SingleInstanceOptions options)
     {
         if (endpoint.ChannelAddress is null)
             throw new IOException("No instance channel is available for this directory.");
         if (OperatingSystem.IsWindows())
-            return new InstanceListener(endpoint, handler, requestTimeout, null);
+            return new InstanceListener(endpoint, handler, options, null);
 
         endpoint.EnsureSocketDirectory();
         var path = endpoint.ChannelAddress;
-
-        // We hold the lock, so any existing socket file belongs to a process that is gone: remove it. Anything that is
-        // not a socket or a regular file (a directory, a symlink) is left alone and makes the bind fail.
-        var existing = new FileInfo(path);
-        if (existing.Exists && existing.LinkTarget is null)
-            File.Delete(path);
+        RemoveStaleEntry(path);
 
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         try
         {
             socket.Bind(new UnixDomainSocketEndPoint(path));
-            // Only the owner may connect (the directory is 0700 as well).
+            // Only the owner may connect (the directory is private as well).
             File.SetUnixFileMode(path, PrivateStorage.PrivateFileMode);
-            socket.Listen(8);
-            return new InstanceListener(endpoint, handler, requestTimeout, socket);
+            socket.Listen(16);
+            return new InstanceListener(endpoint, handler, options, socket);
         }
         catch
         {
@@ -61,10 +59,36 @@ internal sealed class InstanceListener : IDisposable
         }
     }
 
+    /// <summary>
+    /// We hold the lock, so whatever is at the socket path belongs to a process that is gone (or was put there by
+    /// hand). A socket, regular file or symlink is unlinked (a symlink is removed itself, never its target). An empty
+    /// directory is removed; a non-empty directory is left alone and the bind fails, so the app runs without the
+    /// channel (second launches then open a second window) until the directory is removed.
+    /// </summary>
+    internal static void RemoveStaleEntry(string path)
+    {
+        var entry = new FileInfo(path);
+        if (entry.LinkTarget is not null)
+        {
+            File.Delete(path); // unlink(2): removes the link, not what it points to
+        }
+        else if (Directory.Exists(path))
+        {
+            Directory.Delete(path, recursive: false); // throws IOException when not empty
+        }
+        else if (entry.Exists)
+        {
+            File.Delete(path);
+        }
+    }
+
     private async Task SocketLoopAsync()
     {
         while (!_stop.IsCancellationRequested)
         {
+            if (!await WaitForSlotAsync().ConfigureAwait(false))
+                return;
+
             Socket client;
             try
             {
@@ -72,32 +96,63 @@ internal sealed class InstanceListener : IDisposable
             }
             catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
             {
+                _slots.Release();
                 return;
             }
             catch (SocketException)
             {
+                _slots.Release();
                 continue;
             }
 
-            await using var stream = new NetworkStream(client, ownsSocket: true);
-            await ServeAsync(stream).ConfigureAwait(false);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await using var stream = new NetworkStream(client, ownsSocket: true);
+                    if (IsSameUser(client))
+                        await ServeAsync(stream).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _slots.Release();
+                }
+            });
+        }
+    }
+
+    private bool IsSameUser(Socket client)
+    {
+        try
+        {
+            PeerCredentials.Verify(client, _options.ExpectedPeerUserId);
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false; // another user: close without a reply
         }
     }
 
     private async Task PipeLoopAsync()
     {
         var first = true;
+        var instances = Math.Max(1, _options.MaxConcurrentRequests);
         while (!_stop.IsCancellationRequested)
         {
+            if (!await WaitForSlotAsync().ConfigureAwait(false))
+                return;
+
             NamedPipeServerStream pipe;
             try
             {
                 var options = PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly | (first ? PipeOptions.FirstPipeInstance : PipeOptions.None);
-                pipe = new NamedPipeServerStream(_endpoint.ChannelAddress!, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, options);
+                pipe = new NamedPipeServerStream(_endpoint.ChannelAddress!, PipeDirection.InOut, instances, PipeTransmissionMode.Byte, options);
                 first = false;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                _slots.Release();
                 // The name is taken (another user or a dying instance): retry later rather than spin.
                 try
                 {
@@ -110,33 +165,54 @@ internal sealed class InstanceListener : IDisposable
                 continue;
             }
 
-            await using (pipe)
+            try
+            {
+                await pipe.WaitForConnectionAsync(_stop.Token).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException)
+            {
+                await pipe.DisposeAsync().ConfigureAwait(false);
+                _slots.Release();
+                if (ex is IOException)
+                    continue;
+                return;
+            }
+
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    await pipe.WaitForConnectionAsync(_stop.Token).ConfigureAwait(false);
+                    await using (pipe)
+                        await ServeAsync(pipe).ConfigureAwait(false);
                 }
-                catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+                finally
                 {
-                    return;
+                    _slots.Release();
                 }
-                catch (IOException)
-                {
-                    continue;
-                }
+            });
+        }
+    }
 
-                await ServeAsync(pipe).ConfigureAwait(false);
-            }
+    private async Task<bool> WaitForSlotAsync()
+    {
+        try
+        {
+            await _slots.WaitAsync(_stop.Token).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            return false;
         }
     }
 
     /// <summary>Handles one connection. Never throws.</summary>
     private async Task ServeAsync(Stream stream)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
-        timeout.CancelAfter(SingleInstance.ClampTimeout(_requestTimeout));
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+            timeout.CancelAfter(SingleInstance.ClampTimeout(_options.RequestTimeout));
             var line = await InstanceProtocol.ReadLineAsync(stream, timeout.Token).ConfigureAwait(false);
             var message = line is null ? null : InstanceProtocol.TryDecodeRequest(line);
             var reply = message is null ? InstanceReply.Invalid : Handle(message);
@@ -195,6 +271,6 @@ internal sealed class InstanceListener : IDisposable
             {
             }
         }
-        _stop.Dispose();
+        // _stop and _slots are not disposed: in-flight connection tasks may still observe or release them.
     }
 }

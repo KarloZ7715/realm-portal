@@ -35,8 +35,21 @@ public sealed record SingleInstanceOptions
     /// </summary>
     public TimeSpan ForwardTimeout { get; init; } = TimeSpan.FromSeconds(3);
 
-    /// <summary>How long the primary waits for one client to send its request line. Default 2 s.</summary>
-    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(2);
+    /// <summary>
+    /// How long the primary waits for one client to send its request line. Default 1 s (a real client writes at once
+    /// after connecting). Up to <see cref="MaxConcurrentRequests"/> clients are served at the same time, so a few
+    /// silent connections cannot use up a second launch's <see cref="ForwardTimeout"/>.
+    /// </summary>
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>Connections the primary serves concurrently. Default 8.</summary>
+    public int MaxConcurrentRequests { get; init; } = 8;
+
+    /// <summary>
+    /// Test seam: the user id the peer of a Unix socket must have (Linux, checked with <c>SO_PEERCRED</c> on both sides).
+    /// Null means the effective user id of this process.
+    /// </summary>
+    internal uint? ExpectedPeerUserId { get; init; }
 
     /// <summary>
     /// Called in the second launch after it connected and before it sends, with the primary's process id when the
@@ -95,7 +108,7 @@ public static class SingleInstance
             string? detail = null;
             try
             {
-                listener = InstanceListener.Start(endpoint, handler, options.RequestTimeout);
+                listener = InstanceListener.Start(endpoint, handler, options);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SocketException or NotSupportedException or ArgumentException)
             {
@@ -146,7 +159,7 @@ public static class SingleInstance
             int? peer = null;
             try
             {
-                (stream, peer) = Connect(endpoint, remaining);
+                (stream, peer) = Connect(endpoint, remaining, options);
             }
             catch (Exception ex) when (ex is IOException or SocketException or TimeoutException or OperationCanceledException)
             {
@@ -155,8 +168,8 @@ public static class SingleInstance
             }
             catch (UnauthorizedAccessException ex)
             {
-                // A pipe owned by another user (CurrentUserOnly): never talk to it.
-                return (null, ex.Message);
+                // A pipe or socket owned by another user, or a socket folder that is not private: never talk to it.
+                return (null, $"Refused the instance channel: {ex.Message}");
             }
 
             if (stream is null)
@@ -194,7 +207,7 @@ public static class SingleInstance
         return line is null ? throw new IOException("No reply.") : InstanceProtocol.DecodeReply(line);
     }
 
-    private static (Stream Stream, int? PeerProcessId) Connect(InstanceEndpoint endpoint, TimeSpan remaining)
+    private static (Stream Stream, int? PeerProcessId) Connect(InstanceEndpoint endpoint, TimeSpan remaining, SingleInstanceOptions options)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -213,12 +226,16 @@ public static class SingleInstance
             }
         }
 
+        // The shared-temp fallback folder must be private before we connect into it.
+        endpoint.VerifyPrivateSocketDirectory();
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         try
         {
             // Async with a deadline: a blocking connect could wait on a full backlog of a stopped primary.
             using (var cts = new CancellationTokenSource(ClampTimeout(remaining)))
                 socket.ConnectAsync(new UnixDomainSocketEndPoint(endpoint.ChannelAddress!), cts.Token).AsTask().GetAwaiter().GetResult();
+            // Only talk to a primary run by the same user (also closes the race of a folder swapped after the check).
+            PeerCredentials.Verify(socket, options.ExpectedPeerUserId);
             return (new NetworkStream(socket, ownsSocket: true), null);
         }
         catch
@@ -232,6 +249,7 @@ public static class SingleInstance
 
     private static class Native
     {
+        // Windows only; resolved lazily, never called on other platforms.
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint serverProcessId);
