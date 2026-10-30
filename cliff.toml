@@ -45,6 +45,7 @@ filter_unconventional = true
 split_commits = false
 protect_breaking_commits = true
 filter_commits = false
+# Stable tags only. Changes first shipped in an -rc tag are listed under the final version.
 tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
 sort_commits = "oldest"
 commit_parsers = [
