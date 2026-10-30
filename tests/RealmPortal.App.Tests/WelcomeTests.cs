@@ -1,8 +1,13 @@
+using Avalonia.Automation;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Tests.Support;
 using RealmPortal.App.ViewModels;
+using RealmPortal.App.Views;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
 using RealmPortal.Core.Service;
@@ -230,10 +235,9 @@ public class WelcomeTests
         Assert.False(welcome.AddServerCommand.CanExecute(null));
     }
 
-    [AvaloniaFact]
-    public void ServersStep_AddServer_FinishesAndOpensForm()
+    /// <summary>A welcome on the Servers step with one synthetic client in use (no scan needed).</summary>
+    private static (MainViewModel Main, WelcomeViewModel Welcome) WelcomeOnServersStep(Env env)
     {
-        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
         var folder = env.CreateClient("for-add");
         var added = env.Session.Service.AddClient(folder).Value!;
         env.Session.UiPreferences.Save(new UiPreferences(
@@ -247,13 +251,179 @@ public class WelcomeTests
         welcome.ContinueLanguageCommand.Execute(null);
         welcome.ContinueClientsCommand.Execute(null);
         Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        return (main, welcome);
+    }
+
+    [AvaloniaFact]
+    public void ServersStep_AddTwoServersInARow_StaysInWelcome_ThenFinish()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (main, welcome) = WelcomeOnServersStep(env);
         Assert.True(welcome.AddServerCommand.CanExecute(null));
 
-        welcome.AddServerCommand.Execute(null);
+        foreach (var (name, host) in new[] { ("Demo Realm", "logon.example.com"), ("Second Realm", "play.example.net") })
+        {
+            welcome.AddServerCommand.Execute(null);
 
+            // Regression (#202): the form opens inside the welcome; the welcome is not completed.
+            Assert.True(main.IsWelcomeActive);
+            Assert.True(welcome.IsServerFormOpen);
+            Assert.False(welcome.IsStepVisible);
+            Assert.False(env.Session.UiPreferences.Load().IsWelcomeDone);
+            Assert.False(welcome.BackCommand.CanExecute(null));
+
+            var form = welcome.ServerForm!;
+            form.Name = name;
+            form.Address = host;
+            form.SaveCommand.Execute(null);
+
+            Assert.Null(welcome.ServerForm);
+            Assert.True(main.IsWelcomeActive);
+            Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        }
+
+        Assert.Equal(2, welcome.ServerItems.Count);
+        Assert.True(welcome.HasServers);
+        Assert.Equal("2 servers ready", welcome.Title);
+        Assert.False(env.Session.UiPreferences.Load().IsWelcomeDone);
+
+        welcome.FinishCommand.Execute(null);
         Assert.False(main.IsWelcomeActive);
         Assert.True(env.Session.UiPreferences.Load().WelcomeCompleted);
-        Assert.IsType<AddServerViewModel>(main.Content);
+        Assert.Equal(2, env.Session.Service.ListServers(compatibleOnly: false).Value!.Count);
+    }
+
+    [AvaloniaFact]
+    public void ServersStep_AddServerCancel_ReturnsToServersStep()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (main, welcome) = WelcomeOnServersStep(env);
+
+        welcome.AddServerCommand.Execute(null);
+        Assert.True(welcome.IsServerFormOpen);
+        welcome.ServerForm!.CancelCommand.Execute(null);
+
+        Assert.Null(welcome.ServerForm);
+        Assert.True(main.IsWelcomeActive);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        Assert.Empty(welcome.ServerItems);
+        Assert.False(env.Session.UiPreferences.Load().IsWelcomeDone);
+        Assert.True(welcome.AddServerCommand.CanExecute(null));
+
+        welcome.SkipCommand.Execute(null);
+        Assert.False(main.IsWelcomeActive);
+        Assert.True(env.Session.UiPreferences.Load().WelcomeCompleted);
+    }
+
+    [AvaloniaFact]
+    public void Back_IsUnavailableOnLanguageStep()
+    {
+        using var env = new Env();
+        var welcome = env.Main.Welcome!;
+
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Language, welcome.Step);
+        Assert.False(welcome.HasBack);
+        Assert.False(welcome.BackCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public void Back_FromServers_KeepsClientSelection_AndFromClients_KeepsLanguage()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var (main, welcome) = WelcomeOnServersStep(env);
+        var client = Assert.Single(main.Clients.Items);
+        Assert.True(client.IsInUse);
+
+        welcome.BackCommand.Execute(null);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
+        Assert.True(Assert.Single(main.Clients.Items).IsInUse);
+        Assert.True(welcome.HasBack);
+
+        welcome.BackCommand.Execute(null);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Language, welcome.Step);
+        Assert.True(welcome.IsEnglish);
+        Assert.False(welcome.HasBack);
+        Assert.False(env.Session.UiPreferences.Load().IsWelcomeDone);
+
+        // Forward again: the language and client choices are still there.
+        welcome.ContinueLanguageCommand.Execute(null);
+        welcome.ContinueClientsCommand.Execute(null);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+        Assert.True(Assert.Single(main.Clients.Items).IsInUse);
+        Assert.Equal(Language.En, Loc.Instance.Current);
+    }
+
+    [AvaloniaFact]
+    public void Back_AfterLanguageChange_ShowsLanguageStepInNewLanguage()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var welcome = env.Main.Welcome!;
+
+        welcome.SelectSpanishCommand.Execute(null);
+        welcome.ContinueLanguageCommand.Execute(null);
+        Assert.Equal("Paso 2 de 3, Clientes", welcome.StepAnnouncement);
+
+        welcome.BackCommand.Execute(null);
+
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Language, welcome.Step);
+        Assert.True(welcome.IsSpanish);
+        Assert.Equal(Loc.Get("welcome.language.title"), welcome.Title);
+        Assert.Equal("Paso 1 de 3, Idioma", welcome.StepAnnouncement);
+        Assert.Equal("es", env.Session.UiPreferences.Load().LanguageCode);
+        Loc.Instance.SetLanguage(Language.En);
+    }
+
+    [AvaloniaFact]
+    public void ClosingMidFlow_DoesNotCompleteWelcome()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var welcome = env.Main.Welcome!;
+        welcome.ContinueLanguageCommand.Execute(null);
+        welcome.BackCommand.Execute(null);
+        welcome.ContinueLanguageCommand.Execute(null);
+
+        // A new session (next launch) still shows the welcome.
+        var again = new MainViewModel(env.Session, autoTick: false);
+        Assert.True(again.IsWelcomeActive);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Language, again.Welcome!.Step);
+    }
+
+    [AvaloniaFact]
+    public void View_BackButton_HiddenOnLanguageStep_EscGoesBack_AndFocusesSelectedCard()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var window = new MainWindow(env.Main) { Width = 960, Height = 600 };
+        window.Show();
+        Screenshots.Settle();
+        var view = window.GetVisualDescendants().OfType<WelcomeView>().Single();
+        var back = view.FindControl<Button>("BackButton")!;
+        var welcome = env.Main.Welcome!;
+
+        // Step 1: Back is not shown (so it is not focusable) and Esc does nothing.
+        Assert.False(back.IsEffectivelyVisible);
+        view.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Language, welcome.Step);
+        Assert.True(env.Main.IsWelcomeActive);
+
+        welcome.ContinueLanguageCommand.Execute(null);
+        Screenshots.Settle();
+        Assert.True(back.IsEffectivelyVisible);
+        Assert.Equal("Back", AutomationProperties.GetName(back));
+        Assert.Equal("Step 2 of 3, Clients", AutomationProperties.GetName(view.FindControl<ItemsControl>("ProgressStrip")!));
+
+        // Esc = Back on steps 2 and 3; focus goes to the selected language card.
+        view.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
+        Screenshots.Settle();
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Language, welcome.Step);
+        Assert.Same(view.FindControl<Button>("EnglishCard"), window.FocusManager!.GetFocusedElement());
+
+        // Alt+Left also goes back.
+        welcome.ContinueLanguageCommand.Execute(null);
+        welcome.ContinueClientsCommand.Execute(null);
+        Screenshots.Settle();
+        view.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Left, KeyModifiers = KeyModifiers.Alt });
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
+        window.Close();
     }
 
     [AvaloniaFact]

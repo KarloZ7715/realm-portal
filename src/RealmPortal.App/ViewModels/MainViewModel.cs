@@ -99,7 +99,7 @@ public sealed partial class MainViewModel : ObservableObject
                 Servers,
                 Settings,
                 FinishWelcome,
-                openAddServer: OpenAddServerFromWelcomeAsync);
+                createServerForm: CreateWelcomeServerForm);
         }
         else
         {
@@ -186,12 +186,12 @@ public sealed partial class MainViewModel : ObservableObject
         ExceptionLog.Observe(RunAutomaticUpdateCheckAsync());
     }
 
-    private async Task OpenAddServerFromWelcomeAsync()
-    {
-        // Welcome already cleared WelcomeCompleted; open the add-server form on the servers section.
-        ShowAddServer();
-        await Task.CompletedTask.ConfigureAwait(true);
-    }
+    /// <summary>
+    /// The add-server form shown inside the welcome (Servers step). Save and Cancel both call <paramref name="closed"/>,
+    /// which returns to the Servers step; the welcome stays open until Finish or Skip.
+    /// </summary>
+    private AddServerViewModel CreateWelcomeServerForm(Action closed) =>
+        new(Clients, _session!, closed, closed, _probe);
 
     /// <summary>Raised when a section change waits for the unsaved-changes question, so the sidebar can re-select Settings.</summary>
     public event Action? SectionChangeHeld;

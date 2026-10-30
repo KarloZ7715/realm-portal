@@ -27,7 +27,7 @@ a pretend game process). For `1.0.0`, the UI screens and flows below connect to 
 | Client backups manager (`BackupsView`) | Follows `compact-01` + `compact-07` sub-sheet layout — *New (1.0.0)* | "Gestionar respaldos…" / "Manage backups…" inside the `BACKUP` card in Settings |
 | Confirm delete backup | Reuses `07b-confirm-incompatible-switch@2x.png` modal — *New (1.0.0)* | inline `✕` ("Eliminar respaldo") button on a backup row |
 | Backup restore conflict (`Restore anyway`) | `compact-09-backup-conflict@2x.png` & `compact-09b-backup-conflict-restore-anyway@2x.png` — *Exists in Figma* | "Restaurar" / "Restore" on an older backup while a recent switch has a pending Undo |
-| First-run welcome | `01-first-run@2x.png`, `02-detection-*.png` — *Implemented (1.1.0 #107)* | Shown when `IsWelcomeDone` is false: unset `WelcomeCompleted` uses `FirstScanCompleted` (upgrades skip); explicit `false` still shows the wizard; Skip/Finish persist `WelcomeCompleted=true`. Flow: language → clients → servers |
+| First-run welcome | `01-first-run@2x.png`, `02-detection-*.png` — *Implemented (1.1.0 #107)* | Shown when `IsWelcomeDone` is false: unset `WelcomeCompleted` uses `FirstScanCompleted` (upgrades skip); explicit `false` still shows the wizard; Skip/Finish persist `WelcomeCompleted=true`. Flow: language → clients → servers, with Back on steps 2–3 and the add-server form inside the welcome (1.2.0 #202, #203; see [First-run welcome](#first-run-welcome)) |
 
 The language toggle in the status bar ("ES · v1.0.0"; the version comes from `Directory.Build.props` through `AppInfo.Version`) switches Spanish and English at run time. The first language follows the system language.
 
@@ -364,12 +364,25 @@ All keys below are specified for `src/RealmPortal.App/Localization/Strings/en.js
 | `scan.outcome.clientsonly` | `Found {0} client(s). Add a server to start playing.` | `Se encontraron {0} cliente(s). Añade un servidor para empezar a jugar.` |
 | `scan.outcome.nochange` | `Scan complete: no new clients or servers found.` | `Búsqueda completada: no se encontraron clientes ni servidores nuevos.` |
 | `error.storelocked` | `Another Realm Portal operation is updating the configuration. Try again in a moment.` | `Otra operación de Realm Portal está actualizando la configuración. Inténtalo de nuevo en un momento.` |
+| `welcome.back` | `Back` | `Atrás` |
+| `welcome.step.announce` | `Step {0} of 3, {1}` | `Paso {0} de 3, {1}` |
 
 ---
 
 ## Art used without a Figma reference
 
 See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
+
+## First-run welcome
+
+`WelcomeView` / `WelcomeViewModel` (1.1.0 #107; 1.2.0 #202, #203). Steps: 1 Language, 2 Clients, 3 Servers.
+
+- **Layout:** steps in the top row (centred from 960 px, left-aligned below), **Skip for now** top right on every step. Footer row (min 44 px): **Back** on the left (steps 2 and 3 only; hidden, so not focusable, on step 1), then on the right the secondary action (step 2 **Pick a folder by hand**, with **Search again** before it; step 3 **Add**) and the primary (**Continue** / **Continue with N** / **Finish**). Side margins 48 px from 960 px wide, 24 px below.
+- **Back:** text button (`Button.link caps`, chevron left, min 36 px high), the same pattern as Back in About and Backups; accessible name = visible text (`welcome.back`). It keeps every choice: language, clients in use, servers already added.
+- **Add server (step 3):** opens the regular add-server form inside the welcome. Save or Cancel returns to the Servers step with the list refreshed, so several servers can be added in one session. Only **Finish** and **Skip for now** set `WelcomeCompleted=true`; closing the window mid-flow does not, so the welcome shows again on the next launch.
+- **Keyboard:** Esc = Back on steps 2 and 3 (no action on step 1; Skip needs an explicit click or Enter on the button); Alt+Left = Back too. Enter runs the step's primary unless the focused control handles it (a focused button runs itself; Enter inside a multi-line field never triggers the primary). While the add-server form is open, Esc = Cancel. Tab order: step content → Back → secondary → primary → Skip. The radio dots inside the language cards are not tab stops (the card is).
+- **Focus on each step change (and when the add-server form closes):** the selected language card (step 1), the first client checkbox (step 2, or the primary when there are no clients), the primary (step 3; server rows have no controls yet). The last focused element is not remembered.
+- **Announcement:** the step strip's accessible name is `welcome.step.announce` ("Step 2 of 3, Clients") with a polite live setting, updated on each step change and language switch.
 
 ## About
 
