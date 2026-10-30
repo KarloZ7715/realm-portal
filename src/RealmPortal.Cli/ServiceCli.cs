@@ -1,3 +1,4 @@
+using RealmPortal.Core.IO;
 using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Service;
 using RealmPortal.Core.Servers;
@@ -82,9 +83,14 @@ internal static class ServiceCli
     private static string FormatStoreCorrupt(ServiceError error)
     {
         var name = error.Path is { } p ? Path.GetFileName(p) : null;
-        return name is null or ""
-            ? "A config file is corrupt or unreadable."
-            : $"Config file '{name}' is corrupt or unreadable.";
+        if (name is null or "")
+            return "A config file is corrupt or unreadable.";
+        var message = $"Config file '{name}' is corrupt or unreadable.";
+        // #196: point at the previous valid copy when one exists for a store the CLI can restore.
+        var store = name switch { "servers.json" => "servers", "clients.json" => "clients", _ => null };
+        return store is not null && File.Exists(error.Path + ConfigFileBackup.BackupSuffix)
+            ? $"{message} A previous copy exists; run 'realm-portal config restore {store}' to restore it."
+            : message;
     }
 
     private static string FormatInvalidServerInput(ServiceError error)

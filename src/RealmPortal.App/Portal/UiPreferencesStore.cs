@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using RealmPortal.App.Localization;
 using RealmPortal.Core.IO;
 using RealmPortal.Core.Servers;
+using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.Portal;
 
@@ -71,7 +72,33 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
         if (!existed && !OperatingSystem.IsWindows())
             File.SetUnixFileMode(directory.FullName, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(preferences, JsonOptions));
+        ConfigFileBackup.KeepPrevious(_path, _writer, IsValidContent);
         _writer.WriteAllBytes(_path, bytes, new FileReplacementPermissions((int)(UnixFileMode.UserRead | UnixFileMode.UserWrite), null));
+    }
+
+    /// <summary>State of <c>ui-preferences.json.bak</c>, the previous valid preferences kept on every save (#196).</summary>
+    public ConfigFileState BackupState => ConfigFileBackup.Inspect(_path + ConfigFileBackup.BackupSuffix, IsValidContent);
+
+    /// <summary>
+    /// Replaces <c>ui-preferences.json</c> with its valid <c>.bak</c>; the replaced file is kept as
+    /// <c>ui-preferences.json.before-restore</c>.
+    /// </summary>
+    /// <exception cref="FileNotFoundException">There is no <c>.bak</c>.</exception>
+    /// <exception cref="StoreException">The <c>.bak</c> is damaged; nothing was changed.</exception>
+    public void RestoreBackup() => ConfigFileBackup.Restore(_path, _writer, IsValidContent);
+
+    private static bool IsValidContent(byte[] bytes)
+    {
+        try
+        {
+            using var stream = new MemoryStream(bytes);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            return JsonSerializer.Deserialize<UiPreferences>(reader.ReadToEnd(), JsonOptions) is not null;
+        }
+        catch (Exception ex) when (IsUnreadable(ex))
+        {
+            return false;
+        }
     }
 
     public Language ResolveLanguage()

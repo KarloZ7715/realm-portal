@@ -151,19 +151,7 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
 
         try
         {
-            var file = JsonSerializer.Deserialize<StoreFile>(PrivateStorage.ReadBounded(FilePath, PrivateStorage.MaxJsonBytes), JsonOptions)
-                       ?? throw new StoreException($"'{FilePath}' is empty.");
-            if (file.Version != FormatVersion)
-                throw new StoreException($"'{FilePath}' has unsupported format version {file.Version}.");
-
-            var servers = (file.Servers ?? []).Select(ToServer).ToList();
-            if (servers.Select(s => s.Id).Distinct().Count() != servers.Count)
-                throw new StoreException($"'{FilePath}' contains duplicate server ids.");
-            return servers;
-        }
-        catch (JsonException ex)
-        {
-            throw new StoreException($"'{FilePath}' is not valid: {ex.Message}", ex);
+            return Parse(PrivateStorage.ReadBounded(FilePath, PrivateStorage.MaxJsonBytes), FilePath);
         }
         catch (IOException ex)
         {
@@ -175,10 +163,47 @@ public sealed class ServerStore(string configDirectory, IAtomicFileWriter writer
         }
     }
 
+    /// <summary>Parses <c>servers.json</c> bytes with the same rules as loading the store.</summary>
+    /// <exception cref="StoreException">The content is not a valid store file.</exception>
+    internal static List<Server> Parse(byte[] bytes, string path)
+    {
+        try
+        {
+            var file = JsonSerializer.Deserialize<StoreFile>(bytes, JsonOptions)
+                       ?? throw new StoreException($"'{path}' is empty.");
+            if (file.Version != FormatVersion)
+                throw new StoreException($"'{path}' has unsupported format version {file.Version}.");
+
+            var servers = (file.Servers ?? []).Select(ToServer).ToList();
+            if (servers.Select(s => s.Id).Distinct().Count() != servers.Count)
+                throw new StoreException($"'{path}' contains duplicate server ids.");
+            return servers;
+        }
+        catch (JsonException ex)
+        {
+            throw new StoreException($"'{path}' is not valid: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>True when <paramref name="bytes"/> would load as a valid <c>servers.json</c>.</summary>
+    internal static bool IsValidContent(byte[] bytes)
+    {
+        try
+        {
+            Parse(bytes, FileName);
+            return true;
+        }
+        catch (StoreException)
+        {
+            return false;
+        }
+    }
+
     private void Save(List<Server> servers)
     {
         var file = new StoreFile { Version = FormatVersion, Servers = servers.Select(ToRecord).ToList() };
         var json = JsonSerializer.Serialize(file, JsonOptions) + "\n";
+        ConfigFileBackup.KeepPrevious(FilePath, writer, IsValidContent);
         writer.WriteAllBytes(FilePath, new System.Text.UTF8Encoding(false).GetBytes(json), PrivateStorage.PrivateFilePermissions);
     }
 

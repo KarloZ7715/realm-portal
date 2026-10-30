@@ -1,4 +1,5 @@
 using RealmPortal.Core;
+using RealmPortal.Core.IO;
 using RealmPortal.Core.ClientFiles;
 using RealmPortal.Core.Clients;
 using RealmPortal.Core.Launch;
@@ -29,7 +30,7 @@ public sealed class CliApp(
 
     private bool _verbose;
 
-    public static readonly string[] Commands = ["add", "remove", "list", "switch", "undo", "status", "launch", "client", "edit", "scan"];
+    public static readonly string[] Commands = ["add", "remove", "list", "switch", "undo", "status", "launch", "client", "edit", "scan", "config"];
 
     public const string Usage = """
         Usage:
@@ -50,6 +51,8 @@ public sealed class CliApp(
           realm-portal client remove <client>
           realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
           realm-portal scan [--root <folder>]...
+          realm-portal config backups
+          realm-portal config restore <servers|clients>
 
         Global options (before or after the command):
           --verbose               print detailed error messages (paths, parse errors)
@@ -123,6 +126,7 @@ public sealed class CliApp(
                 "status" => Status(parsed, service, clientId, clientDir),
                 "launch" => Launch(parsed, service, clientId, clientDir, parsed.Flags.Contains("--dry-run")),
                 "client" => ClientCommand(parsed, service),
+                "config" => ConfigCommand(parsed, service),
                 "edit" => EditServer(parsed, service),
                 "scan" => Scan(parsed, service),
                 _ => throw new UsageException($"unknown command '{command}'"),
@@ -330,6 +334,52 @@ public sealed class CliApp(
             return Fail(result.Error!);
         SafeWriteLine(output, $"Scan complete: {result.Value!.AddedClients.Count} clients and {result.Value.ImportedServers.Count} servers added.");
         return 0;
+    }
+
+    /// <summary><c>config backups</c> lists the config files and their <c>.bak</c>; <c>config restore</c> restores one (#196).</summary>
+    private int ConfigCommand(Parsed parsed, PortalService service)
+    {
+        if (parsed.Positionals.Count == 0)
+            throw new UsageException("config requires backups or restore");
+        switch (parsed.Positionals[0])
+        {
+            case "backups":
+                Expect(parsed, 1, 1, "backups");
+                var listed = service.GetConfigBackups();
+                if (!listed.Succeeded)
+                    return Fail(listed.Error!);
+                foreach (var status in listed.Value!)
+                    SafeWriteLine(output, FormatConfigBackup(status));
+                return 0;
+            case "restore":
+                Expect(parsed, 2, 2, "restore <servers|clients>");
+                var file = parsed.Positionals[1] switch
+                {
+                    "servers" => ConfigFileKind.Servers,
+                    "clients" => ConfigFileKind.Clients,
+                    var other => throw new UsageException($"unknown config file '{other}' (expected servers or clients)"),
+                };
+                var restored = service.RestoreConfigBackup(file);
+                if (!restored.Succeeded)
+                    return Fail(restored.Error!);
+                var name = Path.GetFileName(restored.Value!.Path);
+                SafeWriteLine(output,
+                    $"Restored {name} from {name}{ConfigFileBackup.BackupSuffix} (the replaced file, if any, was kept as {name}{ConfigFileBackup.BeforeRestoreSuffix}).");
+                return 0;
+            default:
+                throw new UsageException($"unknown config command '{parsed.Positionals[0]}'");
+        }
+    }
+
+    private static string FormatConfigBackup(ConfigBackupStatus status)
+    {
+        var name = Path.GetFileName(status.Path);
+        var backup = status.BackupModifiedAt is { } at
+            ? $"{Describe(status.Backup)} ({at.ToLocalTime():yyyy-MM-dd HH:mm:ss})"
+            : Describe(status.Backup);
+        return $"{name}: current {Describe(status.Current)}, backup {backup}";
+
+        static string Describe(ConfigFileState state) => state.ToString().ToLowerInvariant();
     }
 
     private int ClientCommand(Parsed parsed, PortalService service)

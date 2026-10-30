@@ -516,6 +516,25 @@ manifest hash, and those journals keep working as before. A value that is presen
 
 ---
 
+## 6b. Config file backups (`GetConfigBackups`, `RestoreConfigBackup`, #196)
+
+```csharp
+public enum ConfigFileKind { Servers, Clients }
+public enum ConfigFileState { Missing, Valid, Damaged }
+public sealed record ConfigBackupStatus(
+    ConfigFileKind File, string Path, ConfigFileState Current,
+    string BackupPath, ConfigFileState Backup, DateTimeOffset? BackupModifiedAt);
+
+ServiceResult<IReadOnlyList<ConfigBackupStatus>> GetConfigBackups();
+ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file);
+```
+
+- **Write side (`ConfigFileBackup.KeepPrevious`):** `ServerStore.Save`, `ClientStore.Save` and the app's `UiPreferencesStore.Save` copy the current file to `<file>.bak` (private permissions, `0600` on Unix) before writing, under the same locks as the write. Only a readable, valid current file is copied, so a damaged file (#141) never replaces a good `.bak`. The first save creates no `.bak`. `AtomicFileWriter` itself is unchanged (it also writes game client files).
+- **No automatic restore.** A damaged `servers.json` / `clients.json` still fails with `StoreCorrupt`; the UI can call `GetConfigBackups()` and offer `RestoreConfigBackup` when `Current == Damaged` and `Backup == Valid`.
+- **`RestoreConfigBackup`** runs under the config-directory lock. It moves the current file (if any) to `<file>.before-restore` (overwriting), then writes the `.bak` bytes to `<file>`; the `.bak` stays. If the write fails, the original file is moved back. No `.bak`: `BackupNotFound` with `Path = <file>.bak`, `Consistency.Unchanged`. Damaged `.bak`: `StoreCorrupt` with `Path = <file>.bak`, nothing changed.
+- `state.json` is not changed by a restore; if its active id is not in the restored `servers.json`, `GetStatus` reports no active server (and `activo.json` out of sync) until the next switch.
+- **UI preferences (app only):** `UiPreferencesStore.BackupState` (`ConfigFileState` of the `.bak`) and `UiPreferencesStore.RestoreBackup()` (same semantics; throws `FileNotFoundException` without a `.bak`, `StoreException` when the `.bak` is damaged). `Load()` still returns defaults for a damaged file.
+
 ## 7. Errors (`ServiceErrorCode` mapping)
 
 | Source | Codes |
