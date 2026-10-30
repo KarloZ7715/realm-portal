@@ -286,4 +286,190 @@ public sealed class DuplicateServerTests
         Assert.Equal(1, box.Cli("duplicate", "Example", "--name").Code);
         Assert.Single(box.Servers());
     }
+
+    [Fact]
+    public void Duplicate_CopiesClearCacheOnSwitchTrue()
+    {
+        using var box = new Box();
+        var original = box.Service.AddServer(new NewServer("Example", "logon.example.test", ClearCacheOnSwitch: true)).Value!;
+
+        var copy = box.Service.DuplicateServer(original.Id).Value!;
+
+        Assert.True(copy.ClearCacheOnSwitch);
+        Assert.True(box.Servers().Single(s => s.Id == copy.Id).ClearCacheOnSwitch);
+    }
+
+    [Fact]
+    public void Duplicate_DoesNotReadState_SoADamagedStateFileDoesNotFailAfterSaving()
+    {
+        // The copy is never active; reading state.json after saving it would report a failure with the copy already
+        // written, and every retry would add another one.
+        using var box = new Box();
+        var original = box.Service.AddServer(new NewServer("Example", "logon.example.test")).Value!;
+        Assert.True(box.Service.ActivateWithoutClientFiles(original.Id).Succeeded);
+        var statePath = Path.Combine(box.Config, ActiveServerManager.StateFileName);
+        File.WriteAllText(statePath, "{\"version\":1,");
+
+        var first = box.Service.DuplicateServer(original.Id);
+        var second = box.Service.DuplicateServer(original.Id);
+
+        Assert.True(first.Succeeded, first.Error?.ToString());
+        Assert.True(second.Succeeded, second.Error?.ToString());
+        Assert.False(first.Value!.IsActive);
+        Assert.Equal("Example (copy)", first.Value.Name);
+        Assert.Equal("Example (copy 2)", second.Value!.Name);
+        using var json = JsonDocument.Parse(File.ReadAllBytes(box.ServersPath));
+        Assert.Equal(["Example", "Example (copy)", "Example (copy 2)"],
+            json.RootElement.GetProperty("servers").EnumerateArray().Select(r => r.GetProperty("name").GetString()));
+        Assert.Equal("{\"version\":1,", File.ReadAllText(statePath));
+    }
+
+    [Fact]
+    public void DefaultName_ForASingleTextElementName_IsComparedAsSaved()
+    {
+        // A valid 64-unit name made of one text element ("e" + 63 combining accents) cannot keep any of the original
+        // name; the saved name is the trimmed tail, and the next copy must be numbered instead of reporting it taken.
+        using var box = new Box();
+        var name = "e" + new string('\u0301', Server.MaxNameLength - 1);
+        var original = box.Service.AddServer(new NewServer(name, "logon.example.test")).Value!;
+
+        var first = box.Service.DuplicateServer(original.Id);
+        var second = box.Service.DuplicateServer(original.Id);
+
+        Assert.True(first.Succeeded, first.Error?.ToString());
+        Assert.True(second.Succeeded, second.Error?.ToString());
+        Assert.Equal("(copy)", first.Value!.Name);
+        Assert.Equal("(copy 2)", second.Value!.Name);
+    }
+
+    [Fact]
+    public void DefaultName_DropsTheSpaceWhereTheCutFalls()
+    {
+        // 56 letters, a space, then 7 letters = 64 units: the cut for " (copy)" ends on the space, which is dropped.
+        var name = new string('n', 56) + " " + new string('x', 7);
+        Assert.Equal(Server.MaxNameLength, name.Length);
+
+        Assert.Equal(new string('n', 56) + " (copy)", PortalService.CreateDuplicateServerName(name, []));
+    }
+
+    [Fact]
+    public async Task ConcurrentDuplicates_GetDistinctNames()
+    {
+        using var box = new Box();
+        var original = box.Service.AddServer(new NewServer("Example", "logon.example.test")).Value!;
+        const int count = 8;
+        using var start = new Barrier(count);
+
+        var results = Enumerable.Range(0, count)
+            .Select(_ => Task.Factory.StartNew(() =>
+            {
+                // A separate service per task, as separate App/CLI processes would have.
+                var service = new PortalService(box.Config, box.Projection, new PeClientVersionReader(), new NoLaunch(),
+                    new NeverRunningGameProbe(), _ => null);
+                start.SignalAndWait();
+                return service.DuplicateServer(original.Id);
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default))
+            .ToArray();
+        var done = await Task.WhenAll(results);
+
+        Assert.All(done, r => Assert.True(r.Succeeded, r.Error?.ToString()));
+        var names = done.Select(r => r.Value!.Name).ToList();
+        Assert.Equal(count, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(count + 1, box.Servers().Count);
+    }
+
+    [Fact]
+    public void Overrides_SetTheCopysRealmAndAccount()
+    {
+        using var box = new Box();
+        var original = box.AddFull();
+
+        var copy = box.Service.DuplicateServer(original.Id, realm: "  PvE Realm  ", account: "  alt1  ").Value!;
+
+        Assert.Equal("PvE Realm", copy.Realm);
+        Assert.Equal("alt1", copy.Account);
+        Assert.Equal(original with { Id = copy.Id, Name = copy.Name, Realm = copy.Realm, Account = copy.Account }, copy);
+        Assert.Equal(original, box.Servers().Single(s => s.Id == original.Id));
+    }
+
+    [Fact]
+    public void Overrides_Null_KeepsTheOriginals_AndEmptyLeavesNone()
+    {
+        using var box = new Box();
+        var original = box.AddFull();
+
+        var kept = box.Service.DuplicateServer(original.Id, realm: null, account: null).Value!;
+        var cleared = box.Service.DuplicateServer(original.Id, realm: "", account: "").Value!;
+
+        Assert.Equal(original.Realm, kept.Realm);
+        Assert.Equal(original.Account, kept.Account);
+        Assert.Equal("", cleared.Realm);
+        Assert.Null(cleared.Account);
+    }
+
+    [Theory]
+    [InlineData("bad\u0007realm", null, "realm")]
+    [InlineData(null, "bad\u0007account", "account")]
+    public void Overrides_Invalid_FailWithInvalidServerInput_AndWriteNothing(string? realm, string? account, string field)
+    {
+        using var box = new Box();
+        var original = box.AddFull();
+        var before = File.ReadAllBytes(box.ServersPath);
+
+        var result = box.Service.DuplicateServer(original.Id, realm: realm, account: account);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ServiceErrorCode.InvalidServerInput, result.Error!.Code);
+        Assert.Equal(field, result.Error.Field);
+        Assert.Equal(before, File.ReadAllBytes(box.ServersPath));
+    }
+
+    [Fact]
+    public void Cli_RealmAndAccountOverrides()
+    {
+        using var box = new Box();
+        Assert.Equal(0, box.Cli("add", "Example", "logon.example.test", "--realm", "PvP Realm", "--account", "player1").Code);
+
+        var result = box.Cli("duplicate", "Example", "--name", "Alt", "--realm", "PvE Realm", "--account", "alt1");
+
+        Assert.Equal(0, result.Code);
+        var copy = box.Servers().Single(s => s.Name == "Alt");
+        Assert.Equal("PvE Realm", copy.Realm);
+        Assert.Equal("alt1", copy.Account);
+        Assert.Equal("PvP Realm", box.Servers().Single(s => s.Name == "Example").Realm);
+    }
+
+    [Fact]
+    public void Cli_InvalidOverride_ExitsLikeAdd_AndWritesNothing()
+    {
+        using var box = new Box();
+        Assert.Equal(0, box.Cli("add", "Example", "logon.example.test").Code);
+        var before = File.ReadAllBytes(box.ServersPath);
+        var add = box.Cli("add", "Other", "other.example.test", "--realm", "bad\u0007realm");
+
+        var duplicate = box.Cli("duplicate", "Example", "--realm", "bad\u0007realm");
+
+        Assert.Equal(add.Code, duplicate.Code);
+        Assert.Equal(2, duplicate.Code);
+        Assert.Equal(before, File.ReadAllBytes(box.ServersPath));
+    }
+
+    [Theory]
+    [InlineData("--host", "other.example.test")]
+    [InlineData("--build", "12340")]
+    [InlineData("--line", "set patchlist other.example.test")]
+    [InlineData("--client-dir", "client")]
+    [InlineData("--client", "none")]
+    public void Cli_OtherOptions_AreRejected(string option, string value)
+    {
+        using var box = new Box();
+        Assert.Equal(0, box.Cli("add", "Example", "logon.example.test").Code);
+        var before = File.ReadAllBytes(box.ServersPath);
+
+        var result = box.Cli("duplicate", "Example", option, value);
+
+        Assert.Equal(1, result.Code);
+        Assert.Contains($"option {option} does not apply to this command", result.Err, StringComparison.Ordinal);
+        Assert.Equal(before, File.ReadAllBytes(box.ServersPath));
+    }
 }

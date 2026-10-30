@@ -49,7 +49,7 @@ public sealed class CliApp(
           realm-portal client edit <client> [--name <name>] [--path <path>]
           realm-portal client remove <client>
           realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
-          realm-portal duplicate <server> [--name <name>]
+          realm-portal duplicate <server> [--name <name>] [--realm <realm>] [--account <name>]
           realm-portal scan [--root <folder>]...
 
         Global options (before or after the command):
@@ -271,12 +271,18 @@ public sealed class CliApp(
         return 0;
     }
 
+    private static readonly string[] DuplicateValueOptions = ["--name", "--realm", "--account", "--config-dir", "--projection-dir"];
+
     private int Duplicate(Parsed parsed, PortalService service)
     {
         Expect(parsed, 1, 1, "<server>");
+        // Only --name, --realm and --account apply: --host, --build, --line, --client-dir ... would otherwise be ignored silently.
+        var extraOption = parsed.Options.Keys.Except(DuplicateValueOptions).Order(StringComparer.Ordinal).FirstOrDefault();
+        if (extraOption is not null)
+            throw new UsageException($"option {extraOption} does not apply to this command");
         if (FindServer(service, parsed.Positionals[0], out var server) != 0)
             return 2;
-        var result = service.DuplicateServer(server.Id, parsed.Get("--name"));
+        var result = service.DuplicateServer(server.Id, parsed.Get("--name"), parsed.Get("--realm"), parsed.Get("--account"));
         if (!result.Succeeded)
             return Fail(result.Error!);
         SafeWriteLine(output, $"Added '{result.Value!.Name}' ({result.Value.Id}) as a copy of '{server.Name}'");

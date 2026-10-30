@@ -442,7 +442,7 @@ public sealed class PortalService : IPortalService
         }
     }
 
-    public ServiceResult<ServerEntry> DuplicateServer(string serverId, string? newName = null)
+    public ServiceResult<ServerEntry> DuplicateServer(string serverId, string? newName = null, string? realm = null, string? account = null)
     {
         ArgumentNullException.ThrowIfNull(serverId);
 
@@ -457,15 +457,15 @@ public sealed class PortalService : IPortalService
             var copy = Server.Create(
                 newName ?? CreateDuplicateServerName(source.Name, servers),
                 source.Host,
-                source.Realm,
+                realm ?? source.Realm,
                 StoredExtraRealmlistLines(source),
                 source.RequiredClientBuild,
-                source.Account,
+                account ?? source.Account,
                 clientId: source.ClientId,
                 clearCacheOnSwitch: source.ClearCacheOnSwitch);
             _servers.Add(copy);
-            var activeId = _active.GetActive(copy.ClientId)?.Id;
-            return ServiceResult<ServerEntry>.Ok(ToServerEntry(copy, activeId, copy.ClientId, null));
+            // A new copy is never active, so state.json is not read: nothing can fail after the copy is saved.
+            return ServiceResult<ServerEntry>.Ok(ToServerEntry(copy, activeId: null, copy.ClientId, null));
         }
         catch (Exception ex)
         {
@@ -1354,7 +1354,8 @@ public sealed class PortalService : IPortalService
         {
             var tail = number == 1 ? " (copy)" : $" (copy {number})";
             var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
-            var candidate = prefix + tail;
+            // Trimmed like Server.Create trims the name, so a prefix cut to nothing ("(copy)") is compared as saved.
+            var candidate = (prefix + tail).Trim();
             if (!existing.Any(server => string.Equals(server.Name, candidate, StringComparison.OrdinalIgnoreCase)))
                 return candidate;
         }
