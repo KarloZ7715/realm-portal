@@ -229,4 +229,45 @@ public sealed class Issue213UndoAfterReapplyTests
         Assert.Contains("restored 'B'", globalUndo.Out, StringComparison.Ordinal);
         Assert.Equal(Original, File.ReadAllText(Path.Combine(box.OtherClient, "Data", "enUS", "realmlist.wtf"), Encoding.ASCII));
     }
+
+    [Fact]
+    public void Reapply_WithACorruptJournal_StillSucceeds()
+    {
+        // Dropping a stale undo after a re-apply is best effort: an unreadable last-switch.json must not fail the
+        // switch that already rewrote the client files and activated the server.
+        using var box = new Box();
+        Assert.Equal(0, box.Run("add", "A", HostA).Code);
+        Assert.Equal(0, box.Run("switch", "A", "--client-dir", box.Client).Code);
+        Assert.Equal(0, box.Run("edit", "A", "--host", NewHostA).Code);
+        File.WriteAllText(box.JournalPath, "{ not json");
+
+        var reapply = box.Run("switch", "A", "--client-dir", box.Client);
+
+        Assert.True(reapply.Code == 0, reapply.Err);
+        Assert.Contains(NewHostA, box.Realmlist(), StringComparison.Ordinal);
+        Assert.Contains("Active server: A", box.Run("status", "--client-dir", box.Client).Out, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("--realm", "Other Realm", false)]
+    [InlineData("--name", "Renamed", true)]
+    [InlineData("--account", "player2", true)]
+    public void Reapply_AfterAnEdit_DropsTheUndoOnlyWhenTheFilesChange(string option, string value, bool keepsUndo)
+    {
+        // docs/cli.md and the FAQ: only host or realm edits change the client files; name and account do not.
+        using var box = new Box();
+        Assert.Equal(0, box.Run("add", "A", HostA).Code);
+        Assert.Equal(0, box.Run("switch", "A", "--client-dir", box.Client).Code);
+        Assert.Equal(0, box.Run("edit", "A", option, value).Code);
+        Assert.Equal(0, box.Run("switch", option == "--name" ? value : "A", "--client-dir", box.Client).Code);
+
+        var status = box.Run("status", "--client-dir", box.Client).Out;
+
+        Assert.Contains(keepsUndo ? "Can undo: yes" : "Can undo: no", status, StringComparison.Ordinal);
+        if (keepsUndo)
+        {
+            Assert.Equal(0, box.Run("undo", "--client-dir", box.Client).Code);
+            Assert.Equal(Original, box.Realmlist());
+        }
+    }
 }

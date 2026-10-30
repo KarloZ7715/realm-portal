@@ -121,6 +121,10 @@ public sealed class ClientFilesCanUndoWithoutConflictTests
             return;
         }
 
+        // Root reads a mode-000 file anyway, so the file cannot be made unreadable there.
+        if (Environment.IsPrivilegedProcess)
+            return;
+
         var mode = File.GetUnixFileMode(box.RealmlistPath);
         File.SetUnixFileMode(box.RealmlistPath, UnixFileMode.None);
         try
