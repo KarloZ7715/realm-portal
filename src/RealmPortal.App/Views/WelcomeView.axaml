@@ -138,7 +138,7 @@
     </ScrollViewer>
 
     <!-- Footer actions -->
-    <Grid Grid.Row="2" Margin="16,8,16,6" ColumnDefinitions="*,Auto">
+    <Grid Grid.Row="2" Margin="16,8,16,6" ColumnDefinitions="Auto,*,Auto">
       <!-- Language footer -->
       <StackPanel Grid.ColumnSpan="2" Spacing="8" IsVisible="{Binding IsLanguageStep}" HorizontalAlignment="Center">
         <Button Name="ContinueLanguageButton" Classes="primary" MinWidth="180" HorizontalAlignment="Center" Command="{Binding ContinueLanguageCommand}">
@@ -151,7 +151,10 @@
       </StackPanel>
 
       <!-- Clients footer -->
-      <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center" IsVisible="{Binding IsClientsStep}">
+      <Button Name="BackClientsButton" Classes="link caps" VerticalAlignment="Center" IsVisible="{Binding IsClientsStep}" Command="{Binding BackCommand}" Click="OnBackFromClientsClick">
+        <TextBlock Text="{loc:T welcome.back}"/>
+      </Button>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center" IsVisible="{Binding IsClientsStep}">
         <Button Name="PickFolderButton" Classes="secondary" Command="{Binding PickClientFolderCommand}">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <c:Icon Data="{DynamicResource IconFolder}" Width="14" Height="14" StrokeThickness="2"/>
@@ -165,10 +168,7 @@
           </StackPanel>
         </Button>
       </StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsClientsStep}">
-        <Button Classes="link caps" Command="{Binding BackCommand}" VerticalAlignment="Center">
-          <TextBlock Text="{loc:T welcome.back}"/>
-        </Button>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsClientsStep}">
         <Button Classes="link caps" Command="{Binding SkipCommand}" VerticalAlignment="Center">
           <TextBlock Text="{Binding SkipLabel}"/>
         </Button>
@@ -184,10 +184,10 @@
           <TextBlock Text="{loc:T servers.add}"/>
         </StackPanel>
       </Button>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsServersStep}">
-        <Button Classes="link caps" Command="{Binding BackCommand}" VerticalAlignment="Center">
+      <Button Name="BackServersButton" Classes="link caps" IsVisible="{Binding IsServersStep}" Command="{Binding BackCommand}" Click="OnBackFromServersClick">
           <TextBlock Text="{loc:T welcome.back}"/>
-        </Button>
+      </Button>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" IsVisible="{Binding IsServersStep}">
         <Button Classes="link caps" Command="{Binding SkipCommand}" VerticalAlignment="Center">
           <TextBlock Text="{Binding SkipLabel}"/>
         </Button>
