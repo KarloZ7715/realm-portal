@@ -173,6 +173,30 @@ public class WelcomeTests
     }
 
     [AvaloniaFact]
+    public void Back_StepsBackOneStep_KeepsLanguage_AndIsUnavailableOnLanguage()
+    {
+        using var env = new Env(welcomeCompleted: false, firstScanCompleted: true);
+        var welcome = env.Main.Welcome!;
+        Assert.False(welcome.BackCommand.CanExecute(null));
+
+        welcome.SelectSpanishCommand.Execute(null);
+        welcome.ContinueLanguageCommand.Execute(null);
+        welcome.ContinueClientsCommand.Execute(null);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Servers, welcome.Step);
+
+        welcome.BackCommand.Execute(null);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Clients, welcome.Step);
+        Assert.True(welcome.IsSpanish);
+
+        welcome.BackCommand.Execute(null);
+        Assert.Equal(WelcomeViewModel.WelcomeStep.Language, welcome.Step);
+        Assert.False(welcome.BackCommand.CanExecute(null));
+        Assert.True(welcome.IsSpanish);
+        Assert.Equal(Language.Es, Loc.Instance.Current);
+        Assert.True(env.Main.IsWelcomeActive);
+    }
+
+    [AvaloniaFact]
     public async Task ClientsStep_DetectsSyntheticClient_ThenFinishPersists()
     {
         using var temp = new TempDirectory();
