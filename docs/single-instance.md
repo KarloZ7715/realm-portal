@@ -75,7 +75,11 @@ quick play (`--play`) can reuse the channel. Today the app handles `focus` only 
 else. Malformed, oversized (no newline within 4 KiB) or slow requests (no full line within 1 s) are answered `invalid`
 or dropped; they never reach the handler and never stop the listener. Up to 8 connections are served at the same
 time, so a few silent connections cannot use up a second launch's 3 s budget; more wait in the backlog for at most
-1 s per slot.
+1 s per slot. Once the request is read, the reply has its own 3 s deadline, so a client delayed between sending and
+reading (a busy machine) still gets it; on Windows the primary keeps the pipe open until the client closes it or that
+deadline passes, because closing first would drop an unread reply. The trade-off is that, on Windows, a client
+that sends a request and never reads the reply holds its slot for up to 3 s (before this change it held it for what
+was left of the 1 s request timeout).
 
 ## Timeouts and failure behavior
 

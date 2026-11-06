@@ -1,0 +1,135 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RealmPortal.App.Controls"
+        x:CompileBindings="False">
+  <!--
+    Parchment Expander (Advanced on Add/Edit server, #192 Designer).
+    Flat hover: solid #D1BB92 + 3 px wax-red bar (same rule as parchment popup rows).
+    Chevron is kit IconChevronDown (16 px, ink), rotated -90° when collapsed.
+    No content opacity transition — expanded body stays full ink strength.
+  -->
+  <Styles.Resources>
+    <SolidColorBrush x:Key="ExpanderHoverFillParchmentBrush" Color="#D1BB92"/>
+    <ControlTheme x:Key="RpParchmentExpander" TargetType="Expander">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="ClipToBounds" Value="False"/>
+      <Setter Property="ContentTransition" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <DockPanel LastChildFill="True" Background="Transparent">
+            <Border Name="HeaderChrome"
+                    DockPanel.Dock="Top"
+                    MinHeight="36"
+                    Background="Transparent"
+                    ClipToBounds="False"
+                    CornerRadius="{DynamicResource RadiusControl}">
+              <Panel>
+                <Border Name="HoverFill"
+                        Background="{StaticResource ExpanderHoverFillParchmentBrush}"
+                        CornerRadius="{DynamicResource RadiusControl}"
+                        Opacity="0"
+                        IsHitTestVisible="False"/>
+                <Border Name="Bar"
+                        Width="3"
+                        HorizontalAlignment="Left"
+                        Background="{DynamicResource WaxBrush}"
+                        Opacity="0"
+                        IsHitTestVisible="False"/>
+                <c:NineSlice Name="Ring"
+                             Source="focus-ring-control-parchment"
+                             Insets="12"
+                             ShadowMargin="5"
+                             Opacity="0"
+                             IsHitTestVisible="False"
+                             ZIndex="3"/>
+                <ToggleButton Name="ExpandCollapseButton"
+                              Theme="{x:Null}"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              MinHeight="36"
+                              Padding="4,0,8,0"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              Cursor="Hand"
+                              Focusable="False"
+                              Opacity="1"
+                              Foreground="{DynamicResource InkSoftBrush}"
+                              IsChecked="{TemplateBinding IsExpanded, Mode=TwoWay}">
+                  <ToggleButton.Styles>
+                    <Style Selector="ToggleButton">
+                      <Setter Property="Template">
+                        <ControlTemplate>
+                          <ContentPresenter Content="{TemplateBinding Content}"
+                                            Padding="{TemplateBinding Padding}"
+                                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                            VerticalContentAlignment="Center"
+                                            Background="Transparent"/>
+                        </ControlTemplate>
+                      </Setter>
+                    </Style>
+                  </ToggleButton.Styles>
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <c:Icon Name="Chevron"
+                            Data="{DynamicResource IconChevronDown}"
+                            Width="16"
+                            Height="16"
+                            StrokeThickness="2"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource InkBrush}"
+                            RenderTransformOrigin="50%,50%">
+                      <c:Icon.RenderTransform>
+                        <RotateTransform Angle="-90"/>
+                      </c:Icon.RenderTransform>
+                    </c:Icon>
+                    <ContentPresenter Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      Content="{TemplateBinding Header}"
+                                      ContentTemplate="{TemplateBinding HeaderTemplate}"/>
+                  </Grid>
+                </ToggleButton>
+              </Panel>
+            </Border>
+            <ContentPresenter Name="PART_ContentPresenter"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              IsVisible="{TemplateBinding IsExpanded}"
+                              Opacity="1"
+                              Margin="0,0,0,0"/>
+          </DockPanel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:expanded /template/ c|Icon#Chevron">
+        <Setter Property="RenderTransform">
+          <RotateTransform Angle="0"/>
+        </Setter>
+      </Style>
+      <Style Selector="^:pointerover /template/ Border#HoverFill"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:pointerover /template/ Border#Bar"><Setter Property="Opacity" Value="1"/></Style>
+      <Style Selector="^:focus-visible /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+      <!-- Whole header row is the hit target; keep focus on the Expander itself. -->
+      <Style Selector="^:focus-within /template/ c|NineSlice#Ring"><Setter Property="Opacity" Value="1"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="Expander.parchment">
+    <Setter Property="Theme" Value="{StaticResource RpParchmentExpander}"/>
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+  <!-- Header label matches SERVER DETAILS / sheet-title (InkSoft); never dimmed by the toggle. -->
+  <Style Selector="Expander.parchment TextBlock.sheet-title">
+    <Setter Property="Foreground" Value="{DynamicResource InkSoftBrush}"/>
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+  <Style Selector="Expander.parchment /template/ ToggleButton#ExpandCollapseButton">
+    <Setter Property="Opacity" Value="1"/>
+    <Setter Property="Foreground" Value="{DynamicResource InkSoftBrush}"/>
+  </Style>
+  <Style Selector="Expander.parchment /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+</Styles>

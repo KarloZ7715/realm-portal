@@ -34,13 +34,15 @@ public enum InvalidRealmlistKind
 /// </summary>
 public sealed class InvalidRealmlistException : Exception
 {
-    public InvalidRealmlistException(InvalidRealmlistKind kind, string reason, int? lineNumber = null, string? serverName = null)
+    public InvalidRealmlistException(
+        InvalidRealmlistKind kind, string reason, int? lineNumber = null, string? serverName = null, int? extraLineIndex = null)
         : base(BuildMessage(kind, reason, lineNumber, serverName))
     {
         Kind = kind;
         Reason = reason;
         LineNumber = lineNumber;
         ServerName = serverName;
+        ExtraLineIndex = extraLineIndex;
     }
 
     /// <summary>The category of the violation; callers can branch on it without parsing messages.</summary>
@@ -55,8 +57,14 @@ public sealed class InvalidRealmlistException : Exception
     /// <summary>Name of the server whose realmlist is invalid, when known (set when applying a stored server).</summary>
     public string? ServerName { get; }
 
+    /// <summary>
+    /// 0-based index, in the <c>extraLines</c> passed to <see cref="RealmlistText.Build"/>, of the extra line that caused the
+    /// error (blank entries count, so it matches an editable list); <c>null</c> when the error is not tied to an extra line.
+    /// </summary>
+    public int? ExtraLineIndex { get; }
+
     /// <summary>The same error attributed to a server.</summary>
-    public InvalidRealmlistException ForServer(string serverName) => new(Kind, Reason, LineNumber, serverName);
+    public InvalidRealmlistException ForServer(string serverName) => new(Kind, Reason, LineNumber, serverName, ExtraLineIndex);
 
     private static string BuildMessage(InvalidRealmlistKind kind, string reason, int? lineNumber, string? serverName) =>
         (serverName is null ? "Invalid realmlist" : $"Server '{serverName}' has an invalid realmlist")

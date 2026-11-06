@@ -20,6 +20,7 @@ public class SingleInstanceTests
     {
         ForwardTimeout = TimeSpan.FromSeconds(5),
         RequestTimeout = TimeSpan.FromSeconds(2),
+        ReplyTimeout = TimeSpan.FromSeconds(10),
     };
 
     [Fact]
@@ -661,6 +662,51 @@ public class SingleInstanceTests
             Fast with { RequestTimeout = TimeSpan.FromMilliseconds(300) });
 
         using var silent = RawConnect(endpoint); // connects and sends nothing
+        AssertStillServes(endpoint, received);
+    }
+
+    [Fact]
+    public void AClientThatReadsTheReplyAfterTheRequestTimeout_StillGetsIt()
+    {
+        // A busy machine can delay the client between sending its request and reading the reply. The reply must
+        // stay available after the request deadline has passed (on Windows the pipe is closed by the primary).
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        var received = new BlockingQueue();
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle,
+            Fast with { RequestTimeout = TimeSpan.FromMilliseconds(300) });
+
+        using var stream = RawConnect(endpoint);
+        stream.Write(InstanceProtocol.EncodeRequest(InstanceMessage.Focus));
+        stream.Flush();
+        Assert.Equal(InstanceMessage.Focus, received.Take());
+        Thread.Sleep(TimeSpan.FromMilliseconds(1200));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var line = InstanceProtocol.ReadLineAsync(stream, cts.Token).GetAwaiter().GetResult();
+        Assert.NotNull(line);
+        Assert.Equal(InstanceReply.Ok, InstanceProtocol.DecodeReply(line));
+    }
+
+    [Fact]
+    public void AClientThatNeverReadsTheReply_IsDroppedAfterTheReplyTimeout_AndTheNextOneIsServed()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        var received = new BlockingQueue();
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle,
+            Fast with { MaxConcurrentRequests = 1, ReplyTimeout = TimeSpan.FromMilliseconds(300) });
+
+        // On Linux the primary can write the reply into the socket buffer and close at once, so this test barely
+        // exercises ReplyTimeout there; the Windows CI run (named pipe) is what catches a regression to a single
+        // shared deadline.
+        // Sends a request and keeps the connection open without reading: with a single slot, the next launch is only
+        // served once the primary gives up on this reply.
+        using var stuck = RawConnect(endpoint);
+        stuck.Write(InstanceProtocol.EncodeRequest(InstanceMessage.Focus));
+        stuck.Flush();
+        Assert.Equal(InstanceMessage.Focus, received.Take());
+
         AssertStillServes(endpoint, received);
     }
 

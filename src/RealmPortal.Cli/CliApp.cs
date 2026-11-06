@@ -26,7 +26,7 @@ public sealed class CliApp(
     private static readonly HashSet<string> ValueOptions =
         ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper", "--name", "--path", "--host", "--client", "--root"];
 
-    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose"];
+    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose", "--clear-lines"];
 
     private bool _verbose;
 
@@ -49,7 +49,7 @@ public sealed class CliApp(
           realm-portal client add <path> [--name <name>]
           realm-portal client edit <client> [--name <name>] [--path <path>]
           realm-portal client remove <client>
-          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
+          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--line <realmlist line>]... [--clear-lines] [--build <n|any>] [--account <name>] [--client <client|none>]
           realm-portal duplicate <server> [--name <name>] [--realm <realm>] [--account <name>]
           realm-portal scan [--root <folder>]...
           realm-portal config backups
@@ -247,7 +247,7 @@ public sealed class CliApp(
             build = n;
         }
 
-        var lines = parsed.Options.GetValueOrDefault("--line");
+        var lines = ExtraLineOptions(parsed, "--line must not be blank");
 
         var result = service.AddServer(new NewServer(
             parsed.Positionals[0],
@@ -258,7 +258,7 @@ public sealed class CliApp(
             parsed.Get("--account"),
             ExtraRealmlistLines: lines));
         if (!result.Succeeded)
-            return Fail(result.Error!);
+            return Fail(WithLineOption(result.Error!, lines));
         SafeWriteLine(output, $"Added '{result.Value!.Name}' ({result.Value.Id})");
         return 0;
     }
@@ -295,7 +295,11 @@ public sealed class CliApp(
 
     private int EditServer(Parsed parsed, PortalService service)
     {
-        Expect(parsed, 1, 1, "<server>");
+        Expect(parsed, 1, 1, "<server>", "--clear-lines");
+        var newLines = ExtraLineOptions(parsed, "--line must not be blank; use --clear-lines to remove the extra realmlist lines");
+        var clearLines = parsed.Flags.Contains("--clear-lines");
+        if (clearLines && newLines is not null)
+            throw new UsageException("use either --line or --clear-lines, not both");
         if (FindServer(service, parsed.Positionals[0], out var server) != 0)
             return 2;
 
@@ -322,7 +326,8 @@ public sealed class CliApp(
                 clientId = selected.Id;
         }
 
-        var extraLines = server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+        // --line replaces every extra realmlist line, --clear-lines removes them; without either they are kept (#93, #192).
+        IReadOnlyList<string> extraLines = clearLines ? [] : newLines ?? server.ExtraRealmlistLines;
         var host = parsed.Get("--host") is { } hostRaw
             ? NormalizeHostArgument(hostRaw)
             : server.Host;
@@ -338,7 +343,7 @@ public sealed class CliApp(
             ClearRequiredClientBuild: clearBuild,
             ClearCacheOnSwitch: server.ClearCacheOnSwitch));
         if (!result.Succeeded)
-            return Fail(result.Error!);
+            return Fail(WithLineOption(result.Error!, newLines));
         SafeWriteLine(output, $"Updated '{server.Name}' to '{result.Value!.Name}' ({result.Value.Id})");
         return 0;
     }
@@ -353,6 +358,13 @@ public sealed class CliApp(
         if (!result.Succeeded)
             return Fail(result.Error!);
         SafeWriteLine(output, $"Scan complete: {result.Value!.AddedClients.Count} clients and {result.Value.ImportedServers.Count} servers added.");
+        if (result.Value.AddedClients.Count == 0)
+        {
+            SafeWriteLine(output, (result.Value.AllClients.Count == 0
+                    ? "No game clients were found."
+                    : "No new clients were found; the clients already registered were kept.")
+                + " Run 'realm-portal scan --root <folder>' to search another folder, or 'realm-portal client add <path>' to add one by hand.");
+        }
         return 0;
     }
 
@@ -370,6 +382,8 @@ public sealed class CliApp(
                     return Fail(listed.Error!);
                 foreach (var status in listed.Value!)
                     SafeWriteLine(output, FormatConfigBackup(status));
+                foreach (var line in ConfigBackupHints(listed.Value!))
+                    SafeWriteLine(output, line);
                 return 0;
             case "restore":
                 Expect(parsed, 2, 2, "restore <servers|clients>");
@@ -402,6 +416,28 @@ public sealed class CliApp(
         static string Describe(ConfigFileState state) => state.ToString().ToLowerInvariant();
     }
 
+    /// <summary>
+    /// What to do after <c>config backups</c> (#194): restore a damaged file that has a valid copy, or explain why there is no copy yet.
+    /// </summary>
+    private static IEnumerable<string> ConfigBackupHints(IReadOnlyList<ConfigBackupStatus> statuses)
+    {
+        foreach (var status in statuses)
+        {
+            if (status.Current != ConfigFileState.Valid && status.Backup == ConfigFileState.Valid)
+            {
+                var name = Path.GetFileName(status.Path);
+                var store = status.File == ConfigFileKind.Servers ? "servers" : "clients";
+                yield return $"{name} is {status.Current.ToString().ToLowerInvariant()} but its backup is valid; run 'realm-portal config restore {store}' to restore it.";
+            }
+        }
+
+        if (statuses.All(s => s.Backup == ConfigFileState.Missing))
+            yield return $"No backups yet: a {ConfigFileBackup.BackupSuffix} copy is kept the next time a save changes servers.json or clients.json.";
+    }
+
+    private const string NoClientsHint =
+        "No clients. Run 'realm-portal scan' to look for game clients (add --root <folder> to search another folder), or 'realm-portal client add <path>' to add one by hand.";
+
     private int ClientCommand(Parsed parsed, PortalService service)
     {
         if (parsed.Positionals.Count == 0)
@@ -416,7 +452,7 @@ public sealed class CliApp(
                 if (!listed.Succeeded)
                     return Fail(listed.Error!);
                 if (listed.Value!.Count == 0)
-                    SafeWriteLine(output, "No clients.");
+                    SafeWriteLine(output, NoClientsHint);
                 foreach (var entry in listed.Value)
                     SafeWriteLine(output, $"{entry.Id}  {entry.Name}  {entry.Path}  origin={entry.Origin.ToString().ToLowerInvariant()}");
                 return 0;
@@ -471,7 +507,7 @@ public sealed class CliApp(
         }
         if (client is null)
         {
-            SafeWriteLine(error, $"error: no client matches '{selector}'.");
+            SafeWriteLine(error, $"error: no client matches '{selector}'. Run 'realm-portal client list' to see the registered clients.");
             return 2;
         }
         return 0;
@@ -492,7 +528,9 @@ public sealed class CliApp(
         if (rows.Count == 0)
         {
             var all = service.ListServers();
-            SafeWriteLine(output, all.Succeeded && all.Value!.Count == 0 ? "No servers." : "No compatible servers.");
+            SafeWriteLine(output, all.Succeeded && all.Value!.Count == 0
+                ? "No servers. Add one with 'realm-portal add <name> <host>', or run 'realm-portal scan' to import the servers of your game clients."
+                : "No compatible servers for this client's build. Run 'realm-portal list --all' to see every server, or 'realm-portal edit <server> --build any' to allow any build.");
             return 0;
         }
 
@@ -501,10 +539,50 @@ public sealed class CliApp(
             var build = server.RequiredClientBuild?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "any";
             SafeWriteLine(output,
                 $"{(server.IsActive ? "*" : " ")} {server.Id}  {server.Name}  {server.Host}  build={build}"
+                + string.Concat(server.ExtraRealmlistLines.Select(line => "  " + FormatExtraLine(line)))
                 + (server.IsCompatible ? "" : "  [incompatible]"));
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// The <c>--line</c> values, or <c>null</c> when none was given. A blank value is a usage error: the service would drop it,
+    /// so an empty <c>--line "$VAR"</c> in a script would otherwise remove every extra line without notice (#192).
+    /// </summary>
+    private static List<string>? ExtraLineOptions(Parsed parsed, string blankMessage)
+    {
+        var lines = parsed.Options.GetValueOrDefault("--line");
+        if (lines is not null && lines.Any(string.IsNullOrWhiteSpace))
+            throw new UsageException(blankMessage);
+        return lines;
+    }
+
+    /// <summary>
+    /// Names the offending <c>--line</c> (1-based, in the order given) in an invalid-realmlist error, next to the realmlist line
+    /// it became (line 1 is <c>set realmlist &lt;host&gt;</c>).
+    /// </summary>
+    private static ServiceError WithLineOption(ServiceError serviceError, IReadOnlyList<string>? lines)
+    {
+        if (serviceError is not { Code: ServiceErrorCode.InvalidRealmlist, ExtraLineIndex: { } index, LineNumber: { } number }
+            || lines is null || index >= lines.Count)
+            return serviceError;
+        var marker = $"(line {number})";
+        var at = serviceError.Diagnostic.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0)
+            return serviceError;
+        return serviceError with
+        {
+            Diagnostic = string.Concat(serviceError.Diagnostic.AsSpan(0, at), $"at --line #{index + 1} (realmlist line {number})",
+                serviceError.Diagnostic.AsSpan(at + marker.Length)),
+        };
+    }
+
+    /// <summary>Shows a stored extra realmlist line such as <c>set patchlist patch.example.org</c> as <c>patchlist=patch.example.org</c>.</summary>
+    private static string FormatExtraLine(string line)
+    {
+        var parts = line.Split(' ', 3);
+        return parts is ["set", var key, var value] ? $"{key}={value}" : line;
     }
 
     private int SwitchCommand(Parsed parsed, PortalService service, string? clientId, string? clientDir)
@@ -548,7 +626,7 @@ public sealed class CliApp(
         {
             clientId = ResolveRegisteredClientId(service, explicitClientDir);
             if (clientId is null)
-                return Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+                return Fail(new ServiceError(ServiceErrorCode.ClientNotFound, Path: explicitClientDir));
         }
 
         var result = service.Undo(clientId);
@@ -594,7 +672,7 @@ public sealed class CliApp(
         var status = result.Value!;
         if (status.Active is null)
         {
-            SafeWriteLine(output, "Active server: none");
+            SafeWriteLine(output, "Active server: none (run 'realm-portal switch <server>' to choose one)");
         }
         else
         {
@@ -670,7 +748,7 @@ public sealed class CliApp(
         var status = service.GetStatus();
         if (!status.Succeeded)
             return Fail(status.Error!);
-        server = status.Value!.Active ?? throw new InvalidOperationException("no active server; run 'switch <server>' or 'launch <server>'.");
+        server = status.Value!.Active ?? throw new InvalidOperationException("no active server; run 'realm-portal switch <server>' or 'realm-portal launch <server>'.");
         if (!server.IsCompatible && !force)
         {
             SafeWriteLine(error, $"error: '{server.Name}' requires client build {server.RequiredClientBuild}, but the client is incompatible (use --force to launch anyway).");
@@ -741,7 +819,7 @@ public sealed class CliApp(
         var found = ServiceCli.FindServerEntry(list.Value!, selector);
         if (found is null)
         {
-            SafeWriteLine(error, $"error: no server matches '{selector}'.");
+            SafeWriteLine(error, $"error: no server matches '{selector}'. Run 'realm-portal list' to see the server names and ids.");
             return 2;
         }
 

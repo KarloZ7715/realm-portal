@@ -252,6 +252,14 @@ public sealed record UpdateServerRequest(
   - Under `ConfigDirectoryLock`: removes `clientId` from `clients.json`, clears `ClientId = null` on any server in `servers.json` that referenced `clientId` (servers themselves are not deleted), removes `active_by_client[clientId]` from `state.json`, and clears pending undo if it belonged to `clientId`.
   - When `deleteBackups == false` (default), `<backupRoot>/<clientId>` is kept on disk. When `deleteBackups == true`, acquires `InstallationLock(clientId)` and deletes managed backups under `<backupRoot>/<clientId>`. The real game folder is never touched.
 
+### 2.2b Extra realmlist lines (#192)
+
+- **Read:** `ServerEntry.ExtraRealmlistLines` (`IReadOnlyList<string>`, computed from `Realmlist`) lists the lines after `set realmlist <host>`, without line endings, e.g. `["set patchlist patch.example.org"]`; empty when there are none. `RealmlistText.ExtraLines(string realmlist)` does the same for a raw realmlist. Passing the list back unchanged as `ExtraRealmlistLines` rebuilds the same realmlist.
+- **Write:** `NewServer.ExtraRealmlistLines` / `UpdateServerRequest.ExtraRealmlistLines` (see §2.3 for `null` vs empty on update). Lines go through `RealmlistText.Build`: each is trimmed, blank entries are dropped, and the contract is unchanged (ASCII, CRLF, `set <key> <value>`, only `realmlist` and `patchlist`, each once, so today the only valid extra line is one `set patchlist <value>`). A line that still contains a line break after trimming is rejected (`BadLineEnding`) instead of being split into two lines.
+- **Errors:** an invalid line fails with `InvalidRealmlist` (`RealmlistKind`, `LineNumber` in the built realmlist, where line 1 is `set realmlist <host>`) and **`ExtraLineIndex`**: the 0-based index of the offending entry in the request's `ExtraRealmlistLines`, blank entries included, so the UI can show the error next to that row. `ExtraLineIndex` is `null` for errors not tied to an extra line (e.g. the host). Per-line errors are checked before the total size, so a repeated key is reported as `DuplicateKey` even when the text is also too long. The size limit (`RealmlistAddress.MaxRealmlistBytes`, 1024 bytes including CR LF) fails with `InvalidValue`, `LineNumber` = the line that goes over the limit, and `ExtraLineIndex` set when that line is an extra line. Nothing is saved. The service keeps dropping blank entries (an empty list clears the lines); the CLI rejects a blank `--line` instead.
+- The CLI uses the same calls: `add --line`, `edit --line` (replace) and `edit --clear-lines` (empty list), so the app and the CLI store identical data for the same input.
+- **`DuplicateServer`** copies the source's extra lines unchanged (see §2.3); `--line` on `duplicate` is not accepted.
+
 ### 2.3 Server CRUD semantics (`AddServer`, `UpdateServer`, `DuplicateServer`, `RemoveServer`)
 
 - **`UpdateServer(UpdateServerRequest request)`:**
@@ -261,7 +269,7 @@ public sealed record UpdateServerRequest(
   - **Running check:** If `request.ServerId` is currently active on any client `C` where `IsGameRunning(C) == true` and any connection/file field changed (`Host`, `Realm`, `PatchlistHost`, `ExtraRealmlistLines`, `RequiredClientBuild`), refuses with `ServiceErrorCode.GameRunning` (`ServerName = existing.Name`, `Path = C.Path`).
   - **Active projection & drift update:** Under `ConfigDirectoryLock`, saves `servers.json`. If `state.ActiveId == request.ServerId`, rewrites `activo.json` atomically so the projection stays in sync (`ProjectionInSync == true`). Client files on disk are not rewritten silently during metadata edit; if `Host`, `Realmlist`, or `Realm` changed for an active client, `GetStatus().ClientsNotMatchingActive` reports that client as drifted so the user can re-switch/repair or press Play.
 - **`DuplicateServer(string serverId, string? newName = null, string? realm = null, string? account = null)` (#191):**
-  - Adds a new server built with `Server.Create` (new id, same validation as `AddServer`) that copies the source's `Host`, `Realm`, extra realmlist lines (`set patchlist …`), `RequiredClientBuild`, `Account`, `ClientId` and `ClearCacheOnSwitch`. The copy is appended after the existing servers and is independent: editing or removing it does not change the original.
+  - Adds a new server built with `Server.Create` (new id, same validation as `AddServer`) that copies the source's `Host`, `Realm`, extra realmlist lines (`set patchlist …`, the same list as `ServerEntry.ExtraRealmlistLines`), `RequiredClientBuild`, `Account`, `ClientId` and `ClearCacheOnSwitch`. The copy is appended after the existing servers and is independent: editing or removing it does not change the original.
   - **Account name only:** `Account` is the remembered account name. Realm Portal never stores a password or any other credential (`servers.json` has no such field), so a duplicate carries nothing beyond the original's fields.
   - **Overrides:** a non-null `realm` or `account` replaces the copied value and is trimmed and validated as in `AddServer` (an empty `realm`, or an empty or blank `account`, leaves the copy without one). `null` keeps the original's value. Other fields are always copied; change them afterwards with `UpdateServer`.
   - **Name:** `newName` is trimmed and validated like any name. With `newName == null`, the name is `"<name> (copy)"`, then `"<name> (copy 2)"`, `"<name> (copy 3)"`, ... while taken case-insensitively (`PortalService.CreateDuplicateServerName`). The original name is cut to the longest whole-text-element prefix that keeps the result within `Server.MaxNameLength` (`64` UTF-16 units), as for imported names.
@@ -554,7 +562,7 @@ ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file);
 | Source | Codes |
 |---|---|
 | `ClientFilesException.Code` | mapped **by name**: `GameRunning`, `PermissionDenied`, `ReadOnlyFs`, `PathNotFound`, `PathEscapesClient`, `HashMismatch`, `VerifyFailed`, `UnsupportedClient` (with `ClientVersion`), `InvalidRealmlist`, `NothingToUndo`, `BackupNotFound`, `ProcessCheckFailed`. A test fails if the applier gets a code the service lacks. |
-| `InvalidRealmlistException` | `InvalidRealmlist` with `RealmlistKind`, `LineNumber`, `ServerName` |
+| `InvalidRealmlistException` | `InvalidRealmlist` with `RealmlistKind`, `LineNumber`, `ServerName`, `ExtraLineIndex` (§2.2b) |
 | `ClientVersionException.Kind` | `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `ClientUnreadable` (a missing folder: `PathNotFound`), with `Path` |
 | `StoreException` | `StoreCorrupt`, `ServerNameTaken`, `ServerNotFound`, `ClientNotFound`, `ClientAlreadyExists`, `NothingToUndo`, `UndoTargetMissing`, `StoreLocked` (the config-directory lock `.realm-portal.lock` is still held by another process; nothing changed, retry) |
 | undo or restore backup made for another client folder (manifest `client_root` differs from the registered client) | `PathEscapesClient`, `Diagnostic` names both folders; nothing is written |
@@ -574,6 +582,29 @@ ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file);
 `Consistency` tells the UI what a failed multi-step call left behind: `Unchanged`, `RolledBack` (steps ran and were put back), `Inconsistent`
 (`InconsistentState`: even the rollback failed; tell the user to review the client), `Pending` (only `UndoConflict`: stopped on purpose before touching any file, can be retried, forced via `RestoreBackup(force: true)`, or discarded via `DiscardUndo()`), or
 `AppliedLaunchFailed` (only `Play`: plan, apply and activate succeeded; launch failed — the client is configured, the new server is active, and undo is still available).
+
+### 7.1 Next step per error (`ServiceErrorAction`, #194)
+
+`ServiceErrorActions.NextAction(this ServiceError)` maps an error to a stable `ServiceErrorAction` the UI can turn into a localized hint or a button. It is pure (reads no file) and never throws for a known code; a code added later maps to `None` until it is listed.
+
+| `ServiceErrorAction` | Codes | Suggested UI action |
+|---|---|---|
+| `None` | `BackupNotFound`; `StoreCorrupt` for files other than `servers.json` / `clients.json` | message only |
+| `TryAgain` | `StoreLocked`, `FileSharingViolation`, `HashMismatch`, `Unexpected`, update codes (`UpdateCheckFailed`, `ChecksumMismatch`, `AssetMissing`, `DownloadTooLarge`, `UntrustedRedirect`, `RateLimited`) | Retry |
+| `CloseGame` | `GameRunning`, `ProcessCheckFailed` | close the game, then retry |
+| `ChooseServer` | `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing` | go to the server list |
+| `ScanOrAddClient` | `ClientNotFound` | "Scan again" / "Add client manually" |
+| `ChooseClientFolder` | `PathNotFound`, `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `UnsupportedClient` | pick another client folder |
+| `FixInput` | `InvalidServerInput`, `InvalidClientInput`, `InvalidRealmlist`, `ServerNameTaken`, `ClientAlreadyExists` | focus the offending field (`Field`, `ExtraLineIndex`) |
+| `UseCompatibleClient` | `IncompatibleClient` | pick a matching client, edit the build, or force |
+| `RestoreConfigBackup` | `StoreCorrupt` with `Path` ending in `servers.json` or `clients.json` | offer restore when `GetConfigBackups` shows a valid `.bak` |
+| `CheckPermissions` | `PermissionDenied`, `ReadOnlyFs`, `ClientUnreadable`, `VerifyFailed` | explain how to fix access |
+| `FreeDiskSpace` | `DiskFull` | free space, then retry |
+| `ResolveUndoConflict` | `UndoConflict` | show `ConflictingFiles`; retry undo, restore with force, or `DiscardUndo` |
+| `ReviewClientFiles` | `InconsistentState`, `PathEscapesClient` | review the client, switch again |
+| `CheckLauncherSettings` | `InvalidLauncherSettings`, `LaunchFailed` | open launcher settings (with `AppliedLaunchFailed`, also offer undo) |
+
+The CLI writes the same next steps as commands (see [cli.md](cli.md#empty-results-and-errors)).
 
 ---
 

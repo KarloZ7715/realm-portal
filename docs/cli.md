@@ -27,7 +27,7 @@ realm-portal -h
 realm-portal client-version <client-directory>
 realm-portal add <name> <host> [--realm <realm>] [--line <realmlist line>]... [--build <n>] [--account <name>]
 realm-portal remove <server>
-realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
+realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--line <realmlist line>]... [--clear-lines] [--build <n|any>] [--account <name>] [--client <client|none>]
 realm-portal list [--all]
 realm-portal switch <server> [--force]
 realm-portal undo
@@ -54,10 +54,10 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | `client-version <dir>` | Prints the game version and build of the client in `<dir>`. Takes no options (including the common `--config-dir` / `--projection-dir` / `--client-dir`); a rejected option is named on stderr. `--help` / `-h` after `client-version` print usage and exit 0. |
 | `add` | Adds a server. `<host>` is `host` or `host:port`. `--line` adds an extra `realmlist.wtf` line (repeatable, e.g. `--line "set patchlist patch.example.org"`). `--build` is optional: the client build the server requires (a positive integer). Without it, the server works with any client. |
 | `remove` | Removes a server. |
-| `edit` | Changes a server. Only the options you pass change; everything else (including the required build and extra realmlist lines such as `patchlist`) is kept. `--build <n>` sets the required client build; `--build any` clears it, so the server works with any client. `--client none` unlinks the server from its client. |
-| `list` | Lists servers. The active one is marked with `*`. With `--client-dir`, only servers compatible with that client are shown, unless you add `--all`; incompatible ones are marked `[incompatible]`. |
+| `edit` | Changes a server. Only the options you pass change; everything else (including the required build and extra realmlist lines such as `patchlist`) is kept. `--line` (repeatable, not blank) replaces all extra realmlist lines with the ones given; `--clear-lines` removes them; passing both is a usage error (exit `1`). An invalid line (see [Extra realmlist lines](#extra-realmlist-lines)) changes nothing (exit `2`). `--build <n>` sets the required client build; `--build any` clears it, so the server works with any client. `--client none` unlinks the server from its client. |
+| `list` | Lists servers. The active one is marked with `*`. With `--client-dir`, only servers compatible with that client are shown, unless you add `--all`; incompatible ones are marked `[incompatible]`. Extra realmlist lines are shown after the build as `key=value`, e.g. `patchlist=patch.example.org`. |
 | `switch` | Makes a server the active one. With `--client-dir`, it also backs up and rewrites that client's realm files (`realmlist.wtf` where the client uses it, and `WTF/Config.wtf`). Without `--client-dir`, it only updates Realm Portal's own state and `activo.json`. `--force` skips the compatibility check. |
-| `undo` | Restores the server that was active before the last switch. It remembers one step. With `--client-dir`, restores that client's last switch (and its realm files from the backup when that switch rewrote them), even if another client has a more recent global switch. Without `--client-dir`, undoes the globally latest switch. `REALM_PORTAL_CLIENT_DIR` alone does not scope undo. Switching again to the active server after changing its host or realm (for example `edit A --host …`, then `switch A`) rewrites the files, so there is nothing to undo afterwards; the files from before the first switch remain available as a backup. Other edits, such as a new name or account, and a switch that only repairs files changed by hand keep the undo. |
+| `undo` | Restores the server that was active before the last switch. It remembers one step. With `--client-dir`, restores that client's last switch (and its realm files from the backup when that switch rewrote them), even if another client has a more recent global switch. Without `--client-dir`, undoes the globally latest switch. `REALM_PORTAL_CLIENT_DIR` alone does not scope undo. Switching again to the active server after changing its host, realm or extra realmlist lines (for example `edit A --host …` or `edit A --line …`, then `switch A`) rewrites the files, so there is nothing to undo afterwards; the files from before the first switch remain available as a backup. Other edits, such as a new name or account, and a switch that only repairs files changed by hand keep the undo. |
 | `status` | Shows the active server, whether `activo.json` is in sync, clients whose files do not match the active server, and whether undo is available. With `--client-dir`, also shows that client's version and whether it is compatible. |
 | `launch` | Needs `--client-dir` (or `REALM_PORTAL_CLIENT_DIR`). With `<server>`, switches to it and starts the game; without it, starts the game for the active server. `--force` skips the compatibility check. `--dry-run` prints the exact command a real launch would start (the saved launcher prefix such as `gamemoderun`, or `--wrapper` when given, then the executable; tokens with spaces are quoted; environment changes, if any, on following `env NAME=value` / `unset NAME` lines) without switching or starting the game, and fails the same way a real launch would when a saved launcher setting cannot be applied by the CLI; it still registers the `--client-dir` folder if it is new, and with `<server>` it does not check compatibility. `--wrapper <command>` runs the game through a command such as `wine` and saves it as the launcher prefix in Realm Portal's settings (with `--dry-run` it is only printed, not saved). |
 | `duplicate` | Adds a copy of a server with a new id: same host, realm, extra realmlist lines, required build, account name, linked client and Cache/WDB setting (only the account name is copied; Realm Portal never stores passwords). The name is `--name` when given, otherwise `<name> (copy)`, or `<name> (copy 2)`, `(copy 3)`, ... when that is taken, shortened to fit 64 characters. `--realm` and `--account` set the copy's realm and account name instead of the original's (validated like `add`; an empty value such as `--realm ""` leaves the copy without one); when omitted, the original's are kept. Any other option, such as `--host` or `--build`, is rejected; use `edit` on the copy to change those. The copy does not become the active server, and no game file changes. |
@@ -105,6 +105,15 @@ These options may go before or after the command (see [Commands](#commands)).
 
 The config, projection and backup variables are also read by the desktop app. When testing, point them at temporary folders.
 
+## Extra realmlist lines
+
+`add --line` and `edit --line` take whole `realmlist.wtf` lines that are written after `set realmlist <host>` when you switch. The same rules apply in the CLI and the desktop app, and the same input saves the same data:
+
+- Only `set patchlist <value>` is accepted, at most once. Any other key (including `realmlist` again and `portal`) is rejected.
+- The line must be `set <key> <value>` with lowercase `set`, single spaces, ASCII only, and no quotes, spaces or control characters in the value. Leading and trailing spaces and line breaks are trimmed; a line break inside a line is rejected.
+- A blank `--line` value (empty or only spaces) is a usage error (exit `1`), so an empty variable in a script cannot remove the lines by accident. To remove them, use `edit --clear-lines`.
+- The whole realmlist (`set realmlist <host>` plus the extra lines, each with its CR LF) must be at most 1024 bytes. Errors in a single line, such as a repeated key, are reported before this limit.
+- When a line is rejected, nothing is saved (exit `2`) and the error names the `--line` in the order you gave them and the realmlist line it would have been (line `1` is `set realmlist <host>`), for example `Invalid realmlist at --line #2 (realmlist line 3): the key "foo" is not allowed (only realmlist and patchlist) [ForbiddenKey]`.
 ## Config backups
 
 Every time Realm Portal saves `servers.json` or `clients.json` (and the desktop app saves `ui-preferences.json`), it first copies the previous version to `<file>.bak` in the same folder, with the same private permissions (`0600` on Linux). Only a readable, valid previous version is copied, so a damaged file never replaces a good `.bak`. The first save of a file creates no `.bak`, and a save that changes nothing (for example `edit` with the same values) writes nothing, so the `.bak` keeps the real previous version. Making the `.bak` is best effort: if it cannot be written (for example `servers.json.bak` is a folder), the save still succeeds and `config backups` shows the backup as `damaged`.
@@ -119,6 +128,29 @@ realm-portal config restore servers
 `config backups` prints, for each file, whether the current file and the `.bak` are `missing`, `valid` or `damaged`, and when the `.bak` was saved, in local time with its UTC offset (for example `2026-10-29 23:40:00 UTC-05:00`). It only reads; it does not create the config folder.
 
 `config restore` copies the file it replaces to `<file>.before-restore` (private permissions, overwriting an older one) and then replaces the file in one step, so an interrupted restore never leaves the file missing. If the current file already equals the `.bak`, nothing changes, so running `config restore` twice keeps the first `.before-restore`. Restoring `servers.json` brings back the server list from before the last save; `state.json` is not changed, so if the active server is not in the restored list, `status` shows no active server and `switch` repairs it. `state.json`, `settings.json` and other files have no `.bak`. The CLI does not restore `ui-preferences.json`; the app's API can, but no screen offers it yet. Until then, copy `ui-preferences.json.bak` over `ui-preferences.json` by hand while the app is closed.
+
+## Empty results and errors
+
+When a command finds nothing, or fails, its message says why and, where there is one, what to run next. Exit codes do not change: an empty result is a success (`0`), a failure is `2`.
+
+| Situation | Message (abridged) |
+| --- | --- |
+| `list` with no servers | `No servers. Add one with 'realm-portal add <name> <host>', or run 'realm-portal scan' to import the servers of your game clients.` |
+| `list --client-dir` with no compatible server | `No compatible servers for this client's build. Run 'realm-portal list --all' to see every server, or 'realm-portal edit <server> --build any' to allow any build.` |
+| `client list` with no clients | `No clients. Run 'realm-portal scan' to look for game clients (add --root <folder> to search another folder), or 'realm-portal client add <path>' to add one by hand.` |
+| `scan` adds no client | After `Scan complete: …`: `No game clients were found.` (or, when clients are already registered, `No new clients were found; the clients already registered were kept.`) followed by `Run 'realm-portal scan --root <folder>' to search another folder, or 'realm-portal client add <path>' to add one by hand.` |
+| `config backups` with no `.bak` | `No backups yet: a .bak copy is kept the next time a save changes servers.json or clients.json.` |
+| `config backups` with a damaged file and a valid `.bak` | `servers.json is damaged but its backup is valid; run 'realm-portal config restore servers' to restore it.` |
+| `status` with no active server | `Active server: none (run 'realm-portal switch <server>' to choose one)` |
+| `undo` with nothing to undo | `Nothing to undo: there is no earlier switch to go back to. Run 'realm-portal status' to see the active server, or 'realm-portal switch <server>' to change it.` |
+| unknown `<server>` / `<client>` | `no server matches '…'. Run 'realm-portal list' to see the server names and ids.` / `no client matches '…'. Run 'realm-portal client list' to see the registered clients.` |
+| `undo --client-dir` with a folder that is not registered | `No registered client uses the folder '…'.` plus `client list`, `scan` and `client add` |
+| the game is running | `The game is running, so its client files and active server cannot be changed. Close the game and run the command again.` |
+| incompatible client | `Server requires client build 5875, but the client is 12340. Use a client with that build, change the server's build with 'realm-portal edit <server> --build <n\|any>', or add --force to switch anyway.` |
+| damaged `servers.json` / `clients.json` / `state.json` | `Config file '…' is corrupt or unreadable.` then the `config restore` command when a valid `.bak` exists, otherwise how to fix or move the file aside (Realm Portal never overwrites it). |
+| permissions, read-only folder, full disk, file in use, missing folder, unsupported or unreadable client, launcher problems | The cause, then what to check (for example `Free some disk space and try again.` or `'realm-portal launch --dry-run' shows the command that would run.`). `--verbose` replaces the cause with the detailed error but keeps the next step. |
+
+The desktop app keeps its own wording; the server status dot (DNS failure vs. offline, "checked N min ago") is unchanged. For apps built on the service, `ServiceError.NextAction()` gives the same next step as a stable code (see [app-service.md](app-service.md#7-errors-serviceerrorcode-mapping)).
 
 ## Exit codes
 

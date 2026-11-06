@@ -165,6 +165,8 @@ public enum Consistency
 /// <param name="ConflictingFiles">Client files that differ from what the switch wrote, relative to the client folder with <c>/</c> separators (<see cref="ServiceErrorCode.UndoConflict"/>).</param>
 /// <param name="Consistency">What the failed operation left behind.</param>
 /// <param name="Diagnostic">English exception text for logs. Not UI text and not stable.</param>
+/// <param name="ExtraLineIndex">0-based index, in the request's <c>ExtraRealmlistLines</c> (blank entries included), of the
+/// extra line that broke the realmlist contract (<see cref="ServiceErrorCode.InvalidRealmlist"/>); <c>null</c> otherwise.</param>
 public sealed record ServiceError(
     ServiceErrorCode Code,
     string? ServerName = null,
@@ -177,7 +179,8 @@ public sealed record ServiceError(
     string? ClientVersion = null,
     IReadOnlyList<string>? ConflictingFiles = null,
     Consistency Consistency = Consistency.Unchanged,
-    string Diagnostic = "");
+    string Diagnostic = "",
+    int? ExtraLineIndex = null);
 
 /// <summary>Nothing to return.</summary>
 public readonly record struct Unit;

@@ -83,6 +83,7 @@ public sealed class DuplicateServerTests
         Assert.Equal("Example (copy)", copy.Name);
         Assert.Equal(original with { Id = copy.Id, Name = copy.Name }, copy);
         Assert.Contains(PatchLine, copy.Realmlist, StringComparison.Ordinal);
+        Assert.Equal([PatchLine], copy.ExtraRealmlistLines);
         Assert.Equal("player1", copy.Account);
         Assert.False(copy.ClearCacheOnSwitch);
         Assert.Equal([original.Id, copy.Id], box.Servers().Select(s => s.Id));

@@ -163,7 +163,8 @@
                       </MenuItem>
                       <!-- A MenuItem of its own so hiding it hides the whole row: a bare TextBlock gets a menu container
                            that stays visible and leaves an empty row under "Delete server…" (#201). -->
-                      <MenuItem Name="MenuDisabledHint" Classes="note" IsEnabled="False" IsVisible="{Binding ShowMenuDisabledHint}">
+                      <MenuItem Name="MenuDisabledHint" Classes="note" IsEnabled="False" IsVisible="{Binding ShowMenuDisabledHint}"
+                                AutomationProperties.Name="{Binding MenuDisabledHint}">
                         <MenuItem.Header>
                           <TextBlock Classes="menu-hint" MaxWidth="220" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding MenuDisabledHint}"/>
                         </MenuItem.Header>

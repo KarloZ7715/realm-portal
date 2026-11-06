@@ -5,8 +5,9 @@
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.AddServerView"
              x:DataType="vm:AddServerViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
-    <StackPanel Margin="20,10,20,0">
+  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <!-- Bottom space is a margin on the content: ScrollViewer.Padding is not counted in the scroll extent (#210 follow-up). -->
+    <StackPanel Name="ScrollContent" Margin="20,10,20,12">
       <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Height="44" VerticalAlignment="Center" Text="{Binding FormTitle}"/>
       <TextBlock Classes="footnote" Margin="0,-6,0,6" Foreground="{DynamicResource IvoryBrush}" TextWrapping="Wrap" IsVisible="{Binding IsEditing}" Text="{Binding FormSubtitle}"/>
       <ContentControl Classes="card" Padding="22,12,22,16" Margin="0,2,0,0">
@@ -96,6 +97,43 @@
             </StackPanel>
           </StackPanel>
           </Grid>
+          <!-- Advanced: extra realmlist lines (#192). Collapsed by default; opens when the server already has lines. -->
+          <Expander Name="AdvancedExpander"
+                    Classes="parchment"
+                    Margin="0,14,0,0"
+                    Focusable="True"
+                    IsExpanded="{Binding IsAdvancedExpanded, Mode=TwoWay}"
+                    AutomationProperties.Name="{Binding AdvancedHeaderAccessibleName}">
+            <Expander.Header>
+              <TextBlock Classes="sheet-title" VerticalAlignment="Center" Text="{Binding AdvancedHeaderText}"/>
+            </Expander.Header>
+            <StackPanel Spacing="6" Margin="0,10,0,0" Opacity="1">
+              <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,0,0,2"/>
+              <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.advanced.lines}"/>
+              <TextBox Name="ExtraLinesBox"
+                       Classes="parchment mono"
+                       Classes.error="{Binding HasExtraLinesError}"
+                       AcceptsReturn="True"
+                       TextWrapping="NoWrap"
+                       MinHeight="76"
+                       Height="76"
+                       Padding="12,8"
+                       VerticalContentAlignment="Top"
+                       Foreground="{DynamicResource InkBrush}"
+                       Watermark="{loc:T add.advanced.placeholder}"
+                       Text="{Binding ExtraRealmlistLinesText, Mode=TwoWay}"
+                       AutomationProperties.Name="{loc:T add.advanced.lines}"
+                       AutomationProperties.HelpText="{loc:T add.advanced.help}"/>
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding !HasExtraLinesError}">
+                <c:Icon Data="{DynamicResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource InkSoftBrush}" StrokeThickness="2"/>
+                <TextBlock Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T add.advanced.help}"/>
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding HasExtraLinesError}">
+                <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
+                <TextBlock Name="ExtraLinesError" Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding ExtraLinesError}"/>
+              </Grid>
+            </StackPanel>
+          </Expander>
           <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,12,0,0" IsVisible="{Binding HasSaveError}">
             <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
             <TextBlock Name="SaveError" Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding SaveError}"/>
