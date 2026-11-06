@@ -105,11 +105,14 @@ public class AboutTests
                  {
                      "settings.about", "settings.about.open", "settings.about.hint",
                      "about.title", "about.back", "about.version", "about.credits", "about.copyright",
-                     "about.disclaimer", "about.mit", "about.github", "about.thirdparty", "about.open.failed",
+                     "about.disclaimer", "about.mit", "about.github", "about.thirdparty", "about.thirdparty.hint", "about.open.failed",
                  })
         {
             Assert.False(string.IsNullOrWhiteSpace(Loc.Load(Language.En)[key]));
             Assert.False(string.IsNullOrWhiteSpace(Loc.Load(Language.Es)[key]));
         }
+
+        Assert.Contains("in English", Loc.Load(Language.En)["about.thirdparty.hint"], StringComparison.Ordinal);
+        Assert.Contains("en inglés", Loc.Load(Language.Es)["about.thirdparty.hint"], StringComparison.Ordinal);
     }
 }

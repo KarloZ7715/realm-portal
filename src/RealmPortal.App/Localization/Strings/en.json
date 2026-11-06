@@ -361,7 +361,7 @@
   "about.github": "Open on GitHub",
   "about.open.failed": "Could not open the link in your browser.",
   "about.thirdparty": "Third-party licenses",
-  "about.thirdparty.hint": "NuGet packages, fonts and other components shipped with the app.",
+  "about.thirdparty.hint": "NuGet packages, fonts and other components shipped with the app (in English).",
   "about.copyright": "Copyright (c) 2026 Realm Portal contributors.",
   "about.disclaimer": "Not affiliated with or endorsed by Blizzard Entertainment.",
   "settings.network": "Network & privacy",
