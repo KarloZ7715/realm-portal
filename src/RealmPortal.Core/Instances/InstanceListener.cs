@@ -7,7 +7,8 @@ namespace RealmPortal.Core.Instances;
 /// <summary>
 /// The primary instance's side of the channel: accepts connections and serves up to
 /// <see cref="SingleInstanceOptions.MaxConcurrentRequests"/> at once. Each one gets one request line (bounded in size
-/// and time), one handler call and one reply. Garbage, oversized or slow requests get <see cref="InstanceReply.Invalid"/>
+/// and by <see cref="SingleInstanceOptions.RequestTimeout"/>), one handler call and one reply (kept available for
+/// <see cref="SingleInstanceOptions.ReplyTimeout"/>). Garbage, oversized or slow requests get <see cref="InstanceReply.Invalid"/>
 /// (when possible) and never stop the listener; silent clients cannot block a real one.
 /// </summary>
 internal sealed class InstanceListener : IDisposable
@@ -211,19 +212,28 @@ internal sealed class InstanceListener : IDisposable
     {
         try
         {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
-            timeout.CancelAfter(SingleInstance.ClampTimeout(_options.RequestTimeout));
-            var line = await InstanceProtocol.ReadLineAsync(stream, timeout.Token).ConfigureAwait(false);
+            byte[]? line;
+            using (var request = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token))
+            {
+                request.CancelAfter(SingleInstance.ClampTimeout(_options.RequestTimeout));
+                line = await InstanceProtocol.ReadLineAsync(stream, request.Token).ConfigureAwait(false);
+            }
+
             var message = line is null ? null : InstanceProtocol.TryDecodeRequest(line);
             var reply = message is null ? InstanceReply.Invalid : Handle(message);
-            await stream.WriteAsync(InstanceProtocol.EncodeReply(reply), timeout.Token).ConfigureAwait(false);
-            await stream.FlushAsync(timeout.Token).ConfigureAwait(false);
+
+            // The reply gets its own deadline: the client may be delayed between sending and reading (a busy
+            // machine), and the request deadline may already be close to running out.
+            using var replyTimeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+            replyTimeout.CancelAfter(SingleInstance.ClampTimeout(_options.ReplyTimeout));
+            await stream.WriteAsync(InstanceProtocol.EncodeReply(reply), replyTimeout.Token).ConfigureAwait(false);
+            await stream.FlushAsync(replyTimeout.Token).ConfigureAwait(false);
             if (stream is PipeStream)
             {
-                // Closing a Windows pipe handle discards data the client has not read yet, so wait (bounded by the
-                // same deadline) until the client closes its end; anything else it sends is ignored.
+                // Closing a Windows pipe handle drops a reply the client has not read yet, so wait (bounded by the
+                // reply deadline) until the client closes its end; anything else it sends is ignored.
                 var sink = new byte[512];
-                while (await stream.ReadAsync(sink, timeout.Token).ConfigureAwait(false) > 0)
+                while (await stream.ReadAsync(sink, replyTimeout.Token).ConfigureAwait(false) > 0)
                 {
                 }
             }

@@ -42,6 +42,14 @@ public sealed record SingleInstanceOptions
     /// </summary>
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(1);
 
+    /// <summary>
+    /// How long the primary keeps a reply available after it has read the request: writing it and, on Windows, waiting
+    /// for the client to read it and close the pipe (closing first would drop an unread reply). Separate from
+    /// <see cref="RequestTimeout"/> so a client delayed between sending and reading (a busy machine) still gets its
+    /// answer. Default 3 s, the default <see cref="ForwardTimeout"/>.
+    /// </summary>
+    public TimeSpan ReplyTimeout { get; init; } = TimeSpan.FromSeconds(3);
+
     /// <summary>Connections the primary serves concurrently. Default 8.</summary>
     public int MaxConcurrentRequests { get; init; } = 8;
 

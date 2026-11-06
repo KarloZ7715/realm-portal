@@ -20,6 +20,7 @@ public class SingleInstanceTests
     {
         ForwardTimeout = TimeSpan.FromSeconds(5),
         RequestTimeout = TimeSpan.FromSeconds(2),
+        ReplyTimeout = TimeSpan.FromSeconds(10),
     };
 
     [Fact]
@@ -685,6 +686,25 @@ public class SingleInstanceTests
         var line = InstanceProtocol.ReadLineAsync(stream, cts.Token).GetAwaiter().GetResult();
         Assert.NotNull(line);
         Assert.Equal(InstanceReply.Ok, InstanceProtocol.DecodeReply(line));
+    }
+
+    [Fact]
+    public void AClientThatNeverReadsTheReply_IsDroppedAfterTheReplyTimeout_AndTheNextOneIsServed()
+    {
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        var received = new BlockingQueue();
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle,
+            Fast with { MaxConcurrentRequests = 1, ReplyTimeout = TimeSpan.FromMilliseconds(300) });
+
+        // Sends a request and keeps the connection open without reading: with a single slot, the next launch is only
+        // served once the primary gives up on this reply.
+        using var stuck = RawConnect(endpoint);
+        stuck.Write(InstanceProtocol.EncodeRequest(InstanceMessage.Focus));
+        stuck.Flush();
+        Assert.Equal(InstanceMessage.Focus, received.Take());
+
+        AssertStillServes(endpoint, received);
     }
 
     [Fact]
