@@ -57,4 +57,23 @@ internal static class Screenshots
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         }
     }
+
+    /// <summary>
+    /// Settles, then keeps running dispatcher jobs and render ticks until <paramref name="condition"/> holds or
+    /// <paramref name="timeout"/> (default 5 s) runs out, and fails with <paramref name="what"/> when it never does.
+    /// Use it instead of a fixed number of <see cref="Settle"/> passes when the outcome depends on continuations that
+    /// a loaded machine may run later (#217).
+    /// </summary>
+    public static void SettleUntil(Func<bool> condition, string what, TimeSpan? timeout = null)
+    {
+        Settle();
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
+        while (!condition())
+        {
+            if (DateTime.UtcNow >= deadline)
+                throw new Xunit.Sdk.XunitException($"Timed out after {(timeout ?? TimeSpan.FromSeconds(5)).TotalSeconds:0.#} s waiting until {what}.");
+            Thread.Sleep(5);
+            Settle();
+        }
+    }
 }
