@@ -167,6 +167,7 @@ public sealed class ExtraRealmlistLinesUiTests
         Assert.Equal(["set patchlist a.example.com"], saved.ExtraRealmlistLines);
     }
 
+    [AvaloniaFact]
     public void LocParity_AdvancedKeysExistInBothLanguages()
     {
         var keys = new[]
