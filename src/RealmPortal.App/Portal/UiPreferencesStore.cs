@@ -77,6 +77,9 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
             _path, _writer, bytes, new FileReplacementPermissions((int)(UnixFileMode.UserRead | UnixFileMode.UserWrite), null), IsValidContent);
     }
 
+    /// <summary>State of <c>ui-preferences.json</c> itself (#196 UI).</summary>
+    public ConfigFileState CurrentState => ConfigFileBackup.Inspect(_path, IsValidContent);
+
     /// <summary>State of <c>ui-preferences.json.bak</c>, the previous valid preferences kept on every save (#196).</summary>
     public ConfigFileState BackupState => ConfigFileBackup.Inspect(_path + ConfigFileBackup.BackupSuffix, IsValidContent);
 

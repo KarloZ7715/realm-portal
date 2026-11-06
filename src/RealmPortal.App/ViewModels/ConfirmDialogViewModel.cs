@@ -71,6 +71,11 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
         new("confirm.backupchanged.title", "confirm.backupchanged.body", "confirm.backupchanged.restore",
             "confirm.cancel", [backupLabel]);
 
+    /// <summary>Restore a damaged app config file from its <c>.bak</c> (#196 UI).</summary>
+    public static ConfirmDialogViewModel RestoreConfigBackup(string fileLabel) =>
+        new("confirm.configrestore.title", "confirm.configrestore.body", "confirm.configrestore.accept",
+            "confirm.cancel", [fileLabel]);
+
     [RelayCommand]
     private void Confirm() => Complete(ConfirmDialogChoice.Confirm);
 

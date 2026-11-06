@@ -54,6 +54,8 @@ public sealed partial class MainViewModel : ObservableObject
         settingsScreen.CanManageBackups = false;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
         settingsScreen.OpenAboutRequested += ShowAbout;
+        settingsScreen.ConfirmRestoreConfigAsync = ConfirmRestoreConfigAsync;
+        settingsScreen.ConfigRestored += OnConfigRestored;
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
@@ -78,11 +80,13 @@ public sealed partial class MainViewModel : ObservableObject
             ?? new CoreUpdateCheckerAdapter(session.UpdateChecker);
         Servers = new ServersViewModel(session, autoTick, delay);
         Clients = new ClientsViewModel(session, pickFolder, startFirstScan: false);
-        var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder, _network, _updates);
+        var settingsScreen = new SettingsViewModel(new PortalSettingsStore(session), pickFolder, _network, _updates, session);
         settingsScreen.ApplySavedLanguage();
         settingsScreen.CanManageBackups = true;
         settingsScreen.OpenBackupsManagerRequested += ShowBackupsManager;
         settingsScreen.OpenAboutRequested += ShowAbout;
+        settingsScreen.ConfirmRestoreConfigAsync = ConfirmRestoreConfigAsync;
+        settingsScreen.ConfigRestored += OnConfigRestored;
         Settings = settingsScreen;
         _sections = [Servers, Clients, Settings];
         WireSections();
@@ -635,6 +639,27 @@ public sealed partial class MainViewModel : ObservableObject
         _editingClient = null;
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
+    }
+
+
+    private Task<bool> ConfirmRestoreConfigAsync(ConfigBackupItemViewModel item) =>
+        ConfirmAsync(ConfirmDialogViewModel.RestoreConfigBackup(item.FileLabel));
+
+    private void OnConfigRestored(ConfigBackupItemViewModel item)
+    {
+        if (item.IsPreferences && _session is not null)
+        {
+            var language = _session.UiPreferences.ResolveLanguage();
+            Loc.Instance.SetLanguage(language);
+            Settings.AcceptSavedLanguage(language);
+            OnLanguageChanged();
+        }
+        else
+        {
+            Clients.ReloadFromService();
+            Servers.ReloadFromService();
+        }
+        Settings.ReloadConfigBackups();
     }
 
     private void ShowBackupsManager()
