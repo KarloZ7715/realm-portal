@@ -29,6 +29,9 @@ public sealed class MinisignVerifier : IReleaseSignatureVerifier
         }
     }
 
+    /// <summary>The keys this verifier trusts, in order.</summary>
+    internal IReadOnlyList<MinisignPublicKey> TrustedKeys => _trustedKeys;
+
     /// <summary>A verifier for the keys built into this app (<see cref="ReleaseSigningKeys.Trusted"/>).</summary>
     public static MinisignVerifier ForRelease() => new(ReleaseSigningKeys.Trusted);
 

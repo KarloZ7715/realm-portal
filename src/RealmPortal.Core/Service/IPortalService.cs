@@ -98,6 +98,21 @@ public interface IPortalService
     /// <summary>Deletes one snapshot from the backup store.</summary>
     ServiceResult<Unit> DeleteBackup(string clientId, string backupId);
 
+    // ------------------------------------------------------------ config backups (#196)
+
+    /// <summary>
+    /// State of <c>servers.json</c> and <c>clients.json</c> and of their <c>.bak</c> copies (the previous valid version,
+    /// kept on every successful write). Read-only.
+    /// </summary>
+    ServiceResult<IReadOnlyList<ConfigBackupStatus>> GetConfigBackups();
+
+    /// <summary>
+    /// Replaces the config file with its valid <c>.bak</c>. The replaced file is kept as <c>&lt;file&gt;.before-restore</c>.
+    /// Fails with <see cref="ServiceErrorCode.BackupNotFound"/> when there is no <c>.bak</c> and with
+    /// <see cref="ServiceErrorCode.StoreCorrupt"/> (Path = the <c>.bak</c>) when it is damaged; nothing changes then.
+    /// </summary>
+    ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file);
+
     // ------------------------------------------------------------ status and settings
 
     /// <summary>Active server, whether an undo is possible, and whether <c>activo.json</c> is in sync.</summary>

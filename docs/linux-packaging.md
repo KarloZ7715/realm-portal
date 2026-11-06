@@ -48,23 +48,22 @@ packaging/linux/build-packages.sh /path/to/publish "$(EVENT_NAME=workflow_dispat
 `SHA256SUMS` is signed with minisign (#116) using a password-protected key that stays on the maintainer's machine and
 never goes to GitHub. The matching public key is committed as `minisign.pub` at the repository root.
 
-### One-time setup
+### Release key
 
-```sh
-minisign -G -p minisign.pub -s ~/.minisign/realm-portal.key
-```
-
-minisign asks for a password; use a strong one. Keep an offline backup of `realm-portal.key` and its password. Commit
-only `minisign.pub` (its first line holds the key ID). Until that file exists, `sign-and-publish.sh` refuses to run.
+The release key's public half is [`minisign.pub`](../minisign.pub) at the repository root, key ID `A71D9203F538E296`.
+The same key is built into the app (`ReleaseSigningKeys` in Core). `ReleaseSigningKeysTests` fails if the two ever
+differ. `.gitattributes` keeps `minisign.pub` byte-exact (LF) on every checkout. The secret key and its password stay
+offline with the maintainer. SECURITY.md covers rotation and what happens if the key is lost or leaked.
 
 The script accepts `minisign.pub` when, ignoring CR line endings and trailing blank lines, it has an
 `untrusted comment:` line and one key line that is base64 of 42 bytes starting with `Ed`. It refuses a comment that
 contains "placeholder" and a key whose key ID or key bytes are all zeros.
 
-The same key must also go into `ReleaseSigningKeys` in Core, so the app trusts it. The PR that adds the real key must
-include a test that builds `ReleaseSigningKeys.ForRelease()` and checks that its key ID and key match `minisign.pub`.
-
 ### Each release
+
+The first signed release is rehearsed with an `rc` tag (for example `v1.2.0-rc.1`), which is published as a prerelease
+and never offered by the in-app update check. Check it with `--verify-published` and by hand (below) before signing a
+stable tag.
 
 1. Push the tag and wait for the release workflow. It leaves a draft with the three packages and `SHA256SUMS`, and its
    **draft GitHub release** job summary lists each asset's name, size and SHA-256.
@@ -74,8 +73,8 @@ include a test that builds `ReleaseSigningKeys.ForRelease()` and checks that its
    `minisign` and coreutils.
 
    ```sh
-   packaging/sign-and-publish.sh --dry-run --key ~/.minisign/realm-portal.key v1.2.0   # optional rehearsal
-   packaging/sign-and-publish.sh --key ~/.minisign/realm-portal.key v1.2.0
+   packaging/sign-and-publish.sh --dry-run --key <secret key> v1.2.0   # optional rehearsal
+   packaging/sign-and-publish.sh --key <secret key> v1.2.0
    ```
 
    Before signing, the script:
