@@ -136,23 +136,39 @@
             <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
             <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.hint}"/>
             <ItemsControl Name="ConfigBackupList" ItemsSource="{Binding ConfigBackups}">
+              <ItemsControl.Styles>
+                <!-- Damaged uses wax-red with a warning glyph; missing uses a dashed border (never colour alone). -->
+                <Style Selector="c|Badge.config-state:no-response /template/ c|Icon#Glyph">
+                  <Setter Property="Data" Value="{DynamicResource IconWarning}"/>
+                  <Setter Property="IsFilled" Value="False"/>
+                </Style>
+              </ItemsControl.Styles>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ConfigBackupItemViewModel">
-                  <Border Padding="0,8" AutomationProperties.Name="{Binding StatusAccessibleName}">
+                  <Border Padding="0,10" AutomationProperties.Name="{Binding StatusAccessibleName}">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                      <StackPanel Spacing="2">
+                      <StackPanel Spacing="6">
                         <TextBlock Classes="body-bold" FontSize="15" Foreground="{DynamicResource InkBrush}" Text="{Binding FileLabel}"/>
                         <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding DetailText}"/>
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                          <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.current}"/>
-                          <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding CurrentStateText}"/>
-                          <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text=" · "/>
-                          <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.backup}"/>
-                          <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding BackupStateText}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Classes="footnote" VerticalAlignment="Center" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.current}"/>
+                            <c:Badge Classes="config-state" Status="{Binding CurrentBadgeStatus}" Text="{Binding CurrentStateText}"/>
+                          </StackPanel>
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Classes="footnote" VerticalAlignment="Center" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.backup}"/>
+                            <c:Badge Classes="config-state" Status="{Binding BackupBadgeStatus}" Text="{Binding BackupStateText}"/>
+                          </StackPanel>
                         </StackPanel>
+                        <TextBlock Classes="footnote" TextWrapping="Wrap" MaxWidth="360"
+                                   Foreground="{DynamicResource InkSoftBrush}"
+                                   IsVisible="{Binding ShowRestoreDisabledReason}"
+                                   Text="{Binding RestoreDisabledReason}"/>
                       </StackPanel>
-                      <Button Grid.Column="1" Classes="secondary compact" VerticalAlignment="Center"
-                              IsVisible="{Binding CanRestore}" Command="{Binding RestoreCommand}"
+                      <!-- Always visible; disabled with a reason when restore is not possible (#196 design). -->
+                      <Button Grid.Column="1" Name="RestoreConfigButton" Classes="secondary compact" VerticalAlignment="Center"
+                              IsEnabled="{Binding CanRestore}" Command="{Binding RestoreCommand}"
+                              ToolTip.Tip="{Binding RestoreDisabledReason}"
                               AutomationProperties.Name="{loc:T settings.config.restore}">
                         <TextBlock Text="{loc:T settings.config.restore}"/>
                       </Button>

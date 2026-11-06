@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
 using RealmPortal.App.Portal;
 using RealmPortal.App.Tests.Support;
@@ -88,7 +89,7 @@ public sealed class ConfigBackupUiTests
     }
 
     [AvaloniaFact]
-    public void Restore_IsNotOfferedWhenCurrentIsValid()
+    public void Restore_IsDisabledWhenCurrentIsValid_WithReason()
     {
         using var env = new Env();
         var client = env.CreateClient("wotlk");
@@ -97,7 +98,64 @@ public sealed class ConfigBackupUiTests
         env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
         var main = new MainViewModel(env.Session, autoTick: false);
         main.Settings.ReloadConfigBackups();
-        Assert.All(main.Settings.ConfigBackups, row => Assert.False(row.CanRestore));
+        Assert.All(main.Settings.ConfigBackups, row =>
+        {
+            Assert.False(row.CanRestore);
+            Assert.True(row.ShowRestoreDisabledReason);
+            Assert.Contains("valid", row.RestoreDisabledReason, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(ServerStatus.Ready, row.CurrentBadgeStatus);
+        });
+    }
+
+    [AvaloniaFact]
+    public void Restore_IsDisabledWhenBackupMissing_WithReason()
+    {
+        using var env = new Env();
+        env.Session.UiPreferences.Save(new UiPreferences("en", [], FirstScanCompleted: true, WelcomeCompleted: true));
+        // Damage servers.json with no prior .bak (fresh config has no backup until a successful write).
+        var serversPath = Path.Combine(env.Config, "servers.json");
+        File.WriteAllText(serversPath, "{ not json");
+        if (File.Exists(serversPath + ".bak")) File.Delete(serversPath + ".bak");
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Settings.ReloadConfigBackups();
+        var row = Assert.Single(main.Settings.ConfigBackups, r => r.Kind == ConfigFileKind.Servers);
+        Assert.Equal(ConfigFileState.Damaged, row.Current);
+        Assert.Equal(ConfigFileState.Missing, row.Backup);
+        Assert.False(row.CanRestore);
+        Assert.Contains("no backup", row.RestoreDisabledReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ServerStatus.NoResponse, row.CurrentBadgeStatus);
+        Assert.Equal(ServerStatus.Inactive, row.BackupBadgeStatus);
+    }
+
+    [AvaloniaFact]
+    public void RowAccessibleName_IncludesBackupDateAndState()
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        env.Session.Service.AddServer(new NewServer("Demo", "logon.example.com", ClientId: cid));
+        env.Session.Service.AddServer(new NewServer("Second", "play.example.net", ClientId: cid));
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Settings.ReloadConfigBackups();
+        var row = Assert.Single(main.Settings.ConfigBackups, r => r.Kind == ConfigFileKind.Servers);
+        Assert.NotNull(row.BackupModifiedAt);
+        Assert.Contains("backup", row.StatusAccessibleName, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(row.BackupStateText, row.StatusAccessibleName, StringComparison.Ordinal);
+        Assert.Equal("Valid", row.BackupStateText);
+        Assert.Equal("Valid", row.CurrentStateText);
+    }
+
+    [AvaloniaFact]
+    public void ConfirmRestoreDialog_UsesConfigRestoreKeys()
+    {
+        // Cancel is focused first and Escape cancels in ConfirmDialogView; keys must resolve for EN.
+        Loc.Instance.SetLanguage(Language.En);
+        var dialog = ConfirmDialogViewModel.RestoreConfigBackup("servers.json");
+        Assert.Equal("Restore this configuration file?", dialog.Title);
+        Assert.Contains("servers.json", dialog.Body, StringComparison.Ordinal);
+        Assert.Equal("Restore backup", dialog.ConfirmText);
+        Assert.False(string.IsNullOrWhiteSpace(dialog.CancelText));
     }
 
     [AvaloniaFact]
