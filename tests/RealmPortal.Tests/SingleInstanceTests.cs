@@ -665,6 +665,29 @@ public class SingleInstanceTests
     }
 
     [Fact]
+    public void AClientThatReadsTheReplyAfterTheRequestTimeout_StillGetsIt()
+    {
+        // A busy machine can delay the client between sending its request and reading the reply. The reply must
+        // stay available after the request deadline has passed (on Windows the pipe is closed by the primary).
+        using var dir = ShortTempDirectory.Create();
+        var endpoint = InstanceEndpoint.For(dir.Path);
+        var received = new BlockingQueue();
+        using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle,
+            Fast with { RequestTimeout = TimeSpan.FromMilliseconds(300) });
+
+        using var stream = RawConnect(endpoint);
+        stream.Write(InstanceProtocol.EncodeRequest(InstanceMessage.Focus));
+        stream.Flush();
+        Assert.Equal(InstanceMessage.Focus, received.Take());
+        Thread.Sleep(TimeSpan.FromMilliseconds(1200));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var line = InstanceProtocol.ReadLineAsync(stream, cts.Token).GetAwaiter().GetResult();
+        Assert.NotNull(line);
+        Assert.Equal(InstanceReply.Ok, InstanceProtocol.DecodeReply(line));
+    }
+
+    [Fact]
     public void ConnectionsThatCloseImmediately_DoNotStopTheListener()
     {
         using var dir = ShortTempDirectory.Create();
