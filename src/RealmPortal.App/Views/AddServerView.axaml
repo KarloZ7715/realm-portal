@@ -5,8 +5,9 @@
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.AddServerView"
              x:DataType="vm:AddServerViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
-    <StackPanel Margin="20,10,20,0">
+  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <!-- Bottom space is a margin on the content: ScrollViewer.Padding is not counted in the scroll extent (#210 follow-up). -->
+    <StackPanel Name="ScrollContent" Margin="20,10,20,12">
       <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Height="44" VerticalAlignment="Center" Text="{Binding FormTitle}"/>
       <TextBlock Classes="footnote" Margin="0,-6,0,6" Foreground="{DynamicResource IvoryBrush}" TextWrapping="Wrap" IsVisible="{Binding IsEditing}" Text="{Binding FormSubtitle}"/>
       <ContentControl Classes="card" Padding="22,12,22,16" Margin="0,2,0,0">

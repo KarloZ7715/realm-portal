@@ -358,6 +358,13 @@ public sealed class CliApp(
         if (!result.Succeeded)
             return Fail(result.Error!);
         SafeWriteLine(output, $"Scan complete: {result.Value!.AddedClients.Count} clients and {result.Value.ImportedServers.Count} servers added.");
+        if (result.Value.AddedClients.Count == 0)
+        {
+            SafeWriteLine(output, (result.Value.AllClients.Count == 0
+                    ? "No game clients were found."
+                    : "No new clients were found; the clients already registered were kept.")
+                + " Run 'realm-portal scan --root <folder>' to search another folder, or 'realm-portal client add <path>' to add one by hand.");
+        }
         return 0;
     }
 
@@ -375,6 +382,8 @@ public sealed class CliApp(
                     return Fail(listed.Error!);
                 foreach (var status in listed.Value!)
                     SafeWriteLine(output, FormatConfigBackup(status));
+                foreach (var line in ConfigBackupHints(listed.Value!))
+                    SafeWriteLine(output, line);
                 return 0;
             case "restore":
                 Expect(parsed, 2, 2, "restore <servers|clients>");
@@ -407,6 +416,28 @@ public sealed class CliApp(
         static string Describe(ConfigFileState state) => state.ToString().ToLowerInvariant();
     }
 
+    /// <summary>
+    /// What to do after <c>config backups</c> (#194): restore a damaged file that has a valid copy, or explain why there is no copy yet.
+    /// </summary>
+    private static IEnumerable<string> ConfigBackupHints(IReadOnlyList<ConfigBackupStatus> statuses)
+    {
+        foreach (var status in statuses)
+        {
+            if (status.Current != ConfigFileState.Valid && status.Backup == ConfigFileState.Valid)
+            {
+                var name = Path.GetFileName(status.Path);
+                var store = status.File == ConfigFileKind.Servers ? "servers" : "clients";
+                yield return $"{name} is {status.Current.ToString().ToLowerInvariant()} but its backup is valid; run 'realm-portal config restore {store}' to restore it.";
+            }
+        }
+
+        if (statuses.All(s => s.Backup == ConfigFileState.Missing))
+            yield return $"No backups yet: a {ConfigFileBackup.BackupSuffix} copy is kept the next time a save changes servers.json or clients.json.";
+    }
+
+    private const string NoClientsHint =
+        "No clients. Run 'realm-portal scan' to look for game clients (add --root <folder> to search another folder), or 'realm-portal client add <path>' to add one by hand.";
+
     private int ClientCommand(Parsed parsed, PortalService service)
     {
         if (parsed.Positionals.Count == 0)
@@ -421,7 +452,7 @@ public sealed class CliApp(
                 if (!listed.Succeeded)
                     return Fail(listed.Error!);
                 if (listed.Value!.Count == 0)
-                    SafeWriteLine(output, "No clients.");
+                    SafeWriteLine(output, NoClientsHint);
                 foreach (var entry in listed.Value)
                     SafeWriteLine(output, $"{entry.Id}  {entry.Name}  {entry.Path}  origin={entry.Origin.ToString().ToLowerInvariant()}");
                 return 0;
@@ -476,7 +507,7 @@ public sealed class CliApp(
         }
         if (client is null)
         {
-            SafeWriteLine(error, $"error: no client matches '{selector}'.");
+            SafeWriteLine(error, $"error: no client matches '{selector}'. Run 'realm-portal client list' to see the registered clients.");
             return 2;
         }
         return 0;
@@ -497,7 +528,9 @@ public sealed class CliApp(
         if (rows.Count == 0)
         {
             var all = service.ListServers();
-            SafeWriteLine(output, all.Succeeded && all.Value!.Count == 0 ? "No servers." : "No compatible servers.");
+            SafeWriteLine(output, all.Succeeded && all.Value!.Count == 0
+                ? "No servers. Add one with 'realm-portal add <name> <host>', or run 'realm-portal scan' to import the servers of your game clients."
+                : "No compatible servers for this client's build. Run 'realm-portal list --all' to see every server, or 'realm-portal edit <server> --build any' to allow any build.");
             return 0;
         }
 
@@ -593,7 +626,7 @@ public sealed class CliApp(
         {
             clientId = ResolveRegisteredClientId(service, explicitClientDir);
             if (clientId is null)
-                return Fail(new ServiceError(ServiceErrorCode.ClientNotFound));
+                return Fail(new ServiceError(ServiceErrorCode.ClientNotFound, Path: explicitClientDir));
         }
 
         var result = service.Undo(clientId);
@@ -639,7 +672,7 @@ public sealed class CliApp(
         var status = result.Value!;
         if (status.Active is null)
         {
-            SafeWriteLine(output, "Active server: none");
+            SafeWriteLine(output, "Active server: none (run 'realm-portal switch <server>' to choose one)");
         }
         else
         {
@@ -715,7 +748,7 @@ public sealed class CliApp(
         var status = service.GetStatus();
         if (!status.Succeeded)
             return Fail(status.Error!);
-        server = status.Value!.Active ?? throw new InvalidOperationException("no active server; run 'switch <server>' or 'launch <server>'.");
+        server = status.Value!.Active ?? throw new InvalidOperationException("no active server; run 'realm-portal switch <server>' or 'realm-portal launch <server>'.");
         if (!server.IsCompatible && !force)
         {
             SafeWriteLine(error, $"error: '{server.Name}' requires client build {server.RequiredClientBuild}, but the client is incompatible (use --force to launch anyway).");
@@ -786,7 +819,7 @@ public sealed class CliApp(
         var found = ServiceCli.FindServerEntry(list.Value!, selector);
         if (found is null)
         {
-            SafeWriteLine(error, $"error: no server matches '{selector}'.");
+            SafeWriteLine(error, $"error: no server matches '{selector}'. Run 'realm-portal list' to see the server names and ids.");
             return 2;
         }
 
