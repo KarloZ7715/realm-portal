@@ -44,7 +44,7 @@ signed, but **the app does not check the signature yet** (see [Release signature
 Until it does, the protections are:
 
 - The user always confirms **Update**; nothing updates silently.
-- Releases are immutable once GitHub "immutable releases" is enabled for the repository (pending, see the release gate
+- Releases are immutable once published (GitHub "immutable releases" is enabled for the repository; see the release gate
   below), so assets cannot be swapped after publication.
 - The maintainer account uses 2FA.
 
