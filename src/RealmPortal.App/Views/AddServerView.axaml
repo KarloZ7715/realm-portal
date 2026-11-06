@@ -5,7 +5,7 @@
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.AddServerView"
              x:DataType="vm:AddServerViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
+  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
     <StackPanel Margin="20,10,20,0">
       <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" Height="44" VerticalAlignment="Center" Text="{Binding FormTitle}"/>
       <TextBlock Classes="footnote" Margin="0,-6,0,6" Foreground="{DynamicResource IvoryBrush}" TextWrapping="Wrap" IsVisible="{Binding ShowBuildAndCacheFields}" Text="{Binding FormSubtitle}"/>

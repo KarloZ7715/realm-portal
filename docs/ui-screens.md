@@ -64,7 +64,7 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 ### Server card edit, duplicate & delete
 
-**Duplicate server…** (`Duplicar servidor…`, `menu.duplicate`) sits after Edit and before the separator that leads to Delete in the card menu. It opens the add-server form prefilled from the source (localized name suffix `servers.duplicate.suffix`, host, realm, account, required build, Cache/WDB override). Saving adds a new server with a new id and keeps the source's extra realmlist lines (patchlist, …). Editing or deleting the copy does not change the original (#191).
+**Duplicate server…** (`Duplicar servidor…`, `menu.duplicate`) sits after Edit and before the separator that leads to Delete in the card menu. The menu flyout opens downward when it fits above the status bar, otherwise upward, and is clamped so its bottom never covers the status bar (#191). It opens the add-server form prefilled from the source (localized name suffix `servers.duplicate.suffix` / `.suffix.n`, host, realm, account, required build, Cache/WDB override); the Name box is focused with the full name selected. Saving uses Core `DuplicateServer` (same host+realm allowed) and keeps the source's extra realmlist lines. Editing or deleting the copy does not change the original.
 
 #### 1.1 `Play ▾` (`Jugar ▾`) SplitButton Flyout Menu (`ServersView.axaml`)
 - **Figma reference:** `compact-play-menu@2x.png` (`49:5882`) and `compact-play-menu-disabled@2x.png` (`49:6127`).

@@ -120,6 +120,7 @@
                   <SplitButton.Flyout>
                     <!-- FlipY/Slide keeps the menu inside the window at small heights (design review #191). -->
                     <MenuFlyout Placement="BottomEdgeAlignedRight" PlacementConstraintAdjustment="FlipY,SlideY,SlideX,ResizeY"
+                                Opening="CardMenu_Opening" Opened="CardMenu_Opened"
                                 FlyoutPresenterClasses="parchment">
                       <MenuItem Name="MenuPlay" Classes="two-line" Command="{Binding PlayCommand}"
                                 AutomationProperties.Name="{loc:T card.play}">

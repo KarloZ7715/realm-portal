@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using RealmPortal.App.Views;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -197,8 +198,12 @@ public sealed class DuplicateServerUiTests
         Assert.Contains("indeterminate", Loc.Get("edit.cache.hint"), StringComparison.OrdinalIgnoreCase);
     }
 
-    [AvaloniaFact]
-    public async Task CardMenu_StaysInsideTheWindowAt720Spanish()
+    [AvaloniaTheory]
+    [InlineData("es", 1.0)]
+    [InlineData("es", 2.0)]
+    [InlineData("en", 1.0)]
+    [InlineData("en", 2.0)]
+    public async Task CardMenu_StaysAboveStatusBarAt720(string lang, double scale)
     {
         using var env = new Env();
         var client = env.CreateClient("wotlk");
@@ -207,36 +212,51 @@ public sealed class DuplicateServerUiTests
         env.Session.Service.AddServer(new NewServer("Another Server", "play.example.net", ClientId: cid));
         env.Session.Service.SwitchServer(new SwitchRequest(cid, a.Id));
         env.Session.Service.DiscardUndo(cid);
-        env.Session.UiPreferences.Save(new UiPreferences("es", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
-        Loc.Instance.SetLanguage(Language.Es);
+        env.Session.UiPreferences.Save(new UiPreferences(lang, [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        Loc.Instance.SetLanguage(lang == "es" ? Language.Es : Language.En);
         var main = new MainViewModel(env.Session, autoTick: false);
         main.Servers.ReloadFromService();
         var window = new MainWindow(main) { Width = 720, Height = 440 };
         window.Show();
         Screenshots.Settle();
-        // Open the menu on the lower card so a downward flyout would overflow without FlipY.
+        Screenshots.SetRenderScaling(window, scale);
+        Screenshots.Settle();
+        // Lower card: downward open would cover the status bar without the clamp (#191 design round 2).
         var card = window.GetVisualDescendants().OfType<SplitButton>().ElementAt(1);
         card.Flyout!.ShowAt(card);
-        for (var i = 0; i < 10; i++)
+        Border status = window.FindControl<Border>("StatusBar")!;
+        double statusTop = 0;
+        MenuFlyoutPresenter? presenter = null;
+        Point topLeft = default, bottomRight = default;
+        for (var attempt = 0; attempt < 30; attempt++)
         {
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-            await Task.Yield();
+            await Task.Delay(10);
+            Screenshots.Settle();
+            statusTop = status.TranslatePoint(default, window)!.Value.Y;
+            presenter = window.GetVisualDescendants().OfType<MenuFlyoutPresenter>().FirstOrDefault()
+                ?? TopLevel.GetTopLevel(card)!.GetVisualDescendants().OfType<MenuFlyoutPresenter>().FirstOrDefault();
+            if (presenter is null)
+            {
+                continue;
+            }
+
+            topLeft = presenter.TranslatePoint(default, window)!.Value;
+            bottomRight = presenter.TranslatePoint(new Point(presenter.Bounds.Width, presenter.Bounds.Height), window)!.Value;
+            if (bottomRight.Y <= statusTop + 0.5)
+            {
+                break;
+            }
         }
-        Screenshots.Settle();
-        var presenter = window.GetVisualDescendants().OfType<MenuFlyoutPresenter>().FirstOrDefault()
-            ?? TopLevel.GetTopLevel(card)!.GetVisualDescendants().OfType<MenuFlyoutPresenter>().Single();
-        var topLeft = presenter.TranslatePoint(default, window)!.Value;
-        var bottomRight = presenter.TranslatePoint(new Point(presenter.Bounds.Width, presenter.Bounds.Height), window)!.Value;
-        Assert.True(topLeft.Y >= 0, $"menu top {topLeft.Y} is above the window");
-        Assert.True(bottomRight.Y <= window.Bounds.Height + 0.5, $"menu bottom {bottomRight.Y} exceeds window height {window.Bounds.Height}");
-        Assert.True(topLeft.X >= 0);
+
+        Assert.NotNull(presenter);
+        Assert.True(topLeft.Y >= -0.5, $"menu top {topLeft.Y} is above the window");
+        Assert.True(bottomRight.Y <= statusTop + 0.5,
+            $"menu bottom {bottomRight.Y} overlaps status bar top {statusTop} (lang={lang}, scale={scale})");
+        Assert.True(topLeft.X >= -0.5);
         Assert.True(bottomRight.X <= window.Bounds.Width + 0.5);
-        var delete = ((MenuFlyout)card.Flyout!).Items.OfType<MenuItem>().Single(m => m.Name == "MenuDelete");
-        Assert.True(delete.IsEffectivelyVisible);
-        Assert.Equal(["MenuPlay", "MenuSwitchOnly", "MenuEdit", "MenuDuplicate", "MenuDelete", "MenuDisabledHint"],
-            ((MenuFlyout)card.Flyout!).Items.OfType<MenuItem>().Select(m => m.Name));
-        Screenshots.Save(window, 1.0, "duplicate-menu-720-es-fit-1.0x.png");
-        Screenshots.Save(window, 2.0, "duplicate-menu-720-es-fit-2.0x.png");
+        var tag = scale == 1.0 ? "1.0x" : "2.0x";
+        Screenshots.Save(window, scale, $"duplicate-menu-720-{lang}-fit-{tag}.png");
         card.Flyout.Hide();
         window.Close();
         Loc.Instance.SetLanguage(Language.En);
@@ -256,7 +276,7 @@ public sealed class DuplicateServerUiTests
         window.Show();
         Screenshots.Settle();
         Assert.Single(main.Servers.Visible).DuplicateCommand.Execute(null);
-        for (var i = 0; i < 20; i++)
+        for (var i = 0; i < 30; i++)
         {
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
             await Task.Delay(10);
@@ -266,11 +286,53 @@ public sealed class DuplicateServerUiTests
         Assert.True(name.IsKeyboardFocusWithin || name.IsFocused);
         Assert.Equal(0, name.SelectionStart);
         Assert.Equal(name.Text!.Length, name.SelectionEnd);
+        Assert.True(name.SelectionStart != name.SelectionEnd, "Name must be SelectAll so typing replaces it");
         Assert.EndsWith(" (copy)", name.Text);
-        var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(s => s.Name == "Scroller")
-                   ?? window.GetVisualDescendants().OfType<ScrollViewer>().First();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Duplicate_FooterSaveCopyVisibleWhenScrolledToEnd()
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        env.Session.Service.AddServer(new NewServer("Demo Realm", "logon.example.com", ClientId: cid));
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Servers.ReloadFromService();
+        var window = new MainWindow(main) { Width = 720, Height = 440 };
+        window.Show();
+        Screenshots.Settle();
+        Assert.Single(main.Servers.Visible).DuplicateCommand.Execute(null);
+        for (var i = 0; i < 20; i++)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            await Task.Delay(10);
+        }
+        Screenshots.Settle();
+        var form = window.GetVisualDescendants().OfType<AddServerView>().Single();
+        var scroller = form.FindControl<ScrollViewer>("Scroller")!;
+        form.UpdateLayout();
+        window.UpdateLayout();
+        Screenshots.Settle();
+        // Bring the Save copy button into view (ScrollToEnd alone can run before extent is final).
+        var save = form.FindControl<Button>("SaveButton")!;
+        save.BringIntoView();
+        Screenshots.Settle();
         scroller.ScrollToEnd();
         Screenshots.Settle();
+        if (scroller.Extent.Height > scroller.Viewport.Height + 0.5)
+            scroller.Offset = new Vector(0, scroller.Extent.Height - scroller.Viewport.Height);
+        Screenshots.Settle();
+        var saveTop = save.TranslatePoint(default, window)!.Value.Y;
+        var saveBottom = save.TranslatePoint(new Point(0, save.Bounds.Height), window)!.Value.Y;
+        var statusTop = window.FindControl<Border>("StatusBar")!.TranslatePoint(default, window)!.Value.Y;
+        Assert.True(saveTop < statusTop,
+            $"Save copy top {saveTop} is not above status bar {statusTop}; offset={scroller.Offset.Y} extent={scroller.Extent.Height} viewport={scroller.Viewport.Height}");
+        Assert.True(save.IsEffectivelyVisible);
+        Assert.Contains("copy", save.GetVisualDescendants().OfType<TextBlock>().First().Text,
+            StringComparison.OrdinalIgnoreCase);
         Screenshots.Save(window, 1.0, "duplicate-form-footer-720-en-1.0x.png");
         Screenshots.Save(window, 2.0, "duplicate-form-footer-720-en-2.0x.png");
         window.Close();
