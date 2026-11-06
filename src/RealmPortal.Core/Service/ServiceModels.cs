@@ -217,3 +217,33 @@ public sealed record LauncherSettings(
     public GameLaunchSpec ToSpec(string executablePath, string workingDirectory) =>
         new(executablePath, workingDirectory, CommandTemplate, Arguments, Environment, Prefix);
 }
+
+/// <summary>A config store file that keeps a <c>.bak</c> of its previous valid version (#196).</summary>
+public enum ConfigFileKind
+{
+    /// <summary><c>servers.json</c>.</summary>
+    Servers,
+
+    /// <summary><c>clients.json</c>.</summary>
+    Clients,
+}
+
+/// <summary>The state of a config file or of its <c>.bak</c>.</summary>
+public enum ConfigFileState
+{
+    Missing,
+    Valid,
+
+    /// <summary>Present but unreadable or not a valid store file.</summary>
+    Damaged,
+}
+
+/// <summary>A config store file and its <c>.bak</c> (see <see cref="IPortalService.GetConfigBackups"/>).</summary>
+/// <param name="BackupModifiedAt">Last write time of the <c>.bak</c>, or <c>null</c> when it is missing.</param>
+public sealed record ConfigBackupStatus(
+    ConfigFileKind File,
+    string Path,
+    ConfigFileState Current,
+    string BackupPath,
+    ConfigFileState Backup,
+    DateTimeOffset? BackupModifiedAt);
