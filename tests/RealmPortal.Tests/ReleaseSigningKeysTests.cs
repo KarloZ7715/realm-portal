@@ -12,7 +12,7 @@ namespace RealmPortal.Tests;
 /// </summary>
 public class ReleaseSigningKeysTests
 {
-    private const string ReleaseKeyId = "A71D9203F538E296";
+    private const string ReleaseKeyId = "0D03B1CC6600D915";
     private const string Tag = "realm-portal v1.2.0";
 
     [Fact]
@@ -62,6 +62,26 @@ public class ReleaseSigningKeysTests
         Assert.NotEqual(ReleaseKeyId, key.KeyId);
 
         Assert.Equal(SignatureStatus.UnknownKey, MinisignVerifier.ForRelease().Verify(sums, signature, Tag));
+    }
+
+    [Fact]
+    public void ForRelease_RejectsTheRetiredKey()
+    {
+        // A71D9203F538E296 was replaced before any release was signed with it.
+        const ulong retiredKeyIdValue = 0xA71D9203F538E296;
+        var retiredKeyId = retiredKeyIdValue.ToString("X16", CultureInfo.InvariantCulture);
+        Assert.DoesNotContain(MinisignVerifier.ForRelease().TrustedKeys, k => k.KeyId == retiredKeyId);
+
+        // A signature carrying the retired key ID must be rejected.
+        var sums = "0000000000000000000000000000000000000000000000000000000000000000  RealmPortal-1.2.0-win-x64.zip\n"u8.ToArray();
+        var (_, signature) = SyntheticSigner.Sign(sums, Tag);
+        var lines = System.Text.Encoding.UTF8.GetString(signature).Split('\n');
+        var sig = Convert.FromBase64String(lines[1]);
+        BinaryPrimitives.WriteUInt64LittleEndian(sig.AsSpan(2, 8), retiredKeyIdValue);
+        lines[1] = Convert.ToBase64String(sig);
+        var forged = System.Text.Encoding.UTF8.GetBytes(string.Join('\n', lines));
+
+        Assert.Equal(SignatureStatus.UnknownKey, MinisignVerifier.ForRelease().Verify(sums, forged, Tag));
     }
 
     [Fact]
