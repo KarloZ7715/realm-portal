@@ -299,8 +299,17 @@ public sealed class Step13ServerUiTests
         {
             env.Main.Servers.All.Single(s => s.ServerId == server.Id).EditCommand.Execute(null);
             // The edit form is realized by later layout passes; wait for it rather than a fixed number of passes.
-            Screenshots.SettleUntil(() => window.GetVisualDescendants().OfType<ComboBox>().Any(c => c.Name == "BuildBox"),
-                "the edit form shows its compatible clients box");
+            try
+            {
+                Screenshots.SettleUntil(() => env.Main.Content is AddServerViewModel &&
+                        window.GetVisualDescendants().OfType<ComboBox>().Any(c => c.Name == "BuildBox"),
+                    "the edit form shows its compatible clients box");
+            }
+            catch (Xunit.Sdk.XunitException ex)
+            {
+                throw new Xunit.Sdk.XunitException(
+                    $"{ex.Message} Current Content type: {env.Main.Content?.GetType().FullName ?? "<null>"}.");
+            }
             var form = Assert.IsType<AddServerViewModel>(env.Main.Content);
             var box = window.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "BuildBox");
             Assert.True(box.IsEffectivelyVisible);
