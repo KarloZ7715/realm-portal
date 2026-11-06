@@ -146,7 +146,22 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 # --- Helpers ------------------------------------------------------------------------------------------------------
-# load_assets <api path>: fills asset_* maps from a release object. A missing digest is left empty (see fill_digests).
+# retry <command...>: runs the command up to 5 times, waiting RETRY_SECONDS, then twice that, and so on, between tries.
+retry() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if "$@"; then
+      return 0
+    fi
+    if [[ "$attempt" -lt 5 ]]; then
+      sleep "$((RETRY_SECONDS * attempt))"
+    fi
+  done
+  return 1
+}
+
+# load_assets <api path> [error message]: fills asset_* maps from a release object. A missing digest is left empty (see
+# fill_digests).
 declare -A asset_id=() asset_size=() asset_digest=() asset_uploader=() asset_url=()
 load_assets() {
   asset_id=()
@@ -155,9 +170,10 @@ load_assets() {
   asset_uploader=()
   asset_url=()
   local listing id name size digest uploader url
-  listing="$(gh api "$1" \
+  local error="${2:-could not read the assets of ${tag} (network or API error); nothing was changed, run the script again}"
+  listing="$(retry gh api "$1" \
     --jq '.assets[] | [(.id | tostring), .name, (.size | tostring), (.digest // "-"), (.uploader.login // "-"), (.browser_download_url // "-")] | @tsv')" \
-    || die "could not read the assets of ${tag} (network or API error); nothing was changed, run the script again"
+    || die "$error"
   while IFS=$'\t' read -r id name size digest uploader url; do
     [[ -n "$name" ]] || continue
     [[ -z "${asset_id[$name]+x}" ]] || die "release has two assets named ${name}"
@@ -182,16 +198,28 @@ expect_assets() {
   [[ "$have" == "$want" ]] || die "unexpected release assets. Have: $(echo "$have" | paste -sd' ') Want: $(echo "$want" | paste -sd' ')"
 }
 
-# fetch <name> <dest>: downloads by asset ID (works for drafts) and checks GitHub's digest when there is one.
-fetch() {
+# download <name> <dest>: downloads by asset ID (works for drafts), with retries. Fails only on network or API errors.
+download_once() {
+  gh api -H "Accept: application/octet-stream" "repos/${repo}/releases/assets/${asset_id[$1]}" >"$2"
+}
+download() {
+  retry download_once "$1" "$2"
+}
+
+# check_download <name> <file>: the file has the digest (when GitHub reports one) and size GitHub reports.
+check_download() {
   local name="$1" dest="$2" got
-  gh api -H "Accept: application/octet-stream" "repos/${repo}/releases/assets/${asset_id[$name]}" >"$dest" \
-    || die "could not download ${name} (network or API error)"
   got="$(sha256sum "$dest" | cut -d' ' -f1)"
   if [[ -n "${asset_digest[$name]}" ]]; then
     [[ "$got" == "${asset_digest[$name]}" ]] || die "downloaded ${name} does not match the digest GitHub reports"
   fi
   [[ "$(stat -c %s "$dest")" == "${asset_size[$name]}" ]] || die "downloaded ${name} does not have the size GitHub reports"
+}
+
+# fetch <name> <dest>: download and check_download.
+fetch() {
+  download "$1" "$2" || die "could not download $1 (network or API error)"
+  check_download "$1" "$2"
 }
 
 # fill_digests <dir> <name>...: download and hash every listed asset that has no digest from GitHub (drafts may lack it).
@@ -258,17 +286,13 @@ declare -A expected_digest=()
 irreversible() {
   echo "error: $*" >&2
   echo "error: ${tag} is published and immutable, so it cannot be reverted. Do not reuse the tag. Edit the release notes to warn users and cut a new patch release." >&2
+  echo "error: if this may be a network problem, check again first with: ${SELF} --verify-published ${tag}" >&2
   exit 1
 }
 verify_published() {
-  local fields=""
-  for _ in 1 2 3 4 5; do
-    if fields="$(gh api "repos/${repo}/releases/tags/${tag}" --jq '[.draft, .prerelease, .immutable] | @tsv' 2>/dev/null)"; then
-      break
-    fi
-    fields=""
-    sleep "$RETRY_SECONDS"
-  done
+  local fields="" retry_hint="${tag} may already be published; check it again with: ${SELF} --verify-published ${tag}"
+  fields="$(retry gh api "repos/${repo}/releases/tags/${tag}" --jq '[.draft, .prerelease, .immutable] | @tsv' 2>/dev/null)" \
+    || fields=""
   [[ -n "$fields" ]] || die "could not read the published release ${tag} (network or API error); run '${SELF} --verify-published ${tag}' later"
   local p_draft p_prerelease p_immutable
   IFS=$'\t' read -r p_draft p_prerelease p_immutable <<<"$fields"
@@ -287,7 +311,8 @@ verify_published() {
   # From here on the release cannot go back to draft and its assets cannot change.
   [[ "$p_prerelease" == "$is_prerelease" ]] || irreversible "prerelease flag is ${p_prerelease}, expected ${is_prerelease}"
 
-  load_assets "repos/${repo}/releases/tags/${tag}"
+  load_assets "repos/${repo}/releases/tags/${tag}" \
+    "could not read the assets of ${tag} (network or API error). ${retry_hint}"
   local want have name
   want="$(printf '%s\n' "${ci_assets[@]}" "$sig_name" | sort)"
   have="$(printf '%s\n' "${!asset_id[@]}" | sort)"
@@ -303,7 +328,9 @@ verify_published() {
   # Download all five assets from the published release and hash them ourselves.
   mkdir -p "${tmp}/published"
   for name in "${ci_assets[@]}" "$sig_name"; do
-    ( fetch "$name" "${tmp}/published/${name}" ) || irreversible "could not download or check published ${name}"
+    download "$name" "${tmp}/published/${name}" \
+      || die "could not download published ${name} (network or API error). ${retry_hint}"
+    ( check_download "$name" "${tmp}/published/${name}" ) || irreversible "published ${name} does not match what GitHub reports"
     asset_digest[$name]="$(sha256sum "${tmp}/published/${name}" | cut -d' ' -f1)"
     if [[ -n "${expected_digest[$name]:-}" && "${asset_digest[$name]}" != "${expected_digest[$name]}" ]]; then
       irreversible "published ${name} differs from what was checked before publishing"
@@ -313,17 +340,10 @@ verify_published() {
     || irreversible "the published signature does not verify"
   ( check_sums "${tmp}/published/SHA256SUMS" ) || irreversible "published packages do not match the signed SHA256SUMS"
 
-  local attested=false
-  for _ in 1 2 3 4 5; do
-    if gh release verify "$tag" --repo "$repo" >/dev/null 2>&1; then
-      attested=true
-      break
-    fi
-    sleep "$RETRY_SECONDS"
-  done
-  [[ "$attested" == "true" ]] || irreversible "gh release verify failed (no valid release attestation)"
+  retry gh release verify "$tag" --repo "$repo" >/dev/null 2>&1 \
+    || irreversible "gh release verify failed (no valid release attestation)"
   for name in "${ci_assets[@]}" "$sig_name"; do
-    gh release verify-asset "$tag" "${tmp}/published/${name}" --repo "$repo" >/dev/null 2>&1 \
+    retry gh release verify-asset "$tag" "${tmp}/published/${name}" --repo "$repo" >/dev/null 2>&1 \
       || irreversible "gh release verify-asset failed for ${name}"
   done
   print_table "${ci_assets[@]}" "$sig_name"
@@ -389,7 +409,8 @@ if [[ "$assume_yes" != "true" && "$dry_run" != "true" ]]; then
   [[ "$is_prerelease" == "true" ]] && kind="a prerelease (not latest)"
   echo "If the SHA-256 values above match the workflow's job summary, ${tag} will be signed and published as ${kind}"
   echo "release. It is immutable afterwards."
-  read -r -p "Type the tag to sign and publish it: " answer
+  read -r -p "Type the tag to sign and publish it: " answer \
+    || die "not confirmed (no answer); nothing was signed or uploaded and the release is still a draft"
   [[ "$answer" == "$tag" ]] || die "not confirmed; nothing was signed or uploaded and the release is still a draft"
 fi
 
@@ -418,14 +439,16 @@ load_assets "repos/${repo}/releases/${release_id}"
 expect_assets "${ci_assets[@]}" "$sig_name"
 check_uploaders "${ci_assets[@]}"
 mkdir -p "${tmp}/check"
+# The bytes that were signed must still be what the draft serves; the digest comparison below checks the same thing
+# through GitHub's digests.
+fetch SHA256SUMS "${tmp}/check/SHA256SUMS"
+cmp -s "${tmp}/SHA256SUMS" "${tmp}/check/SHA256SUMS" || die "SHA256SUMS on the draft changed during signing"
+fetch "$sig_name" "${tmp}/check/${sig_name}"
+cmp -s "${tmp}/${sig_name}" "${tmp}/check/${sig_name}" || die "uploaded ${sig_name} differs from the local one"
 fill_digests "${tmp}/check" "${ci_assets[@]}" "$sig_name"
 for name in "${ci_assets[@]}"; do
   [[ "${asset_digest[$name]}" == "${draft_digest[$name]}" ]] || die "${name} changed on the draft while signing"
 done
-fetch SHA256SUMS "${tmp}/check/SHA256SUMS"
-fetch "$sig_name" "${tmp}/check/${sig_name}"
-cmp -s "${tmp}/SHA256SUMS" "${tmp}/check/SHA256SUMS" || die "SHA256SUMS on the draft changed during signing"
-cmp -s "${tmp}/${sig_name}" "${tmp}/check/${sig_name}" || die "uploaded ${sig_name} differs from the local one"
 verify_sig "${tmp}/check/SHA256SUMS" "${tmp}/check/${sig_name}"
 for name in "${ci_assets[@]}" "$sig_name"; do
   expected_digest[$name]="${asset_digest[$name]}"
