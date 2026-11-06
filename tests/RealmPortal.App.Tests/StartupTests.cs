@@ -29,7 +29,7 @@ public class StartupTests
     }
 
     [Fact]
-    public void Run_ExitsWithoutStartingTheUi_WhenAnotherInstanceTookOver()
+    public Task Run_ExitsWithoutStartingTheUi_WhenAnotherInstanceTookOver() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -44,7 +44,7 @@ public class StartupTests
 
         Assert.Equal(0, exitCode);
         Assert.Equal(["crash-log"], calls);
-    }
+    });
 
     [Fact]
     public void DefaultSteps_InstallTheExceptionLogProcessHandlers()
