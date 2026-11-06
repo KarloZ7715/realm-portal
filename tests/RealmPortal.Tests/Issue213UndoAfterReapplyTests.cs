@@ -250,11 +250,12 @@ public sealed class Issue213UndoAfterReapplyTests
 
     [Theory]
     [InlineData("--realm", "Other Realm", false)]
+    [InlineData("--line", "set patchlist patch.example.test", false)]
     [InlineData("--name", "Renamed", true)]
     [InlineData("--account", "player2", true)]
     public void Reapply_AfterAnEdit_DropsTheUndoOnlyWhenTheFilesChange(string option, string value, bool keepsUndo)
     {
-        // docs/cli.md and the FAQ: only host or realm edits change the client files; name and account do not.
+        // docs/cli.md and the FAQ: host, realm or extra realmlist lines change the client files; name and account do not.
         using var box = new Box();
         Assert.Equal(0, box.Run("add", "A", HostA).Code);
         Assert.Equal(0, box.Run("switch", "A", "--client-dir", box.Client).Code);

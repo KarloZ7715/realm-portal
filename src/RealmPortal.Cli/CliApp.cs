@@ -26,7 +26,7 @@ public sealed class CliApp(
     private static readonly HashSet<string> ValueOptions =
         ["--config-dir", "--projection-dir", "--client-dir", "--realm", "--line", "--build", "--account", "--wrapper", "--name", "--path", "--host", "--client", "--root"];
 
-    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose"];
+    private static readonly HashSet<string> FlagOptions = ["--all", "--force", "--dry-run", "--verbose", "--clear-lines"];
 
     private bool _verbose;
 
@@ -49,7 +49,7 @@ public sealed class CliApp(
           realm-portal client add <path> [--name <name>]
           realm-portal client edit <client> [--name <name>] [--path <path>]
           realm-portal client remove <client>
-          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--build <n|any>] [--account <name>] [--client <client|none>]
+          realm-portal edit <server> [--name <name>] [--host <host>] [--realm <realm>] [--line <realmlist line>]... [--clear-lines] [--build <n|any>] [--account <name>] [--client <client|none>]
           realm-portal duplicate <server> [--name <name>] [--realm <realm>] [--account <name>]
           realm-portal scan [--root <folder>]...
           realm-portal config backups
@@ -247,7 +247,7 @@ public sealed class CliApp(
             build = n;
         }
 
-        var lines = parsed.Options.GetValueOrDefault("--line");
+        var lines = ExtraLineOptions(parsed, "--line must not be blank");
 
         var result = service.AddServer(new NewServer(
             parsed.Positionals[0],
@@ -258,7 +258,7 @@ public sealed class CliApp(
             parsed.Get("--account"),
             ExtraRealmlistLines: lines));
         if (!result.Succeeded)
-            return Fail(result.Error!);
+            return Fail(WithLineOption(result.Error!, lines));
         SafeWriteLine(output, $"Added '{result.Value!.Name}' ({result.Value.Id})");
         return 0;
     }
@@ -295,7 +295,11 @@ public sealed class CliApp(
 
     private int EditServer(Parsed parsed, PortalService service)
     {
-        Expect(parsed, 1, 1, "<server>");
+        Expect(parsed, 1, 1, "<server>", "--clear-lines");
+        var newLines = ExtraLineOptions(parsed, "--line must not be blank; use --clear-lines to remove the extra realmlist lines");
+        var clearLines = parsed.Flags.Contains("--clear-lines");
+        if (clearLines && newLines is not null)
+            throw new UsageException("use either --line or --clear-lines, not both");
         if (FindServer(service, parsed.Positionals[0], out var server) != 0)
             return 2;
 
@@ -322,7 +326,8 @@ public sealed class CliApp(
                 clientId = selected.Id;
         }
 
-        var extraLines = server.Realmlist.Split(RealmlistText.LineEnding, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+        // --line replaces every extra realmlist line, --clear-lines removes them; without either they are kept (#93, #192).
+        IReadOnlyList<string> extraLines = clearLines ? [] : newLines ?? server.ExtraRealmlistLines;
         var host = parsed.Get("--host") is { } hostRaw
             ? NormalizeHostArgument(hostRaw)
             : server.Host;
@@ -338,7 +343,7 @@ public sealed class CliApp(
             ClearRequiredClientBuild: clearBuild,
             ClearCacheOnSwitch: server.ClearCacheOnSwitch));
         if (!result.Succeeded)
-            return Fail(result.Error!);
+            return Fail(WithLineOption(result.Error!, newLines));
         SafeWriteLine(output, $"Updated '{server.Name}' to '{result.Value!.Name}' ({result.Value.Id})");
         return 0;
     }
@@ -501,10 +506,50 @@ public sealed class CliApp(
             var build = server.RequiredClientBuild?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "any";
             SafeWriteLine(output,
                 $"{(server.IsActive ? "*" : " ")} {server.Id}  {server.Name}  {server.Host}  build={build}"
+                + string.Concat(server.ExtraRealmlistLines.Select(line => "  " + FormatExtraLine(line)))
                 + (server.IsCompatible ? "" : "  [incompatible]"));
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// The <c>--line</c> values, or <c>null</c> when none was given. A blank value is a usage error: the service would drop it,
+    /// so an empty <c>--line "$VAR"</c> in a script would otherwise remove every extra line without notice (#192).
+    /// </summary>
+    private static List<string>? ExtraLineOptions(Parsed parsed, string blankMessage)
+    {
+        var lines = parsed.Options.GetValueOrDefault("--line");
+        if (lines is not null && lines.Any(string.IsNullOrWhiteSpace))
+            throw new UsageException(blankMessage);
+        return lines;
+    }
+
+    /// <summary>
+    /// Names the offending <c>--line</c> (1-based, in the order given) in an invalid-realmlist error, next to the realmlist line
+    /// it became (line 1 is <c>set realmlist &lt;host&gt;</c>).
+    /// </summary>
+    private static ServiceError WithLineOption(ServiceError serviceError, IReadOnlyList<string>? lines)
+    {
+        if (serviceError is not { Code: ServiceErrorCode.InvalidRealmlist, ExtraLineIndex: { } index, LineNumber: { } number }
+            || lines is null || index >= lines.Count)
+            return serviceError;
+        var marker = $"(line {number})";
+        var at = serviceError.Diagnostic.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0)
+            return serviceError;
+        return serviceError with
+        {
+            Diagnostic = string.Concat(serviceError.Diagnostic.AsSpan(0, at), $"at --line #{index + 1} (realmlist line {number})",
+                serviceError.Diagnostic.AsSpan(at + marker.Length)),
+        };
+    }
+
+    /// <summary>Shows a stored extra realmlist line such as <c>set patchlist patch.example.org</c> as <c>patchlist=patch.example.org</c>.</summary>
+    private static string FormatExtraLine(string line)
+    {
+        var parts = line.Split(' ', 3);
+        return parts is ["set", var key, var value] ? $"{key}={value}" : line;
     }
 
     private int SwitchCommand(Parsed parsed, PortalService service, string? clientId, string? clientDir)
