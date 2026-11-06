@@ -39,6 +39,8 @@ realm-portal client edit <client> [--name <name>] [--path <path>]
 realm-portal client remove <client>
 realm-portal duplicate <server> [--name <name>] [--realm <realm>] [--account <name>]
 realm-portal scan [--root <folder>]...
+realm-portal config backups
+realm-portal config restore <servers|clients>
 ```
 
 Running `realm-portal` with no arguments prints the version and this usage text.
@@ -61,6 +63,8 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | `duplicate` | Adds a copy of a server with a new id: same host, realm, extra realmlist lines, required build, account name, linked client and Cache/WDB setting (only the account name is copied; Realm Portal never stores passwords). The name is `--name` when given, otherwise `<name> (copy)`, or `<name> (copy 2)`, `(copy 3)`, ... when that is taken, shortened to fit 64 characters. `--realm` and `--account` set the copy's realm and account name instead of the original's (validated like `add`; an empty value such as `--realm ""` leaves the copy without one); when omitted, the original's are kept. Any other option, such as `--host` or `--build`, is rejected; use `edit` on the copy to change those. The copy does not become the active server, and no game file changes. |
 | `client list` / `add` / `edit` / `remove` | Manages registered game clients. Removing a client leaves the game folder and its backups on disk. |
 | `scan` | Searches for game clients and imports the servers found in their realm files. See [What `scan` searches](#what-scan-searches). |
+| `config backups` | Shows, for `servers.json` and `clients.json`, whether the current file and its `.bak` copy are missing, valid or damaged, and when the copy was saved. See [Config backups](#config-backups). |
+| `config restore <servers\|clients>` | Replaces `servers.json` or `clients.json` with its `.bak` copy. The replaced file, if any, is kept as `<file>.before-restore`. Fails (exit `2`) when there is no `.bak` or the `.bak` is damaged; nothing is changed then. |
 
 ## What `scan` searches
 
@@ -100,6 +104,21 @@ These options may go before or after the command (see [Commands](#commands)).
 | `REALM_PORTAL_CLIENT_DIR` | none | none |
 
 The config, projection and backup variables are also read by the desktop app. When testing, point them at temporary folders.
+
+## Config backups
+
+Every time Realm Portal saves `servers.json` or `clients.json` (and the desktop app saves `ui-preferences.json`), it first copies the previous version to `<file>.bak` in the same folder, with the same private permissions (`0600` on Linux). Only a readable, valid previous version is copied, so a damaged file never replaces a good `.bak`. The first save of a file creates no `.bak`, and a save that changes nothing (for example `edit` with the same values) writes nothing, so the `.bak` keeps the real previous version. Making the `.bak` is best effort: if it cannot be written (for example `servers.json.bak` is a folder), the save still succeeds and `config backups` shows the backup as `damaged`.
+
+Nothing is restored automatically. When `servers.json` or `clients.json` cannot be read and a valid `.bak` exists, the error message says so and names the command to run:
+
+```bash
+realm-portal config backups
+realm-portal config restore servers
+```
+
+`config backups` prints, for each file, whether the current file and the `.bak` are `missing`, `valid` or `damaged`, and when the `.bak` was saved, in local time with its UTC offset (for example `2026-10-29 23:40:00 UTC-05:00`). It only reads; it does not create the config folder.
+
+`config restore` copies the file it replaces to `<file>.before-restore` (private permissions, overwriting an older one) and then replaces the file in one step, so an interrupted restore never leaves the file missing. If the current file already equals the `.bak`, nothing changes, so running `config restore` twice keeps the first `.before-restore`. Restoring `servers.json` brings back the server list from before the last save; `state.json` is not changed, so if the active server is not in the restored list, `status` shows no active server and `switch` repairs it. `state.json`, `settings.json` and other files have no `.bak`. The CLI does not restore `ui-preferences.json`; the app's API can, but no screen offers it yet. Until then, copy `ui-preferences.json.bak` over `ui-preferences.json` by hand while the app is closed.
 
 ## Exit codes
 

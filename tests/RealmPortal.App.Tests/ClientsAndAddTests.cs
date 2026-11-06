@@ -48,8 +48,8 @@ public class ClientsScreenTests
         await Pump();
         var back = shell.Window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "BackButton");
         Assert.Single(back.GetVisualDescendants().OfType<Icon>());
-        Assert.Equal(["Volver"], back.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
-        Assert.Equal("Volver", Avalonia.Automation.AutomationProperties.GetName(back));
+        Assert.Equal(["Atrás"], back.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+        Assert.Equal("Atrás", Avalonia.Automation.AutomationProperties.GetName(back));
         shell.Snap("edit-client", 1.0);
     }
 
