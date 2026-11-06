@@ -697,6 +697,9 @@ public class SingleInstanceTests
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, received.Handle,
             Fast with { MaxConcurrentRequests = 1, ReplyTimeout = TimeSpan.FromMilliseconds(300) });
 
+        // On Linux the primary can write the reply into the socket buffer and close at once, so this test barely
+        // exercises ReplyTimeout there; the Windows CI run (named pipe) is what catches a regression to a single
+        // shared deadline.
         // Sends a request and keeps the connection open without reading: with a single slot, the next launch is only
         // served once the primary gives up on this reply.
         using var stuck = RawConnect(endpoint);
