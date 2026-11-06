@@ -99,13 +99,15 @@
           </Grid>
           <!-- Advanced: extra realmlist lines (#192). Collapsed by default; opens when the server already has lines. -->
           <Expander Name="AdvancedExpander"
+                    Classes="parchment"
                     Margin="0,14,0,0"
+                    Focusable="True"
                     IsExpanded="{Binding IsAdvancedExpanded, Mode=TwoWay}"
                     AutomationProperties.Name="{Binding AdvancedHeaderAccessibleName}">
             <Expander.Header>
               <TextBlock Classes="sheet-title" VerticalAlignment="Center" Text="{Binding AdvancedHeaderText}"/>
             </Expander.Header>
-            <StackPanel Spacing="6" Margin="0,10,0,0">
+            <StackPanel Spacing="6" Margin="0,10,0,0" Opacity="1">
               <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,0,0,2"/>
               <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.advanced.lines}"/>
               <TextBox Name="ExtraLinesBox"
@@ -117,6 +119,7 @@
                        Height="76"
                        Padding="12,8"
                        VerticalContentAlignment="Top"
+                       Foreground="{DynamicResource InkBrush}"
                        Watermark="{loc:T add.advanced.placeholder}"
                        Text="{Binding ExtraRealmlistLinesText, Mode=TwoWay}"
                        AutomationProperties.Name="{loc:T add.advanced.lines}"

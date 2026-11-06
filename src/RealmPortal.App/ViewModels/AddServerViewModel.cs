@@ -257,7 +257,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     public bool HasAddressInterpretation => AddressInterpretation is not null;
 
-    public override string StatusText => TestState == ConnectionTest.Testing ? Loc.Get("status.testing") : Loc.Get("status.add");
+    public override string StatusText => TestState == ConnectionTest.Testing
+        ? Loc.Get("status.testing")
+        : Loc.Get(IsEditing ? "status.edit" : "status.add");
 
     private bool IsNameValid => Name.Trim().Length is > 0 and <= Server.MaxNameLength;
 
@@ -461,9 +463,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
             if (!result.Succeeded)
             {
                 SetSaveError(result.Error);
-                if (result.Error.Code is ServiceErrorCode.InvalidRealmlist && result.Error.ExtraLineIndex is not null)
+                if (result.Error.Code is ServiceErrorCode.InvalidRealmlist)
                 {
-                    ExtraLinesError = ErrorText.Body(result.Error);
+                    ExtraLinesError = FormatServiceRealmlistError(result.Error);
                     OnPropertyChanged(nameof(ExtraLinesError));
                     OnPropertyChanged(nameof(HasExtraLinesError));
                     IsAdvancedExpanded = true;
@@ -517,9 +519,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
 
     /// <summary>
-    /// Splits the Advanced box into trimmed non-blank lines. Rejects a line that looks like
-    /// <c>set realmlist …</c> (address belongs in the Address field). Other lines are checked with
-    /// <see cref="RealmlistText.Build"/>. Blank lines are dropped silently.
+    /// Splits the Advanced box into trimmed non-blank lines. Rejects <c>set realmlist …</c> and validates each
+    /// line with <see cref="RealmlistText.Build"/>. Blank lines are dropped silently. Localized errors use
+    /// <c>Line N:</c> / <c>Línea N:</c>; when several fail, the first is shown plus <c>and N more</c>.
     /// </summary>
     private bool TryParseExtraLines(string hostForServer, out IReadOnlyList<string> lines, out string? error)
     {
@@ -528,28 +530,81 @@ public sealed partial class AddServerViewModel : ViewModelBase
         if (lines.Count == 0)
             return true;
 
-        foreach (var line in lines)
+        var hostOnly = hostForServer.Contains(':')
+            ? hostForServer[..hostForServer.LastIndexOf(':')]
+            : hostForServer;
+        var failures = new List<(int Line, string Message)>();
+        for (var i = 0; i < lines.Count; i++)
         {
+            var line = lines[i];
+            var displayLine = i + 1;
             if (LooksLikeSetRealmlist(line))
             {
-                error = Loc.Get("add.advanced.error.realmlist");
-                return false;
+                failures.Add((displayLine, Loc.Get("add.advanced.error.realmlist")));
+                continue;
+            }
+
+            try
+            {
+                RealmlistText.Build(hostOnly, [line]);
+            }
+            catch (InvalidRealmlistException ex)
+            {
+                failures.Add((displayLine, FormatRealmlistKind(ex.Kind)));
             }
         }
 
-        try
+        // Catch cross-line issues (duplicate patchlist, overall Build) that per-line checks miss.
+        if (failures.Count == 0)
         {
-            var hostOnly = hostForServer.Contains(':')
-                ? hostForServer[..hostForServer.LastIndexOf(':')]
-                : hostForServer;
-            RealmlistText.Build(hostOnly, lines);
+            try
+            {
+                RealmlistText.Build(hostOnly, lines);
+            }
+            catch (InvalidRealmlistException ex)
+            {
+                var displayLine = ex.ExtraLineIndex is { } idx && idx >= 0 && idx < lines.Count ? idx + 1 : 1;
+                failures.Add((displayLine, FormatRealmlistKind(ex.Kind)));
+            }
+        }
+
+        if (failures.Count == 0)
             return true;
-        }
-        catch (InvalidRealmlistException ex)
-        {
-            error = Loc.Format("add.advanced.error", ex.Reason);
-            return false;
-        }
+
+        error = FormatExtraLineErrors(failures);
+        return false;
+    }
+
+    /// <summary>Localized message for a Core <see cref="InvalidRealmlistKind"/> (never the English reason string).</summary>
+    internal static string FormatRealmlistKind(InvalidRealmlistKind kind) => kind switch
+    {
+        InvalidRealmlistKind.Empty => Loc.Get("add.advanced.error.empty"),
+        InvalidRealmlistKind.NotAscii => Loc.Get("add.advanced.error.notAscii"),
+        InvalidRealmlistKind.WrongFirstLine => Loc.Get("add.advanced.error.wrongFirstLine"),
+        InvalidRealmlistKind.MalformedLine => Loc.Get("add.advanced.error.malformedLine"),
+        InvalidRealmlistKind.ForbiddenKey => Loc.Get("add.advanced.error.forbiddenKey"),
+        InvalidRealmlistKind.DuplicateKey => Loc.Get("add.advanced.error.duplicateKey"),
+        InvalidRealmlistKind.InvalidValue => Loc.Get("add.advanced.error.invalidValue"),
+        InvalidRealmlistKind.BadLineEnding => Loc.Get("add.advanced.error.badLineEnding"),
+        _ => Loc.Get("add.advanced.error.invalidValue"),
+    };
+
+    /// <summary>First error as <c>Line N: …</c>, plus <c> and N more</c> when several lines failed.</summary>
+    internal static string FormatExtraLineErrors(IReadOnlyList<(int Line, string Message)> failures)
+    {
+        var first = Loc.Format("add.advanced.error.line", failures[0].Line, failures[0].Message);
+        if (failures.Count == 1)
+            return first;
+        return first + Loc.Format("add.advanced.error.more", failures.Count - 1);
+    }
+
+    private static string FormatServiceRealmlistError(ServiceError error)
+    {
+        var message = error.RealmlistKind is { } kind
+            ? FormatRealmlistKind(kind)
+            : Loc.Get("add.advanced.error.invalidValue");
+        var line = error.ExtraLineIndex is { } idx ? idx + 1 : error.LineNumber ?? 1;
+        return FormatExtraLineErrors([(line, message)]);
     }
 
     /// <summary>True when a trimmed line is a <c>set realmlist</c> directive (case-insensitive).</summary>

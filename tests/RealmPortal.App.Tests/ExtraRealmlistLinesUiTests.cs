@@ -10,6 +10,7 @@ using RealmPortal.App.Portal;
 using RealmPortal.App.ViewModels;
 using RealmPortal.App.Views;
 using RealmPortal.Core.Service;
+using RealmPortal.Core.Servers;
 using RealmPortal.Tests.Support;
 
 namespace RealmPortal.App.Tests;
@@ -120,7 +121,9 @@ public sealed class ExtraRealmlistLinesUiTests
         form.SaveCommand.Execute(null);
 
         Assert.True(form.HasExtraLinesError);
-        Assert.Equal(Loc.Get("add.advanced.error.realmlist"), form.ExtraLinesError);
+        Assert.Equal(
+            Loc.Format("add.advanced.error.line", 1, Loc.Get("add.advanced.error.realmlist")),
+            form.ExtraLinesError);
         Assert.True(form.IsAdvancedExpanded);
         Assert.Empty(env.Session.Service.ListServers(compatibleOnly: false).Value!);
     }
@@ -235,6 +238,76 @@ public sealed class ExtraRealmlistLinesUiTests
         Screenshots.Settle();
         Assert.Contains(env.Session.Service.ListServers(compatibleOnly: false).Value!, s => s.Name == "Keys");
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public void EditForm_StatusTextSaysEditServerNotSaved()
+    {
+        using var env = new Env();
+        var added = env.Add("Status", "status.example.com");
+        var form = new AddServerViewModel(env.Main.Clients, env.Session, env.Reload(added.Id), () => { }, () => { });
+        Assert.Equal(Loc.Get("status.edit"), form.StatusText);
+        Loc.Instance.SetLanguage(Language.Es);
+        form.RefreshText();
+        Assert.Equal(Loc.Get("status.edit"), form.StatusText);
+        Assert.Equal("Editar servidor · sin guardar", form.StatusText);
+        Loc.Instance.SetLanguage(Language.En);
+        form.RefreshText();
+        Assert.Equal("Edit server · not saved", form.StatusText);
+    }
+
+    [AvaloniaFact]
+    public void AddForm_StatusTextSaysAddServerNotSaved()
+    {
+        using var env = new Env();
+        var form = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+        Assert.Equal(Loc.Get("status.add"), form.StatusText);
+    }
+
+    [AvaloniaFact]
+    public void FormatExtraLineErrors_PrefixesLineAndSummarizesMore()
+    {
+        Loc.Instance.SetLanguage(Language.En);
+        var one = AddServerViewModel.FormatExtraLineErrors([(2, AddServerViewModel.FormatRealmlistKind(InvalidRealmlistKind.MalformedLine))]);
+        Assert.StartsWith("Line 2:", one);
+        Assert.DoesNotContain("more", one, StringComparison.OrdinalIgnoreCase);
+
+        var many = AddServerViewModel.FormatExtraLineErrors([
+            (1, AddServerViewModel.FormatRealmlistKind(InvalidRealmlistKind.ForbiddenKey)),
+            (2, AddServerViewModel.FormatRealmlistKind(InvalidRealmlistKind.DuplicateKey)),
+            (3, AddServerViewModel.FormatRealmlistKind(InvalidRealmlistKind.InvalidValue)),
+        ]);
+        Assert.StartsWith("Line 1:", many);
+        Assert.EndsWith(" and 2 more", many);
+
+        Loc.Instance.SetLanguage(Language.Es);
+        var es = AddServerViewModel.FormatExtraLineErrors([
+            (1, AddServerViewModel.FormatRealmlistKind(InvalidRealmlistKind.MalformedLine)),
+            (2, AddServerViewModel.FormatRealmlistKind(InvalidRealmlistKind.DuplicateKey)),
+        ]);
+        Assert.StartsWith("Línea 1:", es);
+        Assert.EndsWith(" y 1 más", es);
+        Assert.DoesNotContain("must have the form", es, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("appears more than once", es, StringComparison.OrdinalIgnoreCase);
+        Loc.Instance.SetLanguage(Language.En);
+    }
+
+    [AvaloniaFact]
+    public void Save_CoreValidation_UsesLocalizedLinePrefix_NotRawEnglishReason()
+    {
+        using var env = new Env();
+        Loc.Instance.SetLanguage(Language.Es);
+        var form = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+        form.Name = "BadCore";
+        form.Address = "logon.example.com";
+        form.SelectedClient = env.Main.Clients.Items.First(c => c.Id == env.ClientId);
+        form.ExtraRealmlistLinesText = "not a set line";
+        form.SaveCommand.Execute(null);
+        Assert.True(form.HasExtraLinesError);
+        Assert.StartsWith("Línea 1:", form.ExtraLinesError);
+        Assert.DoesNotContain("must have the form", form.ExtraLinesError!, StringComparison.Ordinal);
+        Assert.DoesNotContain("Invalid extra realmlist line:", form.ExtraLinesError!, StringComparison.Ordinal);
+        Loc.Instance.SetLanguage(Language.En);
     }
 
     [AvaloniaFact]
