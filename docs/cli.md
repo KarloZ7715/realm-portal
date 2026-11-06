@@ -38,6 +38,8 @@ realm-portal client add <path> [--name <name>]
 realm-portal client edit <client> [--name <name>] [--path <path>]
 realm-portal client remove <client>
 realm-portal scan [--root <folder>]...
+realm-portal config backups
+realm-portal config restore <servers|clients>
 ```
 
 Running `realm-portal` with no arguments prints the version and this usage text.
@@ -54,11 +56,13 @@ Running `realm-portal` with no arguments prints the version and this usage text.
 | `edit` | Changes a server. Only the options you pass change; everything else (including the required build and extra realmlist lines such as `patchlist`) is kept. `--build <n>` sets the required client build; `--build any` clears it, so the server works with any client. `--client none` unlinks the server from its client. |
 | `list` | Lists servers. The active one is marked with `*`. With `--client-dir`, only servers compatible with that client are shown, unless you add `--all`; incompatible ones are marked `[incompatible]`. |
 | `switch` | Makes a server the active one. With `--client-dir`, it also backs up and rewrites that client's realm files (`realmlist.wtf` where the client uses it, and `WTF/Config.wtf`). Without `--client-dir`, it only updates Realm Portal's own state and `activo.json`. `--force` skips the compatibility check. |
-| `undo` | Restores the server that was active before the last switch. It remembers one step. With `--client-dir`, restores that client's last switch (and its realm files from the backup when that switch rewrote them), even if another client has a more recent global switch. Without `--client-dir`, undoes the globally latest switch. `REALM_PORTAL_CLIENT_DIR` alone does not scope undo. Switching again to the active server after editing it (for example `edit A --host …`, then `switch A`) rewrites the files, so there is nothing to undo afterwards; the earlier files remain available as a backup. |
+| `undo` | Restores the server that was active before the last switch. It remembers one step. With `--client-dir`, restores that client's last switch (and its realm files from the backup when that switch rewrote them), even if another client has a more recent global switch. Without `--client-dir`, undoes the globally latest switch. `REALM_PORTAL_CLIENT_DIR` alone does not scope undo. Switching again to the active server after changing its host or realm (for example `edit A --host …`, then `switch A`) rewrites the files, so there is nothing to undo afterwards; the files from before the first switch remain available as a backup. Other edits, such as a new name or account, and a switch that only repairs files changed by hand keep the undo. |
 | `status` | Shows the active server, whether `activo.json` is in sync, clients whose files do not match the active server, and whether undo is available. With `--client-dir`, also shows that client's version and whether it is compatible. |
 | `launch` | Needs `--client-dir` (or `REALM_PORTAL_CLIENT_DIR`). With `<server>`, switches to it and starts the game; without it, starts the game for the active server. `--force` skips the compatibility check. `--dry-run` prints the exact command a real launch would start (the saved launcher prefix such as `gamemoderun`, or `--wrapper` when given, then the executable; tokens with spaces are quoted; environment changes, if any, on following `env NAME=value` / `unset NAME` lines) without switching or starting the game, and fails the same way a real launch would when a saved launcher setting cannot be applied by the CLI; it still registers the `--client-dir` folder if it is new, and with `<server>` it does not check compatibility. `--wrapper <command>` runs the game through a command such as `wine` and saves it as the launcher prefix in Realm Portal's settings (with `--dry-run` it is only printed, not saved). |
 | `client list` / `add` / `edit` / `remove` | Manages registered game clients. Removing a client leaves the game folder and its backups on disk. |
 | `scan` | Searches for game clients and imports the servers found in their realm files. See [What `scan` searches](#what-scan-searches). |
+| `config backups` | Shows, for `servers.json` and `clients.json`, whether the current file and its `.bak` copy are missing, valid or damaged, and when the copy was saved. See [Config backups](#config-backups). |
+| `config restore <servers\|clients>` | Replaces `servers.json` or `clients.json` with its `.bak` copy. The replaced file, if any, is kept as `<file>.before-restore`. Fails (exit `2`) when there is no `.bak` or the `.bak` is damaged; nothing is changed then. |
 
 ## What `scan` searches
 
@@ -98,6 +102,21 @@ These options may go before or after the command (see [Commands](#commands)).
 | `REALM_PORTAL_CLIENT_DIR` | none | none |
 
 The config, projection and backup variables are also read by the desktop app. When testing, point them at temporary folders.
+
+## Config backups
+
+Every time Realm Portal saves `servers.json` or `clients.json` (and the desktop app saves `ui-preferences.json`), it first copies the previous version to `<file>.bak` in the same folder, with the same private permissions (`0600` on Linux). Only a readable, valid previous version is copied, so a damaged file never replaces a good `.bak`. The first save of a file creates no `.bak`, and a save that changes nothing (for example `edit` with the same values) writes nothing, so the `.bak` keeps the real previous version. Making the `.bak` is best effort: if it cannot be written (for example `servers.json.bak` is a folder), the save still succeeds and `config backups` shows the backup as `damaged`.
+
+Nothing is restored automatically. When `servers.json` or `clients.json` cannot be read and a valid `.bak` exists, the error message says so and names the command to run:
+
+```bash
+realm-portal config backups
+realm-portal config restore servers
+```
+
+`config backups` prints, for each file, whether the current file and the `.bak` are `missing`, `valid` or `damaged`, and when the `.bak` was saved, in local time with its UTC offset (for example `2026-10-29 23:40:00 UTC-05:00`). It only reads; it does not create the config folder.
+
+`config restore` copies the file it replaces to `<file>.before-restore` (private permissions, overwriting an older one) and then replaces the file in one step, so an interrupted restore never leaves the file missing. If the current file already equals the `.bak`, nothing changes, so running `config restore` twice keeps the first `.before-restore`. Restoring `servers.json` brings back the server list from before the last save; `state.json` is not changed, so if the active server is not in the restored list, `status` shows no active server and `switch` repairs it. `state.json`, `settings.json` and other files have no `.bak`. The CLI does not restore `ui-preferences.json`; the app's API can, but no screen offers it yet. Until then, copy `ui-preferences.json.bak` over `ui-preferences.json` by hand while the app is closed.
 
 ## Exit codes
 
