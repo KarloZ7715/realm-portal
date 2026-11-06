@@ -403,22 +403,95 @@ public sealed class DuplicateServerUiTests
     [AvaloniaFact]
     public void Duplicate_NameTruncatesByGrapheme_NotUtf16()
     {
-        using var env = new Env();
         Loc.Instance.SetLanguage(Language.En);
-        // 64 UTF-16 units ending in an emoji (one grapheme, two code units): a naive[..] would split it.
-        var emoji = "😀";
-        Assert.Equal(2, emoji.Length);
-        var name = new string('n', Server.MaxNameLength - emoji.Length) + emoji;
-        Assert.Equal(Server.MaxNameLength, name.Length);
-        var existing = new[] { "other" };
-        var copyName = AddServerViewModel.CreateLocalizedDuplicateName(name, existing);
-        Assert.EndsWith(" (copy)", copyName);
+        const string suffix = " (copy)";
+        var maxPrefix = Server.MaxNameLength - suffix.Length;
+        // Family ZWJ sequence (one grapheme, many UTF-16 units) placed so maxPrefix lands inside it.
+        // A naive value[..maxPrefix] would split the cluster / leave a broken surrogate sequence.
+        var zwj = "👨\u200D👩\u200D👧\u200D👦";
+        Assert.True(zwj.Length > 2);
+        var name = new string('x', maxPrefix - 2) + zwj;
+        Assert.True(name.Length > maxPrefix);
+        var naive = name[..maxPrefix];
+        var cut = AddServerViewModel.TruncateToTextElements(name, maxPrefix);
+        Assert.NotEqual(naive, cut); // kills mutation M2 (naive [..])
+        Assert.True(cut.Length <= maxPrefix);
+        var elements = new List<string>();
+        var en = System.Globalization.StringInfo.GetTextElementEnumerator(cut);
+        while (en.MoveNext())
+            elements.Add((string)en.Current!);
+        Assert.Equal(cut, string.Concat(elements));
+        Assert.False(cut.Length > 0 && char.IsHighSurrogate(cut[^1]), "must not end on a high surrogate");
+
+        var copyName = AddServerViewModel.CreateLocalizedDuplicateName(name, ["other"]);
+        Assert.EndsWith(suffix, copyName);
         Assert.True(copyName.Length <= Server.MaxNameLength);
-        Assert.False(copyName.Contains('\uD83D') && !copyName.Contains(emoji), "high surrogate left without the emoji");
-        // The emoji must be dropped as a whole when the suffix does not fit beside it.
-        Assert.DoesNotContain(emoji, copyName);
-        Assert.DoesNotContain("\uD83D", copyName);
-        Assert.DoesNotContain("\uDE00", copyName);
+    }
+
+    [AvaloniaFact]
+    public void Duplicate_ChangingHostToThirdServer_IsRejected_UnchangedStillSaves()
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        var a = env.Session.Service.AddServer(new NewServer("Alpha", "a.example.com", Realm: "Ra", ClientId: cid)).Value!;
+        var b = env.Session.Service.AddServer(new NewServer("Beta", "b.example.com", Realm: "Rb", ClientId: cid)).Value!;
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Servers.ReloadFromService();
+
+        main.Servers.Visible.Single(s => s.ServerId == a.Id).DuplicateCommand.Execute(null);
+        var ok = Assert.IsType<AddServerViewModel>(main.Content);
+        ok.SaveCommand.Execute(null);
+        Assert.Null(ok.SaveError);
+        Assert.Equal(3, env.Session.Service.ListServers(compatibleOnly: false).Value!.Count);
+
+        main.Servers.ReloadFromService();
+        main.Servers.Visible.Single(s => s.ServerId == a.Id).DuplicateCommand.Execute(null);
+        var clash = Assert.IsType<AddServerViewModel>(main.Content);
+        clash.Address = b.Host;
+        clash.Realm = b.Realm;
+        clash.SaveCommand.Execute(null);
+        Assert.Equal(Loc.Get("add.error.duplicate"), clash.SaveError);
+        Assert.Equal(3, env.Session.Service.ListServers(compatibleOnly: false).Value!.Count);
+    }
+
+    [AvaloniaFact]
+    public void Duplicate_Save_CopiesExtrasViaDuplicateServerPath()
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        var original = env.Session.Service.AddServer(new NewServer(
+            "With Extras", "logon.example.com", ClientId: cid,
+            ExtraRealmlistLines: ["set patchlist example.com"])).Value!;
+        Assert.Contains("set patchlist example.com", original.ExtraRealmlistLines!);
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Servers.ReloadFromService();
+        Assert.Single(main.Servers.Visible).DuplicateCommand.Execute(null);
+        var form = Assert.IsType<AddServerViewModel>(main.Content);
+        form.SaveCommand.Execute(null);
+        Assert.Null(form.SaveError);
+        var copy = Assert.Single(env.Session.Service.ListServers(compatibleOnly: false).Value!, s => s.Id != original.Id);
+        Assert.Contains("set patchlist example.com", copy.ExtraRealmlistLines!);
+    }
+
+    [AvaloniaFact]
+    public void Duplicate_NameAlreadyEndingInCopy_GetsCopy2()
+    {
+        Loc.Instance.SetLanguage(Language.En);
+        Assert.Equal(
+            "Demo (copy 2)",
+            AddServerViewModel.CreateLocalizedDuplicateName("Demo (copy)", ["Demo (copy)"]));
+        Assert.Equal(
+            "Demo (copy 2)",
+            AddServerViewModel.CreateLocalizedDuplicateName("Demo (copy)", ["Demo", "Demo (copy)"]));
+        Loc.Instance.SetLanguage(Language.Es);
+        Assert.Equal(
+            "Demo (copia 2)",
+            AddServerViewModel.CreateLocalizedDuplicateName("Demo (copia)", ["Demo (copia)"]));
+        Loc.Instance.SetLanguage(Language.En);
     }
 
     [AvaloniaFact]

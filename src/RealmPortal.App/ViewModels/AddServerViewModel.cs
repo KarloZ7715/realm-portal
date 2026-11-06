@@ -43,6 +43,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private readonly IReadOnlyList<string>? _extraRealmlistLines;
     private readonly bool _isDuplicating;
     private readonly string? _sourceServerId;
+    private readonly string? _sourceHost;
+    private readonly string _sourceRealm = string.Empty;
 
     public AddServerViewModel(ClientsViewModel clients, DemoBackend backend, Action<ServerSeed> save, Action cancel)
     {
@@ -105,7 +107,11 @@ public sealed partial class AddServerViewModel : ViewModelBase
             throw new ArgumentException("Use the edit constructor when duplicate is false.", nameof(duplicate));
         _isDuplicating = true;
         _sourceServerId = entry.Id;
-        _extraRealmlistLines = entry.ExtraRealmlistLines;
+        _sourceHost = entry.Host;
+        _sourceRealm = entry.Realm.Trim();
+        // Extras stay on the source; Core DuplicateServer copies them. Leaving this null means an
+        // AddServer fallback would drop them — the DuplicateServer path is required (#191 QA M4).
+        _extraRealmlistLines = null;
         Address = entry.Host;
         Realm = entry.Realm;
         Account = entry.Account ?? string.Empty;
@@ -434,8 +440,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
             }
 
             var hostForServer = port == DefaultPort ? host : $"{host}:{port}";
-            // Duplicate mode may keep the source host+realm (and match earlier copies); Core DuplicateServer allows that.
-            if (!IsDuplicating && IsDuplicateAddress(hostForServer, realm))
+            // Host+realm must stay unique, except an unchanged duplicate may keep the source address
+            // (and match earlier copies of that source). Changing to a third server's address is rejected (#191 QA).
+            if (IsDuplicateAddress(hostForServer, realm) && !IsUnchangedSourceAddress(hostForServer, realm))
             {
                 SetSaveMessage("add.error.duplicate");
                 return;
@@ -507,13 +514,20 @@ public sealed partial class AddServerViewModel : ViewModelBase
             && string.Equals(server.Realm.Trim(), realm, StringComparison.OrdinalIgnoreCase));
     }
 
+    private bool IsUnchangedSourceAddress(string hostForServer, string realm) =>
+        IsDuplicating
+        && _sourceHost is not null
+        && string.Equals(hostForServer, _sourceHost, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(realm, _sourceRealm, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// Localized unique duplicate name: <c>"Name (copy)"</c> / <c>"Name (copia)"</c>, then <c>" (copy 2)"</c> / <c>" (copia 2)"</c>, …
     /// Prefixes are cut by whole text elements so a trailing emoji is not split (same rule as Core #219).
     /// </summary>
     internal static string CreateLocalizedDuplicateName(string name, IReadOnlyList<string> existingNames)
     {
-        var basis = name.Trim();
+        // "Foo (copy)" / "Foo (copia)" → next free "Foo (copy 2)" / "Foo (copia 2)", not "Foo (copy) (copy)".
+        var basis = StripTrailingDuplicateSuffix(name.Trim());
         for (var number = 1; ; number++)
         {
             var tail = number == 1
@@ -526,6 +540,43 @@ public sealed partial class AddServerViewModel : ViewModelBase
                 return candidate;
             }
         }
+    }
+
+    /// <summary>Removes a trailing localized <c>(copy)</c> / <c>(copy N)</c> (and ES <c>copia</c>) so renumbering is clean.</summary>
+    internal static string StripTrailingDuplicateSuffix(string name)
+    {
+        var suffixes = new[]
+        {
+            Loc.Get("servers.duplicate.suffix"),
+            // EN/ES templates for N≥2 share the same shape; try both languages so a mixed list still strips.
+            " (copy)",
+            " (copia)",
+        };
+        foreach (var suffix in suffixes.Distinct(StringComparer.Ordinal))
+        {
+            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return name[..^suffix.Length].TrimEnd();
+            }
+        }
+
+        // " (copy 12)" / " (copia 3)"
+        foreach (var marker in new[] { " (copy ", " (copia " })
+        {
+            var idx = name.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (idx <= 0 || !name.EndsWith(')'))
+            {
+                continue;
+            }
+
+            var num = name[(idx + marker.Length)..^1];
+            if (num.Length > 0 && num.All(char.IsAsciiDigit))
+            {
+                return name[..idx].TrimEnd();
+            }
+        }
+
+        return name;
     }
 
     /// <summary>Longest prefix of whole grapheme clusters within <paramref name="maxLength"/> UTF-16 chars.</summary>
