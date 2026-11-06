@@ -607,13 +607,17 @@ public sealed partial class AddServerViewModel : ViewModelBase
         return FormatExtraLineErrors([(line, message)]);
     }
 
-    /// <summary>True when a trimmed line is a <c>set realmlist</c> directive (case-insensitive).</summary>
+    /// <summary>
+    /// True when the line is a <c>set realmlist</c> directive: tokens split on any whitespace,
+    /// case-insensitive. Catches <c>SET  REALMLIST</c>, tabs, and leading spaces; rejects
+    /// glued forms like <c>set realmlistfoo</c> and other keys like <c>set patchlist</c>.
+    /// </summary>
     internal static bool LooksLikeSetRealmlist(string line)
     {
-        const string prefix = "set realmlist";
-        if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            return false;
-        return line.Length == prefix.Length || char.IsWhiteSpace(line[prefix.Length]);
+        var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            && parts[0].Equals("set", StringComparison.OrdinalIgnoreCase)
+            && parts[1].Equals("realmlist", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static IReadOnlyList<string> SplitNonBlankExtraLines(string text) =>

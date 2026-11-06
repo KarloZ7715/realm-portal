@@ -128,17 +128,45 @@ public sealed class ExtraRealmlistLinesUiTests
         Assert.Empty(env.Session.Service.ListServers(compatibleOnly: false).Value!);
     }
 
-    [AvaloniaFact]
-    public void LooksLikeSetRealmlist_IsCaseInsensitive()
+    [AvaloniaTheory]
+    [InlineData("set realmlist host.example.com", true)]
+    [InlineData("SET REALMLIST host.example.com", true)]
+    [InlineData("Set Realmlist host.example.com", true)]
+    [InlineData("SET  REALMLIST host.example.com", true)]
+    [InlineData("set\trealmlist host.example.com", true)]
+    [InlineData("  set realmlist host.example.com", true)]
+    [InlineData("\tSET\tREALMLIST\t host.example.com", true)]
+    [InlineData("set realmlistfoo host.example.com", false)]
+    [InlineData("setrealmlist host.example.com", false)]
+    [InlineData("set patchlist host.example.com", false)]
+    public void LooksLikeSetRealmlist_TokenizesOnAnyWhitespace(string line, bool expected) =>
+        Assert.Equal(expected, AddServerViewModel.LooksLikeSetRealmlist(line));
+
+        [AvaloniaFact]
+    public void BlankAndWhitespaceOnlyLines_AreDroppedByViewModelBeforeCore()
     {
-        Assert.True(AddServerViewModel.LooksLikeSetRealmlist("set realmlist host.example.com"));
-        Assert.True(AddServerViewModel.LooksLikeSetRealmlist("SET REALMLIST host.example.com"));
-        Assert.True(AddServerViewModel.LooksLikeSetRealmlist("Set Realmlist host.example.com"));
-        Assert.False(AddServerViewModel.LooksLikeSetRealmlist("set patchlist host.example.com"));
-        Assert.False(AddServerViewModel.LooksLikeSetRealmlist("set realmlistx host.example.com"));
+        using var env = new Env();
+        var form = new AddServerViewModel(env.Main.Clients, env.Session, () => { }, () => { });
+        form.Name = "Filtered";
+        form.Address = "logon.example.com";
+        form.SelectedClient = env.Main.Clients.Items.First(c => c.Id == env.ClientId);
+        // Empty, spaces-only and tab-only rows must not reach Core or the count header.
+        // One patchlist only: Core rejects duplicate keys.
+        form.ExtraRealmlistLinesText = "set patchlist a.example.com\n\n   \n\t\n  ";
+
+        Assert.Equal(
+            ["set patchlist a.example.com"],
+            AddServerViewModel.SplitNonBlankExtraLines(form.ExtraRealmlistLinesText));
+        Assert.Equal(1, form.NonBlankExtraLineCount);
+        Assert.Equal(Loc.Get("add.advanced.count.one"), form.AdvancedHeaderText);
+
+        form.SaveCommand.Execute(null);
+        Assert.False(form.HasExtraLinesError);
+        Assert.False(form.HasSaveError);
+        var saved = env.Session.Service.ListServers(compatibleOnly: false).Value!.Single(s => s.Name == "Filtered");
+        Assert.Equal(["set patchlist a.example.com"], saved.ExtraRealmlistLines);
     }
 
-    [AvaloniaFact]
     public void LocParity_AdvancedKeysExistInBothLanguages()
     {
         var keys = new[]
