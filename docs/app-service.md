@@ -583,6 +583,29 @@ ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file);
 (`InconsistentState`: even the rollback failed; tell the user to review the client), `Pending` (only `UndoConflict`: stopped on purpose before touching any file, can be retried, forced via `RestoreBackup(force: true)`, or discarded via `DiscardUndo()`), or
 `AppliedLaunchFailed` (only `Play`: plan, apply and activate succeeded; launch failed — the client is configured, the new server is active, and undo is still available).
 
+### 7.1 Next step per error (`ServiceErrorAction`, #194)
+
+`ServiceErrorActions.NextAction(this ServiceError)` maps an error to a stable `ServiceErrorAction` the UI can turn into a localized hint or a button. It is pure (reads no file) and never throws for a known code; a code added later maps to `None` until it is listed.
+
+| `ServiceErrorAction` | Codes | Suggested UI action |
+|---|---|---|
+| `None` | `BackupNotFound`; `StoreCorrupt` for files other than `servers.json` / `clients.json` | message only |
+| `TryAgain` | `StoreLocked`, `FileSharingViolation`, `HashMismatch`, `Unexpected`, update codes (`UpdateCheckFailed`, `ChecksumMismatch`, `AssetMissing`, `DownloadTooLarge`, `UntrustedRedirect`, `RateLimited`) | Retry |
+| `CloseGame` | `GameRunning`, `ProcessCheckFailed` | close the game, then retry |
+| `ChooseServer` | `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing` | go to the server list |
+| `ScanOrAddClient` | `ClientNotFound` | "Scan again" / "Add client manually" |
+| `ChooseClientFolder` | `PathNotFound`, `ClientExecutableNotFound`, `ClientNotAPortableExecutable`, `ClientNoVersionResource`, `UnsupportedClient` | pick another client folder |
+| `FixInput` | `InvalidServerInput`, `InvalidClientInput`, `InvalidRealmlist`, `ServerNameTaken`, `ClientAlreadyExists` | focus the offending field (`Field`, `ExtraLineIndex`) |
+| `UseCompatibleClient` | `IncompatibleClient` | pick a matching client, edit the build, or force |
+| `RestoreConfigBackup` | `StoreCorrupt` with `Path` ending in `servers.json` or `clients.json` | offer restore when `GetConfigBackups` shows a valid `.bak` |
+| `CheckPermissions` | `PermissionDenied`, `ReadOnlyFs`, `ClientUnreadable`, `VerifyFailed` | explain how to fix access |
+| `FreeDiskSpace` | `DiskFull` | free space, then retry |
+| `ResolveUndoConflict` | `UndoConflict` | show `ConflictingFiles`; retry undo, restore with force, or `DiscardUndo` |
+| `ReviewClientFiles` | `InconsistentState`, `PathEscapesClient` | review the client, switch again |
+| `CheckLauncherSettings` | `InvalidLauncherSettings`, `LaunchFailed` | open launcher settings (with `AppliedLaunchFailed`, also offer undo) |
+
+The CLI writes the same next steps as commands (see [cli.md](cli.md#empty-results-and-errors)).
+
 ---
 
 ## Approved decisions (maintainer approval gate)

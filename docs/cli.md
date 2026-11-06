@@ -129,6 +129,29 @@ realm-portal config restore servers
 
 `config restore` copies the file it replaces to `<file>.before-restore` (private permissions, overwriting an older one) and then replaces the file in one step, so an interrupted restore never leaves the file missing. If the current file already equals the `.bak`, nothing changes, so running `config restore` twice keeps the first `.before-restore`. Restoring `servers.json` brings back the server list from before the last save; `state.json` is not changed, so if the active server is not in the restored list, `status` shows no active server and `switch` repairs it. `state.json`, `settings.json` and other files have no `.bak`. The CLI does not restore `ui-preferences.json`; the app's API can, but no screen offers it yet. Until then, copy `ui-preferences.json.bak` over `ui-preferences.json` by hand while the app is closed.
 
+## Empty results and errors
+
+When a command finds nothing, or fails, its message says why and, where there is one, what to run next. Exit codes do not change: an empty result is a success (`0`), a failure is `2`.
+
+| Situation | Message (abridged) |
+| --- | --- |
+| `list` with no servers | `No servers. Add one with 'realm-portal add <name> <host>', or run 'realm-portal scan' to import the servers of your game clients.` |
+| `list --client-dir` with no compatible server | `No compatible servers for this client's build. Run 'realm-portal list --all' to see every server, or 'realm-portal edit <server> --build any' to allow any build.` |
+| `client list` with no clients | `No clients. Run 'realm-portal scan' to look for game clients (add --root <folder> to search another folder), or 'realm-portal client add <path>' to add one by hand.` |
+| `scan` adds no client | After `Scan complete: …`: `No game clients were found.` (or, when clients are already registered, `No new clients were found; the clients already registered were kept.`) followed by `Run 'realm-portal scan --root <folder>' to search another folder, or 'realm-portal client add <path>' to add one by hand.` |
+| `config backups` with no `.bak` | `No backups yet: a .bak copy is kept the next time a save changes servers.json or clients.json.` |
+| `config backups` with a damaged file and a valid `.bak` | `servers.json is damaged but its backup is valid; run 'realm-portal config restore servers' to restore it.` |
+| `status` with no active server | `Active server: none (run 'realm-portal switch <server>' to choose one)` |
+| `undo` with nothing to undo | `Nothing to undo: there is no earlier switch to go back to. Run 'realm-portal status' to see the active server, or 'realm-portal switch <server>' to change it.` |
+| unknown `<server>` / `<client>` | `no server matches '…'. Run 'realm-portal list' to see the server names and ids.` / `no client matches '…'. Run 'realm-portal client list' to see the registered clients.` |
+| `undo --client-dir` with a folder that is not registered | `No registered client uses the folder '…'.` plus `client list`, `scan` and `client add` |
+| the game is running | `The game is running, so its client files and active server cannot be changed. Close the game and run the command again.` |
+| incompatible client | `Server requires client build 5875, but the client is 12340. Use a client with that build, change the server's build with 'realm-portal edit <server> --build <n\|any>', or add --force to switch anyway.` |
+| damaged `servers.json` / `clients.json` / `state.json` | `Config file '…' is corrupt or unreadable.` then the `config restore` command when a valid `.bak` exists, otherwise how to fix or move the file aside (Realm Portal never overwrites it). |
+| permissions, read-only folder, full disk, file in use, missing folder, unsupported or unreadable client, launcher problems | The cause, then what to check (for example `Free some disk space and try again.` or `'realm-portal launch --dry-run' shows the command that would run.`). `--verbose` replaces the cause with the detailed error but keeps the next step. |
+
+The desktop app keeps its own wording; the server status dot (DNS failure vs. offline, "checked N min ago") is unchanged. For apps built on the service, `ServiceError.NextAction()` gives the same next step as a stable code (see [app-service.md](app-service.md#7-errors-serviceerrorcode-mapping)).
+
 ## Exit codes
 
 | Code | Meaning |
