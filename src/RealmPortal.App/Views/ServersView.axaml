@@ -141,6 +141,16 @@
                         </MenuItem.Header>
                       </MenuItem>
                       <Separator IsVisible="{Binding CanManage}"/>
+                      <MenuItem Name="MenuDuplicate" Classes="two-line" IsVisible="{Binding CanManage}" Command="{Binding DuplicateCommand}"
+                                AutomationProperties.Name="{loc:T menu.duplicate}">
+                        <MenuItem.Icon><c:Icon Data="{DynamicResource IconCopy}" Width="14" Height="14" StrokeThickness="1.8"/></MenuItem.Icon>
+                        <MenuItem.Header>
+                          <StackPanel>
+                            <TextBlock Classes="menu-title" Text="{loc:T menu.duplicate}"/>
+                            <TextBlock Classes="menu-hint" Text="{loc:T menu.duplicate.hint}"/>
+                          </StackPanel>
+                        </MenuItem.Header>
+                      </MenuItem>
                       <MenuItem Name="MenuEdit" Classes="two-line" IsVisible="{Binding CanManage}" Command="{Binding EditCommand}"
                                 AutomationProperties.Name="{loc:T menu.edit}">
                         <MenuItem.Icon><c:Icon Data="{DynamicResource IconPencil}" Width="14" Height="14" StrokeThickness="1.8"/></MenuItem.Icon>

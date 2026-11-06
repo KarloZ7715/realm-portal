@@ -39,6 +39,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private bool _formClosed;
     private readonly string? _editingServerId;
     private readonly ServerBuildOption? _initialBuild;
+    private readonly IReadOnlyList<string>? _extraRealmlistLines;
+    private readonly bool _isDuplicating;
 
     public AddServerViewModel(ClientsViewModel clients, DemoBackend backend, Action<ServerSeed> save, Action cancel)
     {
@@ -90,6 +92,45 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _initialInput = CurrentInput();
     }
 
+    /// <summary>
+    /// Duplicate mode (#191): prefilled from <paramref name="entry"/>; saving adds a new server (new id) and keeps the
+    /// source's extra realmlist lines (patchlist, ...). Not edit mode: <see cref="IsEditing"/> stays false.
+    /// </summary>
+    public AddServerViewModel(ClientsViewModel clients, PortalSession session, ServerEntry entry, Action save, Action cancel, bool duplicate, IConnectionProbe? probe = null)
+        : this(clients, session, save, cancel, probe)
+    {
+        if (!duplicate)
+            throw new ArgumentException("Use the edit constructor when duplicate is false.", nameof(duplicate));
+        _isDuplicating = true;
+        _extraRealmlistLines = entry.ExtraRealmlistLines;
+        Address = entry.Host;
+        Realm = entry.Realm;
+        Account = entry.Account ?? string.Empty;
+        SelectedClient = clients.Items.FirstOrDefault(c => c.Id == entry.ClientId)
+            ?? clients.Items.FirstOrDefault(c => c.IsInUse)
+            ?? clients.Items.FirstOrDefault();
+
+        var listed = session.Service.ListClients();
+        var builds = (listed.Succeeded ? listed.Value! : [])
+            .Where(c => c.Version is { HasBuild: true })
+            .Select(c => c.Version!.Build)
+            .Append(entry.RequiredClientBuild ?? 0)
+            .Where(b => b > 0)
+            .Distinct()
+            .Order();
+        BuildOptions = [new ServerBuildOption(null), .. builds.Select(b => new ServerBuildOption(b))];
+        _initialBuild = BuildOptions.First(o => o.Build == entry.RequiredClientBuild);
+        SelectedBuild = _initialBuild;
+        ClearCacheOnSwitch = entry.ClearCacheOnSwitch;
+
+        // Localized "<name> (copy)" / "<name> (copia)"; truncate so the whole name fits Server.MaxNameLength.
+        var suffix = Loc.Get("servers.duplicate.suffix");
+        var maxPrefix = Math.Max(0, Server.MaxNameLength - suffix.Length);
+        var prefix = entry.Name.Length <= maxPrefix ? entry.Name : entry.Name[..maxPrefix].TrimEnd();
+        Name = (prefix + suffix).Trim();
+        _initialInput = CurrentInput();
+    }
+
     private (string Name, string Address, string Realm, string Account, ClientItemViewModel? Client, ServerBuildOption? Build, bool? ClearCache) _initialInput;
 
     private (string, string, string, string, ClientItemViewModel?, ServerBuildOption?, bool?) CurrentInput() =>
@@ -109,11 +150,18 @@ public sealed partial class AddServerViewModel : ViewModelBase
     /// <summary>True when the form edits an existing server instead of adding one.</summary>
     public bool IsEditing => _editingServerId is not null;
 
-    public string FormTitle => Loc.Get(IsEditing ? "edit.server.title" : "add.title");
+    public bool IsDuplicating => _isDuplicating;
 
-    public string FormSubtitle => IsEditing ? Loc.Get("edit.server.subtitle") : string.Empty;
+    /// <summary>Build picker and Cache/WDB override: edit and duplicate (the copy keeps the source's values until changed).</summary>
+    public bool ShowBuildAndCacheFields => IsEditing || IsDuplicating;
 
-    public string SaveLabel => Loc.Get(IsEditing ? "edit.server.save" : "add.save");
+    public string FormTitle => Loc.Get(IsEditing ? "edit.server.title" : IsDuplicating ? "servers.duplicate.title" : "add.title");
+
+    public string FormSubtitle => IsEditing
+        ? Loc.Get("edit.server.subtitle")
+        : IsDuplicating ? Loc.Get("servers.duplicate.subtitle") : string.Empty;
+
+    public string SaveLabel => Loc.Get(IsEditing ? "edit.server.save" : IsDuplicating ? "servers.duplicate.save" : "add.save");
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NameError), nameof(HasNameError))]
@@ -395,6 +443,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
                     RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
                     ClearCacheOnSwitch: ClearCacheOnSwitch))
                 : _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId,
+                    RequiredClientBuild: IsDuplicating || BuildOptions.Count > 0 ? SelectedBuild?.Build : null,
+                    ExtraRealmlistLines: _extraRealmlistLines,
                     ClearCacheOnSwitch: ClearCacheOnSwitch));
             if (!result.Succeeded)
             {

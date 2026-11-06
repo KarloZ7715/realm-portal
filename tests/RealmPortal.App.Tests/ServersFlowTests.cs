@@ -277,7 +277,7 @@ public class ServersMenuTests
         Screenshots.Settle();
         shell.Snap("servers-menu");
         var items = card.Flyout is MenuFlyout menu ? menu.Items.OfType<MenuItem>().ToList() : throw new InvalidOperationException();
-        Assert.Equal(["MenuPlay", "MenuSwitchOnly", "MenuEdit", "MenuDelete", "MenuDisabledHint"], items.Select(i => i.Name));
+        Assert.Equal(["MenuPlay", "MenuSwitchOnly", "MenuDuplicate", "MenuEdit", "MenuDelete", "MenuDisabledHint"], items.Select(i => i.Name));
         // The disabled-reason row is hidden while nothing is locked (#201).
         Assert.False(items[4].IsVisible);
         // Demo cards have no CRUD handlers, so the real-only actions stay hidden.
