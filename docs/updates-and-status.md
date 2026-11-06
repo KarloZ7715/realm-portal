@@ -44,8 +44,9 @@ signed, but **the app does not check the signature yet** (see [Release signature
 Until it does, the protections are:
 
 - The user always confirms **Update**; nothing updates silently.
-- Releases are immutable once published (GitHub "immutable releases" is enabled for the repository; see the release gate
-  below), so assets cannot be swapped after publication.
+- Releases published since GitHub "immutable releases" was enabled for the repository (v1.0.1 on) are immutable, so their
+  assets cannot be swapped after publication. v1.0.0 came out before that and is still mutable, but the updater never
+  offers it. See the release gate below.
 - The maintainer account uses 2FA.
 
 **Release gate:** in-place AppImage replacement ships in 1.1.0 only if immutable releases are enabled for the repository.
