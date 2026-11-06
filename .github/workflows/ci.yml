@@ -115,6 +115,8 @@ jobs:
           echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
 
       - name: Scan git history for secrets
+        # Scan the full history of the commit under test only. By default gitleaks runs `git log --all`, and with
+        # fetch-depth: 0 the checkout fetches every branch, so one PR's branch could fail the scan of every other PR.
         run: |
           gitleaks version
-          gitleaks git --redact --no-banner --verbose .
+          gitleaks git --redact --no-banner --verbose --log-opts="--full-history HEAD" .
