@@ -263,7 +263,8 @@ public class SettingsScreenTests
 
             main.SectionIndex = 0;
             main.Dialog!.ConfirmCommand.Execute(null);
-            Screenshots.Settle();
+            // The dialog is cleared by a continuation of the confirm; wait for it rather than a fixed number of passes.
+            Screenshots.SettleUntil(() => main.Dialog is null, "the discard-changes dialog closes");
 
             Assert.Null(main.Dialog);
             Assert.Equal(0, main.SectionIndex);

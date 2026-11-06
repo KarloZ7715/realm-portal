@@ -73,7 +73,10 @@ public sealed class SheetLayoutTests : IDisposable
     }
 
     private static T Named<T>(Visual root, string name) where T : Control =>
-        root.GetVisualDescendants().OfType<T>().First(c => c.Name == name && c.IsEffectivelyVisible);
+        Find<T>(root, name) ?? throw new InvalidOperationException($"No visible {typeof(T).Name} named '{name}'.");
+
+    private static T? Find<T>(Visual root, string name) where T : Control =>
+        root.GetVisualDescendants().OfType<T>().FirstOrDefault(c => c.Name == name && c.IsEffectivelyVisible);
 
     private static Rect BoundsIn(Control control, Visual relativeTo) =>
         new(control.TranslatePoint(default, relativeTo)!.Value, control.Bounds.Size);
@@ -87,7 +90,9 @@ public sealed class SheetLayoutTests : IDisposable
     {
         var (window, main) = Open(width, height, language);
         main.SectionIndex = 2;
-        Screenshots.Settle();
+        // The Settings view is realized by later layout passes; wait for it rather than a fixed number of passes.
+        Screenshots.SettleUntil(() => Find<ScrollViewer>(window, "Scroller") is not null && Find<Button>(window, "AboutButton") is not null,
+            "the Settings view with its About button is shown");
         var scroller = Named<ScrollViewer>(window, "Scroller");
         // Twice: a late layout pass (fonts, wrapped text) can still grow the extent after the first jump.
         scroller.ScrollToEnd();
