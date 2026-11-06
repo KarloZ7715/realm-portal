@@ -290,6 +290,40 @@ public sealed class ClientFilesApplier : IClientFilesApplier
         }
     }
 
+    public bool CanUndoWithoutConflict(string installationId, string clientRoot, string backupId)
+    {
+        RequireValidIds(installationId, "-");
+        if (!BackupIdFormat.IsValid(backupId))
+            return false;
+        try
+        {
+            var trustedRoot = ClientPaths.CanonicalRoot(clientRoot);
+            if (FindBackup(installationId, backupId) is not { } found)
+                return false;
+            var (manifestPath, manifest, _) = found;
+            ClientPaths.RequireMatchingRoots(trustedRoot, manifest.ClientRoot, manifestPath);
+
+            foreach (var file in manifest.Files)
+            {
+                var path = ClientPaths.ResolveManagedPath(trustedRoot, file.Path);
+                var current = ReadCurrentForUndo(path, out var notComparable);
+                var hash = notComparable || current is null ? null : ClientFilesIo.Sha256Hex(current);
+                if (notComparable
+                    || (!string.Equals(hash, file.Sha256Before, StringComparison.Ordinal)
+                        && !string.Equals(hash, file.Sha256After, StringComparison.Ordinal)))
+                    return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is ClientFilesException or IOException or UnauthorizedAccessException)
+        {
+            // An unreadable or corrupt manifest, an unreadable file or another client folder: undo could not restore
+            // this backup cleanly either, so report it as not undoable instead of failing the caller.
+            return false;
+        }
+    }
+
     public void MarkBackupUndone(string installationId, string backupId)
     {
         RequireValidIds(installationId, "-");
