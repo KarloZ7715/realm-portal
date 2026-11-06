@@ -133,8 +133,9 @@ internal static class ServiceCli
                 "Run 'realm-portal status' to see the active server, then 'realm-portal switch <server>' to write its client files again.",
             ServiceErrorCode.UndoConflict =>
                 "Put those files back as they were after the switch, or move your changes elsewhere, and run 'realm-portal undo' again.",
-            ServiceErrorCode.PermissionDenied =>
-                "Check that your user owns the config and client folders and can write to them, then try again (add --verbose for the path).",
+            ServiceErrorCode.PermissionDenied => string.IsNullOrEmpty(error.Path)
+                ? "Check that your user owns the config and client folders and can write to them, or run the command from an account that can, then try again."
+                : "Check that your user owns it and can write to it, or run the command from an account that can, then try again.",
             ServiceErrorCode.ReadOnlyFs => "Make the folder writable or move it to a writable disk, then try again.",
             ServiceErrorCode.DiskFull => "Free some disk space and try again.",
             ServiceErrorCode.FileSharingViolation => "Close the program using it (often the game or an editor) and try again.",

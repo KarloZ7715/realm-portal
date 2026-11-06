@@ -387,6 +387,27 @@ public class ClearErrorMessagesTests
     }
 
     [Fact]
+    public void PermissionDenied_WithPath_NamesItAndDoesNotPointAtVerbose()
+    {
+        var message = ServiceCli.Describe(new ServiceError(ServiceErrorCode.PermissionDenied, Path: "/tmp/config/servers.json"));
+        Assert.Equal(
+            "Permission denied: '/tmp/config/servers.json' cannot be read or written. Check that your user owns it and can write to it, or run the command from an account that can, then try again.",
+            message);
+        Assert.DoesNotContain("--verbose", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("sudo", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PermissionDenied_WithoutPath_NamesTheFoldersToCheck()
+    {
+        var message = ServiceCli.Describe(new ServiceError(ServiceErrorCode.PermissionDenied));
+        Assert.Equal(
+            "Permission denied: a file or folder Realm Portal needs cannot be read or written. Check that your user owns the config and client folders and can write to them, or run the command from an account that can, then try again.",
+            message);
+        Assert.DoesNotContain("--verbose", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UndoConflict_ListsTheChangedFiles()
     {
         var message = ServiceCli.Describe(new ServiceError(ServiceErrorCode.UndoConflict, ConflictingFiles: ["Data/enUS/realmlist.wtf"], Consistency: Consistency.Pending));
