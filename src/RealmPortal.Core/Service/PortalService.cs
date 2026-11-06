@@ -442,6 +442,37 @@ public sealed class PortalService : IPortalService
         }
     }
 
+    public ServiceResult<ServerEntry> DuplicateServer(string serverId, string? newName = null, string? realm = null, string? account = null)
+    {
+        ArgumentNullException.ThrowIfNull(serverId);
+
+        try
+        {
+            using var configLock = _servers.DirectoryLock.Acquire();
+            var servers = _servers.List();
+            var source = servers.FirstOrDefault(s => s.Id == serverId);
+            if (source is null)
+                return ServiceResult<ServerEntry>.Fail(new ServiceError(ServiceErrorCode.ServerNotFound));
+
+            var copy = Server.Create(
+                newName ?? CreateDuplicateServerName(source.Name, servers),
+                source.Host,
+                realm ?? source.Realm,
+                StoredExtraRealmlistLines(source),
+                source.RequiredClientBuild,
+                account ?? source.Account,
+                clientId: source.ClientId,
+                clearCacheOnSwitch: source.ClearCacheOnSwitch);
+            _servers.Add(copy);
+            // A new copy is never active, so state.json is not read: nothing can fail after the copy is saved.
+            return ServiceResult<ServerEntry>.Ok(ToServerEntry(copy, activeId: null, copy.ClientId, null));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ServerEntry>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
     public ServiceResult<Unit> RemoveServer(string serverId)
     {
         if (serverId is null)
@@ -650,6 +681,74 @@ public sealed class PortalService : IPortalService
         {
             return ServiceResult<UndoOutcome>.Fail(ServiceErrors.FromException(ex));
         }
+    }
+
+    public ServiceResult<IReadOnlyList<ConfigBackupStatus>> GetConfigBackups()
+    {
+        try
+        {
+            // Read-only: a config directory that does not exist yet is reported as all missing, without creating it
+            // (or its lock file).
+            if (!Directory.Exists(_configDirectory))
+                return ServiceResult<IReadOnlyList<ConfigBackupStatus>>.Ok(
+                    [InspectConfigFile(ConfigFileKind.Servers), InspectConfigFile(ConfigFileKind.Clients)]);
+            using (_servers.DirectoryLock.Acquire())
+                return ServiceResult<IReadOnlyList<ConfigBackupStatus>>.Ok(
+                    [InspectConfigFile(ConfigFileKind.Servers), InspectConfigFile(ConfigFileKind.Clients)]);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<IReadOnlyList<ConfigBackupStatus>>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    public ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file)
+    {
+        var (path, isValid) = ConfigFileOf(file);
+        try
+        {
+            using (_servers.DirectoryLock.Acquire())
+            {
+                PortalConfigFile.WithConfigLock(() => ConfigFileBackup.Restore(path, _writer, isValid));
+                return ServiceResult<ConfigBackupStatus>.Ok(InspectConfigFile(file));
+            }
+        }
+        catch (FileNotFoundException)
+        {
+            return ServiceResult<ConfigBackupStatus>.Fail(
+                new ServiceError(ServiceErrorCode.BackupNotFound, Path: path + ConfigFileBackup.BackupSuffix, Consistency: Consistency.Unchanged));
+        }
+        catch (InvalidDataException ex)
+        {
+            // Only a damaged .bak maps here; lock and I/O failures go through ServiceErrors.FromException.
+            return ServiceResult<ConfigBackupStatus>.Fail(
+                new ServiceError(ServiceErrorCode.StoreCorrupt, Path: path + ConfigFileBackup.BackupSuffix, Consistency: Consistency.Unchanged, Diagnostic: ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<ConfigBackupStatus>.Fail(ServiceErrors.FromException(ex));
+        }
+    }
+
+    private (string Path, Func<byte[], bool> IsValid) ConfigFileOf(ConfigFileKind file) => file switch
+    {
+        ConfigFileKind.Servers => (_servers.FilePath, ServerStore.IsValidContent),
+        ConfigFileKind.Clients => (_clients.FilePath, ClientStore.IsValidContent),
+        _ => throw new ArgumentOutOfRangeException(nameof(file), file, "Unknown config file."),
+    };
+
+    private ConfigBackupStatus InspectConfigFile(ConfigFileKind file)
+    {
+        var (path, isValid) = ConfigFileOf(file);
+        var backupPath = path + ConfigFileBackup.BackupSuffix;
+        var backup = ConfigFileBackup.Inspect(backupPath, isValid);
+        return new ConfigBackupStatus(
+            file,
+            path,
+            ConfigFileBackup.Inspect(path, isValid),
+            backupPath,
+            backup,
+            backup == ConfigFileState.Missing ? null : new DateTimeOffset(File.GetLastWriteTimeUtc(backupPath), TimeSpan.Zero));
     }
 
     /// <summary>
@@ -1347,6 +1446,25 @@ public sealed class PortalService : IPortalService
             candidate = (prefix.Length > 0 ? prefix : "Imported server") + tail;
         }
         return candidate;
+    }
+
+    /// <summary>
+    /// Default name of a duplicated server (#191): <c>"&lt;name&gt; (copy)"</c>, then <c>" (copy 2)"</c>, <c>" (copy 3)"</c>, ...
+    /// while the name is taken (case-insensitive). The original name is shortened by whole text elements so the result fits
+    /// <see cref="Server.MaxNameLength"/>, as for imported names.
+    /// </summary>
+    internal static string CreateDuplicateServerName(string name, IReadOnlyList<Server> existing)
+    {
+        var basis = name.Trim();
+        for (var number = 1; ; number++)
+        {
+            var tail = number == 1 ? " (copy)" : $" (copy {number})";
+            var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
+            // Trimmed like Server.Create trims the name, so a prefix cut to nothing ("(copy)") is compared as saved.
+            var candidate = (prefix + tail).Trim();
+            if (!existing.Any(server => string.Equals(server.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+                return candidate;
+        }
     }
 
     /// <summary>

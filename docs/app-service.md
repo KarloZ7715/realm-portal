@@ -252,7 +252,7 @@ public sealed record UpdateServerRequest(
   - Under `ConfigDirectoryLock`: removes `clientId` from `clients.json`, clears `ClientId = null` on any server in `servers.json` that referenced `clientId` (servers themselves are not deleted), removes `active_by_client[clientId]` from `state.json`, and clears pending undo if it belonged to `clientId`.
   - When `deleteBackups == false` (default), `<backupRoot>/<clientId>` is kept on disk. When `deleteBackups == true`, acquires `InstallationLock(clientId)` and deletes managed backups under `<backupRoot>/<clientId>`. The real game folder is never touched.
 
-### 2.3 Server CRUD semantics (`AddServer`, `UpdateServer`, `RemoveServer`)
+### 2.3 Server CRUD semantics (`AddServer`, `UpdateServer`, `DuplicateServer`, `RemoveServer`)
 
 - **`UpdateServer(UpdateServerRequest request)`:**
   - **Null keeps the stored value (#93)** for the file fields the edit form may not show: `RequiredClientBuild == null` keeps the stored build; `ExtraRealmlistLines == null` and `PatchlistHost == null` keep the stored extra realmlist lines (`set patchlist …`). An empty `ExtraRealmlistLines` list clears them. `Name`, `Host`, `Realm`, `Account` and `ClientId` are always taken from the request (`null` clears `Realm`, `Account` and `ClientId`). `ClearRequiredClientBuild == true` removes the stored build ("Any client"; CLI `edit --build any`); combining it with a non-null `RequiredClientBuild` fails with `InvalidServerInput` (`Field = "build"`) and writes nothing.
@@ -260,6 +260,13 @@ public sealed record UpdateServerRequest(
   - Fails with `ServerNotFound` if `request.ServerId` does not exist; fails with `ClientNotFound` if `request.ClientId` is non-null and not in `ClientStore`; fails with `ServerNameTaken` (`ServerName = request.Name`) if another server (`Id != request.ServerId`) already uses `request.Name` case-insensitively.
   - **Running check:** If `request.ServerId` is currently active on any client `C` where `IsGameRunning(C) == true` and any connection/file field changed (`Host`, `Realm`, `PatchlistHost`, `ExtraRealmlistLines`, `RequiredClientBuild`), refuses with `ServiceErrorCode.GameRunning` (`ServerName = existing.Name`, `Path = C.Path`).
   - **Active projection & drift update:** Under `ConfigDirectoryLock`, saves `servers.json`. If `state.ActiveId == request.ServerId`, rewrites `activo.json` atomically so the projection stays in sync (`ProjectionInSync == true`). Client files on disk are not rewritten silently during metadata edit; if `Host`, `Realmlist`, or `Realm` changed for an active client, `GetStatus().ClientsNotMatchingActive` reports that client as drifted so the user can re-switch/repair or press Play.
+- **`DuplicateServer(string serverId, string? newName = null, string? realm = null, string? account = null)` (#191):**
+  - Adds a new server built with `Server.Create` (new id, same validation as `AddServer`) that copies the source's `Host`, `Realm`, extra realmlist lines (`set patchlist …`), `RequiredClientBuild`, `Account`, `ClientId` and `ClearCacheOnSwitch`. The copy is appended after the existing servers and is independent: editing or removing it does not change the original.
+  - **Account name only:** `Account` is the remembered account name. Realm Portal never stores a password or any other credential (`servers.json` has no such field), so a duplicate carries nothing beyond the original's fields.
+  - **Overrides:** a non-null `realm` or `account` replaces the copied value and is trimmed and validated as in `AddServer` (an empty `realm`, or an empty or blank `account`, leaves the copy without one). `null` keeps the original's value. Other fields are always copied; change them afterwards with `UpdateServer`.
+  - **Name:** `newName` is trimmed and validated like any name. With `newName == null`, the name is `"<name> (copy)"`, then `"<name> (copy 2)"`, `"<name> (copy 3)"`, ... while taken case-insensitively (`PortalService.CreateDuplicateServerName`). The original name is cut to the longest whole-text-element prefix that keeps the result within `Server.MaxNameLength` (`64` UTF-16 units), as for imported names.
+  - Does **not** change the active server, `state.json`, `activo.json` or any client file, so there is no running-game check. It does not read `state.json` either (a new copy is never active), so a damaged `state.json` cannot fail the call after the copy was saved.
+  - Fails with `ServerNotFound` (unknown `serverId`), `ServerNameTaken` (a given `newName` is in use), or `InvalidServerInput` with `Field = "name"`, `"realm"` or `"account"` (empty name, too long or forbidden characters); nothing is written then.
 - **`RemoveServer(string serverId)`:**
   - Fails with `ServerNotFound` if `serverId` is not in `ServerStore`.
   - **Running check:** If `serverId` is currently active on any client `C` with `IsGameRunning(C) == true`, refuses with `ServiceErrorCode.GameRunning`.
@@ -520,6 +527,27 @@ manifest hash, and those journals keep working as before. A value that is presen
   `LaunchFailed` with `Consistency.AppliedLaunchFailed` (not `Unchanged`).
 
 ---
+
+## 6b. Config file backups (`GetConfigBackups`, `RestoreConfigBackup`, #196)
+
+```csharp
+public enum ConfigFileKind { Servers, Clients }
+public enum ConfigFileState { Missing, Valid, Damaged }
+public sealed record ConfigBackupStatus(
+    ConfigFileKind File, string Path, ConfigFileState Current,
+    string BackupPath, ConfigFileState Backup, DateTimeOffset? BackupModifiedAt);
+
+ServiceResult<IReadOnlyList<ConfigBackupStatus>> GetConfigBackups();
+ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file);
+```
+
+- **Write side (`ConfigFileBackup.WriteKeepingPrevious`):** `ServerStore.Save` and `ClientStore.Save` (under the config-directory lock, as before) and the app's `UiPreferencesStore.Save` (which has no lock, as before) copy the current file to `<file>.bak` (private permissions, `0600` on Unix) before writing. Only a readable, valid current file is copied, so a damaged file (#141) never replaces a good `.bak`. The first save creates no `.bak`. When the new bytes equal the current file, nothing is written (neither the file nor the `.bak`), so a save without changes (for example the window placement saved on every close) keeps the real previous version. The `.bak` copy is best effort: if it cannot be written (for example `<file>.bak` is a directory), the save still succeeds and `GetConfigBackups` reports the `.bak` as `Damaged`. `AtomicFileWriter` itself is unchanged (it also writes game client files). `ServerStore.IsValidContent` and `ClientStore.IsValidContent` are public so callers can check a file with the same rules as loading.
+- **`ConfigFileState`:** `Missing` (no file), `Valid`, or `Damaged` (unreadable, not a valid store file, or not a regular file, such as a directory).
+- **No automatic restore.** A damaged `servers.json` / `clients.json` still fails with `StoreCorrupt`; the UI can call `GetConfigBackups()` and offer `RestoreConfigBackup` when `Current == Damaged` and `Backup == Valid`.
+- **`GetConfigBackups`** is read-only: when the config directory does not exist yet it reports every file as `Missing` without creating the directory or its lock file. `BackupModifiedAt` is in UTC.
+- **`RestoreConfigBackup`** runs under the config-directory lock. It copies the current file (if any) to `<file>.before-restore` with private permissions (`0600`), overwriting an older one, then replaces `<file>` atomically with the `.bak` bytes, so an unexpected exit never leaves `<file>` missing; the `.bak` stays. When the current file already equals the `.bak`, nothing changes (a second restore keeps the first `.before-restore`). If the write fails, `<file>` is left as it was and the new `.before-restore` copy is removed. A current file that cannot be read is moved aside instead of copied, and moved back if the write fails. No `.bak`: `BackupNotFound` with `Path = <file>.bak`, `Consistency.Unchanged`. Damaged `.bak` (including a directory): `StoreCorrupt` with `Path = <file>.bak`, nothing changed. Lock and I/O failures map like any other operation (`StoreLocked`, `PermissionDenied`, ...), never as a damaged `.bak`.
+- `state.json` is not changed by a restore; if its active id is not in the restored `servers.json`, `GetStatus` reports no active server (and `activo.json` out of sync) until the next switch.
+- **UI preferences (app only):** `UiPreferencesStore.BackupState` (`ConfigFileState` of the `.bak`) and `UiPreferencesStore.RestoreBackup()` (same semantics; throws `FileNotFoundException` without a `.bak`, `StoreException` when the `.bak` is damaged). `Load()` still returns defaults for a damaged file. The API exists; no screen calls it yet (the UI is pending).
 
 ## 7. Errors (`ServiceErrorCode` mapping)
 
