@@ -430,8 +430,10 @@
   "settings.config.preferences": "ui-preferences.json",
   "settings.config.current": "Current:",
   "settings.config.backup": "Backup:",
-  "settings.config.state.valid": "Valid",
-  "settings.config.state.damaged": "Damaged",
+  "settings.config.state.current.valid": "Valid",
+  "settings.config.state.current.damaged": "Damaged",
+  "settings.config.state.backup.valid": "Valid",
+  "settings.config.state.backup.damaged": "Damaged",
   "settings.config.state.missing": "Missing",
   "settings.config.backup.at": "Last backup {0}",
   "settings.config.backup.none": "No backup time available",
@@ -445,6 +447,7 @@
   "settings.config.restore.reason.missing": "There is no backup to restore.",
   "settings.config.restore.reason.unavailable": "Restore is not available for this file.",
   "confirm.configrestore.title": "Restore this configuration file?",
-  "confirm.configrestore.body": "“{0}” is damaged. Restore the last valid .bak copy? The current file is kept as .before-restore.",
+  "confirm.configrestore.body": "{0} is damaged. The last valid backup ({1}) will be restored. The current file is saved separately as {2} in case you need it.",
+  "confirm.configrestore.body.nodate": "{0} is damaged. The last valid backup will be restored. The current file is saved separately as {1} in case you need it.",
   "confirm.configrestore.accept": "Restore backup"
 }

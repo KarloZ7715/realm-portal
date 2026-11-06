@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
+using RealmPortal.Core.IO;
 using RealmPortal.Core.Service;
 
 namespace RealmPortal.App.ViewModels;
@@ -48,12 +49,17 @@ public sealed partial class ConfigBackupItemViewModel : ObservableObject
     /// <summary>Last-write time of the <c>.bak</c> when Core exposes it (UTC from the service).</summary>
     public DateTimeOffset? BackupModifiedAt { get; }
 
-    public string CurrentStateText => Loc.Get(StateKey(Current));
+    /// <summary>Filename Core writes for the displaced file (<c>servers.json.before-restore</c>).</summary>
+    public string BeforeRestoreFileName => FileLabel + ConfigFileBackup.BeforeRestoreSuffix;
 
-    public string BackupStateText => Loc.Get(StateKey(Backup));
+    public string CurrentStateText => Loc.Get(CurrentStateKey(Current));
+
+    public string BackupStateText => Loc.Get(BackupStateKey(Backup));
+
+    public string BackupDateText => BackupModifiedAt is { } at ? FormatBackupDate(at) : string.Empty;
 
     public string DetailText => BackupModifiedAt is { } at
-        ? Loc.Format("settings.config.backup.at", at.ToLocalTime().ToString("g"))
+        ? Loc.Format("settings.config.backup.at", FormatBackupDate(at))
         : Loc.Get("settings.config.backup.none");
 
     /// <summary>Badge status for the current file: Ready = valid (forest), NoResponse = damaged (wax), Inactive = missing.</summary>
@@ -65,7 +71,7 @@ public sealed partial class ConfigBackupItemViewModel : ObservableObject
     /// <summary>Restore is offered only when the main file is damaged and the <c>.bak</c> is valid (#196).</summary>
     public bool CanRestore => Current == ConfigFileState.Damaged && Backup == ConfigFileState.Valid;
 
-    /// <summary>Why Restore is disabled (or that the current file needs no restore).</summary>
+    /// <summary>Why Restore is disabled (or that the current file needs no restore). Also used as HelpText.</summary>
     public string RestoreDisabledReason
     {
         get
@@ -90,7 +96,6 @@ public sealed partial class ConfigBackupItemViewModel : ObservableObject
                 return Loc.Get("settings.config.restore.reason.missing");
             }
 
-            // Current damaged but backup not valid — cover any other combo.
             return Loc.Get("settings.config.restore.reason.unavailable");
         }
     }
@@ -99,7 +104,7 @@ public sealed partial class ConfigBackupItemViewModel : ObservableObject
 
     /// <summary>
     /// Accessible name for the row: file, backup date when known, and backup state
-    /// (e.g. "servers.json backup, 5 Nov 2026, 21:40, Valid").
+    /// (e.g. "servers.json backup, Nov 6, 2026, 10:04, Valid").
     /// </summary>
     public string StatusAccessibleName
     {
@@ -110,7 +115,7 @@ public sealed partial class ConfigBackupItemViewModel : ObservableObject
                 return Loc.Format(
                     "settings.config.row.accessible",
                     FileLabel,
-                    at.ToLocalTime().ToString("g"),
+                    FormatBackupDate(at),
                     BackupStateText);
             }
 
@@ -123,7 +128,9 @@ public sealed partial class ConfigBackupItemViewModel : ObservableObject
         OnPropertyChanged(nameof(FileLabel));
         OnPropertyChanged(nameof(CurrentStateText));
         OnPropertyChanged(nameof(BackupStateText));
+        OnPropertyChanged(nameof(BackupDateText));
         OnPropertyChanged(nameof(DetailText));
+        OnPropertyChanged(nameof(BeforeRestoreFileName));
         OnPropertyChanged(nameof(RestoreDisabledReason));
         OnPropertyChanged(nameof(ShowRestoreDisabledReason));
         OnPropertyChanged(nameof(StatusAccessibleName));
@@ -133,10 +140,43 @@ public sealed partial class ConfigBackupItemViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRestore))]
     private async Task RestoreAsync() => await _restore(this).ConfigureAwait(true);
 
-    private static string StateKey(ConfigFileState state) => state switch
+    /// <summary>
+    /// Long localized date in the UI language (not the OS culture):
+    /// EN <c>Nov 6, 2026, 10:04</c>, ES <c>6 nov 2026, 10:04</c>.
+    /// </summary>
+    // InvariantGlobalization is on: no CultureInfo month names — keep tables for the UI language.
+    private static readonly string[] MonthsEn =
+        ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    private static readonly string[] MonthsEs =
+        ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+    public static string FormatBackupDate(DateTimeOffset at)
     {
-        ConfigFileState.Valid => "settings.config.state.valid",
-        ConfigFileState.Damaged => "settings.config.state.damaged",
+        var local = at.ToLocalTime().DateTime;
+        var monthIndex = local.Month - 1;
+        var time = $"{local.Hour:D2}:{local.Minute:D2}";
+        if (Loc.Instance.Current == Language.Es)
+        {
+            // e.g. "6 nov 2026, 10:04"
+            return $"{local.Day} {MonthsEs[monthIndex]} {local.Year}, {time}";
+        }
+
+        // e.g. "Nov 6, 2026, 10:04"
+        return $"{MonthsEn[monthIndex]} {local.Day}, {local.Year}, {time}";
+    }
+
+    private static string CurrentStateKey(ConfigFileState state) => state switch
+    {
+        ConfigFileState.Valid => "settings.config.state.current.valid",
+        ConfigFileState.Damaged => "settings.config.state.current.damaged",
+        _ => "settings.config.state.missing",
+    };
+
+    private static string BackupStateKey(ConfigFileState state) => state switch
+    {
+        ConfigFileState.Valid => "settings.config.state.backup.valid",
+        ConfigFileState.Damaged => "settings.config.state.backup.damaged",
         _ => "settings.config.state.missing",
     };
 

@@ -397,11 +397,11 @@ See "Pieces to validate with the designer" in `assets/ART-GAPS.md`.
 
 Settings card **APP CONFIGURATION** (`settings.config`): lists `servers.json`, `clients.json` and `ui-preferences.json`. Each row shows:
 
-- File name and **Last backup** timestamp from Core `BackupModifiedAt` (local time), or `settings.config.backup.none` when there is no `.bak`.
-- **Current** and **Backup** state as `Badge` chips (`config-state`): **Valid** (forest / Ready + check), **Damaged** (wax-red / NoResponse + warning glyph), **Missing** (muted / Inactive + info icon). State is never colour alone.
+- File name and **Last backup** long date in the UI language (EN `Nov 6, 2026, 10:04`, ES `6 nov 2026, 10:04`) from Core/`UiPreferencesStore` `BackupModifiedAt`, or `settings.config.backup.none` when there is no `.bak`.
+- **Current** and **Backup** state as `Badge` chips (`config-state`): **Valid** / **Damaged** / **Missing** badges: Current (Actual) uses masculine ES (`Válido`/`Dañado`); Backup (Copia) uses feminine (`Válida`/`Dañada`); `Falta` unchanged. State is never colour alone.
 - **Restore…** is always visible. It is enabled only when the current file is damaged and the `.bak` is valid; otherwise it is disabled and a footnote (also the button tooltip) explains why (`settings.config.restore.reason.*`: current is valid, backup damaged, or no backup).
 - Accessible row name includes the file, backup date when known, and backup state (`settings.config.row.accessible` / `.nodate`), e.g. `servers.json backup, 11/5/2026 9:40 PM, Valid`.
-- Confirm dialog `confirm.configrestore.*`: Cancel is focused first and Escape cancels; Confirm uses the primary wax-red plate.
+- Confirm dialog `confirm.configrestore.*`: body names the last valid backup date and `*.before-restore` (no `.bak` jargon); Cancel is focused first with a focus ring (Tab navigation) and Escape cancels; Confirm uses the primary wax-red plate.
 
 After restore, servers/clients lists reload, or preferences (language) re-apply. Core write/restore is #196 / #218; this is the app UI.
 

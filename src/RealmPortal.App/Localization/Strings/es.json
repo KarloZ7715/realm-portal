@@ -430,8 +430,10 @@
   "settings.config.preferences": "ui-preferences.json",
   "settings.config.current": "Actual:",
   "settings.config.backup": "Copia:",
-  "settings.config.state.valid": "válido",
-  "settings.config.state.damaged": "Dañada",
+  "settings.config.state.current.valid": "Válido",
+  "settings.config.state.current.damaged": "Dañado",
+  "settings.config.state.backup.valid": "Válida",
+  "settings.config.state.backup.damaged": "Dañada",
   "settings.config.state.missing": "Falta",
   "settings.config.backup.at": "Última copia {0}",
   "settings.config.backup.none": "Sin fecha de copia",
@@ -445,6 +447,7 @@
   "settings.config.restore.reason.missing": "No hay copia para restaurar.",
   "settings.config.restore.reason.unavailable": "La restauración no está disponible para este archivo.",
   "confirm.configrestore.title": "¿Restaurar este archivo de configuración?",
-  "confirm.configrestore.body": "«{0}» está dañado. ¿Restaurar la última copia .bak válida? El archivo actual se conserva como .before-restore.",
+  "confirm.configrestore.body": "{0} está dañado. Se restaurará la última copia válida ({1}). El archivo actual se guardará aparte como {2} por si lo necesitas.",
+  "confirm.configrestore.body.nodate": "{0} está dañado. Se restaurará la última copia válida. El archivo actual se guardará aparte como {1} por si lo necesitas.",
   "confirm.configrestore.accept": "Restaurar copia"
 }

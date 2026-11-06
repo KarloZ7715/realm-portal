@@ -643,7 +643,10 @@ public sealed partial class MainViewModel : ObservableObject
 
 
     private Task<bool> ConfirmRestoreConfigAsync(ConfigBackupItemViewModel item) =>
-        ConfirmAsync(ConfirmDialogViewModel.RestoreConfigBackup(item.FileLabel));
+        ConfirmAsync(ConfirmDialogViewModel.RestoreConfigBackup(
+            item.FileLabel,
+            item.BeforeRestoreFileName,
+            string.IsNullOrEmpty(item.BackupDateText) ? null : item.BackupDateText));
 
     private void OnConfigRestored(ConfigBackupItemViewModel item)
     {

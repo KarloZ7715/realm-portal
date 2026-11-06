@@ -84,7 +84,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             "ui-preferences.json",
             prefs.CurrentState,
             prefs.BackupState,
-            null,
+            prefs.BackupModifiedAt,
             RestoreConfigAsync,
             isPreferences: true));
         OnPropertyChanged(nameof(HasConfigBackups));

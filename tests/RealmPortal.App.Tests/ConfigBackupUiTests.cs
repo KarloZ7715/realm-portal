@@ -1,3 +1,6 @@
+using Avalonia.Controls;
+using Avalonia.VisualTree;
+using RealmPortal.App.Views;
 using Avalonia.Headless.XUnit;
 using RealmPortal.App.Controls;
 using RealmPortal.App.Localization;
@@ -128,7 +131,7 @@ public sealed class ConfigBackupUiTests
     }
 
     [AvaloniaFact]
-    public void RowAccessibleName_IncludesBackupDateAndState()
+    public void RowAccessibleName_IncludesLongLocalizedDateAndState()
     {
         using var env = new Env();
         var client = env.CreateClient("wotlk");
@@ -136,26 +139,139 @@ public sealed class ConfigBackupUiTests
         env.Session.Service.AddServer(new NewServer("Demo", "logon.example.com", ClientId: cid));
         env.Session.Service.AddServer(new NewServer("Second", "play.example.net", ClientId: cid));
         env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        Loc.Instance.SetLanguage(Language.En);
         var main = new MainViewModel(env.Session, autoTick: false);
         main.Settings.ReloadConfigBackups();
         var row = Assert.Single(main.Settings.ConfigBackups, r => r.Kind == ConfigFileKind.Servers);
         Assert.NotNull(row.BackupModifiedAt);
-        Assert.Contains("backup", row.StatusAccessibleName, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(row.BackupStateText, row.StatusAccessibleName, StringComparison.Ordinal);
+        var expectedDate = ConfigBackupItemViewModel.FormatBackupDate(row.BackupModifiedAt.Value);
+        Assert.Matches(@"^[A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}$", expectedDate);
+        Assert.Contains(expectedDate, row.StatusAccessibleName, StringComparison.Ordinal);
+        Assert.Contains(expectedDate, row.DetailText, StringComparison.Ordinal);
         Assert.Equal("Valid", row.BackupStateText);
         Assert.Equal("Valid", row.CurrentStateText);
+
+        Loc.Instance.SetLanguage(Language.Es);
+        row.RefreshText();
+        var esDate = ConfigBackupItemViewModel.FormatBackupDate(row.BackupModifiedAt.Value);
+        Assert.Matches(@"^\d{1,2} [a-z]{3} \d{4}, \d{2}:\d{2}$", esDate);
+        Assert.Contains(esDate, row.StatusAccessibleName, StringComparison.Ordinal);
+        Loc.Instance.SetLanguage(Language.En);
     }
 
     [AvaloniaFact]
-    public void ConfirmRestoreDialog_UsesConfigRestoreKeys()
+    public void StateBadges_AgreeInGenderForSpanishActualVsCopia()
     {
-        // Cancel is focused first and Escape cancels in ConfirmDialogView; keys must resolve for EN.
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        env.Session.Service.AddServer(new NewServer("Demo", "logon.example.com", ClientId: cid));
+        env.Session.Service.AddServer(new NewServer("Second", "play.example.net", ClientId: cid));
+        var serversPath = Path.Combine(env.Config, "servers.json");
+        File.WriteAllText(serversPath, "{ not json");
+        env.Session.UiPreferences.Save(new UiPreferences("es", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        Loc.Instance.SetLanguage(Language.Es);
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Settings.ReloadConfigBackups();
+        var damaged = Assert.Single(main.Settings.ConfigBackups, r => r.Kind == ConfigFileKind.Servers);
+        Assert.Equal("Dañado", damaged.CurrentStateText); // Actual = masculine
+        Assert.Equal("Válida", damaged.BackupStateText); // Copia = feminine
+        var clients = Assert.Single(main.Settings.ConfigBackups, r => r.Kind == ConfigFileKind.Clients);
+        Assert.Equal("Válido", clients.CurrentStateText);
+        Assert.Equal("Falta", clients.BackupStateText);
         Loc.Instance.SetLanguage(Language.En);
-        var dialog = ConfirmDialogViewModel.RestoreConfigBackup("servers.json");
-        Assert.Equal("Restore this configuration file?", dialog.Title);
-        Assert.Contains("servers.json", dialog.Body, StringComparison.Ordinal);
-        Assert.Equal("Restore backup", dialog.ConfirmText);
-        Assert.False(string.IsNullOrWhiteSpace(dialog.CancelText));
+        damaged.RefreshText();
+        Assert.Equal("Damaged", damaged.CurrentStateText);
+        Assert.Equal("Valid", damaged.BackupStateText);
+    }
+
+    [AvaloniaFact]
+    public void ConfirmRestoreDialog_BodyUsesDateAndBeforeRestoreFile_NoBakJargon()
+    {
+        Loc.Instance.SetLanguage(Language.En);
+        var withDate = ConfirmDialogViewModel.RestoreConfigBackup(
+            "servers.json", "servers.json.before-restore", "Nov 6, 2026, 10:04");
+        Assert.Equal("Restore this configuration file?", withDate.Title);
+        Assert.Contains("servers.json is damaged", withDate.Body, StringComparison.Ordinal);
+        Assert.Contains("Nov 6, 2026, 10:04", withDate.Body, StringComparison.Ordinal);
+        Assert.Contains("servers.json.before-restore", withDate.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain(".bak", withDate.Body, StringComparison.Ordinal);
+        Assert.Equal("Restore backup", withDate.ConfirmText);
+
+        var noDate = ConfirmDialogViewModel.RestoreConfigBackup(
+            "clients.json", "clients.json.before-restore");
+        Assert.Contains("clients.json is damaged", noDate.Body, StringComparison.Ordinal);
+        Assert.Contains("clients.json.before-restore", noDate.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("(", noDate.Body, StringComparison.Ordinal);
+
+        Loc.Instance.SetLanguage(Language.Es);
+        var es = ConfirmDialogViewModel.RestoreConfigBackup(
+            "servers.json", "servers.json.before-restore", "6 nov 2026, 10:04");
+        Assert.Contains("está dañado", es.Body, StringComparison.Ordinal);
+        Assert.Contains("6 nov 2026, 10:04", es.Body, StringComparison.Ordinal);
+        Assert.Contains("servers.json.before-restore", es.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain(".bak", es.Body, StringComparison.Ordinal);
+        Loc.Instance.SetLanguage(Language.En);
+    }
+
+    [AvaloniaFact]
+    public async Task RestoreButton_HelpTextMatchesDisabledReason_AndCancelHasFocusRing()
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        env.Session.Service.AddServer(new NewServer("Demo", "logon.example.com", ClientId: cid));
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Settings.ReloadConfigBackups();
+        var row = Assert.Single(main.Settings.ConfigBackups, r => r.Kind == ConfigFileKind.Servers);
+        Assert.False(row.CanRestore);
+        Assert.False(string.IsNullOrWhiteSpace(row.RestoreDisabledReason));
+
+        var window = new MainWindow(main) { Width = 960, Height = 600 };
+        window.Show();
+        main.SectionIndex = 2;
+        Screenshots.Settle();
+        var settings = window.GetVisualDescendants().OfType<SettingsView>().Single();
+        var button = settings.GetVisualDescendants().OfType<Button>()
+            .First(b => b.Name == "RestoreConfigButton" && !b.IsEnabled);
+        Assert.Equal(row.RestoreDisabledReason, Avalonia.Automation.AutomationProperties.GetHelpText(button));
+
+        // Open confirm dialog and assert Cancel holds keyboard focus (focus-visible ring).
+        var answer = main.ConfirmAsync(ConfirmDialogViewModel.RestoreConfigBackup(
+            "servers.json", "servers.json.before-restore", "Nov 6, 2026, 10:04"));
+        for (var i = 0; i < 20; i++)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            await Task.Delay(10);
+        }
+        Screenshots.Settle();
+        var dialog = window.GetVisualDescendants().OfType<ConfirmDialogView>().Single();
+        var cancel = dialog.FindControl<Button>("CancelButton")!;
+        Assert.True(cancel.IsKeyboardFocusWithin || cancel.IsFocused);
+        Screenshots.Save(window, 1.0, "config-restore-dialog-960-en-1.0x.png");
+        Screenshots.Save(window, 2.0, "config-restore-dialog-960-en-2.0x.png");
+        cancel.Command!.Execute(null);
+        await answer;
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void PreferencesRow_ExposesBackupModifiedAtLikeServers()
+    {
+        using var env = new Env();
+        // Two saves so ui-preferences.json.bak exists with an mtime.
+        env.Session.UiPreferences.Save(new UiPreferences("en", [], FirstScanCompleted: true, WelcomeCompleted: true));
+        env.Session.UiPreferences.Save(new UiPreferences("es", [], FirstScanCompleted: true, WelcomeCompleted: true));
+        Assert.NotNull(env.Session.UiPreferences.BackupModifiedAt);
+        Loc.Instance.SetLanguage(Language.En);
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Settings.ReloadConfigBackups();
+        var prefs = Assert.Single(main.Settings.ConfigBackups, r => r.IsPreferences);
+        Assert.NotNull(prefs.BackupModifiedAt);
+        var date = ConfigBackupItemViewModel.FormatBackupDate(prefs.BackupModifiedAt.Value);
+        Assert.Contains(date, prefs.DetailText, StringComparison.Ordinal);
+        Assert.Contains(date, prefs.StatusAccessibleName, StringComparison.Ordinal);
     }
 
     [AvaloniaFact]

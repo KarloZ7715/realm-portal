@@ -150,6 +150,11 @@
                       <StackPanel Spacing="6">
                         <TextBlock Classes="body-bold" FontSize="15" Foreground="{DynamicResource InkBrush}" Text="{Binding FileLabel}"/>
                         <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding DetailText}"/>
+                        <!-- Disabled reason aligns with the file name (not indented under the badges). -->
+                        <TextBlock Classes="footnote" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource InkSoftBrush}"
+                                   IsVisible="{Binding ShowRestoreDisabledReason}"
+                                   Text="{Binding RestoreDisabledReason}"/>
                         <StackPanel Orientation="Horizontal" Spacing="10">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock Classes="footnote" VerticalAlignment="Center" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.current}"/>
@@ -160,16 +165,13 @@
                             <c:Badge Classes="config-state" Status="{Binding BackupBadgeStatus}" Text="{Binding BackupStateText}"/>
                           </StackPanel>
                         </StackPanel>
-                        <TextBlock Classes="footnote" TextWrapping="Wrap" MaxWidth="360"
-                                   Foreground="{DynamicResource InkSoftBrush}"
-                                   IsVisible="{Binding ShowRestoreDisabledReason}"
-                                   Text="{Binding RestoreDisabledReason}"/>
                       </StackPanel>
                       <!-- Always visible; disabled with a reason when restore is not possible (#196 design). -->
                       <Button Grid.Column="1" Name="RestoreConfigButton" Classes="secondary compact" VerticalAlignment="Center"
                               IsEnabled="{Binding CanRestore}" Command="{Binding RestoreCommand}"
                               ToolTip.Tip="{Binding RestoreDisabledReason}"
-                              AutomationProperties.Name="{loc:T settings.config.restore}">
+                              AutomationProperties.Name="{loc:T settings.config.restore}"
+                              AutomationProperties.HelpText="{Binding RestoreDisabledReason}">
                         <TextBlock Text="{loc:T settings.config.restore}"/>
                       </Button>
                     </Grid>
