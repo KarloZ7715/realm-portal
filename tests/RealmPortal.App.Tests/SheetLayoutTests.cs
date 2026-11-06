@@ -193,8 +193,8 @@ public sealed class SheetLayoutTests : IDisposable
                         ?? flyout.Items.OfType<MenuItem>().First().FindAncestorOfType<MenuFlyoutPresenter>()!;
         var rows = presenter.GetVisualDescendants().OfType<MenuItem>().Where(m => m.IsEffectivelyVisible).Select(m => m.Name).ToList();
         string?[] expected = locked
-            ? ["MenuPlay", "MenuSwitchOnly", "MenuDuplicate", "MenuEdit", "MenuDelete", "MenuDisabledHint"]
-            : ["MenuPlay", "MenuSwitchOnly", "MenuDuplicate", "MenuEdit", "MenuDelete"];
+            ? ["MenuPlay", "MenuSwitchOnly", "MenuEdit", "MenuDuplicate", "MenuDelete", "MenuDisabledHint"]
+            : ["MenuPlay", "MenuSwitchOnly", "MenuEdit", "MenuDuplicate", "MenuDelete"];
         Assert.Equal(expected, rows);
         flyout.Hide();
     }

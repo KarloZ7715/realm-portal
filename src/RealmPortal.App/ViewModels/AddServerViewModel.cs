@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
@@ -41,6 +42,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private readonly ServerBuildOption? _initialBuild;
     private readonly IReadOnlyList<string>? _extraRealmlistLines;
     private readonly bool _isDuplicating;
+    private readonly string? _sourceServerId;
 
     public AddServerViewModel(ClientsViewModel clients, DemoBackend backend, Action<ServerSeed> save, Action cancel)
     {
@@ -102,6 +104,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         if (!duplicate)
             throw new ArgumentException("Use the edit constructor when duplicate is false.", nameof(duplicate));
         _isDuplicating = true;
+        _sourceServerId = entry.Id;
         _extraRealmlistLines = entry.ExtraRealmlistLines;
         Address = entry.Host;
         Realm = entry.Realm;
@@ -123,11 +126,11 @@ public sealed partial class AddServerViewModel : ViewModelBase
         SelectedBuild = _initialBuild;
         ClearCacheOnSwitch = entry.ClearCacheOnSwitch;
 
-        // Localized "<name> (copy)" / "<name> (copia)"; truncate so the whole name fits Server.MaxNameLength.
-        var suffix = Loc.Get("servers.duplicate.suffix");
-        var maxPrefix = Math.Max(0, Server.MaxNameLength - suffix.Length);
-        var prefix = entry.Name.Length <= maxPrefix ? entry.Name : entry.Name[..maxPrefix].TrimEnd();
-        Name = (prefix + suffix).Trim();
+        // Localized unique "<name> (copy)" / " (copy 2)" …; cut by grapheme so a trailing emoji is not split (#219 F2).
+        var names = session.Service.ListServers(compatibleOnly: false) is { Succeeded: true, Value: { } servers }
+            ? servers.Select(s => s.Name).ToList()
+            : [];
+        Name = CreateLocalizedDuplicateName(entry.Name, names);
         _initialInput = CurrentInput();
     }
 
@@ -267,7 +270,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     public bool HasAddressInterpretation => AddressInterpretation is not null;
 
-    public override string StatusText => TestState == ConnectionTest.Testing ? Loc.Get("status.testing") : Loc.Get("status.add");
+    public override string StatusText => TestState == ConnectionTest.Testing
+        ? Loc.Get("status.testing")
+        : Loc.Get(IsDuplicating ? "status.duplicate" : "status.add");
 
     private bool IsNameValid => Name.Trim().Length is > 0 and <= Server.MaxNameLength;
 
@@ -429,7 +434,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
             }
 
             var hostForServer = port == DefaultPort ? host : $"{host}:{port}";
-            if (IsDuplicateAddress(hostForServer, realm))
+            // Duplicate mode may keep the source host+realm (and match earlier copies); Core DuplicateServer allows that.
+            if (!IsDuplicating && IsDuplicateAddress(hostForServer, realm))
             {
                 SetSaveMessage("add.error.duplicate");
                 return;
@@ -438,14 +444,35 @@ public sealed partial class AddServerViewModel : ViewModelBase
             var realmValue = realm.Length == 0 ? null : realm;
             var accountValue = account.Length == 0 ? null : account;
             var (build, clearBuild) = BuildChange();
-            var result = _editingServerId is { } serverId
-                ? _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue,
+            ServiceResult<ServerEntry> result;
+            if (_editingServerId is { } serverId)
+            {
+                result = _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue,
                     RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
-                    ClearCacheOnSwitch: ClearCacheOnSwitch))
-                : _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId,
-                    RequiredClientBuild: IsDuplicating || BuildOptions.Count > 0 ? SelectedBuild?.Build : null,
+                    ClearCacheOnSwitch: ClearCacheOnSwitch));
+            }
+            else if (IsDuplicating && _sourceServerId is { } sourceId)
+            {
+                // Core DuplicateServer (#219) allows the same host+realm as the source; then apply form fields it does not take.
+                var created = _session.Service.DuplicateServer(sourceId, Name.Trim(), realmValue, accountValue);
+                if (!created.Succeeded)
+                {
+                    SetSaveError(created.Error);
+                    return;
+                }
+
+                result = _session.Service.UpdateServer(new UpdateServerRequest(created.Value!.Id, Name.Trim(), hostForServer, realmValue,
+                    RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
+                    ClearCacheOnSwitch: ClearCacheOnSwitch));
+            }
+            else
+            {
+                result = _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId,
+                    RequiredClientBuild: BuildOptions.Count > 0 ? SelectedBuild?.Build : null,
                     ExtraRealmlistLines: _extraRealmlistLines,
                     ClearCacheOnSwitch: ClearCacheOnSwitch));
+            }
+
             if (!result.Succeeded)
             {
                 SetSaveError(result.Error);
@@ -475,8 +502,54 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
         return servers.Value!.Any(server =>
             server.Id != _editingServerId
+            && server.Id != _sourceServerId
             && string.Equals(server.Host, hostForServer, StringComparison.OrdinalIgnoreCase)
             && string.Equals(server.Realm.Trim(), realm, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Localized unique duplicate name: <c>"Name (copy)"</c> / <c>"Name (copia)"</c>, then <c>" (copy 2)"</c> / <c>" (copia 2)"</c>, …
+    /// Prefixes are cut by whole text elements so a trailing emoji is not split (same rule as Core #219).
+    /// </summary>
+    internal static string CreateLocalizedDuplicateName(string name, IReadOnlyList<string> existingNames)
+    {
+        var basis = name.Trim();
+        for (var number = 1; ; number++)
+        {
+            var tail = number == 1
+                ? Loc.Get("servers.duplicate.suffix")
+                : Loc.Format("servers.duplicate.suffix.n", number);
+            var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
+            var candidate = (prefix + tail).Trim();
+            if (!existingNames.Any(n => string.Equals(n, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    /// <summary>Longest prefix of whole grapheme clusters within <paramref name="maxLength"/> UTF-16 chars.</summary>
+    internal static string TruncateToTextElements(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        var end = 0;
+        var elements = StringInfo.GetTextElementEnumerator(value);
+        while (elements.MoveNext())
+        {
+            var next = elements.ElementIndex + ((string)elements.Current).Length;
+            if (next > maxLength)
+            {
+                break;
+            }
+
+            end = next;
+        }
+
+        return value[..end];
     }
 
     [RelayCommand]

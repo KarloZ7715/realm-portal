@@ -118,7 +118,9 @@
                     <TextBlock Text="{loc:T card.play}"/>
                   </StackPanel>
                   <SplitButton.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterClasses="parchment">
+                    <!-- FlipY/Slide keeps the menu inside the window at small heights (design review #191). -->
+                    <MenuFlyout Placement="BottomEdgeAlignedRight" PlacementConstraintAdjustment="FlipY,SlideY,SlideX,ResizeY"
+                                FlyoutPresenterClasses="parchment">
                       <MenuItem Name="MenuPlay" Classes="two-line" Command="{Binding PlayCommand}"
                                 AutomationProperties.Name="{loc:T card.play}">
                         <MenuItem.Icon><c:Icon Data="{DynamicResource IconPlay}" IsFilled="True" Width="12" Height="12"/></MenuItem.Icon>
@@ -129,7 +131,6 @@
                           </StackPanel>
                         </MenuItem.Header>
                       </MenuItem>
-                      <Separator/>
                       <MenuItem Name="MenuSwitchOnly" Classes="two-line" Command="{Binding SwitchOnlyCommand}"
                                 AutomationProperties.Name="{Binding SwitchMenuText}">
                         <MenuItem.Icon><c:Icon Data="{DynamicResource IconRefresh}" Width="14" Height="14" StrokeThickness="2.2"/></MenuItem.Icon>
@@ -141,16 +142,6 @@
                         </MenuItem.Header>
                       </MenuItem>
                       <Separator IsVisible="{Binding CanManage}"/>
-                      <MenuItem Name="MenuDuplicate" Classes="two-line" IsVisible="{Binding CanManage}" Command="{Binding DuplicateCommand}"
-                                AutomationProperties.Name="{loc:T menu.duplicate}">
-                        <MenuItem.Icon><c:Icon Data="{DynamicResource IconCopy}" Width="14" Height="14" StrokeThickness="1.8"/></MenuItem.Icon>
-                        <MenuItem.Header>
-                          <StackPanel>
-                            <TextBlock Classes="menu-title" Text="{loc:T menu.duplicate}"/>
-                            <TextBlock Classes="menu-hint" Text="{loc:T menu.duplicate.hint}"/>
-                          </StackPanel>
-                        </MenuItem.Header>
-                      </MenuItem>
                       <MenuItem Name="MenuEdit" Classes="two-line" IsVisible="{Binding CanManage}" Command="{Binding EditCommand}"
                                 AutomationProperties.Name="{loc:T menu.edit}">
                         <MenuItem.Icon><c:Icon Data="{DynamicResource IconPencil}" Width="14" Height="14" StrokeThickness="1.8"/></MenuItem.Icon>
@@ -161,6 +152,17 @@
                           </StackPanel>
                         </MenuItem.Header>
                       </MenuItem>
+                      <MenuItem Name="MenuDuplicate" Classes="two-line" IsVisible="{Binding CanManage}" Command="{Binding DuplicateCommand}"
+                                AutomationProperties.Name="{loc:T menu.duplicate}">
+                        <MenuItem.Icon><c:Icon Data="{DynamicResource IconCopy}" Width="14" Height="14" StrokeThickness="1.8"/></MenuItem.Icon>
+                        <MenuItem.Header>
+                          <StackPanel>
+                            <TextBlock Classes="menu-title" Text="{loc:T menu.duplicate}"/>
+                            <TextBlock Classes="menu-hint" Text="{loc:T menu.duplicate.hint}"/>
+                          </StackPanel>
+                        </MenuItem.Header>
+                      </MenuItem>
+                      <Separator IsVisible="{Binding CanManage}"/>
                       <MenuItem Name="MenuDelete" Classes="two-line" IsVisible="{Binding CanManage}" Command="{Binding DeleteCommand}"
                                 AutomationProperties.Name="{loc:T menu.delete}">
                         <MenuItem.Icon><c:Icon Data="{DynamicResource IconClose}" Width="14" Height="14" StrokeThickness="2"/></MenuItem.Icon>
@@ -173,7 +175,8 @@
                       </MenuItem>
                       <!-- A MenuItem of its own so hiding it hides the whole row: a bare TextBlock gets a menu container
                            that stays visible and leaves an empty row under "Delete server…" (#201). -->
-                      <MenuItem Name="MenuDisabledHint" Classes="note" IsEnabled="False" IsVisible="{Binding ShowMenuDisabledHint}">
+                      <MenuItem Name="MenuDisabledHint" Classes="note" IsEnabled="False" IsVisible="{Binding ShowMenuDisabledHint}"
+                                AutomationProperties.Name="{Binding MenuDisabledHint}">
                         <MenuItem.Header>
                           <TextBlock Classes="menu-hint" MaxWidth="220" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding MenuDisabledHint}"/>
                         </MenuItem.Header>

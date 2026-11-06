@@ -50,7 +50,7 @@
             <TextBlock Classes="body-bold" FontSize="16" Foreground="{DynamicResource InkBrush}" Text="{loc:T add.client}"/>
             <ComboBox Name="ClientBox" Classes="parchment" Classes.error="{Binding HasClientError}" HorizontalAlignment="Stretch" ItemsSource="{Binding Clients.Items}" SelectedItem="{Binding SelectedClient, Mode=TwoWay}">
               <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:ClientItemViewModel"><TextBlock Text="{Binding Label}"/></DataTemplate>
+                <DataTemplate x:DataType="vm:ClientItemViewModel"><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/></DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding !HasClientError}">
