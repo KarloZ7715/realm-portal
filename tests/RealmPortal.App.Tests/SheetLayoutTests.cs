@@ -250,12 +250,21 @@ public sealed class SheetLayoutTests : IDisposable
     [AvaloniaFact]
     public async Task EditClient_ScrolledToTheEnd_ShowsTheFooterButtons()
     {
+        // Edit-client content is short; grow ScrollContent past the viewport so the sheet must scroll.
+        // Extent > Viewport (and the margin-vs-padding check inside AssertLastControlFullyVisible) then
+        // fail if the #210 content-margin fix is reverted to ScrollViewer.Padding.
         var (window, main) = Open(720, 360, Language.En);
         main.SectionIndex = 1;
         await Pump();
         main.Clients.Items[0].EditCommand.Execute(null);
         await Pump();
-        AssertLastControlFullyVisible(Named<ScrollViewer>(window, "Scroller"), Named<Button>(window, "SaveButton"));
+        var scroller = Named<ScrollViewer>(window, "Scroller");
+        var content = Named<StackPanel>(window, "ScrollContent");
+        Assert.True(content.Margin.Bottom >= 12, "bottom space must be content margin, not ScrollViewer.Padding (#210)");
+        content.MinHeight = scroller.Viewport.Height + 120;
+        Screenshots.Settle();
+        Assert.True(scroller.Extent.Height > scroller.Viewport.Height, "Edit client must scroll so the padding bug can show");
+        AssertLastControlFullyVisible(scroller, Named<Button>(window, "SaveButton"));
     }
 
     [AvaloniaFact]
