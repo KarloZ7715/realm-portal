@@ -85,7 +85,12 @@ jobs:
         if: steps.sln.outputs.solution != ''
         env:
           SOLUTION: ${{ steps.sln.outputs.solution }}
-        run: dotnet test "$SOLUTION" --no-build -c Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+        # LogFilePrefix gives each test project its own TRX file (a shared LogFileName was overwritten, #217).
+        run: dotnet test "$SOLUTION" --no-build -c Release --logger "trx;LogFilePrefix=test-results" --results-directory TestResults
+
+      - name: List test result files
+        if: always() && steps.sln.outputs.solution != ''
+        run: ls -l TestResults/*.trx
 
   gitleaks:
     name: gitleaks (secret scan)

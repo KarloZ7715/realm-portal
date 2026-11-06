@@ -298,7 +298,9 @@ public sealed class Step13ServerUiTests
         try
         {
             env.Main.Servers.All.Single(s => s.ServerId == server.Id).EditCommand.Execute(null);
-            Screenshots.Settle();
+            // The edit form is realized by later layout passes; wait for it rather than a fixed number of passes.
+            Screenshots.SettleUntil(() => window.GetVisualDescendants().OfType<ComboBox>().Any(c => c.Name == "BuildBox"),
+                "the edit form shows its compatible clients box");
             var form = Assert.IsType<AddServerViewModel>(env.Main.Content);
             var box = window.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "BuildBox");
             Assert.True(box.IsEffectivelyVisible);
