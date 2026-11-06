@@ -15,11 +15,12 @@ using RealmPortal.Tests.Support;
 
 namespace RealmPortal.App.Tests;
 
-/// <summary>Layout of Settings, the About and Client backups sub-sheets and the server card menu (#198-#201).</summary>
+/// <summary>Layout of Settings, the About and Client backups sub-sheets and the server card menu (#198-#201, #210 follow-ups).</summary>
 public sealed class SheetLayoutTests : IDisposable
 {
     private readonly TempDirectory _temp = new();
     private MainWindow? _window;
+    private PortalSession? _session;
 
     public void Dispose()
     {
@@ -36,7 +37,8 @@ public sealed class SheetLayoutTests : IDisposable
         File.WriteAllBytes(Path.Combine(client, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
         var config = _temp.Combine("config");
         Directory.CreateDirectory(config);
-        var session = PortalSession.CreateForPaths(config, _temp.Combine("projection"), _temp.Combine("backups"));
+        _session = PortalSession.CreateForPaths(config, _temp.Combine("projection"), _temp.Combine("backups"));
+        var session = _session;
         var clientId = session.Service.AddClient(client, "World of Warcraft").Value!.Id;
         var active = session.Service.AddServer(new NewServer("My Server", "logon.example.com", Account: "demo", ClientId: clientId)).Value!;
         session.Service.AddServer(new NewServer("Another Server", "play.example.net", ClientId: clientId));
@@ -196,6 +198,105 @@ public sealed class SheetLayoutTests : IDisposable
             ? ["MenuPlay", "MenuSwitchOnly", "MenuEdit", "MenuDelete", "MenuDisabledHint"]
             : ["MenuPlay", "MenuSwitchOnly", "MenuEdit", "MenuDelete"];
         Assert.Equal(expected, rows);
+        if (locked)
+        {
+            var hint = flyout.Items.OfType<MenuItem>().Single(i => i.Name == "MenuDisabledHint");
+            Assert.Equal(main.Servers.All[cardIndex].MenuDisabledHint, Avalonia.Automation.AutomationProperties.GetName(hint));
+        }
         flyout.Hide();
+    }
+
+    private void AssertLastControlFullyVisible(ScrollViewer scroller, Control last)
+    {
+        scroller.ScrollToEnd();
+        Screenshots.Settle();
+        scroller.ScrollToEnd();
+        Screenshots.Settle();
+        var content = Named<Control>(scroller, "ScrollContent");
+        Assert.Equal(content.Bounds.Height + content.Margin.Top + content.Margin.Bottom, scroller.Extent.Height, 0.5);
+        var bottom = BoundsIn(last, scroller).Bottom;
+        Assert.True(bottom <= scroller.Viewport.Height + 0.5, $"last control ends at {bottom}, viewport is {scroller.Viewport.Height}");
+    }
+
+    [AvaloniaFact]
+    public void Clients_ScrolledToTheEnd_ShowsSearchAgainFully()
+    {
+        // Short window and many clients so the sheet scrolls; ScrollViewer.Padding would cut "Search again".
+        var config = _temp.Combine("config-clients");
+        Directory.CreateDirectory(config);
+        var session = PortalSession.CreateForPaths(config, _temp.Combine("projection-c"), _temp.Combine("backups-c"));
+        var ids = new List<string>();
+        for (var i = 0; i < 8; i++)
+        {
+            var folder = _temp.Combine("home", "demo", "Games", $"Client-{i}");
+            Directory.CreateDirectory(Path.Combine(folder, "Data", "enUS"));
+            File.WriteAllBytes(Path.Combine(folder, "Wow.exe"), SyntheticPe.WithVersion(new Version(3, 3, 5, 12340)));
+            ids.Add(session.Service.AddClient(folder, $"Client {i}").Value!.Id);
+        }
+
+        session.UiPreferences.Save(new UiPreferences("en", ids, FirstScanCompleted: true));
+        Loc.Instance.SetLanguage(Language.En);
+        var main = new MainViewModel(session, autoTick: false, probe: new OfflineProbe(), updates: new NullUpdateChecker());
+        _window = new MainWindow(main) { Width = 720, Height = 360 };
+        _window.Show();
+        Screenshots.Settle();
+        main.SectionIndex = 1;
+        Screenshots.Settle();
+        var scroller = Named<ScrollViewer>(_window, "Scroller");
+        Assert.True(scroller.Extent.Height > scroller.Viewport.Height, "Clients must scroll so the padding bug can show");
+        AssertLastControlFullyVisible(scroller, Named<Button>(_window, "RescanButton"));
+    }
+
+    [AvaloniaFact]
+    public async Task EditClient_ScrolledToTheEnd_ShowsTheFooterButtons()
+    {
+        var (window, main) = Open(720, 360, Language.En);
+        main.SectionIndex = 1;
+        await Pump();
+        main.Clients.Items[0].EditCommand.Execute(null);
+        await Pump();
+        AssertLastControlFullyVisible(Named<ScrollViewer>(window, "Scroller"), Named<Button>(window, "SaveButton"));
+    }
+
+    [AvaloniaFact]
+    public async Task AddServer_ScrolledToTheEnd_ShowsTheFooterButtons()
+    {
+        var (window, main) = Open(720, 360, Language.En);
+        main.Servers.RequestAddServerCommand.Execute(null);
+        await Pump();
+        var scroller = Named<ScrollViewer>(window, "Scroller");
+        Assert.True(scroller.Extent.Height > scroller.Viewport.Height, "Add server must scroll at this height");
+        AssertLastControlFullyVisible(scroller, Named<Button>(window, "SaveButton"));
+    }
+
+    [AvaloniaFact]
+    public async Task BackupsList_UsesContentMarginInsteadOfScrollViewerPadding()
+    {
+        var (window, main) = Open(720, 440, Language.En);
+        main.SectionIndex = 2;
+        Screenshots.Settle();
+        var clientId = _session!.Service.ListClients().Value![0].Id;
+        for (var i = 0; i < 3; i++)
+        {
+            var created = _session.Service.CreateBackup(clientId, $"shot-{i}");
+            Assert.True(created.Succeeded, created.Error?.Code.ToString());
+        }
+
+        main.Settings.OpenBackupsManagerCommand.Execute(null);
+        await Pump();
+        var scroller = Named<ScrollViewer>(window, "BackupScroller");
+        var list = Named<ItemsControl>(window, "BackupList");
+        Assert.Equal(new Thickness(0, 0, 10, 10), list.Margin);
+        Assert.Equal(default, scroller.Padding);
+        // Extent includes the list margin; with ScrollViewer.Padding the bottom gap was outside the extent.
+        Assert.Equal(list.Bounds.Height + list.Margin.Top + list.Margin.Bottom, scroller.Extent.Height, 0.5);
+        scroller.ScrollToEnd();
+        Screenshots.Settle();
+        scroller.ScrollToEnd();
+        Screenshots.Settle();
+        var rows = list.GetVisualDescendants().OfType<ContentControl>().Where(c => c.Classes.Contains("thin")).ToList();
+        Assert.NotEmpty(rows);
+        var bottom = BoundsIn(rows[^1], scroller).Bottom;
+        Assert.True(bottom <= scroller.Viewport.Height + 0.5, $"last backup ends at {bottom}, viewport is {scroller.Viewport.Height}");
     }
 }
