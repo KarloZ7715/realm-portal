@@ -20,7 +20,8 @@ APPIMAGETOOL="${APPIMAGETOOL:-}"
 
 # Debian sorts "1.0.0-rc.1" ABOVE "1.0.0" (dash starts the debian revision). Map SemVer
 # prerelease dashes to "~" so an rc .deb upgrades cleanly to the final release.
-# File name and control Version: both use the Debian form; AppImage/zip keep SemVer.
+# Only the control Version uses the Debian form. Every file name (the .deb included) keeps
+# SemVer: GitHub renames "~" to "." in release asset names (see ../release-asset-names.sh).
 DEB_VERSION="$("${SCRIPT_DIR}/semver-to-deb-version.sh" "$VERSION")"
 IS_PRERELEASE=0
 [[ "$VERSION" == *-* ]] && IS_PRERELEASE=1
@@ -83,8 +84,8 @@ write_metainfo() {
 }
 
 # --- .deb ---
-# Staging dir and .deb file use DEB_VERSION (~ for prereleases); AppImage keeps SemVer VERSION.
-DEB_STAGING="${ROOT_DIR}/pkg-deb/realm-portal_${DEB_VERSION}_amd64"
+# The control Version uses DEB_VERSION (~ for prereleases); the staging dir and the .deb file use SemVer VERSION.
+DEB_STAGING="${ROOT_DIR}/pkg-deb/realm-portal_${VERSION}_amd64"
 DEB_INSTALL_LIB="/opt/realm-portal"
 rm -rf "${DEB_STAGING}"
 mkdir -p "${DEB_STAGING}/DEBIAN" \
@@ -118,7 +119,7 @@ Description: Realm Portal desktop launcher
  Switch between game realms with one click.
 EOF
 
-DEB_FILE="${OUT_DIR}/realm-portal_${DEB_VERSION}_amd64.deb"
+DEB_FILE="${OUT_DIR}/realm-portal_${VERSION}_amd64.deb"
 dpkg-deb --build --root-owner-group "${DEB_STAGING}" "${DEB_FILE}"
 
 REQUIRED_DOCS=(
