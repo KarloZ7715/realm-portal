@@ -456,16 +456,38 @@ public sealed partial class MainViewModel : ObservableObject
             catch (Exception ex)
             {
                 ExceptionLog.Default.Write(ex, "Main.InstallUpdate");
-                await ConfirmAsync(new ConfirmDialogViewModel(
-                    "update.install.failed.title",
-                    UpdateInstallPresentation.FailureBodyKey(ex),
-                    "dialog.ok")).ConfigureAwait(true);
+                await ShowInstallFailureAsync(ex, offer).ConfigureAwait(true);
             }
         }
         else if (choice == ConfirmDialogChoice.Secondary)
             await Task.Run(() => _updates.RemindLater(offer)).ConfigureAwait(true);
         else if (choice == ConfirmDialogChoice.Cancel)
             await Task.Run(() => _updates.SkipThisVersion(offer)).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Signature failures (#116) offer the release page so the user can download and check the release by hand;
+    /// nothing is installed from here.
+    /// </summary>
+    private async Task ShowInstallFailureAsync(Exception error, UpdateOffer offer)
+    {
+        var bodyKey = UpdateInstallPresentation.FailureBodyKey(error);
+        if (!UpdateInstallPresentation.IsSignatureFailure(error))
+        {
+            await ConfirmAsync(new ConfirmDialogViewModel("update.install.failed.title", bodyKey, "dialog.ok")).ConfigureAwait(true);
+            return;
+        }
+
+        var choice = await ChooseAsync(new ConfirmDialogViewModel(
+            "update.install.failed.title",
+            bodyKey,
+            "update.install.open_release_page",
+            "update.install.dismiss")).ConfigureAwait(true);
+        if (choice == ConfirmDialogChoice.Confirm
+            && ReleasePageUrl.TryGetTrusted(ReleasePageUrl.Resolve(offer), out var uri))
+        {
+            await _uriOpener.OpenAsync(uri).ConfigureAwait(true);
+        }
     }
 
     private async Task HandleInstallOutcomeAsync(UpdateInstallOutcome? outcome, UpdateOffer offer)

@@ -109,6 +109,22 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// </summary>
     public Func<UpdateOffer, Task<ConfirmDialogChoice?>>? PresentUpdateAsync { get; set; }
 
+    /// <summary>
+    /// Release page offered next to a signature failure (#116), so the user can download and check the release by hand.
+    /// Cleared whenever the status text changes.
+    /// </summary>
+    [ObservableProperty]
+    private string? _releasePageUrl;
+
+    partial void OnUpdateCheckStatusChanged(string? value) => ReleasePageUrl = null;
+
+    [RelayCommand]
+    private void OpenReleasePage()
+    {
+        if (ReleasePageUrl is { } url)
+            OpenExternalUrl?.Invoke(url);
+    }
+
     /// <summary>Main sets this so install release-page fallback can open a trusted URL.</summary>
     public Action<string>? OpenExternalUrl { get; set; }
 
@@ -232,6 +248,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
         !string.IsNullOrWhiteSpace(template)
         && template.Contains("{exe}", StringComparison.Ordinal);
 
+    private static string? ReleasePageUrl_TryResolve(UpdateOffer offer)
+    {
+        var url = Network.ReleasePageUrl.Resolve(offer);
+        return Network.ReleasePageUrl.TryGetTrusted(url, out _) ? url : null;
+    }
+
     [RelayCommand]
     private async Task CheckForUpdatesAsync()
     {
@@ -255,6 +277,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
                         {
                             ExceptionLog.Default.Write(ex, "Settings.InstallUpdate");
                             UpdateCheckStatus = Loc.Get(UpdateInstallPresentation.FailureBodyKey(ex));
+                            if (UpdateInstallPresentation.IsSignatureFailure(ex)
+                                && ReleasePageUrl_TryResolve(offer) is { } page)
+                            {
+                                ReleasePageUrl = page;
+                            }
                         }
                     }
                     else if (choice == ConfirmDialogChoice.Secondary)

@@ -234,6 +234,66 @@ public class SignedUpdateDownloadTests
         Assert.Equal(201, SignedSha256Sums.Printable(new string('x', 500)).Length);
     }
 
+    /// <summary>A non-seekable body handed out 1 KiB at a time, counting what the downloader actually pulled.</summary>
+    private sealed class CountingStream(int size) : Stream
+    {
+        public const int Chunk = 1024;
+        private readonly byte[] _data = new byte[size];
+
+        public int Consumed { get; private set; }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => Consumed; set => throw new NotSupportedException(); }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var n = Math.Min(Math.Min(buffer.Length, Chunk), _data.Length - Consumed);
+            _data.AsMemory(Consumed, n).CopyTo(buffer);
+            Consumed += n;
+            return ValueTask.FromResult(n);
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
+
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    [Theory]
+    [InlineData("SHA256SUMS", false)]
+    [InlineData("SHA256SUMS", true)]
+    [InlineData(ReleaseSignature.AssetName, false)]
+    [InlineData(ReleaseSignature.AssetName, true)]
+    public async Task OversizedStream_IsCutOffWhileReading(string name, bool smallContentLength)
+    {
+        // 256 KiB, sent chunked (no length) or with a Content-Length of 1 that lies about the size.
+        var body = new CountingStream(256 * 1024);
+        var server = SignedRelease();
+        server.Routes[Url(name)] = () =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) };
+            if (smallContentLength)
+                response.Content.Headers.ContentLength = 1;
+            else
+                response.Headers.TransferEncodingChunked = true;
+            return response;
+        };
+
+        var (error, _, placed) = await Install(server, Release());
+
+        var isSums = name == "SHA256SUMS";
+        Assert.Equal(isSums ? UpdateErrorCode.DownloadTooLarge : UpdateErrorCode.SignatureInvalid, error?.Code);
+        Assert.Empty(placed);
+        var limit = isSums ? Sha256Sums.MaxBytes : SignedSha256Sums.MaxSignatureBytes;
+        Assert.True(body.Consumed <= limit + CountingStream.Chunk,
+            $"read {body.Consumed} bytes of {name} before giving up; the limit is {limit}");
+    }
+
     private static MinisignPublicKey Key(string name) =>
         MinisignPublicKey.Parse(File.ReadAllLines(Path.Combine(Dir, $"test-key-{name}.pub"))[1]);
 

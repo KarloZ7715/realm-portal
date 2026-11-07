@@ -13,6 +13,9 @@ public static class UpdateInstallPresentation
     /// String key for the body shown when installing an update failed. Signature problems (#116) get their own text so
     /// the user can tell an unsigned release from one whose signature does not check out.
     /// </summary>
+    public static bool IsSignatureFailure(Exception? error) =>
+        FailureBodyKey(error) is "update.install.unsigned.body" or "update.install.badsignature.body";
+
     public static string FailureBodyKey(Exception? error)
     {
         for (var e = error; e is not null; e = e.InnerException)

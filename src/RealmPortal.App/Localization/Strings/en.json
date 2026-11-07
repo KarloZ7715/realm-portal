@@ -443,5 +443,7 @@
   "update.install.failed.title": "Update failed",
   "update.install.failed.body": "Could not download or verify the update. Try again, or open the release page.",
   "update.install.unsigned.body": "This release is not signed, so it was not installed. Open the release page and check it before installing by hand.",
-  "update.install.badsignature.body": "The release signature is not valid or was made with an unknown key, so the update was not installed. Do not install this download; open the release page instead."
+  "update.install.badsignature.body": "The release signature is not valid or was made with an unknown key, so the update was not installed. Do not install this download; open the release page instead.",
+  "update.install.open_release_page": "Open release page",
+  "update.install.dismiss": "Close"
 }
