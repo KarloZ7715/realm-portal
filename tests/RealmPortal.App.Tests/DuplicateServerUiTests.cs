@@ -541,4 +541,108 @@ public sealed class DuplicateServerUiTests
         Assert.Equal("Example (copia 2)", Assert.IsType<AddServerViewModel>(main.Content).Name);
         Loc.Instance.SetLanguage(Language.En);
     }
+
+    [AvaloniaFact]
+    public void Duplicate_SaveFailsAfterCopyCreated_RollsBackCopy()
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        var original = env.Session.Service.AddServer(new NewServer(
+            "Alpha", "a.example.com", Realm: "Icecrown", Account: "demo", ClientId: cid)).Value!;
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Servers.ReloadFromService();
+        Assert.Single(main.Servers.Visible).DuplicateCommand.Execute(null);
+        var form = Assert.IsType<AddServerViewModel>(main.Content);
+
+        // The client disappears while the form is open: DuplicateServer succeeds, the follow-up update fails.
+        Assert.True(env.Session.Service.RemoveClient(cid).Succeeded);
+        form.SaveCommand.Execute(null);
+
+        Assert.NotNull(form.SaveError);
+        Assert.Contains(Loc.Get("error.state.unchanged"), form.SaveError);
+        var servers = env.Session.Service.ListServers(compatibleOnly: false).Value!;
+        Assert.Equal(original.Id, Assert.Single(servers).Id);
+    }
+
+    /// <summary>
+    /// Heights where the downward estimate is wrong by a few pixels, so the menu has to flip and slide (#191).
+    /// Without the re-open guard the flip loops forever; the test caps that loop so it fails instead of hanging.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData(470.0)]
+    [InlineData(575.0)]
+    public void CardMenu_FlipAndAdjust_OpensBoundedTimes(double height)
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        var a = env.Session.Service.AddServer(new NewServer("My Server", "logon.example.com", Account: "demo", ClientId: cid)).Value!;
+        env.Session.Service.AddServer(new NewServer("Another Server", "play.example.net", ClientId: cid));
+        env.Session.Service.AddServer(new NewServer("Third Server", "game.example.org", ClientId: cid));
+        env.Session.Service.AddServer(new NewServer("Fourth Server", "realm.example.com", ClientId: cid));
+        env.Session.Service.SwitchServer(new SwitchRequest(cid, a.Id));
+        env.Session.Service.DiscardUndo(cid);
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        Loc.Instance.SetLanguage(Language.En);
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Servers.ReloadFromService();
+        var window = new MainWindow(main) { Width = 720, Height = height };
+        window.Show();
+        Screenshots.Settle();
+        Border status = window.FindControl<Border>("StatusBar")!;
+
+        var cards = window.GetVisualDescendants().OfType<SplitButton>().ToList();
+        Assert.NotEmpty(cards);
+        var flipped = 0;
+        var worstOverlap = double.MinValue;
+        foreach (var card in cards)
+        {
+            var flyout = (MenuFlyout)card.Flyout!;
+            var opened = 0;
+            void OnOpened(object? s, EventArgs e) => opened++;
+            // Runs after the view's handler: once the loop is evident, force upward so the test ends instead of hanging.
+            void OnOpening(object? s, EventArgs e)
+            {
+                if (opened >= 6)
+                {
+                    flyout.Placement = PlacementMode.TopEdgeAlignedRight;
+                }
+            }
+
+            flyout.Opened += OnOpened;
+            flyout.Opening += OnOpening;
+            flyout.ShowAt(card);
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(1);
+            while (DateTime.UtcNow < deadline && opened < 6)
+            {
+                Screenshots.Settle();
+            }
+
+            var presenter = window.GetVisualDescendants().OfType<MenuFlyoutPresenter>().FirstOrDefault();
+            if (presenter is not null)
+            {
+                var bottom = presenter.TranslatePoint(new Point(0, presenter.Bounds.Height), window)!.Value.Y;
+                worstOverlap = Math.Max(worstOverlap, bottom - status.TranslatePoint(default, window)!.Value.Y);
+            }
+
+            flyout.Opened -= OnOpened;
+            flyout.Opening -= OnOpening;
+            Assert.True(flyout.IsOpen, $"menu closed itself at 720x{height}");
+            Assert.InRange(opened, 1, 2);
+            if (opened == 2)
+            {
+                flipped++;
+            }
+
+            flyout.Hide();
+            Screenshots.Settle();
+        }
+
+        window.Close();
+        Assert.True(flipped > 0, $"no card flipped at 720x{height}; the case no longer exercises the flip");
+        // Known follow-up: after a flip the menu may still overlap the status bar by a couple of pixels.
+        Assert.True(worstOverlap <= 4, $"menu overlaps the status bar by {worstOverlap}px at 720x{height}");
+    }
 }

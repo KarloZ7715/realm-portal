@@ -530,6 +530,11 @@ public sealed partial class AddServerViewModel : ViewModelBase
                 result = _session.Service.UpdateServer(new UpdateServerRequest(created.Value!.Id, Name.Trim(), hostForServer, realmValue,
                     RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
                     ExtraRealmlistLines: extraForRequest, ClearCacheOnSwitch: ClearCacheOnSwitch));
+                if (!result.Succeeded)
+                {
+                    // Roll back the copy so a failed save leaves the server list unchanged, as the error says.
+                    _session.Service.RemoveServer(created.Value!.Id);
+                }
             }
             else
             {
