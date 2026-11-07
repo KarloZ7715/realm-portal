@@ -70,6 +70,9 @@ jobs:
       - name: Test deb version mapping
         run: packaging/test-deb-version.sh
 
+      - name: Test release asset names
+        run: packaging/test-release-asset-names.sh
+
       - name: Test license collection
         run: packaging/test-collect-licenses.sh
 
@@ -290,10 +293,13 @@ jobs:
         run: |
           set -euo pipefail
           ver="$PACKAGE_VERSION"
-          deb_ver="$(packaging/linux/semver-to-deb-version.sh "$ver")"
+          # File names use the SemVer version; GitHub would rename a "~" to "." (see packaging/release-asset-names.sh).
+          mapfile -t bins < <(packaging/release-asset-names.sh "$ver")
+          deb_file="realm-portal_${ver}_amd64.deb"
+          [[ "${bins[0]}" == "$deb_file" ]]
           mkdir -p artifacts/release
           # Linux
-          cp -v "artifacts/linux/realm-portal_${deb_ver}_amd64.deb" artifacts/release/
+          cp -v "artifacts/linux/${deb_file}" artifacts/release/
           cp -v "artifacts/linux/RealmPortal-${ver}-x86_64.AppImage" artifacts/release/
           # Windows
           cp -v "artifacts/win/RealmPortal-${ver}-win-x64.zip" artifacts/release/
@@ -301,17 +307,15 @@ jobs:
           (
             cd artifacts/release
             sha256sum \
-              "realm-portal_${deb_ver}_amd64.deb" \
+              "$deb_file" \
               "RealmPortal-${ver}-win-x64.zip" \
               "RealmPortal-${ver}-x86_64.AppImage" \
               > SHA256SUMS
           )
-          # Confirm a "~" in the .deb name survives (GitHub must not rename it)
-          if [[ "$deb_ver" == *"~"* ]]; then
-            [[ -f "artifacts/release/realm-portal_${deb_ver}_amd64.deb" ]]
-            echo "deb asset keeps tilde: realm-portal_${deb_ver}_amd64.deb"
+          if grep -F '~' artifacts/release/SHA256SUMS; then
+            echo "::error::A release asset name contains '~', which GitHub renames"
+            exit 1
           fi
-          echo "deb_version=$deb_ver" >> "$GITHUB_OUTPUT"
           if [[ "$ver" == *-* ]]; then
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
@@ -361,15 +365,13 @@ jobs:
       - name: Verify assets, digests, sizes, and download URLs
         env:
           GH_TOKEN: ${{ github.token }}
-          DEB_VERSION: ${{ steps.assets.outputs.deb_version }}
           IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
         run: |
           set -euo pipefail
           ver="$PACKAGE_VERSION"
-          deb_ver="$DEB_VERSION"
           owner_repo="${GITHUB_REPOSITORY}"
           expected=(
-            "realm-portal_${deb_ver}_amd64.deb"
+            "realm-portal_${ver}_amd64.deb"
             "RealmPortal-${ver}-x86_64.AppImage"
             "RealmPortal-${ver}-win-x64.zip"
             "SHA256SUMS"
@@ -382,7 +384,7 @@ jobs:
           fi
           mapfile -t sums_names < <(awk '{print $2}' artifacts/release/SHA256SUMS | sort)
           mapfile -t bin_names < <(printf '%s\n' \
-            "realm-portal_${deb_ver}_amd64.deb" \
+            "realm-portal_${ver}_amd64.deb" \
             "RealmPortal-${ver}-x86_64.AppImage" \
             "RealmPortal-${ver}-win-x64.zip" | sort)
           if [[ "${sums_names[*]}" != "${bin_names[*]}" ]]; then
@@ -455,12 +457,6 @@ jobs:
             else
               echo "::error::browser_download_url mismatch for ${name}: got ${browser_url} (want ${final_url} or untagged-*/${name})"
               exit 1
-            fi
-            if [[ "$name" == *"~"* ]]; then
-              [[ "$browser_url" == *"~"* ]] || {
-                echo "::error::GitHub renamed tilde out of ${name}"
-                exit 1
-              }
             fi
             echo "ok: ${name} size=${local_size} url=${browser_url}"
           done < artifacts/release/SHA256SUMS
