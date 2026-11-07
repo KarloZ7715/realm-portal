@@ -23,6 +23,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
     public ClientsViewModel(DemoBackend backend)
     {
         _backend = backend;
+        ConfigureClientRequirement();
         foreach (var seed in DemoData.Clients)
         {
             AddDemo(seed);
@@ -32,6 +33,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
     public ClientsViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool startFirstScan = true)
     {
         _session = session;
+        ConfigureClientRequirement();
         _pickFolder = pickFolder;
         ReloadFromService();
         if (startFirstScan)
@@ -54,11 +56,27 @@ public sealed partial class ClientsViewModel : ViewModelBase
     private bool _isScanning;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(HasNotice))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(HasNotice), nameof(ShowPlainNotice))]
     private string? _notice;
 
     private ServiceError? _noticeError;
-    public bool IsEmpty => Items.Count == 0 && !IsScanning && _noticeError is null;
+    public bool HasNoClients => Items.Count == 0;
+    public bool IsEmpty => HasNoClients && !IsScanning;
+    public bool ShowPlainNotice => HasNotice && !Recovery.HasCause;
+    public ErrorRecoveryViewModel MissingClientNotice { get; } = new();
+
+    private void ConfigureClientRequirement()
+    {
+        MissingClientNotice.Show(new ServiceError(ServiceErrorCode.ClientNotFound), causeKey: "add.clients.empty");
+        MissingClientNotice.NavigateRequested += destination => destination == RecoveryDestination.ScanClients
+            ? RescanCommand.ExecuteAsync(null) : PickFolderCommand.ExecuteAsync(null);
+        Recovery.PropertyChanged += (_, _) => OnPropertyChanged(nameof(ShowPlainNotice));
+        Items.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(HasNoClients));
+        };
+    }
 
     private void ReportError(ServiceError error, Func<Task> retry, Func<Task>? fix = null)
     {
@@ -93,6 +111,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
     public override void RefreshText()
     {
         Recovery.RefreshText();
+        MissingClientNotice.RefreshText();
         if (_noticeError is not null) Notice = ErrorText.Body(_noticeError);
         foreach (var item in Items)
         {

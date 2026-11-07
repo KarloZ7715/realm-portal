@@ -222,7 +222,12 @@ public sealed class ExtraRealmlistLinesUiTests
         var saveY = save.TranslatePoint(default, view)!.Value.Y;
         Assert.True(cacheY < expanderY, $"cache {cacheY} vs expander {expanderY}");
         Assert.True(expanderY < linesY, $"expander {expanderY} vs lines {linesY}");
-        Assert.True(linesY < saveY, $"lines {linesY} vs save {saveY}");
+        // The footer now stays outside the scroller. Bring the last field into its viewport first.
+        lines.BringIntoView();
+        Screenshots.Settle();
+        linesY = lines.TranslatePoint(default, view)!.Value.Y;
+        saveY = save.TranslatePoint(default, view)!.Value.Y;
+        Assert.True(linesY < saveY, $"scrolled lines {linesY} vs fixed save {saveY}");
         window.Close();
     }
 

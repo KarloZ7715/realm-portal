@@ -32,7 +32,6 @@
               <TextBlock Text="{loc:T clients.edit.browse}"/>
             </Button>
           </Grid>
-          <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap"/>
           <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{loc:T clients.pick.unavailable}" IsVisible="{Binding BrowseUnavailable}" TextWrapping="Wrap"/>
         </StackPanel>
       </ContentControl>

@@ -359,7 +359,8 @@ public sealed class ClearErrorsUiTests
         settings.SaveCommand.Execute(null);
         Assert.Equal(ServiceErrorAction.CheckPermissions, settings.Recovery.Action);
         Assert.True(settings.Recovery.HasCause);
-        Assert.Contains("/home/demo/config", settings.Recovery.Cause);
+        Assert.Equal("/home/demo/config", settings.Recovery.PathText);
+        Assert.DoesNotContain("/home/demo/config", settings.Recovery.Cause);
         Assert.True(settings.Recovery.HasPrimary);
     }
 
@@ -406,14 +407,15 @@ public sealed class ClearErrorsUiTests
     }
 
     [AvaloniaFact]
-    public void AFailedListDoesNotPretendThatTheClientListIsEmpty()
+    public void AFailedListKeepsItsNoticeAboveTheEmptyClientActions()
     {
         using var env = new IsolatedAppSession();
         env.Session.Service.AddClient(env.CreateClientFolder("demo-client"));
         File.WriteAllText(Path.Combine(env.Config, "clients.json"), "{ damaged");
         var clients = new ClientsViewModel(env.Session, startFirstScan: false);
         Assert.True(clients.HasNotice);
-        Assert.False(clients.IsEmpty);
+        Assert.True(clients.Recovery.HasCause);
+        Assert.True(clients.IsEmpty);
     }
 
     [AvaloniaFact]

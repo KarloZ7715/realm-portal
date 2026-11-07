@@ -1,10 +1,38 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:RealmPortal.App.ViewModels"
- x:Class="RealmPortal.App.Views.ErrorRecoveryView" x:DataType="vm:ErrorRecoveryViewModel" IsVisible="{Binding IsVisible}">
- <StackPanel Spacing="8" Margin="0,4,0,12">
-  <TextBlock Name="RecoveryHint" Text="{Binding Hint}" TextWrapping="Wrap" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}"/>
-  <WrapPanel>
-   <Button Name="RecoveryPrimary" Classes="secondary compact" Margin="0,0,8,8" IsVisible="{Binding HasPrimary}" Command="{Binding PrimaryCommand}" AutomationProperties.Name="{Binding PrimaryText}" AutomationProperties.HelpText="{Binding Hint}"><TextBlock Text="{Binding PrimaryText}" TextWrapping="Wrap"/></Button>
-   <Button Name="RecoverySecondary" Classes="secondary compact" Margin="0,0,8,8" IsVisible="{Binding HasSecondary}" Command="{Binding SecondaryCommand}" AutomationProperties.Name="{Binding SecondaryText}" AutomationProperties.HelpText="{Binding Hint}"><TextBlock Text="{Binding SecondaryText}" TextWrapping="Wrap"/></Button>
-  </WrapPanel>
- </StackPanel>
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RealmPortal.App.ViewModels"
+             xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:loc="using:RealmPortal.App.Localization"
+             x:Class="RealmPortal.App.Views.ErrorRecoveryView"
+             x:DataType="vm:ErrorRecoveryViewModel"
+             IsVisible="{Binding HasCause}">
+
+  <Border Background="{DynamicResource Leather950Brush}" Margin="0,2,0,12">
+    <c:Banner Name="ErrorNotice" Header="{Binding Title}" Severity="{Binding Severity}"
+              AutomationProperties.LiveSetting="Assertive" AutomationProperties.Name="{Binding AccessibleName}">
+      <StackPanel Spacing="6">
+        <TextBlock Name="RecoveryCause" Text="{Binding Cause}" TextWrapping="Wrap" Classes="body-sm" Foreground="{DynamicResource BoneBrush}"/>
+        <c:MiddleEllipsisTextBlock Name="RecoveryPath" FullText="{Binding PathText}" IsVisible="{Binding HasPath}"
+                                  FontFamily="{DynamicResource FontMono}" FontSize="12" Foreground="{DynamicResource BoneSoftBrush}"/>
+        <ItemsControl Name="ConflictingFiles" ItemsSource="{Binding ConflictingFiles}" IsVisible="{Binding HasConflictingFiles}"
+                      AutomationProperties.Name="{loc:T recovery.conflictingfiles}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <TextBlock Text="•" Foreground="{DynamicResource BoneSoftBrush}"/>
+                <c:MiddleEllipsisTextBlock Grid.Column="1" FullText="{Binding}" FontFamily="{DynamicResource FontMono}" FontSize="12" Foreground="{DynamicResource BoneSoftBrush}"/>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Name="RecoveryHint" Text="{Binding Hint}" TextWrapping="Wrap" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}"/>
+        <WrapPanel>
+          <Button Name="RecoveryPrimary" Classes="secondary compact" Margin="0,2,8,2" IsVisible="{Binding HasPrimary}" Command="{Binding PrimaryCommand}"
+                  AutomationProperties.Name="{Binding PrimaryText}" AutomationProperties.HelpText="{Binding Hint}"><TextBlock Text="{Binding PrimaryText}" TextWrapping="Wrap"/></Button>
+          <Button Name="RecoverySecondary" Classes="secondary compact" Margin="0,2,8,2" IsVisible="{Binding HasSecondary}" Command="{Binding SecondaryCommand}"
+                  AutomationProperties.Name="{Binding SecondaryText}" AutomationProperties.HelpText="{Binding Hint}"><TextBlock Text="{Binding SecondaryText}" TextWrapping="Wrap"/></Button>
+        </WrapPanel>
+      </StackPanel>
+    </c:Banner>
+  </Border>
 </UserControl>

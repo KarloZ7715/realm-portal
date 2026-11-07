@@ -484,7 +484,7 @@
   "recovery.usecompatibleclient.hint": "Selecciona un cliente con la compilación requerida o edita la compilación que exige el servidor.",
   "recovery.usecompatibleclient.button": "Elegir cliente compatible",
   "recovery.restoreconfigbackup.hint": "Revisa las copias de la configuración en Ajustes. Solo se puede restaurar una copia válida si el archivo está dañado.",
-  "recovery.restoreconfigbackup.button": "Revisar copia de configuración",
+  "recovery.restoreconfigbackup.button": "Revisar copias de configuración",
   "recovery.checkpermissions.hint": "Comprueba que tu cuenta pueda leer y escribir en la carpeta y que el disco permita escritura; después, reintenta.",
   "recovery.checkpermissions.button": "Reintentar",
   "recovery.freediskspace.hint": "Libera espacio en el disco y vuelve a intentarlo.",
@@ -496,12 +496,17 @@
   "recovery.checklaunchersettings.hint": "Revisa el comando del lanzador, el wrapper, los argumentos y las variables de entorno en Ajustes antes de volver a iniciar el juego.",
   "recovery.checklaunchersettings.button": "Ajustes del lanzador",
   "recovery.addclient": "Añadir cliente manualmente",
-  "clients.empty.cause": "No hay clientes del juego registrados. La búsqueda puede no encontrar juegos fuera de las carpetas habituales; busca de nuevo o añade su carpeta manualmente.",
+  "clients.empty.cause": "Busca de nuevo en las carpetas habituales o añade el cliente manualmente si está en otro lugar.",
   "servers.empty.first.title": "Aún no hay servidores",
   "servers.empty.first.hint": "No se han añadido ni importado servidores. Añade uno o busca clientes del juego para importar sus servidores.",
   "servers.empty.filtered.hint": "Ningún servidor coincide con la búsqueda o el cliente seleccionado. Borra la búsqueda, elige otro filtro de cliente o añade un servidor.",
   "add.clients.empty": "No hay clientes disponibles para este servidor. Busca clientes o añade la carpeta de un juego para continuar.",
   "backups.empty.cause": "Este cliente aún no tiene copias de seguridad. Al cambiar de servidor se guardan los archivos anteriores; también puedes crear una copia ahora. Si no hay un cliente seleccionado, añádelo primero en Clientes.",
   "servers.empty.filtered.title": "Ningún servidor coincide con este cliente",
-  "recovery.field": "el campo indicado"
+  "recovery.field": "el campo indicado",
+  "clients.empty.title": "Aún no hay clientes",
+  "status.error.section": "Error · {0}",
+  "recovery.path.reference": "la siguiente ruta",
+  "recovery.conflictingfiles": "Archivos del cliente modificados",
+  "error.undoconflict.notice": "Los archivos del cliente cambiaron después del cambio de servidor. Se detuvo la operación de deshacer para no sobrescribirlos."
 }

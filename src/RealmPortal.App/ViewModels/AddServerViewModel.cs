@@ -47,6 +47,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _saveDemo = save;
         _cancel = cancel;
         Clients = clients;
+        Clients.Items.CollectionChanged += OnClientsChanged;
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
         _initialInput = CurrentInput();
     }
@@ -58,6 +59,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _savePortal = save;
         _cancel = cancel;
         Clients = clients;
+        Clients.Items.CollectionChanged += OnClientsChanged;
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
         _initialInput = CurrentInput();
     }
@@ -200,6 +202,16 @@ public sealed partial class AddServerViewModel : ViewModelBase
         : _saveFailedUnknown ? Loc.Get("error.state.unknown")
         : null;
 
+    public bool CanSaveServer => SelectedClient is not null && Clients.Items.Contains(SelectedClient);
+    public string SaveDisabledReason => CanSaveServer ? string.Empty : Loc.Get("add.clients.empty");
+    public bool HasPlainSaveError => HasSaveError && !Recovery.HasCause;
+
+    private void OnClientsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        SaveCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(SaveDisabledReason));
+    }
+
     public bool HasSaveError => SaveError is not null;
 
     public bool HasResult => TestState != ConnectionTest.None;
@@ -298,6 +310,8 @@ public sealed partial class AddServerViewModel : ViewModelBase
     public override void RefreshText()
     {
         Recovery.RefreshText();
+        Clients.MissingClientNotice.RefreshText();
+        OnPropertyChanged(nameof(SaveDisabledReason));
         foreach (var option in BuildOptions)
         {
             option.Refresh();
@@ -316,6 +330,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         OnPropertyChanged(nameof(ClientError));
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(HasPlainSaveError));
         OnPropertyChanged(nameof(FormTitle));
         OnPropertyChanged(nameof(FormSubtitle));
         OnPropertyChanged(nameof(SaveLabel));
@@ -406,7 +421,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     private bool CanTest() => TestState != ConnectionTest.Testing;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSaveServer))]
     private void Save()
     {
         Submitted = true;
@@ -514,6 +529,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     /// </summary>
     public void OnFormClosed()
     {
+        Clients.Items.CollectionChanged -= OnClientsChanged;
         _formClosed = true;
         CancelInFlightProbe();
     }
@@ -666,7 +682,12 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     partial void OnAccountChanged(string value) => ClearSaveError();
 
-    partial void OnSelectedClientChanged(ClientItemViewModel? value) => ClearSaveError();
+    partial void OnSelectedClientChanged(ClientItemViewModel? value)
+    {
+        ClearSaveError();
+        SaveCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(SaveDisabledReason));
+    }
 
     partial void OnRealmChanged(string value) => ClearSaveError();
 
@@ -700,6 +721,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _saveMessageKey = null;
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(HasPlainSaveError));
     }
 
     /// <summary>Shows a client-side save failure whose copy is a localization key.</summary>
@@ -710,6 +732,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _saveMessageKey = messageKey;
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(HasPlainSaveError));
     }
 
     private void ClearSaveError()
@@ -725,6 +748,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _saveMessageKey = null;
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(HasPlainSaveError));
     }
 }
 

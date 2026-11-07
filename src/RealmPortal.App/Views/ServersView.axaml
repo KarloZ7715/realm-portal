@@ -66,7 +66,7 @@
 
       <!-- Switching / opening / running -->
       <StackPanel Grid.Row="3">
-      <c:Banner Name="PhaseBanner" Margin="0,2,0,12" IsVisible="{Binding ShowBanner}"
+      <c:Banner Name="PhaseBanner" Margin="0,2,0,12" IsVisible="{Binding ShowPhaseBanner}"
                 Severity="{Binding BannerSeverity}" Header="{Binding BannerHeader}">
         <TextBlock Text="{Binding BannerBody}" TextWrapping="Wrap"/>
       </c:Banner>

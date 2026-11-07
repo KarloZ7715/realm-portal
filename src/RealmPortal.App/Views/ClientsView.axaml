@@ -9,25 +9,35 @@
   <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <!-- Bottom space is a margin on the content: ScrollViewer.Padding is not counted in the scroll extent (#210 follow-up). -->
     <StackPanel Name="ScrollContent" Margin="20,10,20,12">
-      <Grid ColumnDefinitions="*,Auto" Height="44">
+      <Grid ColumnDefinitions="*,Auto" Height="44" IsVisible="{Binding !IsEmpty}">
         <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T clients.title}"/>
         <Button Grid.Column="1" Name="PickButton" Classes="secondary compact" c:ButtonSurface.Surface="Parchment" VerticalAlignment="Center" Command="{Binding PickFolderCommand}"
-                AutomationProperties.Name="{loc:T recovery.addclient}" AutomationProperties.HelpText="{loc:T clients.empty.cause}">
+                IsVisible="{Binding !IsEmpty}" AutomationProperties.Name="{loc:T recovery.addclient}" AutomationProperties.HelpText="{loc:T clients.empty.cause}">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <c:Icon Data="{DynamicResource IconFolder}" Width="16" Height="16" StrokeThickness="2"/>
             <TextBlock Text="{loc:T clients.pick}"/>
           </StackPanel>
         </Button>
       </Grid>
-      <TextBlock Name="Subtitle" Classes="sheet-subtitle" Text="{Binding Summary}"/>
+      <TextBlock Name="Subtitle" IsVisible="{Binding !IsEmpty}" Classes="sheet-subtitle" Text="{Binding Summary}"/>
       <TextBlock Name="ScanNotice" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,0,0,12"
-                 Text="{Binding Notice}" IsVisible="{Binding HasNotice}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                 Text="{Binding Notice}" IsVisible="{Binding ShowPlainNotice}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
 
       <v:ErrorRecoveryView DataContext="{Binding Recovery}"/>
-      <TextBlock Name="ClientsEmptyCause" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,4,0,12"
-                 IsVisible="{Binding IsEmpty}" TextWrapping="Wrap" Text="{loc:T clients.empty.cause}"/>
+      <StackPanel Name="ClientsEmptyState" IsVisible="{Binding IsEmpty}" HorizontalAlignment="Center" Spacing="4" Margin="0,8,0,12" MaxWidth="530">
+        <c:Seal Status="Inactive" Width="36" Height="36" HorizontalAlignment="Center"/>
+        <TextBlock Classes="h1" FontSize="24" Text="{loc:T clients.empty.title}" Foreground="{DynamicResource IvoryBrush}" HorizontalAlignment="Center"/>
+        <TextBlock Name="ClientsEmptyCause" Classes="body-sm" FontSize="14" Foreground="{DynamicResource BoneSoftBrush}"
+                   TextWrapping="Wrap" TextAlignment="Center" Text="{loc:T clients.empty.cause}"/>
+        <WrapPanel HorizontalAlignment="Center">
+          <Button Name="EmptyClientScan" Classes="primary compact" Margin="0,6,8,0" Command="{Binding RescanCommand}"
+                  AutomationProperties.Name="{loc:T recovery.scanoraddclient.button}" AutomationProperties.HelpText="{loc:T clients.empty.cause}"><TextBlock Text="{loc:T recovery.scanoraddclient.button}"/></Button>
+          <Button Name="EmptyClientAdd" Classes="secondary compact" Margin="0,6,0,0" Command="{Binding PickFolderCommand}"
+                  AutomationProperties.Name="{loc:T recovery.addclient}" AutomationProperties.HelpText="{loc:T clients.empty.cause}"><TextBlock Text="{loc:T recovery.addclient}"/></Button>
+        </WrapPanel>
+      </StackPanel>
       <!-- The sheet is drawn with the parchment tile art, so it grows with the list. -->
-      <ContentControl Name="ClientsSheet" Classes="card" Padding="22,14,22,6" Margin="0,0,0,0">
+      <ContentControl Name="ClientsSheet" IsVisible="{Binding !IsEmpty}" Classes="card" Padding="22,14,22,6" Margin="0,0,0,0">
         <StackPanel>
           <TextBlock Classes="sheet-title" Text="{loc:T clients.sheet}" Margin="0,2,0,8"/>
           <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill" Margin="0,0,0,2"/>
@@ -70,7 +80,7 @@
         </StackPanel>
       </ContentControl>
 
-      <StackPanel Orientation="Horizontal" Spacing="28" Margin="14,14,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="28" Margin="14,14,0,0" IsVisible="{Binding !IsEmpty}">
         <Button Name="RescanButton" Classes="link caps" Command="{Binding RescanCommand}" VerticalAlignment="Center"
                 AutomationProperties.Name="{loc:T recovery.scanoraddclient.button}" AutomationProperties.HelpText="{loc:T clients.empty.cause}">
           <StackPanel Orientation="Horizontal" Spacing="8">

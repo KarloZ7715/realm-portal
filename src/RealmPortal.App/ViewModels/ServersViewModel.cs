@@ -265,6 +265,8 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public bool ShowBanner => Phase != ServersPhase.Idle || HasErrorBanner;
 
+    public bool ShowPhaseBanner => ShowBanner && !Recovery.HasCause;
+
     public bool ShowSteps => IsBusy;
 
     public bool HasQuery => !string.IsNullOrWhiteSpace(SearchText);
@@ -974,13 +976,14 @@ public sealed partial class ServersViewModel : ViewModelBase
     private void SetError(ServiceError? error, string? messageKey = null, Func<Task>? retry = null)
     {
         if (error is not null) Recovery.Show(error, retry);
-        else Recovery.Clear();
+        else Recovery.ShowMessage(messageKey ?? "error.unknown.body");
         _bannerError = messageKey is null ? error : null;
         _bannerMessageKey = messageKey ?? (error is null ? "error.unknown.body" : null);
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(BannerSeverity));
         OnPropertyChanged(nameof(ShowBanner));
+        OnPropertyChanged(nameof(ShowPhaseBanner));
         OnPropertyChanged(nameof(ShowEmpty));
         OnPropertyChanged(nameof(StatusText));
     }
@@ -1096,6 +1099,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(ShowBanner));
+        OnPropertyChanged(nameof(ShowPhaseBanner));
         OnPropertyChanged(nameof(RunningCount));
     }
 }

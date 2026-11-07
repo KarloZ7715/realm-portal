@@ -47,7 +47,7 @@
     </ContentControl>
 
     <StackPanel Grid.Row="2">
-      <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}"/>
+      <TextBlock IsVisible="{Binding ShowPlainNotice}" Text="{Binding Notice}" TextWrapping="Wrap" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}"/>
       <v:ErrorRecoveryView DataContext="{Binding Recovery}"/>
     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
       <TextBlock Classes="sheet-title" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T backups.saved}"/>

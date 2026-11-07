@@ -429,17 +429,29 @@ Known platform gap (plain Avalonia, X11): without reading `_NET_FRAME_EXTENTS`, 
 ## Clear empty states and recoverable errors (#194)
 
 The Servers, Clients, client backups and server-form screens explain why an empty
-list can occur and what to do next. An error reading a list is not presented as a
-successful empty result. Servers distinguish an unpopulated list from a search or
+list can occur and what to do next. Clients keeps a read-error notice above its
+empty-state actions rather than pretending that the operation succeeded. Servers distinguish an unpopulated list from a search or
 client filter with no matches. Clients offers **Scan again** and **Add client
-manually**; the server form reuses both commands without discarding its fields.
+manually** in a centered seal/title/explanation zone, without an empty saved-clients
+header. The server form reuses both commands without discarding its fields. Its
+client-requirement notice is inside the parchment, above SERVER DETAILS; Test
+connection, Cancel and Save stay in a fixed footer outside the form scroller. Save
+is disabled without a selected saved client and explains why through HelpText.
 Client backups explain that a switch keeps the previous files and that a manual
 backup can be created for a selected client. The separate app-configuration card
 continues to explain when config backup copies are created.
 
-Service failures keep the existing localized cause, conflicting file list and
-consistency statement. `ErrorRecoveryViewModel` adds the localized instruction
-from `ServiceError.NextAction()` and contextual, keyboard-reachable buttons:
+Every service failure uses the same `ErrorRecoveryView` notice on Servers,
+Clients, Add/Edit server, Edit client, Settings and client backups. The 3 px left
+bar and warning icon are amber for recoverable errors and lacre for failures;
+meaning does not depend on color. A bold title, localized cause, next-step
+instruction and keyboard-reachable buttons are all inside the notice. Its
+assertive live-region name is the title plus cause. Full paths are separate
+JetBrains Mono lines, middle-ellipsized to their available width with the complete
+value in the tooltip and accessible name. Undo conflicts show a mono file list,
+not an inline sentence. Existing consistency statements remain intact.
+
+`ErrorRecoveryViewModel` maps `ServiceError.NextAction()` to contextual buttons:
 
 | Next action | UI behavior |
 | --- | --- |
@@ -450,7 +462,7 @@ from `ServiceError.NextAction()` and contextual, keyboard-reachable buttons:
 | ChooseClientFolder | Reopen the relevant folder picker (or open Clients to add a folder). |
 | FixInput | Focus the offending form field; an extra-line error expands Advanced and selects the visible line, accounting for blank lines omitted from the request. Without a form context, retain the instruction only. |
 | UseCompatibleClient | Open Clients to select a compatible client; the instruction also explains editing the server build requirement. Never force a switch. |
-| RestoreConfigBackup | Offer a link to the Settings app-configuration card only after `GetConfigBackups` reports a valid backup for the failed file. Restore still uses the existing damaged-file gate and confirmation there. |
+| RestoreConfigBackup | Offer **Review config backups** / **Revisar copias de configuración** inside the notice, linking to the Settings app-configuration card only after `GetConfigBackups` reports a valid backup for the failed file. Restore still uses the existing damaged-file gate and confirmation there. |
 | CheckPermissions / FreeDiskSpace | Explain the manual prerequisite and offer an operation-specific retry where available. Never change permissions or remove files. |
 | ResolveUndoConflict | Keep the conflicting file list, explain preserving changes, and retain undo-again / confirmed-discard actions in the Servers flow. Backup restore retains its existing conflict dialog; no forced restore is added. |
 | ReviewClientFiles | Explain inspecting files/links and open Clients. Never repair or overwrite files automatically. |
@@ -458,12 +470,16 @@ from `ServiceError.NextAction()` and contextual, keyboard-reachable buttons:
 | None | Keep the cause; invent no actionable operation. |
 
 Recovery navigation respects unsaved Settings changes. Visible error instructions
-and buttons refresh through both real language controls. Long status text is
-ellipsized with a full-text tooltip so the language toggle remains reachable.
+and buttons refresh through both real language controls. The status bar uses a
+short localized **Error · Clients** (or the current section), not a duplicate of
+the full cause. Existing non-error status text keeps its ellipsis and tooltip.
 DNS vs. offline and the status dot's last-checked text are unchanged.
 
-Headless coverage is in `ClearErrorsUiTests`: every action, both languages, actual
-navigation and operation replay, config-backup gating, field/line focus, empty
-screens, language switching, keyboard activation and compact status layout. No
+Headless coverage is in `ClearErrorsUiTests` and `ClearErrorNoticeDesignTests`:
+every action, both languages, actual navigation and operation replay,
+config-backup gating, field/line focus, empty-screen commands, language switching,
+assertive announcements, severity, mono paths/files and compact status layout.
+At 720 × 480, client notices and empty-state actions remain above the status bar;
+the form scrolls independently of its always-reachable Cancel/Save footer. No
 file repair, process termination, permission editor or additional Core behavior is
 part of this UI change.

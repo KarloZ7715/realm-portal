@@ -58,6 +58,7 @@ public sealed partial class BackupsViewModel : ViewModelBase
         _noticeError = error;
         Notice = ErrorText.Body(error);
         Recovery.Show(error, retry);
+        OnPropertyChanged(nameof(ShowPlainNotice));
         OnPropertyChanged(nameof(ShowEmpty));
     }
 
@@ -66,9 +67,11 @@ public sealed partial class BackupsViewModel : ViewModelBase
         if (_noticeError is not null) Notice = null;
         _noticeError = null;
         Recovery.Clear();
+        OnPropertyChanged(nameof(ShowPlainNotice));
         OnPropertyChanged(nameof(ShowEmpty));
     }
 
+    public bool ShowPlainNotice => !Recovery.HasCause;
     public bool ShowEmpty => !HasBackups && _noticeError is null;
     public bool HasBackups => Backups.Count > 0;
     public string CountText => Loc.Format("backups.count", Backups.Count, ClientFilesApplier.DefaultKeepBackups);

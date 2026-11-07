@@ -259,7 +259,9 @@ public sealed partial class MainViewModel : ObservableObject
             ? _editingClient
             : _sections[Math.Clamp(SectionIndex, 0, _sections.Length - 1)];
 
-    public string StatusText => Welcome?.StatusText ?? Content.StatusText;
+    public string StatusText => Welcome?.StatusText ?? (Content.Recovery.HasCause
+        ? Loc.Format("status.error.section", Loc.Get(SectionIndex == 1 ? "nav.clients" : SectionIndex == 2 ? "nav.settings" : "nav.servers"))
+        : Content.StatusText);
 
     /// <summary>"ES · v1.0.0": the language toggle of the status bar (version from <see cref="AppInfo.Version"/>).</summary>
     public string LanguageLabel => $"{Loc.Instance.Code} · v{AppInfo.Version}";
@@ -820,6 +822,10 @@ public sealed partial class MainViewModel : ObservableObject
                 System.IO.Path.GetFileName(row.Path) == System.IO.Path.GetFileName(error.Path));
         };
         screen.Recovery.NavigateRequested += NavigateRecoveryAsync;
+        screen.Recovery.PropertyChanged += (_, _) =>
+        {
+            if (ReferenceEquals(screen, Content)) OnPropertyChanged(nameof(StatusText));
+        };
         screen.Recovery.RefreshText();
     }
 

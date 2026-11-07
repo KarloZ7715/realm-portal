@@ -484,7 +484,7 @@
   "recovery.usecompatibleclient.hint": "Select a client with the required build, or edit the server’s build requirement.",
   "recovery.usecompatibleclient.button": "Choose compatible client",
   "recovery.restoreconfigbackup.hint": "Review the app configuration backups in Settings. Restore is available only when a valid backup can replace a damaged file.",
-  "recovery.restoreconfigbackup.button": "Review config backup",
+  "recovery.restoreconfigbackup.button": "Review config backups",
   "recovery.checkpermissions.hint": "Check that your account can read and write the folder and that the disk is writable, then retry.",
   "recovery.checkpermissions.button": "Try again",
   "recovery.freediskspace.hint": "Free some space on the disk, then retry.",
@@ -496,12 +496,17 @@
   "recovery.checklaunchersettings.hint": "Review the launcher command, wrapper, arguments and environment in Settings before trying to launch again.",
   "recovery.checklaunchersettings.button": "Launcher settings",
   "recovery.addclient": "Add client manually",
-  "clients.empty.cause": "No game clients are registered. A scan may not find games outside the usual folders; scan again or add their folder manually.",
+  "clients.empty.cause": "Scan the usual game folders again, or add a client manually if it is stored elsewhere.",
   "servers.empty.first.title": "No servers yet",
   "servers.empty.first.hint": "No servers have been added or imported. Add a server, or scan game clients to import their servers.",
   "servers.empty.filtered.hint": "No servers match the search or the selected client. Clear the search, choose another client filter, or add a server.",
   "add.clients.empty": "No clients are available for this server. Scan for clients or add a game folder to continue.",
   "backups.empty.cause": "No backups for this client yet. A switch keeps the previous client files, or you can create a backup now. If no client is selected, add one in Clients first.",
   "servers.empty.filtered.title": "No servers match this client",
-  "recovery.field": "the indicated field"
+  "recovery.field": "the indicated field",
+  "clients.empty.title": "No clients yet",
+  "status.error.section": "Error · {0}",
+  "recovery.path.reference": "the following path",
+  "recovery.conflictingfiles": "Changed client files",
+  "error.undoconflict.notice": "Client files changed since the switch, so undo stopped without overwriting those changes."
 }

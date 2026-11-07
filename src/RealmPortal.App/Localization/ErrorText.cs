@@ -44,6 +44,19 @@ public static class ErrorText
         return Compose(CodeBody(error), StateSentence(error.Consistency));
     }
 
+    /// <summary>Notice text keeps paths and conflicting files in separate accessible mono rows.</summary>
+    public static string NoticeBody(ServiceError error)
+    {
+        if (error.Code == ServiceErrorCode.UndoConflict)
+            return Compose(Loc.Get("error.undoconflict.notice"), StateSentence(error.Consistency));
+        if (string.IsNullOrWhiteSpace(error.Path)) return Body(error);
+        var reference = Loc.Get("recovery.path.reference");
+        var body = Body(error with { Path = reference });
+        // The replacement can be the first word (PathNotFound) or part of a sentence (DiskFull).
+        return body.StartsWith(reference, StringComparison.Ordinal)
+            ? char.ToUpperInvariant(body[0]) + body[1..] : body;
+    }
+
     /// <summary>The code's own sentence, with placeholders filled and no claim about what was left on disk.</summary>
     private static string CodeBody(ServiceError error) => error.Code switch
     {

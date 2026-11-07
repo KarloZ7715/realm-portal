@@ -280,7 +280,13 @@ public sealed class SheetLayoutTests : IDisposable
         await Pump();
         var scroller = Named<ScrollViewer>(window, "Scroller");
         Assert.True(scroller.Extent.Height > scroller.Viewport.Height, "Add server must scroll at this height");
-        AssertLastControlFullyVisible(scroller, Named<Button>(window, "SaveButton"));
+        scroller.ScrollToEnd();
+        Screenshots.Settle();
+        var save = Named<Button>(window, "SaveButton");
+        Assert.DoesNotContain(scroller, save.GetVisualAncestors());
+        var status = Named<TextBlock>(window, "StatusText");
+        Assert.True(BoundsIn(save, window).Bottom < BoundsIn(status, window).Top,
+            "the fixed footer stays above the status bar while the form scrolls");
     }
 
     [AvaloniaFact]
