@@ -178,13 +178,13 @@ chmod +x "${tmp}/bin/gh"
 # With no_digest=1 the assets have no digest field.
 no_digest=""
 new_release() {
-  local tag="$1" draft="${2:-true}" ver deb pre
+  local tag="$1" draft="${2:-true}" ver pre
   ver="${tag#v}"
-  deb="$("${SCRIPT_DIR}/linux/semver-to-deb-version.sh" "$ver")"
   pre="${3:-$([[ "$ver" == *-* ]] && echo true || echo false)}"
   rm -rf "${tmp}/state" && mkdir -p "${tmp}/state/assets" "${tmp}/state/files"
   : >"${tmp}/state/calls.log"
-  local names=("realm-portal_${deb}_amd64.deb" "RealmPortal-${ver}-x86_64.AppImage" "RealmPortal-${ver}-win-x64.zip")
+  local names
+  mapfile -t names < <("${SCRIPT_DIR}/release-asset-names.sh" "$ver")
   local n id=1 assets="[]" d
   for n in "${names[@]}"; do
     head -c 4096 /dev/urandom >"${tmp}/state/files/${n}"

@@ -70,6 +70,9 @@ jobs:
       - name: Test deb version mapping
         run: packaging/test-deb-version.sh
 
+      - name: Test release asset names
+        run: packaging/test-release-asset-names.sh
+
       - name: Test license collection
         run: packaging/test-collect-licenses.sh
 
@@ -221,6 +224,13 @@ jobs:
         shell: bash
         run: packaging/collect-licenses.sh "$PUBLISH_DIR" win-x64 "$PUBLISH_DIR"
 
+      - name: Resolve Windows archive name
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t bins < <(packaging/release-asset-names.sh "$PACKAGE_VERSION")
+          echo "ZIP_NAME=${bins[2]}" >> "$GITHUB_ENV"
+
       - name: Package Windows archive
         shell: pwsh
         run: |
@@ -231,7 +241,7 @@ jobs:
           }
           $packageDir = Join-Path $env:RUNNER_TEMP 'packages-win-x64'
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
-          $zipName = "RealmPortal-$($env:PACKAGE_VERSION)-win-x64.zip"
+          $zipName = $env:ZIP_NAME
           $zipPath = Join-Path $packageDir $zipName
           Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
           $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
@@ -290,28 +300,21 @@ jobs:
         run: |
           set -euo pipefail
           ver="$PACKAGE_VERSION"
-          deb_ver="$(packaging/linux/semver-to-deb-version.sh "$ver")"
+          # File names use the SemVer version; GitHub would rename a "~" to "." (see packaging/release-asset-names.sh).
+          mapfile -t bins < <(packaging/release-asset-names.sh "$ver")
+          [[ ${#bins[@]} -eq 3 ]]
           mkdir -p artifacts/release
-          # Linux
-          cp -v "artifacts/linux/realm-portal_${deb_ver}_amd64.deb" artifacts/release/
-          cp -v "artifacts/linux/RealmPortal-${ver}-x86_64.AppImage" artifacts/release/
-          # Windows
-          cp -v "artifacts/win/RealmPortal-${ver}-win-x64.zip" artifacts/release/
+          # Linux: .deb and AppImage; Windows: zip
+          cp -v "artifacts/linux/${bins[0]}" "artifacts/linux/${bins[1]}" "artifacts/win/${bins[2]}" artifacts/release/
           # Merged SHA256SUMS (one line per binary; same layout as historical releases)
           (
             cd artifacts/release
-            sha256sum \
-              "realm-portal_${deb_ver}_amd64.deb" \
-              "RealmPortal-${ver}-win-x64.zip" \
-              "RealmPortal-${ver}-x86_64.AppImage" \
-              > SHA256SUMS
+            sha256sum "${bins[0]}" "${bins[2]}" "${bins[1]}" > SHA256SUMS
           )
-          # Confirm a "~" in the .deb name survives (GitHub must not rename it)
-          if [[ "$deb_ver" == *"~"* ]]; then
-            [[ -f "artifacts/release/realm-portal_${deb_ver}_amd64.deb" ]]
-            echo "deb asset keeps tilde: realm-portal_${deb_ver}_amd64.deb"
+          if grep -F '~' artifacts/release/SHA256SUMS; then
+            echo "::error::A release asset name contains '~', which GitHub renames"
+            exit 1
           fi
-          echo "deb_version=$deb_ver" >> "$GITHUB_OUTPUT"
           if [[ "$ver" == *-* ]]; then
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
@@ -361,19 +364,14 @@ jobs:
       - name: Verify assets, digests, sizes, and download URLs
         env:
           GH_TOKEN: ${{ github.token }}
-          DEB_VERSION: ${{ steps.assets.outputs.deb_version }}
           IS_PRERELEASE: ${{ steps.assets.outputs.is_prerelease }}
         run: |
           set -euo pipefail
           ver="$PACKAGE_VERSION"
-          deb_ver="$DEB_VERSION"
           owner_repo="${GITHUB_REPOSITORY}"
-          expected=(
-            "realm-portal_${deb_ver}_amd64.deb"
-            "RealmPortal-${ver}-x86_64.AppImage"
-            "RealmPortal-${ver}-win-x64.zip"
-            "SHA256SUMS"
-          )
+          mapfile -t bins < <(packaging/release-asset-names.sh "$ver")
+          [[ ${#bins[@]} -eq 3 ]]
+          expected=("${bins[@]}" "SHA256SUMS")
           mapfile -t remote < <(gh release view "$TAG" --json assets -q '.assets[].name' | sort)
           mapfile -t want < <(printf '%s\n' "${expected[@]}" | sort)
           if [[ "${remote[*]}" != "${want[*]}" ]]; then
@@ -381,10 +379,7 @@ jobs:
             exit 1
           fi
           mapfile -t sums_names < <(awk '{print $2}' artifacts/release/SHA256SUMS | sort)
-          mapfile -t bin_names < <(printf '%s\n' \
-            "realm-portal_${deb_ver}_amd64.deb" \
-            "RealmPortal-${ver}-x86_64.AppImage" \
-            "RealmPortal-${ver}-win-x64.zip" | sort)
+          mapfile -t bin_names < <(printf '%s\n' "${bins[@]}" | sort)
           if [[ "${sums_names[*]}" != "${bin_names[*]}" ]]; then
             echo "::error::SHA256SUMS entries mismatch"
             cat artifacts/release/SHA256SUMS
@@ -455,12 +450,6 @@ jobs:
             else
               echo "::error::browser_download_url mismatch for ${name}: got ${browser_url} (want ${final_url} or untagged-*/${name})"
               exit 1
-            fi
-            if [[ "$name" == *"~"* ]]; then
-              [[ "$browser_url" == *"~"* ]] || {
-                echo "::error::GitHub renamed tilde out of ${name}"
-                exit 1
-              }
             fi
             echo "ok: ${name} size=${local_size} url=${browser_url}"
           done < artifacts/release/SHA256SUMS
