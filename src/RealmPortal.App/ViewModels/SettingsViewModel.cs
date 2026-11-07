@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Localization;
@@ -5,6 +6,7 @@ using Avalonia.Threading;
 using RealmPortal.App.Network;
 using RealmPortal.Core;
 using RealmPortal.Core.Service;
+using RealmPortal.App.Portal;
 using RealmPortal.App.Settings;
 
 namespace RealmPortal.App.ViewModels;
@@ -20,6 +22,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly INetworkSettingsStore _network;
     private readonly IUpdateChecker _updates;
     private readonly Func<Task<string?>>? _pickFolder;
+    private readonly PortalSession? _session;
     private SettingsModel _saved;
     private bool _justSaved;
     private bool _networkHydrating;
@@ -28,18 +31,102 @@ public sealed partial class SettingsViewModel : ViewModelBase
         ISettingsStore store,
         Func<Task<string?>>? pickFolder = null,
         INetworkSettingsStore? network = null,
-        IUpdateChecker? updates = null)
+        IUpdateChecker? updates = null,
+        PortalSession? session = null)
     {
         _store = store;
         _pickFolder = pickFolder;
         _network = network ?? new MemoryNetworkSettingsStore();
         _updates = updates ?? new NullUpdateChecker();
+        _session = session;
         _saved = store.Load();
         Reset();
         LoadNetwork();
+        ReloadConfigBackups();
     }
 
-    /// <summary>Switches the UI to the saved language; the app calls it once at startup.</summary>
+    /// <summary>Asked before restoring a damaged config file from its <c>.bak</c>. Main wires the confirm dialog.</summary>
+    public Func<ConfigBackupItemViewModel, Task<bool>>? ConfirmRestoreConfigAsync { get; set; }
+
+    /// <summary>Raised after a successful config restore so Main can reload servers/clients or preferences.</summary>
+    public event Action<ConfigBackupItemViewModel>? ConfigRestored;
+
+    public ObservableCollection<ConfigBackupItemViewModel> ConfigBackups { get; } = [];
+
+    public bool HasConfigBackups => ConfigBackups.Count > 0;
+
+    /// <summary>Re-reads servers/clients/preferences backup status for the Settings card (#196 UI).</summary>
+    public void ReloadConfigBackups()
+    {
+        ConfigBackups.Clear();
+        if (_session is null)
+            return;
+
+        var listed = _session.Service.GetConfigBackups();
+        if (listed.Succeeded)
+        {
+            foreach (var status in listed.Value!)
+            {
+                ConfigBackups.Add(new ConfigBackupItemViewModel(
+                    status.File == ConfigFileKind.Servers ? "settings.config.servers" : "settings.config.clients",
+                    status.Path,
+                    status.Current,
+                    status.Backup,
+                    status.BackupModifiedAt,
+                    RestoreConfigAsync,
+                    kind: status.File));
+            }
+        }
+
+        var prefs = _session.UiPreferences;
+        ConfigBackups.Add(new ConfigBackupItemViewModel(
+            "settings.config.preferences",
+            "ui-preferences.json",
+            prefs.CurrentState,
+            prefs.BackupState,
+            prefs.BackupModifiedAt,
+            RestoreConfigAsync,
+            isPreferences: true));
+        OnPropertyChanged(nameof(HasConfigBackups));
+    }
+
+    private async Task RestoreConfigAsync(ConfigBackupItemViewModel item)
+    {
+        if (!item.CanRestore || _session is null)
+            return;
+        if (ConfirmRestoreConfigAsync is not null &&
+            !await ConfirmRestoreConfigAsync(item).ConfigureAwait(true))
+            return;
+
+        try
+        {
+            if (item.IsPreferences)
+            {
+                _session.UiPreferences.RestoreBackup();
+            }
+            else if (item.Kind is { } kind)
+            {
+                var result = _session.Service.RestoreConfigBackup(kind);
+                if (!result.Succeeded)
+                {
+                    ConfigMessage = Loc.Get("settings.config.restore.failed");
+                    return;
+                }
+            }
+            else
+                return;
+
+            ConfigMessage = Loc.Format("settings.config.restored", item.FileLabel);
+            ReloadConfigBackups();
+            ConfigRestored?.Invoke(item);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or IOException or UnauthorizedAccessException
+                                   or RealmPortal.Core.Servers.StoreException)
+        {
+            ConfigMessage = Loc.Get("settings.config.restore.failed");
+        }
+    }
+
     public void ApplySavedLanguage()
     {
         Loc.Instance.SetLanguage(_saved.Language);
@@ -63,6 +150,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(OpenBackupsManagerCommand))]
     private bool _canManageBackups;
+
+    /// <summary>Soft status after a config restore attempt (null when idle).</summary>
+    [ObservableProperty]
+    private string? _configMessage;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDirty), nameof(StatusText), nameof(TemplateError))]
@@ -309,12 +400,20 @@ public sealed partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    public override void RefreshText() => Changed();
+    public override void RefreshText()
+    {
+        Changed();
+        // Rows format their text from Loc; refresh them after the culture changed (#196).
+        foreach (var item in ConfigBackups)
+            item.RefreshText();
+        OnPropertyChanged(nameof(ConfigMessage));
+    }
 
     private void SetLanguage(Language language)
     {
         if (Loc.Instance.Current != language)
         {
+            // Loc.Changed reaches MainViewModel.OnLanguageChanged, which calls RefreshText().
             Loc.Instance.SetLanguage(language);
         }
     }

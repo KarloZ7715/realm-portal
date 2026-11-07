@@ -71,6 +71,25 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
         new("confirm.backupchanged.title", "confirm.backupchanged.body", "confirm.backupchanged.restore",
             "confirm.cancel", [backupLabel]);
 
+    /// <summary>Restore a damaged app config file from its valid backup (#196 UI). Omit the date parenthesis when unknown.</summary>
+    public static ConfirmDialogViewModel RestoreConfigBackup(
+        string fileLabel,
+        string beforeRestoreFileName,
+        string? backupDateText = null) =>
+        string.IsNullOrEmpty(backupDateText)
+            ? new(
+                "confirm.configrestore.title",
+                "confirm.configrestore.body.nodate",
+                "confirm.configrestore.accept",
+                "confirm.cancel",
+                [fileLabel, beforeRestoreFileName])
+            : new(
+                "confirm.configrestore.title",
+                "confirm.configrestore.body",
+                "confirm.configrestore.accept",
+                "confirm.cancel",
+                [fileLabel, backupDateText, beforeRestoreFileName]);
+
     [RelayCommand]
     private void Confirm() => Complete(ConfirmDialogChoice.Confirm);
 
