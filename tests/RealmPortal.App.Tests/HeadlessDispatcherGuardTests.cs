@@ -1,3 +1,4 @@
+using System.Reflection;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 
@@ -6,6 +7,29 @@ namespace RealmPortal.App.Tests;
 /// <summary>The guard in <see cref="TestApp.EnsureRunLoopDispatcher"/> (#217).</summary>
 public class HeadlessDispatcherGuardTests
 {
+    private const string ReverifyReset =
+        "Re-verify the dispatcher-reset reflection in TestApp.ResetUIThreadDispatcher before updating this guard.";
+
+    [Fact]
+    public void DispatcherReset_IsVerifiedAgainstThePinnedAvaloniaVersion()
+    {
+        var actual = typeof(Dispatcher).Assembly.GetName().Version;
+        Assert.True(actual == new Version(11, 3, 22, 0),
+            $"Expected Avalonia 11.3.22.0, loaded {actual}. {ReverifyReset}");
+    }
+
+    [Fact]
+    public void DispatcherReset_HasTheExpectedInternalSignature()
+    {
+        var methods = typeof(Dispatcher).GetMethods(BindingFlags.Static | BindingFlags.NonPublic)
+            .Where(method => method.Name == "ResetForUnitTests").ToArray();
+        Assert.True(methods.Length == 1,
+            $"Expected exactly one static non-public ResetForUnitTests method, found {methods.Length}. {ReverifyReset}");
+        var reset = methods[0];
+        Assert.True(reset.ReturnType == typeof(void) && reset.GetParameters().Length == 0 && !reset.IsGenericMethod,
+            $"Expected non-generic static void ResetForUnitTests() with no parameters, found {reset}. {ReverifyReset}");
+    }
+
     [AvaloniaFact]
     public void HeadlessTests_RunOnADispatcherThatSupportsNestedLoops()
     {
