@@ -19,7 +19,7 @@ public interface IUpdateChecker
     void SkipThisVersion(string version);
 
     /// <summary>
-    /// Download, verify (SHA256SUMS) and place the asset for the current <see cref="InstallKind"/>.
+    /// Download, verify (signed SHA256SUMS, #116) and place the asset for the current <see cref="InstallKind"/>.
     /// Does not execute the download except after a verified AppImage self-replace when the user restarts.
     /// </summary>
     Task<UpdateInstallResult> InstallUpdateAsync(UpdateOffer offer, CancellationToken cancellationToken = default);

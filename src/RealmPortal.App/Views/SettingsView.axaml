@@ -111,14 +111,20 @@
                       Content="{loc:T settings.updates.auto}"/>
             <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}"
                        Text="{loc:T settings.updates.auto.hint}"/>
-            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
-              <Button Name="CheckUpdatesButton" Classes="secondary compact" MinWidth="172"
+            <!-- Status sits under the button so long messages (e.g. signature failures, #116) wrap instead of clipping. -->
+            <StackPanel Spacing="8" Margin="0,4,0,0">
+              <Button Name="CheckUpdatesButton" Classes="secondary compact" MinWidth="172" HorizontalAlignment="Left"
                       c:ButtonSurface.Surface="Parchment" Command="{Binding CheckForUpdatesCommand}">
                 <TextBlock Text="{loc:T settings.updates.check}"/>
               </Button>
-              <TextBlock Name="UpdateCheckStatus" Classes="footnote" VerticalAlignment="Center"
+              <TextBlock Name="UpdateCheckStatus" Classes="footnote" TextWrapping="Wrap"
                          Foreground="{DynamicResource InkSoftBrush}" Text="{Binding UpdateCheckStatus}"
                          IsVisible="{Binding UpdateCheckStatus, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+              <Button Name="OpenReleasePageButton" Classes="secondary compact" HorizontalAlignment="Left"
+                      c:ButtonSurface.Surface="Parchment" Command="{Binding OpenReleasePageCommand}"
+                      IsVisible="{Binding ReleasePageUrl, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{loc:T update.install.open_release_page}"/>
+              </Button>
             </StackPanel>
             <CheckBox Name="StatusProbeOption" Classes="parchment" Margin="0,8,0,0"
                       IsChecked="{Binding StatusProbeEnabled, Mode=TwoWay}"
