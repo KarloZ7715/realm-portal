@@ -9,7 +9,8 @@ public partial class ConfirmDialogView : UserControl
     public ConfirmDialogView()
     {
         InitializeComponent();
-        Loaded += (_, _) => this.FindControl<Button>("CancelButton")?.Focus();
+        // Tab navigation marks focus-visible so the Cancel focus ring is drawn (#196 design).
+        Loaded += (_, _) => this.FindControl<Button>("CancelButton")?.Focus(NavigationMethod.Tab);
         KeyDown += OnKeyDown;
     }
 

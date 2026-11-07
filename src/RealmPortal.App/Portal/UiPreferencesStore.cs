@@ -77,8 +77,26 @@ public sealed class UiPreferencesStore(string configDirectory, IAtomicFileWriter
             _path, _writer, bytes, new FileReplacementPermissions((int)(UnixFileMode.UserRead | UnixFileMode.UserWrite), null), IsValidContent);
     }
 
+    /// <summary>State of <c>ui-preferences.json</c> itself (#196 UI).</summary>
+    public ConfigFileState CurrentState => ConfigFileBackup.Inspect(_path, IsValidContent);
+
     /// <summary>State of <c>ui-preferences.json.bak</c>, the previous valid preferences kept on every save (#196).</summary>
     public ConfigFileState BackupState => ConfigFileBackup.Inspect(_path + ConfigFileBackup.BackupSuffix, IsValidContent);
+
+    /// <summary>Last write time of <c>ui-preferences.json.bak</c>, or <c>null</c> when missing (#196 UI parity).</summary>
+    public DateTimeOffset? BackupModifiedAt
+    {
+        get
+        {
+            var bak = _path + ConfigFileBackup.BackupSuffix;
+            if (!File.Exists(bak))
+            {
+                return null;
+            }
+
+            return new DateTimeOffset(File.GetLastWriteTimeUtc(bak), TimeSpan.Zero);
+        }
+    }
 
     /// <summary>
     /// Replaces <c>ui-preferences.json</c> with its valid <c>.bak</c>; the replaced file is kept as

@@ -134,6 +134,63 @@
           </StackPanel>
         </ContentControl>
 
+
+        <!-- App configuration backups (#196 UI) -->
+        <ContentControl Classes="card" Padding="26,16,26,18" IsVisible="{Binding HasConfigBackups}">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="sheet-title" Text="{loc:T settings.config}"/>
+            <Line Classes="stitch parchment" StartPoint="0,0" EndPoint="1,0" Stretch="Fill"/>
+            <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.hint}"/>
+            <ItemsControl Name="ConfigBackupList" ItemsSource="{Binding ConfigBackups}">
+              <ItemsControl.Styles>
+                <!-- Damaged uses wax-red with a warning glyph; missing uses a dashed border (never colour alone). -->
+                <Style Selector="c|Badge.config-state:no-response /template/ c|Icon#Glyph">
+                  <Setter Property="Data" Value="{DynamicResource IconWarning}"/>
+                  <Setter Property="IsFilled" Value="False"/>
+                </Style>
+              </ItemsControl.Styles>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ConfigBackupItemViewModel">
+                  <Border Padding="0,10" AutomationProperties.Name="{Binding StatusAccessibleName}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                      <StackPanel Spacing="6">
+                        <TextBlock Classes="body-bold" FontSize="15" Foreground="{DynamicResource InkBrush}" Text="{Binding FileLabel}"/>
+                        <TextBlock Classes="footnote" Foreground="{DynamicResource InkSoftBrush}" Text="{Binding DetailText}"/>
+                        <!-- Disabled reason aligns with the file name (not indented under the badges). -->
+                        <TextBlock Classes="footnote" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource InkSoftBrush}"
+                                   IsVisible="{Binding ShowRestoreDisabledReason}"
+                                   Text="{Binding RestoreDisabledReason}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Classes="footnote" VerticalAlignment="Center" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.current}"/>
+                            <c:Badge Classes="config-state" Status="{Binding CurrentBadgeStatus}" Text="{Binding CurrentStateText}"/>
+                          </StackPanel>
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Classes="footnote" VerticalAlignment="Center" Foreground="{DynamicResource InkSoftBrush}" Text="{loc:T settings.config.backup}"/>
+                            <c:Badge Classes="config-state" Status="{Binding BackupBadgeStatus}" Text="{Binding BackupStateText}"/>
+                          </StackPanel>
+                        </StackPanel>
+                      </StackPanel>
+                      <!-- Always visible; disabled with a reason when restore is not possible (#196 design). -->
+                      <Button Grid.Column="1" Name="RestoreConfigButton" Classes="secondary compact" VerticalAlignment="Center"
+                              IsEnabled="{Binding CanRestore}" Command="{Binding RestoreCommand}"
+                              ToolTip.Tip="{Binding RestoreDisabledReason}"
+                              AutomationProperties.Name="{loc:T settings.config.restore}"
+                              AutomationProperties.HelpText="{Binding RestoreDisabledReason}">
+                        <TextBlock Text="{loc:T settings.config.restore}"/>
+                      </Button>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}"
+                       IsVisible="{Binding ConfigMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                       Text="{Binding ConfigMessage}" AutomationProperties.LiveSetting="Polite"/>
+          </StackPanel>
+        </ContentControl>
+
         <!-- About -->
         <ContentControl Classes="card thin" Padding="26,12,26,16">
           <StackPanel Spacing="8">
