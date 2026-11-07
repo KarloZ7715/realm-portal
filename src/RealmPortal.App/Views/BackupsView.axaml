@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:v="using:RealmPortal.App.Views"
              xmlns:vm="using:RealmPortal.App.ViewModels"
              xmlns:service="using:RealmPortal.Core.Service"
              xmlns:loc="using:RealmPortal.App.Localization"
@@ -45,10 +46,14 @@
       </Grid>
     </ContentControl>
 
-    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+    <StackPanel Grid.Row="2">
+      <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}"/>
+      <v:ErrorRecoveryView DataContext="{Binding Recovery}"/>
+    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
       <TextBlock Classes="sheet-title" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T backups.saved}"/>
       <TextBlock Grid.Column="1" Classes="footnote" Foreground="{DynamicResource BoneSoftBrush}" VerticalAlignment="Center" Text="{Binding CountText}"/>
     </Grid>
+    </StackPanel>
 
     <Grid Grid.Row="3">
       <ScrollViewer Name="BackupScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -92,9 +97,15 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
       </ScrollViewer>
-      <Border Name="EmptyNotice" Classes="notice" VerticalAlignment="Top" Padding="18" IsVisible="{Binding !HasBackups}">
-        <TextBlock Classes="body" Foreground="{DynamicResource InkBrush}" TextWrapping="Wrap" Text="{loc:T backups.empty}"/>
-      </Border>
+      <ContentControl Name="EmptyNotice" Classes="card thin" VerticalAlignment="Top" Padding="18" IsVisible="{Binding ShowEmpty}">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="body" Foreground="{DynamicResource InkBrush}" TextWrapping="Wrap" Text="{loc:T backups.empty.cause}"/>
+          <Button Name="BackupFindClientsButton" Classes="secondary compact" HorizontalAlignment="Left" Command="{Binding FindClientsCommand}"
+                  AutomationProperties.Name="{loc:T recovery.reviewclientfiles.button}" AutomationProperties.HelpText="{loc:T backups.empty.cause}">
+            <TextBlock Text="{loc:T recovery.reviewclientfiles.button}"/>
+          </Button>
+        </StackPanel>
+      </ContentControl>
     </Grid>
   </Grid>
 </UserControl>

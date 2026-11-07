@@ -297,6 +297,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     public override void RefreshText()
     {
+        Recovery.RefreshText();
         foreach (var option in BuildOptions)
         {
             option.Refresh();
@@ -680,6 +681,20 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     private void SetSaveError(ServiceError? error)
     {
+        if (error is not null)
+            Recovery.Show(error, () => { Save(); return Task.CompletedTask; }, error.NextAction() == ServiceErrorAction.FixInput ? () =>
+            {
+                var field = error.ExtraLineIndex is not null ? "ExtraRealmlistLines" : error.Field ?? "Name";
+                if (field == "ExtraRealmlistLines") IsAdvancedExpanded = true;
+                // Save drops blank lines before building the request; focus the corresponding visible line.
+                var visibleLine = error.ExtraLineIndex is { } index
+                    ? ExtraRealmlistLinesText.Split('\n').Select((text, line) => (text, line))
+                        .Where(entry => !string.IsNullOrWhiteSpace(entry.text)).Skip(index)
+                        .Select(entry => (int?)entry.line).FirstOrDefault()
+                    : null;
+                RequestRecoveryFocus(field, visibleLine);
+                return Task.CompletedTask;
+            } : null);
         _saveServiceError = error;
         _saveFailedUnknown = error is null;
         _saveMessageKey = null;
@@ -699,6 +714,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     private void ClearSaveError()
     {
+        Recovery.Clear();
         if (_saveServiceError is null && !_saveFailedUnknown && _saveMessageKey is null)
         {
             return;

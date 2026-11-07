@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:v="using:RealmPortal.App.Views"
              xmlns:vm="using:RealmPortal.App.ViewModels"
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.ClientsView"
@@ -10,7 +11,8 @@
     <StackPanel Name="ScrollContent" Margin="20,10,20,12">
       <Grid ColumnDefinitions="*,Auto" Height="44">
         <TextBlock Classes="h1" Foreground="{DynamicResource IvoryBrush}" VerticalAlignment="Center" Text="{loc:T clients.title}"/>
-        <Button Grid.Column="1" Name="PickButton" Classes="secondary compact" c:ButtonSurface.Surface="Parchment" VerticalAlignment="Center" Command="{Binding PickFolderCommand}">
+        <Button Grid.Column="1" Name="PickButton" Classes="secondary compact" c:ButtonSurface.Surface="Parchment" VerticalAlignment="Center" Command="{Binding PickFolderCommand}"
+                AutomationProperties.Name="{loc:T recovery.addclient}" AutomationProperties.HelpText="{loc:T clients.empty.cause}">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <c:Icon Data="{DynamicResource IconFolder}" Width="16" Height="16" StrokeThickness="2"/>
             <TextBlock Text="{loc:T clients.pick}"/>
@@ -21,6 +23,9 @@
       <TextBlock Name="ScanNotice" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,0,0,12"
                  Text="{Binding Notice}" IsVisible="{Binding HasNotice}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
 
+      <v:ErrorRecoveryView DataContext="{Binding Recovery}"/>
+      <TextBlock Name="ClientsEmptyCause" Classes="body-sm" Foreground="{DynamicResource BoneSoftBrush}" Margin="0,4,0,12"
+                 IsVisible="{Binding IsEmpty}" TextWrapping="Wrap" Text="{loc:T clients.empty.cause}"/>
       <!-- The sheet is drawn with the parchment tile art, so it grows with the list. -->
       <ContentControl Name="ClientsSheet" Classes="card" Padding="22,14,22,6" Margin="0,0,0,0">
         <StackPanel>
@@ -66,7 +71,8 @@
       </ContentControl>
 
       <StackPanel Orientation="Horizontal" Spacing="28" Margin="14,14,0,0">
-        <Button Name="RescanButton" Classes="link caps" Command="{Binding RescanCommand}" VerticalAlignment="Center">
+        <Button Name="RescanButton" Classes="link caps" Command="{Binding RescanCommand}" VerticalAlignment="Center"
+                AutomationProperties.Name="{loc:T recovery.scanoraddclient.button}" AutomationProperties.HelpText="{loc:T clients.empty.cause}">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <c:Icon Data="{DynamicResource IconRefresh}" Width="14" Height="14" StrokeThickness="2.2"/>
             <TextBlock Text="{loc:T clients.rescan}"/>

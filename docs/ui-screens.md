@@ -424,3 +424,46 @@ The main window remembers its last normal size and position and whether it was m
 - Demo (`--demo`), gallery and tests do not read or write it.
 
 Known platform gap (plain Avalonia, X11): without reading `_NET_FRAME_EXTENTS`, some window managers may still shift a non-maximized window by the title-bar height between runs. Native Wayland ignores client positions (size and maximized still apply).
+
+
+## Clear empty states and recoverable errors (#194)
+
+The Servers, Clients, client backups and server-form screens explain why an empty
+list can occur and what to do next. An error reading a list is not presented as a
+successful empty result. Servers distinguish an unpopulated list from a search or
+client filter with no matches. Clients offers **Scan again** and **Add client
+manually**; the server form reuses both commands without discarding its fields.
+Client backups explain that a switch keeps the previous files and that a manual
+backup can be created for a selected client. The separate app-configuration card
+continues to explain when config backup copies are created.
+
+Service failures keep the existing localized cause, conflicting file list and
+consistency statement. `ErrorRecoveryViewModel` adds the localized instruction
+from `ServiceError.NextAction()` and contextual, keyboard-reachable buttons:
+
+| Next action | UI behavior |
+| --- | --- |
+| TryAgain | Run the failing operation again, not just dismiss its message. |
+| CloseGame | Explain that the user must close the game; retry runs the same operation and all safety checks again. Never terminate a process. |
+| ChooseServer | Open the current Servers list. |
+| ScanOrAddClient | Open Clients and scan again, or pick a folder to add a client manually. |
+| ChooseClientFolder | Reopen the relevant folder picker (or open Clients to add a folder). |
+| FixInput | Focus the offending form field; an extra-line error expands Advanced and selects the visible line, accounting for blank lines omitted from the request. Without a form context, retain the instruction only. |
+| UseCompatibleClient | Open Clients to select a compatible client; the instruction also explains editing the server build requirement. Never force a switch. |
+| RestoreConfigBackup | Offer a link to the Settings app-configuration card only after `GetConfigBackups` reports a valid backup for the failed file. Restore still uses the existing damaged-file gate and confirmation there. |
+| CheckPermissions / FreeDiskSpace | Explain the manual prerequisite and offer an operation-specific retry where available. Never change permissions or remove files. |
+| ResolveUndoConflict | Keep the conflicting file list, explain preserving changes, and retain undo-again / confirmed-discard actions in the Servers flow. Backup restore retains its existing conflict dialog; no forced restore is added. |
+| ReviewClientFiles | Explain inspecting files/links and open Clients. Never repair or overwrite files automatically. |
+| CheckLauncherSettings | Open Settings, scroll to and focus the launcher command. |
+| None | Keep the cause; invent no actionable operation. |
+
+Recovery navigation respects unsaved Settings changes. Visible error instructions
+and buttons refresh through both real language controls. Long status text is
+ellipsized with a full-text tooltip so the language toggle remains reachable.
+DNS vs. offline and the status dot's last-checked text are unchanged.
+
+Headless coverage is in `ClearErrorsUiTests`: every action, both languages, actual
+navigation and operation replay, config-backup gating, field/line focus, empty
+screens, language switching, keyboard activation and compact status layout. No
+file repair, process termination, permission editor or additional Core behavior is
+part of this UI change.

@@ -109,13 +109,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
                 var result = _session.Service.RestoreConfigBackup(kind);
                 if (!result.Succeeded)
                 {
-                    ConfigMessage = Loc.Get("settings.config.restore.failed");
+                    ConfigMessage = null;
+                    Recovery.Show(result.Error!, () => RestoreConfigAsync(item));
                     return;
                 }
             }
             else
                 return;
 
+            Recovery.Clear();
             ConfigMessage = Loc.Format("settings.config.restored", item.FileLabel);
             ReloadConfigBackups();
             ConfigRestored?.Invoke(item);
@@ -258,6 +260,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
+        Recovery.Clear();
         ServiceErrorField = null;
         if (EnvironmentError is not null)
         {
@@ -294,6 +297,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         if (error is not null)
         {
             ServiceErrorField = error.Code == "InvalidLauncherSettings" ? "template" : "backup";
+            var code = Enum.TryParse<ServiceErrorCode>(error.Code, out var parsed) ? parsed : ServiceErrorCode.Unexpected;
+            Recovery.Show(new ServiceError(code, Path: error.Path), () => { Save(); return Task.CompletedTask; });
             return;
         }
 
@@ -306,6 +311,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void Cancel()
     {
+        Recovery.Clear();
         Reset();
         Loc.Instance.SetLanguage(_saved.Language);
         Changed();
@@ -402,6 +408,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public override void RefreshText()
     {
+        Recovery.RefreshText();
         Changed();
         // Rows format their text from Loc; refresh them after the culture changed (#196).
         foreach (var item in ConfigBackups)

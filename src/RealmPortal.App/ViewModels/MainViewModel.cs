@@ -194,8 +194,12 @@ public sealed partial class MainViewModel : ObservableObject
     /// The add-server form shown inside the welcome (Servers step). Save and Cancel both call <paramref name="closed"/>,
     /// which returns to the Servers step; the welcome stays open until Finish or Skip.
     /// </summary>
-    private AddServerViewModel CreateWelcomeServerForm(Action closed) =>
-        new(Clients, _session!, closed, closed, _probe);
+    private AddServerViewModel CreateWelcomeServerForm(Action closed)
+    {
+        var form = new AddServerViewModel(Clients, _session!, closed, closed, _probe);
+        WireRecovery(form);
+        return form;
+    }
 
     /// <summary>Raised when a section change waits for the unsaved-changes question, so the sidebar can re-select Settings.</summary>
     public event Action? SectionChangeHeld;
@@ -558,6 +562,7 @@ public sealed partial class MainViewModel : ObservableObject
             }, CloseAddServer);
         }
 
+        WireRecovery(_adding);
         _adding.PropertyChanged += OnSectionChanged;
         OnPropertyChanged(nameof(Adding));
         OnPropertyChanged(nameof(Content));
@@ -590,6 +595,7 @@ public sealed partial class MainViewModel : ObservableObject
             Servers.ReloadFromService();
             CloseAddServer();
         }, CloseAddServer, _probe);
+        WireRecovery(_adding);
         _adding.PropertyChanged += OnSectionChanged;
         OnPropertyChanged(nameof(Adding));
         OnPropertyChanged(nameof(Content));
@@ -625,6 +631,7 @@ public sealed partial class MainViewModel : ObservableObject
                 Clients.ApplyClientUpdate(oldId, updated, item.IsInUse);
             CloseEditClient();
         }, CloseEditClient);
+        WireRecovery(_editingClient);
         _editingClient.PropertyChanged += OnSectionChanged;
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
@@ -676,6 +683,8 @@ public sealed partial class MainViewModel : ObservableObject
             ConfirmDeleteBackupAsync = ConfirmDeleteBackupAsync,
             ResolveRestoreConflictAsync = ResolveRestoreConflictAsync,
         };
+        _backups.ClientsRequested += () => ExceptionLog.Observe(NavigateRecoveryAsync(RecoveryDestination.Clients));
+        WireRecovery(_backups);
         _backups.PropertyChanged += OnSectionChanged;
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(StatusText));
@@ -801,14 +810,54 @@ public sealed partial class MainViewModel : ObservableObject
         return await ConfirmAsync(dialog).ConfigureAwait(true);
     }
 
+    private void WireRecovery(ViewModelBase screen)
+    {
+        screen.Recovery.CanRestoreConfig = error =>
+        {
+            var backups = _session?.Service.GetConfigBackups();
+            return backups is { Succeeded: true } && backups.Value!.Any(row =>
+                row.Backup == ConfigFileState.Valid &&
+                System.IO.Path.GetFileName(row.Path) == System.IO.Path.GetFileName(error.Path));
+        };
+        screen.Recovery.NavigateRequested += NavigateRecoveryAsync;
+        screen.Recovery.RefreshText();
+    }
+
+    private async Task NavigateRecoveryAsync(RecoveryDestination destination)
+    {
+        var section = destination is RecoveryDestination.ConfigBackups or RecoveryDestination.LauncherSettings ? 2
+            : destination == RecoveryDestination.Servers ? 0 : 1;
+        if (SectionIndex == 2 && section != 2 && !await ConfirmDiscardSettingsAsync().ConfigureAwait(true))
+            return;
+        // A recovery destination is a list/card, never a stale editor or subpage.
+        CloseAddServer();
+        CloseEditClient();
+        CloseBackupsManager();
+        CloseAbout();
+        SetSection(section);
+        if (destination == RecoveryDestination.ConfigBackups)
+        {
+            Settings.ReloadConfigBackups();
+            Dispatcher.UIThread.Post(() => Settings.RequestRecoveryFocus("ConfigBackupList"), DispatcherPriority.Loaded);
+        }
+        else if (destination == RecoveryDestination.LauncherSettings)
+            Dispatcher.UIThread.Post(() => Settings.RequestRecoveryFocus("TemplateBox"), DispatcherPriority.Loaded);
+        else if (destination == RecoveryDestination.ScanClients)
+            await Clients.RescanCommand.ExecuteAsync(null).ConfigureAwait(true);
+        else if (destination == RecoveryDestination.AddClient)
+            await Clients.PickFolderCommand.ExecuteAsync(null).ConfigureAwait(true);
+    }
+
     private void WireSections()
     {
         foreach (var section in _sections)
         {
             section.PropertyChanged += OnSectionChanged;
+            WireRecovery(section);
         }
 
         Servers.AddServerRequested += ShowAddServer;
+        Servers.ScanClientsRequested += () => ExceptionLog.Observe(NavigateRecoveryAsync(RecoveryDestination.ScanClients));
         Servers.EditServerRequested += ShowEditServer;
         Servers.ConfirmDeleteServerAsync = ConfirmDeleteServerAsync;
         Loc.Instance.Changed += OnLanguageChanged;

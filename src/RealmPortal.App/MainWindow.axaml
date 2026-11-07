@@ -56,10 +56,11 @@
     <!-- Status bar -->
     <Border Grid.Row="1" Classes="statusbar" Height="26">
       <Grid ColumnDefinitions="*,Auto" Margin="14,0,8,0">
-        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
           <c:Icon Data="{DynamicResource IconDiamond}" IsFilled="True" Width="9" Height="9" Foreground="{DynamicResource ForestLightBrush}"/>
-          <TextBlock Name="StatusText" Classes="path" FontSize="11.5" Foreground="{DynamicResource BoneBrush}" Text="{Binding StatusText}"/>
-        </StackPanel>
+          <TextBlock Grid.Column="1" Name="StatusText" Classes="path" FontSize="11.5" Foreground="{DynamicResource BoneBrush}"
+                     Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusText}"/>
+        </Grid>
         <Button Grid.Column="1" Name="LanguageButton" Classes="link mono" Padding="6,2" Command="{Binding ToggleLanguageCommand}"
                 AutomationProperties.Name="{loc:T status.language.tooltip}" ToolTip.Tip="{loc:T status.language.tooltip}">
           <TextBlock Text="{Binding LanguageLabel}"/>

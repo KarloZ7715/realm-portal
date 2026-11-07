@@ -10,6 +10,16 @@ public partial class AddServerView : UserControl
     public AddServerView()
     {
         InitializeComponent();
+        RecoveryFocus.Wire(this, field => field.ToLowerInvariant() switch
+        {
+            "host" or "realmlisthost" or "address" => "AddressBox",
+            "realm" => "RealmBox",
+            "account" => "AccountBox",
+            "clientid" => "ClientBox",
+            "build" or "requiredclientbuild" => "BuildBox",
+            "extrarealmlistlines" => "ExtraLinesBox",
+            _ => "NameBox",
+        });
         ExtraLinesBox.AddHandler(KeyDownEvent, OnExtraLinesKeyDown, RoutingStrategies.Tunnel);
     }
 
