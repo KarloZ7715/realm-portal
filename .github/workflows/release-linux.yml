@@ -224,6 +224,13 @@ jobs:
         shell: bash
         run: packaging/collect-licenses.sh "$PUBLISH_DIR" win-x64 "$PUBLISH_DIR"
 
+      - name: Resolve Windows archive name
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t bins < <(packaging/release-asset-names.sh "$PACKAGE_VERSION")
+          echo "ZIP_NAME=${bins[2]}" >> "$GITHUB_ENV"
+
       - name: Package Windows archive
         shell: pwsh
         run: |
@@ -234,7 +241,7 @@ jobs:
           }
           $packageDir = Join-Path $env:RUNNER_TEMP 'packages-win-x64'
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
-          $zipName = "RealmPortal-$($env:PACKAGE_VERSION)-win-x64.zip"
+          $zipName = $env:ZIP_NAME
           $zipPath = Join-Path $packageDir $zipName
           Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
           $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
@@ -295,22 +302,14 @@ jobs:
           ver="$PACKAGE_VERSION"
           # File names use the SemVer version; GitHub would rename a "~" to "." (see packaging/release-asset-names.sh).
           mapfile -t bins < <(packaging/release-asset-names.sh "$ver")
-          deb_file="realm-portal_${ver}_amd64.deb"
-          [[ "${bins[0]}" == "$deb_file" ]]
+          [[ ${#bins[@]} -eq 3 ]]
           mkdir -p artifacts/release
-          # Linux
-          cp -v "artifacts/linux/${deb_file}" artifacts/release/
-          cp -v "artifacts/linux/RealmPortal-${ver}-x86_64.AppImage" artifacts/release/
-          # Windows
-          cp -v "artifacts/win/RealmPortal-${ver}-win-x64.zip" artifacts/release/
+          # Linux: .deb and AppImage; Windows: zip
+          cp -v "artifacts/linux/${bins[0]}" "artifacts/linux/${bins[1]}" "artifacts/win/${bins[2]}" artifacts/release/
           # Merged SHA256SUMS (one line per binary; same layout as historical releases)
           (
             cd artifacts/release
-            sha256sum \
-              "$deb_file" \
-              "RealmPortal-${ver}-win-x64.zip" \
-              "RealmPortal-${ver}-x86_64.AppImage" \
-              > SHA256SUMS
+            sha256sum "${bins[0]}" "${bins[2]}" "${bins[1]}" > SHA256SUMS
           )
           if grep -F '~' artifacts/release/SHA256SUMS; then
             echo "::error::A release asset name contains '~', which GitHub renames"
@@ -370,12 +369,9 @@ jobs:
           set -euo pipefail
           ver="$PACKAGE_VERSION"
           owner_repo="${GITHUB_REPOSITORY}"
-          expected=(
-            "realm-portal_${ver}_amd64.deb"
-            "RealmPortal-${ver}-x86_64.AppImage"
-            "RealmPortal-${ver}-win-x64.zip"
-            "SHA256SUMS"
-          )
+          mapfile -t bins < <(packaging/release-asset-names.sh "$ver")
+          [[ ${#bins[@]} -eq 3 ]]
+          expected=("${bins[@]}" "SHA256SUMS")
           mapfile -t remote < <(gh release view "$TAG" --json assets -q '.assets[].name' | sort)
           mapfile -t want < <(printf '%s\n' "${expected[@]}" | sort)
           if [[ "${remote[*]}" != "${want[*]}" ]]; then
@@ -383,10 +379,7 @@ jobs:
             exit 1
           fi
           mapfile -t sums_names < <(awk '{print $2}' artifacts/release/SHA256SUMS | sort)
-          mapfile -t bin_names < <(printf '%s\n' \
-            "realm-portal_${ver}_amd64.deb" \
-            "RealmPortal-${ver}-x86_64.AppImage" \
-            "RealmPortal-${ver}-win-x64.zip" | sort)
+          mapfile -t bin_names < <(printf '%s\n' "${bins[@]}" | sort)
           if [[ "${sums_names[*]}" != "${bin_names[*]}" ]]; then
             echo "::error::SHA256SUMS entries mismatch"
             cat artifacts/release/SHA256SUMS

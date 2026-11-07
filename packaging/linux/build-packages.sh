@@ -17,6 +17,8 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PACKAGING_DIR="${ROOT_DIR}/packaging/linux"
 OUT_DIR="${3:-"${ROOT_DIR}/artifacts/linux"}"
 APPIMAGETOOL="${APPIMAGETOOL:-}"
+# File names come from the single source of release asset names (deb, AppImage, zip).
+mapfile -t ASSET_NAMES < <("${SCRIPT_DIR}/../release-asset-names.sh" "$VERSION")
 
 # Debian sorts "1.0.0-rc.1" ABOVE "1.0.0" (dash starts the debian revision). Map SemVer
 # prerelease dashes to "~" so an rc .deb upgrades cleanly to the final release.
@@ -119,7 +121,7 @@ Description: Realm Portal desktop launcher
  Switch between game realms with one click.
 EOF
 
-DEB_FILE="${OUT_DIR}/realm-portal_${VERSION}_amd64.deb"
+DEB_FILE="${OUT_DIR}/${ASSET_NAMES[0]}"
 dpkg-deb --build --root-owner-group "${DEB_STAGING}" "${DEB_FILE}"
 
 REQUIRED_DOCS=(
@@ -179,7 +181,7 @@ if [[ ! -x "${APPIMAGETOOL}" ]]; then
 fi
 
 export ARCH=x86_64
-APPIMAGE_FILE="${OUT_DIR}/RealmPortal-${VERSION}-x86_64.AppImage"
+APPIMAGE_FILE="${OUT_DIR}/${ASSET_NAMES[1]}"
 # appimagetool runs under FUSE or extracts itself; --appimage-extract-and-run works in CI without user namespaces.
 APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" --no-appstream "${APPDIR}" "${APPIMAGE_FILE}"
 
