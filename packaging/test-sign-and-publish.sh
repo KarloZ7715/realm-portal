@@ -183,7 +183,8 @@ new_release() {
   pre="${3:-$([[ "$ver" == *-* ]] && echo true || echo false)}"
   rm -rf "${tmp}/state" && mkdir -p "${tmp}/state/assets" "${tmp}/state/files"
   : >"${tmp}/state/calls.log"
-  local names=("realm-portal_${ver}_amd64.deb" "RealmPortal-${ver}-x86_64.AppImage" "RealmPortal-${ver}-win-x64.zip")
+  local names
+  mapfile -t names < <("${SCRIPT_DIR}/release-asset-names.sh" "$ver")
   local n id=1 assets="[]" d
   for n in "${names[@]}"; do
     head -c 4096 /dev/urandom >"${tmp}/state/files/${n}"

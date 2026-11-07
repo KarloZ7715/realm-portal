@@ -29,8 +29,23 @@ for ver in 1.2.0 1.2.0-rc.1 2.3.4-rc.2 0.0.0-pr.17; do
       echo "ok: ${ver} -> ${n}"
     fi
   done
-  [[ "${names[0]:-}" == "realm-portal_${ver}_amd64.deb" ]] || fail "${ver}: unexpected .deb name: ${names[0]:-}"
 done
+
+# Pin the exact names (and order) for a final and an rc version, so any drift in the helper fails.
+expect_names() { # <version> <deb> <appimage> <zip>
+  local ver="$1" got want
+  shift
+  got="$("$NAMES" "$ver" 2>/dev/null || true)"
+  want="$(printf '%s\n' "$@")"
+  if [[ "$got" == "$want" ]]; then
+    echo "ok: ${ver} exact names"
+  else
+    fail "${ver}: names differ. got=(${got//$'\n'/ }) want=(${want//$'\n'/ })"
+  fi
+}
+expect_names 1.2.0 realm-portal_1.2.0_amd64.deb RealmPortal-1.2.0-x86_64.AppImage RealmPortal-1.2.0-win-x64.zip
+expect_names 1.2.0-rc.1 realm-portal_1.2.0-rc.1_amd64.deb RealmPortal-1.2.0-rc.1-x86_64.AppImage \
+  RealmPortal-1.2.0-rc.1-win-x64.zip
 
 # The Debian Version field (not the file name) keeps "~" so dpkg orders the rc first.
 if [[ "$("$CONV" 1.2.0-rc.1)" == "1.2.0~rc.1" ]]; then
