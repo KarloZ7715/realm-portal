@@ -62,6 +62,9 @@ public sealed class UpdateDownloader : IDisposable
         }
     }
 
+    /// <summary>The verifier in use; tests check that the default is the built-in release key.</summary>
+    internal IReleaseSignatureVerifier SignatureVerifier => _signatureVerifier;
+
     public async Task<UpdateInstallResult> DownloadAndPlaceAsync(
         ReleaseDocument release,
         CancellationToken cancellationToken = default)
