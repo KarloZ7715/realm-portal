@@ -36,12 +36,17 @@ is debounced to one request per minute.
 
 ### Threat model
 
-The update check verifies downloads against the release's `SHA256SUMS`. This detects corrupted or truncated downloads only.
-It does **not** protect against a compromised GitHub account, token or release workflow, because the attacker would control
-both the asset and `SHA256SUMS`. [#116](https://github.com/KarloZ7715/realm-portal/issues/116) adds the real authenticity
-control: `SHA256SUMS` is signed with a key that stays offline, and the app carries the public key. Releases from 1.2.0 on are
-signed, but **the app does not check the signature yet** (see [Release signature](#release-signature-116-not-enforced-yet)).
-Until it does, the protections are:
+The in-app download path verifies downloads against the release's `SHA256SUMS`, and only trusts `SHA256SUMS` after
+checking its minisign signature ([#116](https://github.com/KarloZ7715/realm-portal/issues/116)). The signing key stays
+offline with the maintainer and the app carries the public key, so a compromised GitHub account, token or release
+workflow cannot swap both an asset and `SHA256SUMS` without that download being refused (see
+[Release signature](#release-signature-116)).
+
+**Current limit:** the published packages are built with `InstallKind=Unknown`, so they never download an update in the
+app: **Update** opens the release page and the user downloads by hand. The signature check only runs for builds with a
+download-capable install kind, which arrive with [#206](https://github.com/KarloZ7715/realm-portal/issues/206). Until
+then, check a manual download with the `minisign` steps in
+[SECURITY.md](../SECURITY.md#verifying-a-release-by-hand). The other protections still apply:
 
 - The user always confirms **Update**; nothing updates silently.
 - Releases published since GitHub "immutable releases" was enabled for the repository (v1.0.1 on) are immutable, so their
@@ -141,15 +146,14 @@ downloading the app checks it:
 - Release process: the published `SHA256SUMS` must list every asset of the release (v1.0.0 and v1.0.1 do). The release workflow
   should check this automatically; otherwise the affected kinds fall back to the release page.
 
-### Release signature (#116, not enforced yet)
+### Release signature (#116)
 
 Releases from 1.2.0 on ship `SHA256SUMS.minisig`, a minisign signature over `SHA256SUMS` made by the maintainer with the
 release key (key ID `0D03B1CC6600D915`, public key in [`minisign.pub`](../minisign.pub)). The signing process is in
 [linux-packaging.md](linux-packaging.md#signing-and-publishing-a-release).
 
 Core has a minisign verifier (`RealmPortal.Core.Updates.Signing`) and trusts exactly that key
-(`ReleaseSigningKeys`, checked against `minisign.pub` by `ReleaseSigningKeysTests`). **`UpdateDownloader` does not call
-it yet**, so the app does not download or check `SHA256SUMS.minisig` today. The verifier works like this:
+(`ReleaseSigningKeys`, checked against `minisign.pub` by `ReleaseSigningKeysTests`). The verifier works like this:
 
 - Only prehashed `ED` signatures (Ed25519 over the BLAKE2b-512 hash of `SHA256SUMS`) are accepted; legacy `Ed` is
   rejected. The key ID in the signature picks the key from `ReleaseSigningKeys`. An unknown key ID is rejected.
@@ -161,16 +165,34 @@ it yet**, so the app does not download or check `SHA256SUMS.minisig` today. The 
   comment (a caller bug) throws `ArgumentException`.
 - Ed25519 and BLAKE2b come from BouncyCastle (MIT), kept in one adapter (`BouncyCastleEd25519`).
 
-Planned updater policy once it is wired in:
+How the download path uses it (`UpdateDownloader.DownloadVerifiedSumsAsync`, which calls `SignedSha256Sums.Check`).
+This only runs when the build has a download-capable `InstallKind`; published packages are `Unknown` until
+[#206](https://github.com/KarloZ7715/realm-portal/issues/206) and open the release page instead (see the threat model).
 
-1. Download `SHA256SUMS.minisig` (refused above 16 KiB) next to `SHA256SUMS`, and verify the signature before using any
-   line of `SHA256SUMS`.
-2. Build the expected trusted comment from the tag of the release being installed, including any pre-release suffix.
-   `ReleaseVersion.TagName` has none, so the raw tag must be used.
-3. Anything other than `Valid` (no signature, unknown key, bad signature, wrong trusted comment, too large, malformed)
-   stops the update with an error and offers to open the release page. There is no fallback to unsigned checksums,
-   so releases before 1.2.0 (unsigned) are never installed in-app by a version that enforces the check.
-4. Only strictly newer versions are offered, as today. The trusted comment is shown escaped if it is ever displayed.
+1. If the release's asset list is known and has no `SHA256SUMS.minisig`, the update stops with `SignatureMissing` before
+   anything is downloaded.
+2. Otherwise `SHA256SUMS` and `SHA256SUMS.minisig` are downloaded from the same release, each capped both from
+   `Content-Length` and while streaming (the read stops at the first chunk past the cap):
+   - `SHA256SUMS` over 64 KiB: `DownloadTooLarge`.
+   - `SHA256SUMS.minisig` over 16 KiB: `SignatureInvalid` (`SignatureStatus.TooLarge`).
+   - `SHA256SUMS.minisig` answering 404: `SignatureMissing` (the release is unsigned).
+   - 403 or 429 on either file: `RateLimited` (with `Retry-After` when GitHub sends it).
+   - Any other non-200 status, a connect or read timeout, or the overall deadline on either file: `UpdateCheckFailed`.
+   - A redirect off the allowlist, without `Location`, or more than 5 hops: `UntrustedRedirect`.
+3. The expected trusted comment is built from the raw tag of the release (`ReleaseSignature.TrustedCommentFor(string)`),
+   including any pre-release suffix. `ReleaseVersion.TagName` has none, so it is not used for this. Download URLs are
+   still built from `ReleaseVersion`, and prereleases are never offered, so this does not make rc updates work in-app.
+4. No line of `SHA256SUMS` is read until the signature is `Valid`. Malformed, legacy `Ed`, unknown key, bad signature,
+   bad global signature or wrong trusted comment give `SignatureInvalid` with the `SignatureStatus` attached. After that,
+   a missing or duplicated line for the asset gives `AssetMissing` and a wrong asset digest `ChecksumMismatch`. In every
+   case nothing is saved and there is no fallback to unsigned checksums.
+5. For `SignatureMissing` the user sees "this release is not signed"; for `SignatureInvalid`, "the signature is not valid
+   or was made with an unknown key". Both offer an **Open release page** button (the update dialog and Settings), which
+   only opens this repository's `https://github.com/.../releases/tag/...` URL. Other failure codes show the general
+   "could not download or verify" message. The trusted comment is never shown; if a tag or comment ends up in a log
+   message it goes through `SignedSha256Sums.Printable`, which escapes control characters.
+6. Only strictly newer versions are offered. An app on 1.2.0 or later therefore never offers an unsigned (pre-1.2.0)
+   release, and in-app updates from older apps to 1.2.0 still use the old, unsigned-check code they shipped with.
 
 Key rotation: a new key is added to `ReleaseSigningKeys` next to the old one and shipped in a release signed with the
 old key. Later releases are signed with the new key, and the old key is dropped once users have had time to update.
@@ -265,7 +287,8 @@ name may also query the DNS resolver configured on the system (on a cache miss).
 - Core: `IReleaseFeed`, `UpdateChecker`, `UpdateDownloader` (verify and place atomically), `InstallKind`, and
   `ProbeScheduler` on top of the existing `IConnectionProbe`. The UI only owns the dialogs, the toggles and the dot.
 - New error codes: `UpdateCheckFailed`, `ChecksumMismatch`, `AssetMissing`, `DownloadTooLarge`, `UntrustedRedirect`,
-  `RateLimited`.
+  `RateLimited`, and from #116 `SignatureMissing` and `SignatureInvalid` (on `UpdateException`, which also carries the
+  `SignatureStatus`). These two are update-only and have no `ServiceErrorCode` twin yet.
 
 ## 4. Tests
 

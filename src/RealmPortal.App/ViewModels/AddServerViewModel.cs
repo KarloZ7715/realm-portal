@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealmPortal.App.Controls;
@@ -40,6 +41,10 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private readonly string? _editingServerId;
     private readonly ServerBuildOption? _initialBuild;
     private readonly string _initialExtraLines = string.Empty;
+    private readonly bool _isDuplicating;
+    private readonly string? _sourceServerId;
+    private readonly string? _sourceHost;
+    private readonly string _sourceRealm = string.Empty;
 
     public AddServerViewModel(ClientsViewModel clients, DemoBackend backend, Action<ServerSeed> save, Action cancel)
     {
@@ -96,6 +101,50 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _initialInput = CurrentInput();
     }
 
+    /// <summary>
+    /// Duplicate mode (#191): prefilled from <paramref name="entry"/>; saving adds a new server (new id) and keeps the
+    /// source's extra realmlist lines (patchlist, ...). Not edit mode: <see cref="IsEditing"/> stays false.
+    /// </summary>
+    public AddServerViewModel(ClientsViewModel clients, PortalSession session, ServerEntry entry, Action save, Action cancel, bool duplicate, IConnectionProbe? probe = null)
+        : this(clients, session, save, cancel, probe)
+    {
+        if (!duplicate)
+            throw new ArgumentException("Use the edit constructor when duplicate is false.", nameof(duplicate));
+        _isDuplicating = true;
+        _sourceServerId = entry.Id;
+        _sourceHost = entry.Host;
+        _sourceRealm = entry.Realm.Trim();
+        Address = entry.Host;
+        Realm = entry.Realm;
+        Account = entry.Account ?? string.Empty;
+        SelectedClient = clients.Items.FirstOrDefault(c => c.Id == entry.ClientId)
+            ?? clients.Items.FirstOrDefault(c => c.IsInUse)
+            ?? clients.Items.FirstOrDefault();
+
+        var listed = session.Service.ListClients();
+        var builds = (listed.Succeeded ? listed.Value! : [])
+            .Where(c => c.Version is { HasBuild: true })
+            .Select(c => c.Version!.Build)
+            .Append(entry.RequiredClientBuild ?? 0)
+            .Where(b => b > 0)
+            .Distinct()
+            .Order();
+        BuildOptions = [new ServerBuildOption(null), .. builds.Select(b => new ServerBuildOption(b))];
+        _initialBuild = BuildOptions.First(o => o.Build == entry.RequiredClientBuild);
+        SelectedBuild = _initialBuild;
+        ClearCacheOnSwitch = entry.ClearCacheOnSwitch;
+
+        // Localized unique "<name> (copy)" / " (copy 2)" …; cut by grapheme so a trailing emoji is not split (#219 F2).
+        var names = session.Service.ListServers(compatibleOnly: false) is { Succeeded: true, Value: { } servers }
+            ? servers.Select(s => s.Name).ToList()
+            : [];
+        Name = CreateLocalizedDuplicateName(entry.Name, names);
+        ExtraRealmlistLinesText = string.Join('\n', entry.ExtraRealmlistLines);
+        _initialExtraLines = ExtraRealmlistLinesText;
+        IsAdvancedExpanded = entry.ExtraRealmlistLines.Count > 0;
+        _initialInput = CurrentInput();
+    }
+
     private (string Name, string Address, string Realm, string Account, ClientItemViewModel? Client, ServerBuildOption? Build, bool? ClearCache, string Extra) _initialInput;
 
     private (string, string, string, string, ClientItemViewModel?, ServerBuildOption?, bool?, string) CurrentInput() =>
@@ -115,11 +164,18 @@ public sealed partial class AddServerViewModel : ViewModelBase
     /// <summary>True when the form edits an existing server instead of adding one.</summary>
     public bool IsEditing => _editingServerId is not null;
 
-    public string FormTitle => Loc.Get(IsEditing ? "edit.server.title" : "add.title");
+    public bool IsDuplicating => _isDuplicating;
 
-    public string FormSubtitle => IsEditing ? Loc.Get("edit.server.subtitle") : string.Empty;
+    /// <summary>Build and Cache/WDB fields show when editing or duplicating.</summary>
+    public bool ShowBuildAndCacheFields => IsEditing || IsDuplicating;
 
-    public string SaveLabel => Loc.Get(IsEditing ? "edit.server.save" : "add.save");
+    public string FormTitle => Loc.Get(IsEditing ? "edit.server.title" : IsDuplicating ? "servers.duplicate.title" : "add.title");
+
+    public string FormSubtitle => IsEditing
+        ? Loc.Get("edit.server.subtitle")
+        : IsDuplicating ? Loc.Get("servers.duplicate.subtitle") : string.Empty;
+
+    public string SaveLabel => Loc.Get(IsEditing ? "edit.server.save" : IsDuplicating ? "servers.duplicate.save" : "add.save");
 
     /// <summary>Extra realmlist lines after <c>set realmlist</c>, one per row (#192). Blank lines are dropped on save.</summary>
     [ObservableProperty]
@@ -271,7 +327,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     public override string StatusText => TestState == ConnectionTest.Testing
         ? Loc.Get("status.testing")
-        : Loc.Get(IsEditing ? "status.edit" : "status.add");
+        : Loc.Get(IsDuplicating ? "status.duplicate" : IsEditing ? "status.edit" : "status.add");
 
     private bool IsNameValid => Name.Trim().Length is > 0 and <= Server.MaxNameLength;
 
@@ -442,7 +498,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
             }
 
             var hostForServer = port == DefaultPort ? host : $"{host}:{port}";
-            if (IsDuplicateAddress(hostForServer, realm))
+            if (IsDuplicateAddress(hostForServer, realm) && !IsUnchangedSourceAddress(hostForServer, realm))
             {
                 SetSaveMessage("add.error.duplicate");
                 return;
@@ -464,18 +520,44 @@ public sealed partial class AddServerViewModel : ViewModelBase
             OnPropertyChanged(nameof(ExtraLinesError));
             OnPropertyChanged(nameof(HasExtraLinesError));
 
-            // Edit: null keeps stored lines when the box still matches the original; empty list clears them.
+            // Edit/duplicate: null keeps stored lines when the box still matches the original; empty list clears them.
             // Add: null when there are no lines. ExtraRealmlistLines takes precedence over PatchlistHost (Core).
-            IReadOnlyList<string>? extraForRequest = IsEditing
+            IReadOnlyList<string>? extraForRequest = IsEditing || IsDuplicating
                 ? (ExtraRealmlistLinesText == _initialExtraLines ? null : extraLines)
                 : (extraLines.Count == 0 ? null : extraLines);
 
-            var result = _editingServerId is { } serverId
-                ? _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue,
+            ServiceResult<ServerEntry> result;
+            if (_editingServerId is { } serverId)
+            {
+                result = _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue,
                     RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
-                    ExtraRealmlistLines: extraForRequest, ClearCacheOnSwitch: ClearCacheOnSwitch))
-                : _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId,
                     ExtraRealmlistLines: extraForRequest, ClearCacheOnSwitch: ClearCacheOnSwitch));
+            }
+            else if (IsDuplicating && _sourceServerId is { } sourceId)
+            {
+                // Core DuplicateServer copies extras from the source; then UpdateServer applies form fields + any edits.
+                var created = _session.Service.DuplicateServer(sourceId, Name.Trim(), realmValue, accountValue);
+                if (!created.Succeeded)
+                {
+                    SetSaveError(created.Error);
+                    return;
+                }
+
+                result = _session.Service.UpdateServer(new UpdateServerRequest(created.Value!.Id, Name.Trim(), hostForServer, realmValue,
+                    RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
+                    ExtraRealmlistLines: extraForRequest, ClearCacheOnSwitch: ClearCacheOnSwitch));
+                if (!result.Succeeded)
+                {
+                    // Roll back the copy so a failed save leaves the server list unchanged, as the error says.
+                    _session.Service.RemoveServer(created.Value!.Id);
+                }
+            }
+            else
+            {
+                result = _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId,
+                    RequiredClientBuild: BuildOptions.Count > 0 ? SelectedBuild?.Build : null,
+                    ExtraRealmlistLines: extraForRequest, ClearCacheOnSwitch: ClearCacheOnSwitch));
+            }
             if (!result.Succeeded)
             {
                 SetSaveError(result.Error);
@@ -512,9 +594,100 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
         return servers.Value!.Any(server =>
             server.Id != _editingServerId
+            && server.Id != _sourceServerId
             && string.Equals(server.Host, hostForServer, StringComparison.OrdinalIgnoreCase)
             && string.Equals(server.Realm.Trim(), realm, StringComparison.OrdinalIgnoreCase));
     }
+
+    private bool IsUnchangedSourceAddress(string hostForServer, string realm) =>
+        IsDuplicating
+        && _sourceHost is not null
+        && string.Equals(hostForServer, _sourceHost, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(realm, _sourceRealm, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Localized unique duplicate name: <c>"Name (copy)"</c> / <c>"Name (copia)"</c>, then <c>" (copy 2)"</c> / <c>" (copia 2)"</c>, …
+    /// Prefixes are cut by whole text elements so a trailing emoji is not split (same rule as Core #219).
+    /// </summary>
+    internal static string CreateLocalizedDuplicateName(string name, IReadOnlyList<string> existingNames)
+    {
+        // "Foo (copy)" / "Foo (copia)" → next free "Foo (copy 2)" / "Foo (copia 2)", not "Foo (copy) (copy)".
+        var basis = StripTrailingDuplicateSuffix(name.Trim());
+        for (var number = 1; ; number++)
+        {
+            var tail = number == 1
+                ? Loc.Get("servers.duplicate.suffix")
+                : Loc.Format("servers.duplicate.suffix.n", number);
+            var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
+            var candidate = (prefix + tail).Trim();
+            if (!existingNames.Any(n => string.Equals(n, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    /// <summary>Removes a trailing localized <c>(copy)</c> / <c>(copy N)</c> (and ES <c>copia</c>) so renumbering is clean.</summary>
+    internal static string StripTrailingDuplicateSuffix(string name)
+    {
+        var suffixes = new[]
+        {
+            Loc.Get("servers.duplicate.suffix"),
+            // EN/ES templates for N≥2 share the same shape; try both languages so a mixed list still strips.
+            " (copy)",
+            " (copia)",
+        };
+        foreach (var suffix in suffixes.Distinct(StringComparer.Ordinal))
+        {
+            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return name[..^suffix.Length].TrimEnd();
+            }
+        }
+
+        // " (copy 12)" / " (copia 3)"
+        foreach (var marker in new[] { " (copy ", " (copia " })
+        {
+            var idx = name.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (idx <= 0 || !name.EndsWith(')'))
+            {
+                continue;
+            }
+
+            var num = name[(idx + marker.Length)..^1];
+            if (num.Length > 0 && num.All(char.IsAsciiDigit))
+            {
+                return name[..idx].TrimEnd();
+            }
+        }
+
+        return name;
+    }
+
+    /// <summary>Longest prefix of whole grapheme clusters within <paramref name="maxLength"/> UTF-16 chars.</summary>
+    internal static string TruncateToTextElements(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        var end = 0;
+        var elements = StringInfo.GetTextElementEnumerator(value);
+        while (elements.MoveNext())
+        {
+            var next = elements.ElementIndex + ((string)elements.Current).Length;
+            if (next > maxLength)
+            {
+                break;
+            }
+
+            end = next;
+        }
+
+        return value[..end];
+    }
+
 
     [RelayCommand]
     private void Cancel()

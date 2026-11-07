@@ -466,16 +466,38 @@ public sealed partial class MainViewModel : ObservableObject
             catch (Exception ex)
             {
                 ExceptionLog.Default.Write(ex, "Main.InstallUpdate");
-                await ConfirmAsync(new ConfirmDialogViewModel(
-                    "update.install.failed.title",
-                    "update.install.failed.body",
-                    "dialog.ok")).ConfigureAwait(true);
+                await ShowInstallFailureAsync(ex, offer).ConfigureAwait(true);
             }
         }
         else if (choice == ConfirmDialogChoice.Secondary)
             await Task.Run(() => _updates.RemindLater(offer)).ConfigureAwait(true);
         else if (choice == ConfirmDialogChoice.Cancel)
             await Task.Run(() => _updates.SkipThisVersion(offer)).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Signature failures (#116) offer the release page so the user can download and check the release by hand;
+    /// nothing is installed from here.
+    /// </summary>
+    private async Task ShowInstallFailureAsync(Exception error, UpdateOffer offer)
+    {
+        var bodyKey = UpdateInstallPresentation.FailureBodyKey(error);
+        if (!UpdateInstallPresentation.IsSignatureFailure(error))
+        {
+            await ConfirmAsync(new ConfirmDialogViewModel("update.install.failed.title", bodyKey, "dialog.ok")).ConfigureAwait(true);
+            return;
+        }
+
+        var choice = await ChooseAsync(new ConfirmDialogViewModel(
+            "update.install.failed.title",
+            bodyKey,
+            "update.install.open_release_page",
+            "update.install.dismiss")).ConfigureAwait(true);
+        if (choice == ConfirmDialogChoice.Confirm
+            && ReleasePageUrl.TryGetTrusted(ReleasePageUrl.Resolve(offer), out var uri))
+        {
+            await _uriOpener.OpenAsync(uri).ConfigureAwait(true);
+        }
     }
 
     private async Task HandleInstallOutcomeAsync(UpdateInstallOutcome? outcome, UpdateOffer offer)
@@ -598,6 +620,33 @@ public sealed partial class MainViewModel : ObservableObject
             CloseAddServer();
         }, CloseAddServer, _probe);
         WireRecovery(_adding);
+        _adding.PropertyChanged += OnSectionChanged;
+        OnPropertyChanged(nameof(Adding));
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+        SyncProbeListVisibility();
+    }
+
+
+    private void ShowDuplicateServer(ServerItemViewModel card)
+    {
+        if (_session is null || card.ServerId is null || !card.CanDuplicate || _adding is not null)
+            return;
+
+        var serversResult = _session.Service.ListServers(compatibleOnly: false);
+        if (!serversResult.Succeeded)
+            return;
+
+        var entry = serversResult.Value!.FirstOrDefault(server => server.Id == card.ServerId);
+        if (entry is null)
+            return;
+
+        SectionIndex = 0;
+        _adding = new AddServerViewModel(Clients, _session, entry, () =>
+        {
+            Servers.ReloadFromService();
+            CloseAddServer();
+        }, CloseAddServer, duplicate: true, _probe);
         _adding.PropertyChanged += OnSectionChanged;
         OnPropertyChanged(nameof(Adding));
         OnPropertyChanged(nameof(Content));
@@ -865,6 +914,7 @@ public sealed partial class MainViewModel : ObservableObject
         Servers.AddServerRequested += ShowAddServer;
         Servers.ScanClientsRequested += () => ExceptionLog.Observe(NavigateRecoveryAsync(RecoveryDestination.ScanClients));
         Servers.EditServerRequested += ShowEditServer;
+        Servers.DuplicateServerRequested += ShowDuplicateServer;
         Servers.ConfirmDeleteServerAsync = ConfirmDeleteServerAsync;
         Loc.Instance.Changed += OnLanguageChanged;
     }

@@ -203,6 +203,8 @@ public sealed partial class ServersViewModel : ViewModelBase
     /// <summary>Raised when the user picks "Edit server…" on a card; the shell opens the edit sheet.</summary>
     public event Action<ServerItemViewModel>? EditServerRequested;
 
+    public event Action<ServerItemViewModel>? DuplicateServerRequested;
+
     public ObservableCollection<ServerItemViewModel> Visible { get; } = [];
 
     /// <summary>Header filter items, rebuilt on every reload: "All clients in use" plus each saved client.</summary>
@@ -367,6 +369,8 @@ public sealed partial class ServersViewModel : ViewModelBase
     private void ClearSearch() => SearchText = string.Empty;
 
     private void EditRequested(ServerItemViewModel item) => EditServerRequested?.Invoke(item);
+
+    private void DuplicateRequested(ServerItemViewModel item) => DuplicateServerRequested?.Invoke(item);
 
     private void DeleteRequested(ServerItemViewModel item) => ExceptionLog.Observe(DeleteServerAsync(item));
 
@@ -598,6 +602,7 @@ public sealed partial class ServersViewModel : ViewModelBase
                 _hasMultipleClients,
                 clientDisplayName,
                 EditRequested,
+                DuplicateRequested,
                 DeleteRequested);
             card.Order = order++;
             if (clientId is not null && _runningClients.Contains(clientId))

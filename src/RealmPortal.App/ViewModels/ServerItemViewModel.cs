@@ -35,6 +35,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
     private readonly Action<ServerItemViewModel> _play;
     private readonly Action<ServerItemViewModel> _switchOnly;
     private readonly Action<ServerItemViewModel>? _edit;
+    private readonly Action<ServerItemViewModel>? _duplicate;
     private readonly Action<ServerItemViewModel>? _delete;
 
     private ServerItemViewModel(
@@ -51,6 +52,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
         Action<ServerItemViewModel> play,
         Action<ServerItemViewModel> switchOnly,
         Action<ServerItemViewModel>? edit,
+        Action<ServerItemViewModel>? duplicate,
         Action<ServerItemViewModel>? delete,
         bool showClientLabel,
         string? clientDisplayName,
@@ -71,6 +73,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
         _play = play;
         _switchOnly = switchOnly;
         _edit = edit;
+        _duplicate = duplicate;
         _delete = delete;
         ShowClientLabel = showClientLabel;
         ClientDisplayName = clientDisplayName;
@@ -98,6 +101,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
             play,
             switchOnly,
             edit,
+            null,
             delete,
             false,
             null,
@@ -115,6 +119,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
         bool showClientLabel = false,
         string? clientDisplayName = null,
         Action<ServerItemViewModel>? edit = null,
+        Action<ServerItemViewModel>? duplicate = null,
         Action<ServerItemViewModel>? delete = null)
     {
         var needsRepair = entry.IsActive && !projectionInSync;
@@ -135,6 +140,7 @@ public sealed partial class ServerItemViewModel : ObservableObject
             play,
             switchOnly,
             edit,
+            duplicate,
             delete,
             showClientLabel,
             clientDisplayName,
@@ -242,15 +248,20 @@ public sealed partial class ServerItemViewModel : ObservableObject
     private void SwitchOnly() => _switchOnly(this);
 
     /// <summary>True when the card has an edit/delete action wired (production list only).</summary>
-    public bool CanManage => _edit is not null || _delete is not null;
+    public bool CanManage => _edit is not null || _duplicate is not null || _delete is not null;
 
     /// <summary>Edit is disabled while the app is busy or this card's client is running a game.</summary>
     public bool CanEdit => _edit is not null && CanAct;
+
+    public bool CanDuplicate => _duplicate is not null && CanAct;
 
     public bool CanDelete => _delete is not null && CanAct;
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
     private void Edit() => _edit?.Invoke(this);
+
+    [RelayCommand(CanExecute = nameof(CanDuplicate))]
+    private void Duplicate() => _duplicate?.Invoke(this);
 
     [RelayCommand(CanExecute = nameof(CanDelete))]
     private void Delete() => _delete?.Invoke(this);
@@ -310,10 +321,12 @@ public sealed partial class ServerItemViewModel : ObservableObject
         OnPropertyChanged(nameof(CanPlay));
         OnPropertyChanged(nameof(CanSwitchOnly));
         OnPropertyChanged(nameof(CanEdit));
+        OnPropertyChanged(nameof(CanDuplicate));
         OnPropertyChanged(nameof(CanDelete));
         PlayCommand.NotifyCanExecuteChanged();
         SwitchOnlyCommand.NotifyCanExecuteChanged();
         EditCommand.NotifyCanExecuteChanged();
+        DuplicateCommand.NotifyCanExecuteChanged();
         DeleteCommand.NotifyCanExecuteChanged();
     }
 
