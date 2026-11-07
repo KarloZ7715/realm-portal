@@ -11,6 +11,16 @@ public partial class AddServerView : UserControl
     public AddServerView()
     {
         InitializeComponent();
+        RecoveryFocus.Wire(this, field => field.ToLowerInvariant() switch
+        {
+            "host" or "realmlisthost" or "address" => "AddressBox",
+            "realm" => "RealmBox",
+            "account" => "AccountBox",
+            "clientid" => "ClientBox",
+            "build" or "requiredclientbuild" => "BuildBox",
+            "extrarealmlistlines" => "ExtraLinesBox",
+            _ => "NameBox",
+        });
         Loaded += OnLoaded;
         NameBox.GotFocus += OnNameGotFocus;
         ExtraLinesBox.AddHandler(KeyDownEvent, OnExtraLinesKeyDown, RoutingStrategies.Tunnel);
@@ -22,7 +32,8 @@ public partial class AddServerView : UserControl
         NameBox.GotFocus += OnNameGotFocus;
         // Duplicate (and add/edit): focus the name so the user can rename immediately.
         // In duplicate mode SelectAll so the next key replaces the whole " (copy)" / " (copia)" name (#191).
-        Dispatcher.UIThread.Post(FocusNameForEdit, DispatcherPriority.Input);
+        // Normal runs before the Loaded recovery focus, so an error field keeps the caret (#194).
+        Dispatcher.UIThread.Post(FocusNameForEdit, DispatcherPriority.Normal);
     }
 
     private void OnNameGotFocus(object? sender, GotFocusEventArgs e) => SelectNameIfDuplicating();

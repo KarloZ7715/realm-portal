@@ -1,10 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:v="using:RealmPortal.App.Views"
              xmlns:vm="using:RealmPortal.App.ViewModels"
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.AddServerView"
              x:DataType="vm:AddServerViewModel">
+  <Grid RowDefinitions="*,Auto">
   <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <!-- Bottom space is a margin on the content: ScrollViewer.Padding is not counted in the scroll extent (#210 follow-up). -->
     <StackPanel Name="ScrollContent" Margin="20,10,20,12">
@@ -12,6 +14,8 @@
       <TextBlock Classes="footnote" Margin="0,-6,0,6" Foreground="{DynamicResource IvoryBrush}" TextWrapping="Wrap" IsVisible="{Binding ShowBuildAndCacheFields}" Text="{Binding FormSubtitle}"/>
       <ContentControl Classes="card" Padding="22,12,22,16" Margin="0,2,0,0">
         <StackPanel>
+          <v:ErrorRecoveryView Name="ClientRequirementNotice" IsVisible="{Binding #ScrollContent.DataContext.Clients.HasNoClients}" DataContext="{Binding Clients.MissingClientNotice}"/>
+          <v:ErrorRecoveryView DataContext="{Binding Recovery}"/>
           <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,8">
             <TextBlock Classes="sheet-title" VerticalAlignment="Center" Text="{loc:T add.sheet}"/>
             <c:Badge Grid.Column="1" Name="ResultBadge" IsVisible="{Binding HasResult}" Status="{Binding ResultStatus}" Text="{Binding ResultText}"/>
@@ -134,13 +138,16 @@
               </Grid>
             </StackPanel>
           </Expander>
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,12,0,0" IsVisible="{Binding HasSaveError}">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,12,0,0" IsVisible="{Binding HasPlainSaveError}">
             <c:Icon Data="{DynamicResource IconError}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{DynamicResource WaxTextBrush}" StrokeThickness="2"/>
             <TextBlock Name="SaveError" Grid.Column="1" Classes="footnote" TextWrapping="Wrap" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding SaveError}"/>
           </Grid>
         </StackPanel>
       </ContentControl>
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,16,0,0">
+
+    </StackPanel>
+  </ScrollViewer>
+      <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" Margin="20,10,20,12">
         <Button Name="TestButton" Classes="secondary" Width="210" Command="{Binding TestCommand}">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <c:Icon Data="{DynamicResource IconRefresh}" Width="14" Height="14" StrokeThickness="2.2"/>
@@ -150,10 +157,9 @@
         <Button Grid.Column="2" Name="CancelButton" Classes="link caps" Margin="0,0,22,0" VerticalAlignment="Center" Command="{Binding CancelCommand}">
           <TextBlock Text="{loc:T add.cancel}"/>
         </Button>
-        <Button Grid.Column="3" Name="SaveButton" Width="172" Command="{Binding SaveCommand}">
+        <Button Grid.Column="3" Name="SaveButton" Width="172" Command="{Binding SaveCommand}" AutomationProperties.HelpText="{Binding SaveDisabledReason}" ToolTip.Tip="{Binding SaveDisabledReason}">
           <TextBlock Text="{Binding SaveLabel}"/>
         </Button>
       </Grid>
-    </StackPanel>
-  </ScrollViewer>
+  </Grid>
 </UserControl>

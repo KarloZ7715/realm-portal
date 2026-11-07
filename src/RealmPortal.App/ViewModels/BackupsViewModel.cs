@@ -23,6 +23,9 @@ public sealed partial class BackupsViewModel : ViewModelBase
 
     public ObservableCollection<BackupClientOption> Clients { get; } = [];
     public ObservableCollection<BackupItemViewModel> Backups { get; } = [];
+    public event Action? ClientsRequested;
+    [RelayCommand] private void FindClients() => ClientsRequested?.Invoke();
+
     public Func<BackupEntry, Task<bool>>? ConfirmDeleteBackupAsync { get; set; }
     public Func<BackupEntry, Task<ConfirmDialogChoice>>? ResolveRestoreConflictAsync { get; set; }
 
@@ -49,6 +52,27 @@ public sealed partial class BackupsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(StatusText))]
     private string? _notice;
 
+    private ServiceError? _noticeError;
+    private void ReportError(ServiceError error, Func<Task> retry)
+    {
+        _noticeError = error;
+        Notice = ErrorText.Body(error);
+        Recovery.Show(error, retry);
+        OnPropertyChanged(nameof(ShowPlainNotice));
+        OnPropertyChanged(nameof(ShowEmpty));
+    }
+
+    private void ClearError()
+    {
+        if (_noticeError is not null) Notice = null;
+        _noticeError = null;
+        Recovery.Clear();
+        OnPropertyChanged(nameof(ShowPlainNotice));
+        OnPropertyChanged(nameof(ShowEmpty));
+    }
+
+    public bool ShowPlainNotice => !Recovery.HasCause;
+    public bool ShowEmpty => !HasBackups && _noticeError is null;
     public bool HasBackups => Backups.Count > 0;
     public string CountText => Loc.Format("backups.count", Backups.Count, ClientFilesApplier.DefaultKeepBackups);
     public override string StatusText => Notice ?? (SelectedClient is null
@@ -57,6 +81,8 @@ public sealed partial class BackupsViewModel : ViewModelBase
 
     public override void RefreshText()
     {
+        Recovery.RefreshText();
+        if (_noticeError is not null) Notice = ErrorText.Body(_noticeError);
         foreach (var backup in Backups)
             backup.RefreshText();
         OnPropertyChanged(nameof(CountText));
@@ -87,10 +113,11 @@ public sealed partial class BackupsViewModel : ViewModelBase
             var result = await Task.Run(() => _session.Service.CreateBackup(selected.Entry.Id)).ConfigureAwait(true);
             if (!result.Succeeded)
             {
-                Notice = ErrorText.Body(result.Error!);
+                ReportError(result.Error!, CreateBackupAsync);
                 return;
             }
 
+            ClearError();
             var backup = result.Value!;
             Notice = Loc.Format(backup.WasDeduplicated ? "backups.status.deduplicated" : "backups.status.created", backup.BackupId);
             await LoadBackupsAsync().ConfigureAwait(true);
@@ -125,9 +152,7 @@ public sealed partial class BackupsViewModel : ViewModelBase
                 }
                 else if (choice == ConfirmDialogChoice.Secondary)
                 {
-                    var discarded = await Task.Run(() => _session.Service.DiscardUndo(selected.Entry.Id)).ConfigureAwait(true);
-                    Notice = discarded.Succeeded ? Loc.Get("backups.status.undo.discarded") : ErrorText.Body(discarded.Error!);
-                    await LoadBackupsAsync().ConfigureAwait(true);
+                    await DiscardPendingUndoAsync(selected.Entry.Id).ConfigureAwait(true);
                     return;
                 }
                 else
@@ -138,10 +163,11 @@ public sealed partial class BackupsViewModel : ViewModelBase
 
             if (!result.Succeeded)
             {
-                Notice = ErrorText.Body(result.Error!);
+                ReportError(result.Error!, () => RestoreAsync(item));
                 return;
             }
 
+            ClearError();
             Notice = Loc.Format("backups.status.restored", result.Value!.RestoredBackupId);
             await LoadBackupsAsync().ConfigureAwait(true);
         }
@@ -149,6 +175,19 @@ public sealed partial class BackupsViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    private async Task DiscardPendingUndoAsync(string clientId)
+    {
+        var discarded = await Task.Run(() => _session.Service.DiscardUndo(clientId)).ConfigureAwait(true);
+        if (!discarded.Succeeded)
+        {
+            ReportError(discarded.Error!, () => DiscardPendingUndoAsync(clientId));
+            return;
+        }
+        ClearError();
+        Notice = Loc.Get("backups.status.undo.discarded");
+        await LoadBackupsAsync().ConfigureAwait(true);
     }
 
     private async Task DeleteAsync(BackupItemViewModel item)
@@ -165,10 +204,11 @@ public sealed partial class BackupsViewModel : ViewModelBase
             var result = await Task.Run(() => _session.Service.DeleteBackup(selected.Entry.Id, item.Entry.BackupId)).ConfigureAwait(true);
             if (!result.Succeeded)
             {
-                Notice = ErrorText.Body(result.Error!);
+                ReportError(result.Error!, () => DeleteAsync(item));
                 return;
             }
 
+            ClearError();
             Notice = Loc.Get("backups.status.deleted");
             await LoadBackupsAsync().ConfigureAwait(true);
         }
@@ -183,7 +223,7 @@ public sealed partial class BackupsViewModel : ViewModelBase
         var result = _session.Service.ListClients();
         if (!result.Succeeded)
         {
-            Notice = ErrorText.Body(result.Error!);
+            ReportError(result.Error!, () => { LoadClients(); return Task.CompletedTask; });
             return;
         }
 
@@ -210,10 +250,11 @@ public sealed partial class BackupsViewModel : ViewModelBase
         var result = await Task.Run(() => _session.Service.ListBackups(selected.Entry.Id)).ConfigureAwait(true);
         if (!result.Succeeded)
         {
-            Notice = ErrorText.Body(result.Error!);
+            ReportError(result.Error!, LoadBackupsAsync);
             return;
         }
 
+        ClearError();
         Backups.Clear();
         foreach (var entry in result.Value!)
             Backups.Add(new BackupItemViewModel(entry, () => IsGameRunning || IsGameStateUnknown, RestoreAsync, DeleteAsync));
@@ -244,6 +285,7 @@ public sealed partial class BackupsViewModel : ViewModelBase
     private void Changed()
     {
         OnPropertyChanged(nameof(HasBackups));
+        OnPropertyChanged(nameof(ShowEmpty));
         OnPropertyChanged(nameof(CountText));
         OnPropertyChanged(nameof(StatusText));
     }

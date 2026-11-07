@@ -52,6 +52,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _saveDemo = save;
         _cancel = cancel;
         Clients = clients;
+        Clients.Items.CollectionChanged += OnClientsChanged;
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
         _initialInput = CurrentInput();
     }
@@ -63,6 +64,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _savePortal = save;
         _cancel = cancel;
         Clients = clients;
+        Clients.Items.CollectionChanged += OnClientsChanged;
         SelectedClient = clients.Items.FirstOrDefault(c => c.IsInUse) ?? clients.Items.FirstOrDefault();
         _initialInput = CurrentInput();
     }
@@ -256,6 +258,16 @@ public sealed partial class AddServerViewModel : ViewModelBase
         : _saveFailedUnknown ? Loc.Get("error.state.unknown")
         : null;
 
+    public bool CanSaveServer => SelectedClient is not null && Clients.Items.Contains(SelectedClient);
+    public string SaveDisabledReason => CanSaveServer ? string.Empty : Loc.Get("add.clients.empty");
+    public bool HasPlainSaveError => HasSaveError && !Recovery.HasCause;
+
+    private void OnClientsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        SaveCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(SaveDisabledReason));
+    }
+
     public bool HasSaveError => SaveError is not null;
 
     public bool HasResult => TestState != ConnectionTest.None;
@@ -353,6 +365,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     public override void RefreshText()
     {
+        Recovery.RefreshText();
+        Clients.MissingClientNotice.RefreshText();
+        OnPropertyChanged(nameof(SaveDisabledReason));
         foreach (var option in BuildOptions)
         {
             option.Refresh();
@@ -371,6 +386,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         OnPropertyChanged(nameof(ClientError));
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(HasPlainSaveError));
         OnPropertyChanged(nameof(FormTitle));
         OnPropertyChanged(nameof(FormSubtitle));
         OnPropertyChanged(nameof(SaveLabel));
@@ -461,7 +477,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     private bool CanTest() => TestState != ConnectionTest.Testing;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSaveServer))]
     private void Save()
     {
         Submitted = true;
@@ -686,6 +702,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     /// </summary>
     public void OnFormClosed()
     {
+        Clients.Items.CollectionChanged -= OnClientsChanged;
         _formClosed = true;
         CancelInFlightProbe();
     }
@@ -838,7 +855,12 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     partial void OnAccountChanged(string value) => ClearSaveError();
 
-    partial void OnSelectedClientChanged(ClientItemViewModel? value) => ClearSaveError();
+    partial void OnSelectedClientChanged(ClientItemViewModel? value)
+    {
+        ClearSaveError();
+        SaveCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(SaveDisabledReason));
+    }
 
     partial void OnRealmChanged(string value) => ClearSaveError();
 
@@ -853,11 +875,26 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     private void SetSaveError(ServiceError? error)
     {
+        if (error is not null)
+            Recovery.Show(error, () => { Save(); return Task.CompletedTask; }, error.NextAction() == ServiceErrorAction.FixInput ? () =>
+            {
+                var field = error.ExtraLineIndex is not null ? "ExtraRealmlistLines" : error.Field ?? "Name";
+                if (field == "ExtraRealmlistLines") IsAdvancedExpanded = true;
+                // Save drops blank lines before building the request; focus the corresponding visible line.
+                var visibleLine = error.ExtraLineIndex is { } index
+                    ? ExtraRealmlistLinesText.Split('\n').Select((text, line) => (text, line))
+                        .Where(entry => !string.IsNullOrWhiteSpace(entry.text)).Skip(index)
+                        .Select(entry => (int?)entry.line).FirstOrDefault()
+                    : null;
+                RequestRecoveryFocus(field, visibleLine);
+                return Task.CompletedTask;
+            } : null);
         _saveServiceError = error;
         _saveFailedUnknown = error is null;
         _saveMessageKey = null;
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(HasPlainSaveError));
     }
 
     /// <summary>Shows a client-side save failure whose copy is a localization key.</summary>
@@ -868,10 +905,12 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _saveMessageKey = messageKey;
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(HasPlainSaveError));
     }
 
     private void ClearSaveError()
     {
+        Recovery.Clear();
         if (_saveServiceError is null && !_saveFailedUnknown && _saveMessageKey is null)
         {
             return;
@@ -882,6 +921,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _saveMessageKey = null;
         OnPropertyChanged(nameof(SaveError));
         OnPropertyChanged(nameof(HasSaveError));
+        OnPropertyChanged(nameof(HasPlainSaveError));
     }
 }
 

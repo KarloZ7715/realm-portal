@@ -11,6 +11,10 @@ namespace RealmPortal.App.Localization;
 /// </summary>
 public static class ErrorText
 {
+    /// <summary>A localized instruction; diagnostics remain log-only.</summary>
+    public static string NextStep(ServiceErrorAction action) => action == ServiceErrorAction.None
+        ? string.Empty : Loc.Get($"recovery.{action.ToString().ToLowerInvariant()}.hint");
+
     public static string Title(ClientFilesErrorCode code) => Title(code.ToString());
 
     /// <summary>
@@ -40,6 +44,19 @@ public static class ErrorText
         return Compose(CodeBody(error), StateSentence(error.Consistency));
     }
 
+    /// <summary>Notice text keeps paths and conflicting files in separate accessible mono rows.</summary>
+    public static string NoticeBody(ServiceError error)
+    {
+        if (error.Code == ServiceErrorCode.UndoConflict)
+            return Compose(Loc.Get("error.undoconflict.notice"), StateSentence(error.Consistency));
+        if (string.IsNullOrWhiteSpace(error.Path)) return Body(error);
+        var reference = Loc.Get("recovery.path.reference");
+        var body = Body(error with { Path = reference });
+        // The replacement can be the first word (PathNotFound) or part of a sentence (DiskFull).
+        return body.StartsWith(reference, StringComparison.Ordinal)
+            ? char.ToUpperInvariant(body[0]) + body[1..] : body;
+    }
+
     /// <summary>The code's own sentence, with placeholders filled and no claim about what was left on disk.</summary>
     private static string CodeBody(ServiceError error) => error.Code switch
     {
@@ -57,7 +74,7 @@ public static class ErrorText
         ServiceErrorCode.UndoConflict =>
             Body(error.Code.ToString(), FormatFileList(error.ConflictingFiles)),
         ServiceErrorCode.InvalidServerInput =>
-            Body(error.Code.ToString(), error.Field ?? string.Empty),
+            Body(error.Code.ToString(), FieldLabel(error.Field)),
         // error.unexpected.body is a "{0}" slot for log text. Use the generic body, which has no placeholder.
         ServiceErrorCode.Unexpected =>
             Body("unknown"),
@@ -106,6 +123,17 @@ public static class ErrorText
 
         return string.Format(System.Globalization.CultureInfo.CurrentCulture, Lookup(code, "body"), args);
     }
+
+    private static string FieldLabel(string? field) => Loc.Get(field?.ToLowerInvariant() switch
+    {
+        "name" => "add.name",
+        "host" or "address" => "add.address",
+        "realm" => "add.realm",
+        "account" => "add.account",
+        "build" or "requiredclientbuild" => "edit.build",
+        "clientid" => "add.client",
+        _ => "recovery.field",
+    });
 
     private static string FormatFileList(IReadOnlyList<string>? files) =>
         files is null or { Count: 0 } ? string.Empty : string.Join(", ", files);

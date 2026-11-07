@@ -3,7 +3,7 @@
         xmlns:c="using:RealmPortal.App.Controls">
   <!--
     Notices and progress furniture, drawn in code (no kit art; the mockups draw them with dashed "stitch" outlines):
-      Banner          dashed outline, a 4 px bar and icon in the severity colour, bold title, body text (info / warning / error)
+      Banner          dashed outline, a 3 px bar and icon in the severity colour, bold title, body text (info / warning / error)
       StepIndicator   round marker + label + dashed connector (done / current / pending)
       ContentControl.toast   the undo notice: leather popup plate over a soft shadow
       Line.stitch     dashed rule (sheet headers, the sidebar edge); add class "parchment" on parchment
@@ -18,7 +18,7 @@
           <Panel>
             <Rectangle Fill="#33000000" Stroke="{DynamicResource BronzeDarkBrush}" StrokeThickness="1"
                        StrokeDashArray="4,3" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
-            <Border Name="Bar" Width="4" HorizontalAlignment="Left" Margin="1,1,0,1" Background="{DynamicResource BronzeLightBrush}"/>
+            <Border Name="Bar" Width="3" HorizontalAlignment="Left" Margin="1,1,0,1" Background="{DynamicResource BronzeLightBrush}"/>
             <Grid ColumnDefinitions="Auto,*" Margin="{TemplateBinding Padding}">
               <c:Icon Name="Glyph" Width="26" Height="26" Margin="6,0,14,0" VerticalAlignment="Center" StrokeThickness="1.7"
                       Foreground="{DynamicResource BronzeLightBrush}" Data="{DynamicResource IconInfo}"/>
@@ -37,7 +37,7 @@
       <Style Selector="^:warning /template/ Border#Bar"><Setter Property="Background" Value="{DynamicResource AmberLightBrush}"/></Style>
       <Style Selector="^:warning /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconWarning}"/><Setter Property="Foreground" Value="{DynamicResource AmberLightBrush}"/></Style>
       <Style Selector="^:error /template/ Border#Bar"><Setter Property="Background" Value="{DynamicResource WaxLightBrush}"/></Style>
-      <Style Selector="^:error /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconError}"/><Setter Property="Foreground" Value="{DynamicResource WaxLightBrush}"/></Style>
+      <Style Selector="^:error /template/ c|Icon#Glyph"><Setter Property="Data" Value="{DynamicResource IconWarning}"/><Setter Property="Foreground" Value="{DynamicResource WaxLightBrush}"/></Style>
     </ControlTheme>
 
     <ControlTheme x:Key="RpStepIndicator" TargetType="c:StepIndicator">

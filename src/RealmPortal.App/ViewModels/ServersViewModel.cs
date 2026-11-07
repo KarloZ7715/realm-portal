@@ -267,13 +267,15 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public bool ShowBanner => Phase != ServersPhase.Idle || HasErrorBanner;
 
+    public bool ShowPhaseBanner => ShowBanner && !Recovery.HasCause;
+
     public bool ShowSteps => IsBusy;
 
     public bool HasQuery => !string.IsNullOrWhiteSpace(SearchText);
 
     public bool ShowResults => CanSearch && HasQuery && Visible.Count > 0;
 
-    public bool ShowEmpty => CanSearch && HasQuery && Visible.Count == 0;
+    public bool ShowEmpty => CanSearch && Visible.Count == 0 && !HasErrorBanner;
 
     public bool ShowDiscardUndo => ToastVisible && _undoConflict;
 
@@ -287,7 +289,10 @@ public sealed partial class ServersViewModel : ViewModelBase
         ? Loc.Format("servers.results.one", SearchText.Trim())
         : Loc.Format("servers.results.many", Visible.Count, SearchText.Trim());
 
-    public string EmptyTitle => Loc.Format("servers.empty.title", SearchText.Trim());
+    public string EmptyTitle => _all.Count == 0 ? Loc.Get("servers.empty.first.title") : !HasQuery ? Loc.Get("servers.empty.filtered.title") : Loc.Format("servers.empty.title", SearchText.Trim());
+    public string EmptyHint => Loc.Get(_all.Count == 0 ? "servers.empty.first.hint" : "servers.empty.filtered.hint");
+    public event Action? ScanClientsRequested;
+    [RelayCommand] private void ScanClients() => ScanClientsRequested?.Invoke();
 
     public BannerSeverity BannerSeverity => HasErrorBanner
         ? BannerSeverity.Warning
@@ -386,7 +391,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         var result = await Task.Run(() => _session.Service.RemoveServer(card.ServerId)).ConfigureAwait(true);
         if (!result.Succeeded)
         {
-            SetError(result.Error);
+            SetError(result.Error, retry: () => DeleteServerAsync(card));
             return;
         }
 
@@ -413,12 +418,13 @@ public sealed partial class ServersViewModel : ViewModelBase
                         _undoConflict = true;
                         _bannerError = result.Error;
                         _bannerMessageKey = null;
+                        Recovery.Show(result.Error, UndoAsync, discard: DiscardUndoAsync);
                         ShowToast();
                         Refresh();
                     }
                     else
                     {
-                        SetError(result.Error);
+                        SetError(result.Error, retry: UndoAsync);
                     }
                 }
                 else
@@ -465,7 +471,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         {
             if (!result.Succeeded)
             {
-                SetError(result.Error);
+                SetError(result.Error, retry: DiscardUndoAsync);
             }
             else
             {
@@ -549,7 +555,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         var list = _session.Service.ListServers(compatibleOnly: false);
         if (!list.Succeeded)
         {
-            SetError(list.Error);
+            SetError(list.Error, retry: () => { ReloadFromService(); return Task.CompletedTask; });
             RefreshUndoAvailability();
             return;
         }
@@ -679,6 +685,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         if (clientId is null)
         {
             SetError(null, "error.noclient.body");
+            Recovery.Show(new ServiceError(ServiceErrorCode.ClientNotFound));
             return;
         }
 
@@ -720,7 +727,7 @@ public sealed partial class ServersViewModel : ViewModelBase
         if (!result.Succeeded)
         {
             var appliedLaunch = play && PlayServiceResults.ShouldRefreshStatusAfterFailure(result);
-            SetError(result.Error);
+            SetError(result.Error, retry: () => RunPortalAsync(ResolveCard(target), play));
             target.Overlay = ServerOverlay.None;
             Phase = ServersPhase.Idle;
             _repairRun = false;
@@ -971,19 +978,24 @@ public sealed partial class ServersViewModel : ViewModelBase
     /// Shows the error banner from <paramref name="error"/>, or from <paramref name="messageKey"/> when there is no error.
     /// Both null uses <c>error.unknown.body</c>. Text is formatted when the banner is read.
     /// </summary>
-    private void SetError(ServiceError? error, string? messageKey = null)
+    private void SetError(ServiceError? error, string? messageKey = null, Func<Task>? retry = null)
     {
+        if (error is not null) Recovery.Show(error, retry);
+        else Recovery.ShowMessage(messageKey ?? "error.unknown.body");
         _bannerError = messageKey is null ? error : null;
         _bannerMessageKey = messageKey ?? (error is null ? "error.unknown.body" : null);
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(BannerSeverity));
         OnPropertyChanged(nameof(ShowBanner));
+        OnPropertyChanged(nameof(ShowPhaseBanner));
+        OnPropertyChanged(nameof(ShowEmpty));
         OnPropertyChanged(nameof(StatusText));
     }
 
     private void ClearErrorBanner()
     {
+        Recovery.Clear();
         _bannerError = null;
         _bannerMessageKey = null;
     }
@@ -1027,6 +1039,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
     public override void RefreshText()
     {
+        Recovery.RefreshText();
         foreach (var item in _all)
         {
             item.RefreshText();
@@ -1039,6 +1052,7 @@ public sealed partial class ServersViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(ResultsText));
         OnPropertyChanged(nameof(EmptyTitle));
+        OnPropertyChanged(nameof(EmptyHint));
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(ToastText));
@@ -1083,11 +1097,14 @@ public sealed partial class ServersViewModel : ViewModelBase
         OnPropertyChanged(nameof(ResultsText));
         OnPropertyChanged(nameof(ShowResults));
         OnPropertyChanged(nameof(ShowEmpty));
+        OnPropertyChanged(nameof(EmptyTitle));
+        OnPropertyChanged(nameof(EmptyHint));
         OnPropertyChanged(nameof(BannerSeverity));
         OnPropertyChanged(nameof(BannerHeader));
         OnPropertyChanged(nameof(BannerBody));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(ShowBanner));
+        OnPropertyChanged(nameof(ShowPhaseBanner));
         OnPropertyChanged(nameof(RunningCount));
     }
 }

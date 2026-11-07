@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:v="using:RealmPortal.App.Views"
              xmlns:vm="using:RealmPortal.App.ViewModels"
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.EditClientView"
@@ -31,10 +32,10 @@
               <TextBlock Text="{loc:T clients.edit.browse}"/>
             </Button>
           </Grid>
-          <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap"/>
           <TextBlock Classes="footnote" Foreground="{DynamicResource WaxTextBrush}" Text="{loc:T clients.pick.unavailable}" IsVisible="{Binding BrowseUnavailable}" TextWrapping="Wrap"/>
         </StackPanel>
       </ContentControl>
+      <v:ErrorRecoveryView DataContext="{Binding Recovery}"/>
       <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,16,0,0" ColumnSpacing="12">
         <TextBlock Classes="path" Foreground="{DynamicResource BoneSoftBrush}" VerticalAlignment="Center" Text="{Binding StatusText}"/>
         <Button Grid.Column="1" Name="CancelButton" Classes="secondary" c:ButtonSurface.Surface="Parchment" MinWidth="130" Command="{Binding CancelCommand}">

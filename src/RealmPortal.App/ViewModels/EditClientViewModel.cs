@@ -58,6 +58,7 @@ public sealed partial class EditClientViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
+        Recovery.Clear();
         _serviceError = null;
         OnPropertyChanged(nameof(Error));
         OnPropertyChanged(nameof(HasError));
@@ -79,6 +80,8 @@ public sealed partial class EditClientViewModel : ViewModelBase
             if (!result.Succeeded)
             {
                 _serviceError = result.Error;
+                Recovery.Show(result.Error!, SaveAsync, result.Error!.NextAction() == ServiceErrorAction.ChooseClientFolder
+                    ? BrowseAsync : () => { RequestRecoveryFocus(result.Error.Field ?? "Name"); return Task.CompletedTask; });
                 OnPropertyChanged(nameof(Error));
                 OnPropertyChanged(nameof(HasError));
                 return;
@@ -96,6 +99,7 @@ public sealed partial class EditClientViewModel : ViewModelBase
     {
         if (_pickFolder is null)
         {
+            Recovery.Clear();
             _serviceError = null;
             OnPropertyChanged(nameof(Error));
             OnPropertyChanged(nameof(HasError));
@@ -118,6 +122,7 @@ public sealed partial class EditClientViewModel : ViewModelBase
 
     public override void RefreshText()
     {
+        Recovery.RefreshText();
         OnPropertyChanged(nameof(ClientTitle));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(Error));

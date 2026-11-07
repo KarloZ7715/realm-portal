@@ -23,6 +23,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
     public ClientsViewModel(DemoBackend backend)
     {
         _backend = backend;
+        ConfigureClientRequirement();
         foreach (var seed in DemoData.Clients)
         {
             AddDemo(seed);
@@ -32,6 +33,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
     public ClientsViewModel(PortalSession session, Func<Task<string?>>? pickFolder = null, bool startFirstScan = true)
     {
         _session = session;
+        ConfigureClientRequirement();
         _pickFolder = pickFolder;
         ReloadFromService();
         if (startFirstScan)
@@ -54,8 +56,45 @@ public sealed partial class ClientsViewModel : ViewModelBase
     private bool _isScanning;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(HasNotice))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(HasNotice), nameof(ShowPlainNotice))]
     private string? _notice;
+
+    private ServiceError? _noticeError;
+    public bool HasNoClients => Items.Count == 0;
+    public bool IsEmpty => HasNoClients && !IsScanning;
+    public bool ShowPlainNotice => HasNotice && !Recovery.HasCause;
+    public ErrorRecoveryViewModel MissingClientNotice { get; } = new();
+
+    private void ConfigureClientRequirement()
+    {
+        MissingClientNotice.Show(new ServiceError(ServiceErrorCode.ClientNotFound), causeKey: "add.clients.empty");
+        MissingClientNotice.NavigateRequested += destination => destination == RecoveryDestination.ScanClients
+            ? RescanCommand.ExecuteAsync(null) : PickFolderCommand.ExecuteAsync(null);
+        Recovery.PropertyChanged += (_, _) => OnPropertyChanged(nameof(ShowPlainNotice));
+        Items.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(HasNoClients));
+        };
+    }
+
+    private void ReportError(ServiceError error, Func<Task> retry, Func<Task>? fix = null)
+    {
+        _noticeError = error;
+        Notice = ErrorText.Body(error);
+        Recovery.Show(error, retry, fix);
+        OnPropertyChanged(nameof(IsEmpty));
+    }
+
+    private void ClearError()
+    {
+        if (_noticeError is not null) Notice = null;
+        _noticeError = null;
+        Recovery.Clear();
+        OnPropertyChanged(nameof(IsEmpty));
+    }
+
+    partial void OnIsScanningChanged(bool value) => OnPropertyChanged(nameof(IsEmpty));
 
     public int InUseCount => Items.Count(i => i.IsInUse);
 
@@ -71,6 +110,9 @@ public sealed partial class ClientsViewModel : ViewModelBase
 
     public override void RefreshText()
     {
+        Recovery.RefreshText();
+        MissingClientNotice.RefreshText();
+        if (_noticeError is not null) Notice = ErrorText.Body(_noticeError);
         foreach (var item in Items)
         {
             item.RefreshText();
@@ -91,12 +133,14 @@ public sealed partial class ClientsViewModel : ViewModelBase
         var inUse = prefs.InUseSet;
         var list = _session.Service.ListClients();
         Items.Clear();
+        OnPropertyChanged(nameof(IsEmpty));
         if (!list.Succeeded)
         {
-            Notice = ErrorText.Body(list.Error!);
+            ReportError(list.Error!, () => { ReloadFromService(); return Task.CompletedTask; });
             return;
         }
 
+        ClearError();
         foreach (var entry in list.Value!)
         {
             var running = _session.Service.IsGameRunning(entry.Id);
@@ -169,7 +213,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
             var outcome = await Task.Run(() => _session.Service.Scan()).ConfigureAwait(true);
             if (!outcome.Succeeded)
             {
-                Notice = ErrorText.Body(outcome.Error!);
+                ReportError(outcome.Error!, () => RunScanAsync(markFirstScanCompleted));
                 return;
             }
 
@@ -186,6 +230,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
             var imported = outcome.Value.ImportedServers.Count;
             var known = Math.Max(0, outcome.Value.AllClients.Count - added);
             var failed = outcome.Value.AllClients.Count(client => client.Error is not null);
+            ClearError();
             Notice = added == 0 && imported == 0
                 ? Loc.Format("scan.outcome.nochange.count", known, failed)
                 : Loc.Format("scan.outcome.summary", added, imported, known, failed);
@@ -219,7 +264,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
             var result = await Task.Run(() => _session.Service.AddClient(folder)).ConfigureAwait(true);
             if (!result.Succeeded)
             {
-                Notice = ErrorText.Body(result.Error!);
+                ReportError(result.Error!, PickFolderAsync, PickFolderAsync);
                 OnPropertyChanged(nameof(StatusText));
                 return;
             }
@@ -228,6 +273,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
             var ids = prefs.InUseSet;
             ids.Add(result.Value!.Id);
             _session.UiPreferences.Save(prefs with { ClientsInUse = ids.ToList() });
+            ClearError();
             Notice = Loc.Get("status.folderadded.real");
             ReloadFromService();
             return;
@@ -252,6 +298,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
         var item = new ClientItemViewModel(seed, EditRequested, itemToRemove => ExceptionLog.Observe(RemoveClientAsync(itemToRemove)));
         WireInUse(item);
         Items.Add(item);
+        OnPropertyChanged(nameof(IsEmpty));
     }
 
     private void AddPortal(Core.Service.ClientEntry entry, bool inUse, bool isRunning, bool isStateUnknown)
@@ -260,6 +307,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
             EditRequested, itemToRemove => ExceptionLog.Observe(RemoveClientAsync(itemToRemove)));
         WireInUse(item);
         Items.Add(item);
+        OnPropertyChanged(nameof(IsEmpty));
     }
 
     private void EditRequested(ClientItemViewModel item) => ClientEditRequested?.Invoke(item);
@@ -286,7 +334,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
         var result = await Task.Run(() => _session.Service.RemoveClient(item.Id)).ConfigureAwait(true);
         if (!result.Succeeded)
         {
-            Notice = ErrorText.Body(result.Error!);
+            ReportError(result.Error!, () => RemoveClientAsync(item));
             return;
         }
 
@@ -294,6 +342,7 @@ public sealed partial class ClientsViewModel : ViewModelBase
         var inUse = preferences.InUseSet;
         inUse.Remove(item.Id);
         _session.UiPreferences.Save(preferences with { ClientsInUse = inUse.ToList() });
+        ClearError();
         Notice = Loc.Get("clients.remove.success");
         ReloadFromService();
     }
