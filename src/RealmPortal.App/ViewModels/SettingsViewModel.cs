@@ -254,7 +254,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
                         catch (Exception ex)
                         {
                             ExceptionLog.Default.Write(ex, "Settings.InstallUpdate");
-                            UpdateCheckStatus = Loc.Get("update.install.failed.body");
+                            UpdateCheckStatus = Loc.Get(UpdateInstallPresentation.FailureBodyKey(ex));
                         }
                     }
                     else if (choice == ConfirmDialogChoice.Secondary)

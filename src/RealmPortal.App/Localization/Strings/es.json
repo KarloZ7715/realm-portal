@@ -441,5 +441,7 @@
   "update.install.windows": "Extrae el zip sobre la carpeta actual de Realm Portal.\n\nArchivo:\n{0}",
   "update.install.command_and_path": "Archivo:\n{0}\n\n{1}",
   "update.install.failed.title": "Error al actualizar",
-  "update.install.failed.body": "No se pudo descargar o verificar la actualización. Inténtalo de nuevo o abre la página de la versión."
+  "update.install.failed.body": "No se pudo descargar o verificar la actualización. Inténtalo de nuevo o abre la página de la versión.",
+  "update.install.unsigned.body": "Esta versión no está firmada, así que no se instaló. Abre la página de la versión y revísala antes de instalarla a mano.",
+  "update.install.badsignature.body": "La firma de la versión no es válida o se hizo con una clave desconocida, así que la actualización no se instaló. No instales esta descarga; abre la página de la versión."
 }

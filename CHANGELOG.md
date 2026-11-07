@@ -6,6 +6,12 @@ All notable changes to Realm Portal are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- The updater checks the minisign signature on `SHA256SUMS` before using it, and refuses unsigned releases or bad signatures with a clear message ([#116](https://github.com/KarloZ7715/realm-portal/issues/116))
+
 ## [1.1.0](https://github.com/KarloZ7715/realm-portal/compare/v1.0.1...v1.1.0) - 2026-10-28
 
 ### Added

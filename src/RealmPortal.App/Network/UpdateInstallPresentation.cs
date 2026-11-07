@@ -10,6 +10,28 @@ namespace RealmPortal.App.Network;
 public static class UpdateInstallPresentation
 {
     /// <summary>
+    /// String key for the body shown when installing an update failed. Signature problems (#116) get their own text so
+    /// the user can tell an unsigned release from one whose signature does not check out.
+    /// </summary>
+    public static string FailureBodyKey(Exception? error)
+    {
+        for (var e = error; e is not null; e = e.InnerException)
+        {
+            if (e is UpdateException ue)
+            {
+                return ue.Code switch
+                {
+                    UpdateErrorCode.SignatureMissing => "update.install.unsigned.body",
+                    UpdateErrorCode.SignatureInvalid => "update.install.badsignature.body",
+                    _ => "update.install.failed.body",
+                };
+            }
+        }
+
+        return "update.install.failed.body";
+    }
+
+    /// <summary>
     /// Localized detail for the update-ready dialog / Settings soft status.
     /// Prefer copyable command + path when present; always include <see cref="UpdateInstallOutcome.SavedPath"/>
     /// alongside instructions when both exist (e.g. Windows ZIP).

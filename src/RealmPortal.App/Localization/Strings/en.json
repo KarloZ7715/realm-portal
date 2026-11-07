@@ -441,5 +441,7 @@
   "update.install.windows": "Extract the zip over your current Realm Portal folder.\n\nFile:\n{0}",
   "update.install.command_and_path": "File:\n{0}\n\n{1}",
   "update.install.failed.title": "Update failed",
-  "update.install.failed.body": "Could not download or verify the update. Try again, or open the release page."
+  "update.install.failed.body": "Could not download or verify the update. Try again, or open the release page.",
+  "update.install.unsigned.body": "This release is not signed, so it was not installed. Open the release page and check it before installing by hand.",
+  "update.install.badsignature.body": "The release signature is not valid or was made with an unknown key, so the update was not installed. Do not install this download; open the release page instead."
 }

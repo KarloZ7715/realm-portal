@@ -32,8 +32,9 @@ was signed with it; nothing was ever signed with it. That key is no longer trust
 
 The trusted comment of each signature is `realm-portal <tag>`, for example `realm-portal v1.2.0`.
 
-The app does not check the signature yet; see
-[docs/updates-and-status.md](docs/updates-and-status.md#release-signature-116-not-enforced-yet).
+From 1.2.0 on, the app checks this signature before it trusts `SHA256SUMS`, and refuses an update that is unsigned or
+whose signature does not verify. See
+[docs/updates-and-status.md](docs/updates-and-status.md#release-signature-116).
 
 ### Verifying a release by hand
 

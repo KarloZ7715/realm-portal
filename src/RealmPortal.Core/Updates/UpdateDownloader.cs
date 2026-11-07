@@ -2,12 +2,13 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using RealmPortal.Core.Updates.Signing;
 
 namespace RealmPortal.Core.Updates;
 
 /// <summary>
-/// Downloads release assets with manual HTTPS allowlisted redirects, verifies SHA256SUMS,
-/// and places files atomically (AppImage replace / Deb / WindowsZip to Downloads).
+/// Downloads release assets with manual HTTPS allowlisted redirects, checks the minisign signature on SHA256SUMS,
+/// verifies the asset against it, and places files atomically (AppImage replace / Deb / WindowsZip to Downloads).
 /// </summary>
 public sealed class UpdateDownloader : IDisposable
 {
@@ -21,6 +22,7 @@ public sealed class UpdateDownloader : IDisposable
     private readonly Func<InstallKind> _installKind;
     private readonly Func<bool> _appImageSelfReplace;
     private readonly Func<string> _downloadsDirectory;
+    private readonly IReleaseSignatureVerifier _signatureVerifier;
 
     public UpdateDownloader(
         HttpClient? httpClient = null,
@@ -28,8 +30,10 @@ public sealed class UpdateDownloader : IDisposable
         Func<string, string?>? getVariable = null,
         Func<InstallKind>? installKind = null,
         Func<bool>? appImageSelfReplace = null,
-        Func<string>? downloadsDirectory = null)
+        Func<string>? downloadsDirectory = null,
+        IReleaseSignatureVerifier? signatureVerifier = null)
     {
+        _signatureVerifier = signatureVerifier ?? MinisignVerifier.ForRelease();
         _userAgentVersion = userAgentVersion ?? (() => AppInfo.Version);
         _getVariable = getVariable ?? Environment.GetEnvironmentVariable;
         _installKind = installKind ?? (() => InstallKindInfo.Current);
@@ -91,16 +95,7 @@ public sealed class UpdateDownloader : IDisposable
             }
         }
 
-        var sumsName = "SHA256SUMS";
-        var sumsUrl = ReleaseDocumentParser.ExpectedDownloadUrl(release.Version, sumsName);
-        var sumsBytes = await DownloadBytesAsync(
-            new Uri(sumsUrl),
-            pinnedSize: Sha256Sums.MaxBytes,
-            absoluteDeadline: TimeSpan.FromMinutes(1),
-            cancellationToken).ConfigureAwait(false);
-        if (sumsBytes.Length > Sha256Sums.MaxBytes)
-            throw new UpdateException(UpdateErrorCode.DownloadTooLarge, "SHA256SUMS exceeds 64 KiB.");
-        var sumsText = System.Text.Encoding.UTF8.GetString(sumsBytes);
+        var sumsText = await DownloadVerifiedSumsAsync(release, cancellationToken).ConfigureAwait(false);
         var expectedDigest = Sha256Sums.FindDigest(sumsText, assetName);
 
         var pin = asset.Size > 0 ? Math.Min(asset.Size, MaxAssetBytes) : MaxAssetBytes;
@@ -159,6 +154,60 @@ public sealed class UpdateDownloader : IDisposable
             TryDelete(partPath);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Downloads <c>SHA256SUMS</c> and <c>SHA256SUMS.minisig</c> from the release and returns the checksums text only
+    /// when the signature is valid for this release's tag. There is no unsigned fallback.
+    /// </summary>
+    public async Task<string> DownloadVerifiedSumsAsync(
+        ReleaseDocument release,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(release);
+
+        // A release whose asset list we have and that lists no signature is unsigned; don't bother downloading.
+        if (release.Assets.Count > 0
+            && !release.Assets.Any(a => string.Equals(a.Name, ReleaseSignature.AssetName, StringComparison.Ordinal)))
+        {
+            throw new UpdateException(UpdateErrorCode.SignatureMissing, "The release has no SHA256SUMS.minisig.");
+        }
+
+        var sumsBytes = await DownloadBytesAsync(
+            new Uri(ReleaseDocumentParser.ExpectedDownloadUrl(release.Version, "SHA256SUMS")),
+            pinnedSize: Sha256Sums.MaxBytes,
+            absoluteDeadline: TimeSpan.FromMinutes(1),
+            cancellationToken).ConfigureAwait(false);
+        if (sumsBytes.Length > Sha256Sums.MaxBytes)
+            throw new UpdateException(UpdateErrorCode.DownloadTooLarge, "SHA256SUMS exceeds 64 KiB.");
+
+        byte[] signature;
+        try
+        {
+            // The pin makes the stream copy stop at 16 KiB, and a bigger Content-Length is refused before reading.
+            signature = await DownloadBytesAsync(
+                new Uri(ReleaseDocumentParser.ExpectedDownloadUrl(release.Version, ReleaseSignature.AssetName)),
+                pinnedSize: SignedSha256Sums.MaxSignatureBytes,
+                absoluteDeadline: TimeSpan.FromMinutes(1),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (UpdateException ex) when (ex.HttpStatus == 404)
+        {
+            throw new UpdateException(UpdateErrorCode.SignatureMissing, "The release has no SHA256SUMS.minisig.", ex)
+            {
+                HttpStatus = ex.HttpStatus,
+                Host = ex.Host,
+            };
+        }
+        catch (UpdateException ex) when (ex.Code == UpdateErrorCode.DownloadTooLarge)
+        {
+            throw new UpdateException(UpdateErrorCode.SignatureInvalid, "SHA256SUMS.minisig exceeds 16 KiB.", ex)
+            {
+                Signature = SignatureStatus.TooLarge,
+            };
+        }
+
+        return SignedSha256Sums.EnsureValid(_signatureVerifier, release.TagName, sumsBytes, signature);
     }
 
     private async Task<UpdateInstallResult> ReplaceAppImageAsync(

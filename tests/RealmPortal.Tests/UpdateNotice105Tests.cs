@@ -6,6 +6,7 @@ using RealmPortal.Core.IO;
 using RealmPortal.Core.Servers;
 using RealmPortal.Core.Service;
 using RealmPortal.Core.Updates;
+using RealmPortal.Core.Updates.Signing;
 using RealmPortal.Tests.Support;
 
 namespace RealmPortal.Tests;
@@ -149,6 +150,11 @@ public class UpdateNotice105Tests
     [InlineData("v1.1.0", "1.0.1", UpdateCheckOutcome.Offer)]
     [InlineData("v1.0.1", "1.0.1", UpdateCheckOutcome.UpToDate)]
     [InlineData("v1.0.0", "1.0.1", UpdateCheckOutcome.UpToDate)]
+    // Only strictly newer versions are offered, so a 1.2.0+ app never offers an unsigned (pre-1.2.0) release (#116).
+    [InlineData("v1.2.0", "1.2.0", UpdateCheckOutcome.UpToDate)]
+    [InlineData("v1.1.0", "1.2.0", UpdateCheckOutcome.UpToDate)]
+    [InlineData("v1.2.1", "1.2.0", UpdateCheckOutcome.Offer)]
+    [InlineData("v2.0.0", "1.2.0", UpdateCheckOutcome.Offer)]
     public async Task VersionComparison(string tag, string running, UpdateCheckOutcome expected)
     {
         var (settings, cache, dir) = Stores();
@@ -472,7 +478,7 @@ public class UpdateNotice105Tests
         var asset = "realm-portal_1.1.0_amd64.deb";
         var url = ReleaseDocumentParser.ExpectedDownloadUrl(version, asset);
         var release = new ReleaseDocument(version, "v1.1.0", "", null,
-            [new ReleaseAsset(asset, url, 10)]);
+            [new ReleaseAsset(asset, url, 10), new ReleaseAsset(ReleaseSignature.AssetName, "", 0)]);
 
         // Need SHA256SUMS to succeed first — make handler serve sums then redirect asset
         handler.Responder = req =>
@@ -521,6 +527,11 @@ public class UpdateNotice105Tests
                     };
                 }
 
+                if (u == ReleaseDocumentParser.ExpectedDownloadUrl(version, ReleaseSignature.AssetName))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent("sig"u8.ToArray()) };
+                }
+
                 if (u == url)
                 {
                     return new HttpResponseMessage(HttpStatusCode.OK)
@@ -544,10 +555,11 @@ public class UpdateNotice105Tests
             client,
             installKind: () => InstallKind.Deb,
             appImageSelfReplace: () => false,
-            downloadsDirectory: () => downloads);
+            downloadsDirectory: () => downloads,
+            signatureVerifier: new AcceptAnySignature());
 
         var release = new ReleaseDocument(version, "v1.1.0", "notes", null,
-            [new ReleaseAsset(asset, url, payload.Length)]);
+            [new ReleaseAsset(asset, url, payload.Length), new ReleaseAsset(ReleaseSignature.AssetName, "", 0)]);
         var result = await dl.DownloadAndPlaceAsync(release);
         Assert.Equal(InstallKind.Deb, result.Kind);
         Assert.True(File.Exists(result.SavedPath));
@@ -575,5 +587,12 @@ public class UpdateNotice105Tests
             Assert.NotNull(s.UpdatesLaterUntilUtc);
             Assert.True(s.UpdatesLaterUntilUtc > DateTimeOffset.Parse("2026-10-29T12:00:00Z"));
         }
+    }
+
+    /// <summary>Signature checks have their own tests (SignedUpdateDownloadTests); this one is about placing the file.</summary>
+    private sealed class AcceptAnySignature : IReleaseSignatureVerifier
+    {
+        public SignatureStatus Verify(ReadOnlySpan<byte> signedContent, ReadOnlySpan<byte> signatureFile, string expectedTrustedComment) =>
+            SignatureStatus.Valid;
     }
 }

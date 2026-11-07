@@ -458,7 +458,7 @@ public sealed partial class MainViewModel : ObservableObject
                 ExceptionLog.Default.Write(ex, "Main.InstallUpdate");
                 await ConfirmAsync(new ConfirmDialogViewModel(
                     "update.install.failed.title",
-                    "update.install.failed.body",
+                    UpdateInstallPresentation.FailureBodyKey(ex),
                     "dialog.ok")).ConfigureAwait(true);
             }
         }
