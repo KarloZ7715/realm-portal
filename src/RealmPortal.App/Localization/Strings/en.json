@@ -443,7 +443,7 @@
   "update.install.failed.title": "Update failed",
   "update.install.failed.body": "Could not download or verify the update. Try again, or open the release page.",
   "settings.config": "APP CONFIGURATION",
-  "settings.config.hint": "A .bak copy of each file is kept on every change. Restore is offered when the main file is damaged and the copy is valid.",
+  "settings.config.hint": "A backup copy of each file is kept on every change. Restore is offered when the main file is damaged and the copy is valid.",
   "settings.config.servers": "servers.json",
   "settings.config.clients": "clients.json",
   "settings.config.preferences": "ui-preferences.json",

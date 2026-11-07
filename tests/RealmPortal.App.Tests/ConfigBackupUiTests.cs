@@ -111,6 +111,145 @@ public sealed class ConfigBackupUiTests
     }
 
     [AvaloniaFact]
+    public void Restore_IsDisabledWhenCurrentAndBackupAreBothValid()
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        // Two writes so servers.json.bak exists and is valid.
+        env.Session.Service.AddServer(new NewServer("Demo", "logon.example.com", ClientId: cid));
+        env.Session.Service.AddServer(new NewServer("Second", "play.example.net", ClientId: cid));
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        env.Session.UiPreferences.Save(new UiPreferences("en", [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Settings.ReloadConfigBackups();
+        var bothValid = main.Settings.ConfigBackups
+            .Where(r => r.Current == ConfigFileState.Valid && r.Backup == ConfigFileState.Valid)
+            .ToList();
+        Assert.Contains(bothValid, r => r.Kind == ConfigFileKind.Servers);
+        Assert.All(bothValid, row =>
+        {
+            Assert.False(row.CanRestore);
+            Assert.False(row.RestoreCommand.CanExecute(null));
+            Assert.True(row.ShowRestoreDisabledReason);
+            Assert.Contains("valid", row.RestoreDisabledReason, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    public static TheoryData<bool, Language, Language> LanguageSwitchCases => new()
+    {
+        { false, Language.En, Language.Es },
+        { false, Language.Es, Language.En },
+        { true, Language.En, Language.Es },
+        { true, Language.Es, Language.En },
+    };
+
+    /// <summary>
+    /// F1: switching language through the real controls (Settings selector or the global toggle)
+    /// re-renders every backup row: badges, date line, reason and HelpText. No manual RefreshText.
+    /// </summary>
+    [AvaloniaTheory]
+    [MemberData(nameof(LanguageSwitchCases))]
+    public void LanguageSwitch_RerendersBackupRows(bool globalToggle, Language from, Language to)
+    {
+        using var env = new Env();
+        var client = env.CreateClient("wotlk");
+        var cid = env.Session.Service.AddClient(client, "WotLK").Value!.Id;
+        env.Session.Service.AddServer(new NewServer("Demo", "logon.example.com", ClientId: cid));
+        env.Session.Service.AddServer(new NewServer("Second", "play.example.net", ClientId: cid));
+        File.WriteAllText(Path.Combine(env.Config, "servers.json"), "{ not json");
+        var code = from == Language.Es ? "es" : "en";
+        env.Session.UiPreferences.Save(new UiPreferences(code, [cid], FirstScanCompleted: true, WelcomeCompleted: true));
+        Loc.Instance.SetLanguage(from);
+        var main = new MainViewModel(env.Session, autoTick: false);
+        main.Settings.ReloadConfigBackups();
+
+        var window = new MainWindow(main) { Width = 960, Height = 600 };
+        window.Show();
+        main.SectionIndex = 2;
+        Screenshots.Settle();
+        var view = window.GetVisualDescendants().OfType<SettingsView>().Single();
+        var before = RenderedRows(view);
+
+        try
+        {
+            if (globalToggle)
+            {
+                var toggle = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LanguageButton");
+                toggle.Command!.Execute(toggle.CommandParameter);
+            }
+            else
+            {
+                var option = view.FindControl<RadioButton>(to == Language.Es ? "SpanishOption" : "EnglishOption")!;
+                option.IsChecked = true;
+            }
+
+            Screenshots.Settle();
+            Assert.Equal(to, Loc.Instance.Current);
+
+            var after = RenderedRows(view);
+            Assert.Equal(main.Settings.ConfigBackups.Count, after.Count);
+            for (var i = 0; i < after.Count; i++)
+            {
+                var row = main.Settings.ConfigBackups[i];
+                var shown = after[i];
+                Assert.Equal(ExpectedState(row.Current, current: true), shown.CurrentBadge);
+                Assert.Equal(ExpectedState(row.Backup, current: false), shown.BackupBadge);
+                Assert.Equal(row.DetailText, shown.Detail);
+                if (row.BackupModifiedAt is { } at)
+                    Assert.Contains(ConfigBackupItemViewModel.FormatBackupDate(at), shown.Detail, StringComparison.Ordinal);
+                Assert.Equal(row.RestoreDisabledReason, shown.Reason);
+                Assert.Equal(row.RestoreDisabledReason, shown.HelpText);
+                Assert.Equal(row.StatusAccessibleName, shown.AccessibleName);
+                Assert.NotEqual(before[i].CurrentBadge, shown.CurrentBadge);
+                Assert.NotEqual(before[i].Detail, shown.Detail);
+                if (row.ShowRestoreDisabledReason)
+                    Assert.NotEqual(before[i].Reason, shown.Reason);
+            }
+        }
+        finally
+        {
+            window.Close();
+            Loc.Instance.SetLanguage(Language.En);
+        }
+    }
+
+    private static string ExpectedState(ConfigFileState state, bool current) => state switch
+    {
+        ConfigFileState.Valid => Loc.Get(current ? "settings.config.state.current.valid" : "settings.config.state.backup.valid"),
+        ConfigFileState.Damaged => Loc.Get(current ? "settings.config.state.current.damaged" : "settings.config.state.backup.damaged"),
+        _ => Loc.Get("settings.config.state.missing"),
+    };
+
+    private sealed record ShownRow(string? CurrentBadge, string? BackupBadge, string? Detail, string? Reason, string? HelpText, string? AccessibleName);
+
+    private static List<ShownRow> RenderedRows(SettingsView view)
+    {
+        var list = view.FindControl<ItemsControl>("ConfigBackupList")!;
+        var rows = new List<ShownRow>();
+        foreach (var border in list.GetVisualDescendants().OfType<Border>()
+                     .Where(b => b.DataContext is ConfigBackupItemViewModel && b.Parent is Avalonia.Controls.Presenters.ContentPresenter))
+        {
+            var badges = border.GetVisualDescendants().OfType<Badge>().ToList();
+            var texts = border.GetVisualDescendants().OfType<TextBlock>()
+                .Where(t => t.Classes.Contains("footnote")).ToList();
+            var button = border.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "RestoreConfigButton");
+            // Badge shows DisplayText (upper case of Text); compare Text and check DisplayText follows it.
+            foreach (var b in badges)
+                Assert.Equal(b.Text?.ToUpper(System.Globalization.CultureInfo.CurrentUICulture), b.DisplayText);
+            rows.Add(new ShownRow(
+                badges[0].Text,
+                badges[1].Text,
+                texts[0].Text,
+                texts[1].Text,
+                Avalonia.Automation.AutomationProperties.GetHelpText(button),
+                Avalonia.Automation.AutomationProperties.GetName(border)));
+        }
+
+        return rows;
+    }
+
+    [AvaloniaFact]
     public void Restore_IsDisabledWhenBackupMissing_WithReason()
     {
         using var env = new Env();

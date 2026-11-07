@@ -443,7 +443,7 @@
   "update.install.failed.title": "Error al actualizar",
   "update.install.failed.body": "No se pudo descargar o verificar la actualización. Inténtalo de nuevo o abre la página de la versión.",
   "settings.config": "CONFIGURACIÓN DE LA APP",
-  "settings.config.hint": "Se guarda una copia .bak de cada archivo en cada cambio. Restaurar se ofrece cuando el archivo principal está dañado y la copia es válida.",
+  "settings.config.hint": "Se guarda una copia de seguridad de cada archivo en cada cambio. Restaurar se ofrece cuando el archivo principal está dañado y la copia es válida.",
   "settings.config.servers": "servers.json",
   "settings.config.clients": "clients.json",
   "settings.config.preferences": "ui-preferences.json",

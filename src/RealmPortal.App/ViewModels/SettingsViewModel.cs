@@ -400,15 +400,20 @@ public sealed partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    public override void RefreshText() => Changed();
-
-    private void SetLanguage(Language language)
+    public override void RefreshText()
     {
+        Changed();
+        // Rows format their text from Loc; refresh them after the culture changed (#196).
         foreach (var item in ConfigBackups)
             item.RefreshText();
         OnPropertyChanged(nameof(ConfigMessage));
+    }
+
+    private void SetLanguage(Language language)
+    {
         if (Loc.Instance.Current != language)
         {
+            // Loc.Changed reaches MainViewModel.OnLanguageChanged, which calls RefreshText().
             Loc.Instance.SetLanguage(language);
         }
     }
