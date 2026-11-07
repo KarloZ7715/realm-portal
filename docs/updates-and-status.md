@@ -176,7 +176,9 @@ This only runs when the build has a download-capable `InstallKind`; published pa
    - `SHA256SUMS` over 64 KiB: `DownloadTooLarge`.
    - `SHA256SUMS.minisig` over 16 KiB: `SignatureInvalid` (`SignatureStatus.TooLarge`).
    - `SHA256SUMS.minisig` answering 404: `SignatureMissing` (the release is unsigned).
-   - Any other HTTP status or a timeout on either file: `UpdateCheckFailed`. An off-allowlist redirect: `UntrustedRedirect`.
+   - 403 or 429 on either file: `RateLimited` (with `Retry-After` when GitHub sends it).
+   - Any other non-200 status, a connect or read timeout, or the overall deadline on either file: `UpdateCheckFailed`.
+   - A redirect off the allowlist, without `Location`, or more than 5 hops: `UntrustedRedirect`.
 3. The expected trusted comment is built from the raw tag of the release (`ReleaseSignature.TrustedCommentFor(string)`),
    including any pre-release suffix. `ReleaseVersion.TagName` has none, so it is not used for this. Download URLs are
    still built from `ReleaseVersion`, and prereleases are never offered, so this does not make rc updates work in-app.
