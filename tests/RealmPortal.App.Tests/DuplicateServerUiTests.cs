@@ -456,8 +456,10 @@ public sealed class DuplicateServerUiTests
         Assert.Equal(3, env.Session.Service.ListServers(compatibleOnly: false).Value!.Count);
     }
 
-    [AvaloniaFact]
-    public void Duplicate_Save_CopiesExtrasViaDuplicateServerPath()
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Duplicate_Save_CopiesExtrasViaDuplicateServerPath(bool editExtras)
     {
         using var env = new Env();
         var client = env.CreateClient("wotlk");
@@ -475,13 +477,15 @@ public sealed class DuplicateServerUiTests
         Assert.True(form.IsAdvancedExpanded);
         Assert.Equal("set patchlist example.com", form.ExtraRealmlistLinesText);
         Assert.Equal(1, form.NonBlankExtraLineCount);
-        form.ExtraRealmlistLinesText += "\nset portal example.net";
+        if (editExtras)
+            form.ExtraRealmlistLinesText = "set patchlist patch.example.com";
         form.SaveCommand.Execute(null);
         Assert.Null(form.SaveError);
-        var copy = Assert.Single(env.Session.Service.ListServers(compatibleOnly: false).Value!, s => s.Id != original.Id);
-        Assert.Contains("set patchlist example.com", copy.ExtraRealmlistLines!);
-        Assert.Contains("set portal example.net", copy.ExtraRealmlistLines!);
-        Assert.DoesNotContain("set portal example.net", env.Session.Service.ListServers(compatibleOnly: false).Value!.Single(s => s.Id == original.Id).ExtraRealmlistLines);
+        Assert.Null(form.ExtraLinesError);
+        var saved = env.Session.Service.ListServers(compatibleOnly: false).Value!;
+        var copy = Assert.Single(saved, s => s.Id != original.Id);
+        Assert.Equal([editExtras ? "set patchlist patch.example.com" : "set patchlist example.com"], copy.ExtraRealmlistLines);
+        Assert.Equal(["set patchlist example.com"], saved.Single(s => s.Id == original.Id).ExtraRealmlistLines);
     }
 
     [AvaloniaFact]

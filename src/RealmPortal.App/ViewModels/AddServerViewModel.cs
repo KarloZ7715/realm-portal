@@ -584,6 +584,89 @@ public sealed partial class AddServerViewModel : ViewModelBase
         && string.Equals(hostForServer, _sourceHost, StringComparison.OrdinalIgnoreCase)
         && string.Equals(realm, _sourceRealm, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Localized unique duplicate name: <c>"Name (copy)"</c> / <c>"Name (copia)"</c>, then <c>" (copy 2)"</c> / <c>" (copia 2)"</c>, …
+    /// Prefixes are cut by whole text elements so a trailing emoji is not split (same rule as Core #219).
+    /// </summary>
+    internal static string CreateLocalizedDuplicateName(string name, IReadOnlyList<string> existingNames)
+    {
+        // "Foo (copy)" / "Foo (copia)" → next free "Foo (copy 2)" / "Foo (copia 2)", not "Foo (copy) (copy)".
+        var basis = StripTrailingDuplicateSuffix(name.Trim());
+        for (var number = 1; ; number++)
+        {
+            var tail = number == 1
+                ? Loc.Get("servers.duplicate.suffix")
+                : Loc.Format("servers.duplicate.suffix.n", number);
+            var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
+            var candidate = (prefix + tail).Trim();
+            if (!existingNames.Any(n => string.Equals(n, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    /// <summary>Removes a trailing localized <c>(copy)</c> / <c>(copy N)</c> (and ES <c>copia</c>) so renumbering is clean.</summary>
+    internal static string StripTrailingDuplicateSuffix(string name)
+    {
+        var suffixes = new[]
+        {
+            Loc.Get("servers.duplicate.suffix"),
+            // EN/ES templates for N≥2 share the same shape; try both languages so a mixed list still strips.
+            " (copy)",
+            " (copia)",
+        };
+        foreach (var suffix in suffixes.Distinct(StringComparer.Ordinal))
+        {
+            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return name[..^suffix.Length].TrimEnd();
+            }
+        }
+
+        // " (copy 12)" / " (copia 3)"
+        foreach (var marker in new[] { " (copy ", " (copia " })
+        {
+            var idx = name.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (idx <= 0 || !name.EndsWith(')'))
+            {
+                continue;
+            }
+
+            var num = name[(idx + marker.Length)..^1];
+            if (num.Length > 0 && num.All(char.IsAsciiDigit))
+            {
+                return name[..idx].TrimEnd();
+            }
+        }
+
+        return name;
+    }
+
+    /// <summary>Longest prefix of whole grapheme clusters within <paramref name="maxLength"/> UTF-16 chars.</summary>
+    internal static string TruncateToTextElements(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        var end = 0;
+        var elements = StringInfo.GetTextElementEnumerator(value);
+        while (elements.MoveNext())
+        {
+            var next = elements.ElementIndex + ((string)elements.Current).Length;
+            if (next > maxLength)
+            {
+                break;
+            }
+
+            end = next;
+        }
+
+        return value[..end];
+    }
+
 
     [RelayCommand]
     private void Cancel()

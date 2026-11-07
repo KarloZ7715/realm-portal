@@ -8,6 +8,8 @@ namespace RealmPortal.App.Views;
 
 public partial class ServersView : UserControl
 {
+    private MenuFlyout? _reopeningMenuAboveStatusBar;
+
     public ServersView() => InitializeComponent();
 
     /// <summary>
@@ -22,6 +24,12 @@ public partial class ServersView : UserControl
         }
 
         flyout.VerticalOffset = 0;
+        // Preserve an explicit upward retry; recomputing the estimate can reopen the menu forever.
+        if (ReferenceEquals(flyout, _reopeningMenuAboveStatusBar))
+        {
+            return;
+        }
+
         var target = flyout.Target as Control;
         if (target is null || TopLevel.GetTopLevel(target) is not Window window)
         {
@@ -56,7 +64,7 @@ public partial class ServersView : UserControl
             : PlacementMode.TopEdgeAlignedRight;
     }
 
-    private static void ClampMenuAboveStatusBar(MenuFlyout flyout, bool flipIfNeeded)
+    private void ClampMenuAboveStatusBar(MenuFlyout flyout, bool flipIfNeeded)
     {
         var target = flyout.Target as Control;
         if (target is null || TopLevel.GetTopLevel(target) is not Window window)
@@ -93,7 +101,15 @@ public partial class ServersView : UserControl
             flyout.Hide();
             flyout.Placement = PlacementMode.TopEdgeAlignedRight;
             flyout.VerticalOffset = 0;
-            flyout.ShowAt(target);
+            _reopeningMenuAboveStatusBar = flyout;
+            try
+            {
+                flyout.ShowAt(target);
+            }
+            finally
+            {
+                _reopeningMenuAboveStatusBar = null;
+            }
             // Opened will fire again and clamp without flipping in a loop.
             return;
         }
