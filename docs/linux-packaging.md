@@ -22,7 +22,7 @@ On a tag push, after both package jobs succeed, the **draft-release** job in `.g
 
 Linux outputs are also uploaded as a workflow artifact named `realm-portal-linux-<version>` containing:
 
-- `realm-portal_<deb-version>_amd64.deb` (SemVer prerelease dashes become `~` in the Debian version/filename, e.g. `1.1.0-rc.1` → `realm-portal_1.1.0~rc.1_amd64.deb`, so dpkg sorts the rc below the final release)
+- `realm-portal_<version>_amd64.deb` (the file name keeps the SemVer form, e.g. `realm-portal_1.1.0-rc.1_amd64.deb`, because GitHub renames `~` to `.` in release asset names; the package's Debian `Version` field still turns prerelease dashes into `~`, e.g. `1.1.0~rc.1`, so dpkg sorts the rc below the final release)
 - `RealmPortal-<version>-x86_64.AppImage` (keeps the SemVer form, e.g. `…-1.1.0-rc.1-…`)
 - `SHA256SUMS` (checksums for the `.deb` and AppImage)
 
