@@ -597,6 +597,33 @@ public sealed partial class MainViewModel : ObservableObject
         SyncProbeListVisibility();
     }
 
+
+    private void ShowDuplicateServer(ServerItemViewModel card)
+    {
+        if (_session is null || card.ServerId is null || !card.CanDuplicate || _adding is not null)
+            return;
+
+        var serversResult = _session.Service.ListServers(compatibleOnly: false);
+        if (!serversResult.Succeeded)
+            return;
+
+        var entry = serversResult.Value!.FirstOrDefault(server => server.Id == card.ServerId);
+        if (entry is null)
+            return;
+
+        SectionIndex = 0;
+        _adding = new AddServerViewModel(Clients, _session, entry, () =>
+        {
+            Servers.ReloadFromService();
+            CloseAddServer();
+        }, CloseAddServer, duplicate: true, _probe);
+        _adding.PropertyChanged += OnSectionChanged;
+        OnPropertyChanged(nameof(Adding));
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(StatusText));
+        SyncProbeListVisibility();
+    }
+
     private void CloseAddServer()
     {
         if (_adding is null)
@@ -810,6 +837,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         Servers.AddServerRequested += ShowAddServer;
         Servers.EditServerRequested += ShowEditServer;
+        Servers.DuplicateServerRequested += ShowDuplicateServer;
         Servers.ConfirmDeleteServerAsync = ConfirmDeleteServerAsync;
         Loc.Instance.Changed += OnLanguageChanged;
     }

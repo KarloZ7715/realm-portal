@@ -62,7 +62,9 @@ These are implemented as designed in `UX-DESIGN.md` section 2b ("Definido aquí"
 
 ---
 
-### Server card edit & delete
+### Server card edit, duplicate & delete
+
+**Duplicate server…** (`Duplicar servidor…`, `menu.duplicate`) sits after Edit and before the separator that leads to Delete in the card menu. The menu flyout opens downward when it fits above the status bar, otherwise upward, and is clamped to keep its bottom above the status bar (#191); at some small window heights the flipped menu can still overlap the status bar by a few pixels (known follow-up). It opens the add-server form prefilled from the source (localized name suffix `servers.duplicate.suffix` / `.suffix.n`, host, realm, account, required build, Cache/WDB override); the Name box is focused with the full name selected. Saving uses Core `DuplicateServer` (source address may be kept; a third server's host+realm is still rejected) and Core copies the source's extra realmlist lines; if applying the form's edits to the copy fails, the copy is removed so the server list is unchanged. Names already ending in `(copy)`/`(copia)` become `(copy 2)`. Editing or deleting the copy does not change the original.
 
 #### 1.1 `Play ▾` (`Jugar ▾`) SplitButton Flyout Menu (`ServersView.axaml`)
 - **Figma reference:** `compact-play-menu@2x.png` (`49:5882`) and `compact-play-menu-disabled@2x.png` (`49:6127`).
@@ -296,6 +298,14 @@ All keys below are specified for `src/RealmPortal.App/Localization/Strings/en.js
 | `menu.switch` | `Switch only` | `Solo cambiar` |
 | `menu.repair` | `Repair` | `Reparar` |
 | `menu.edit` | `Edit server…` | `Editar servidor…` |
+| `menu.duplicate` | `Duplicate server…` | `Duplicar servidor…` |
+| `menu.duplicate.hint` | `Makes a copy to edit; the original stays as it is.` | `Crea una copia para editarla; el original no cambia.` |
+| `servers.duplicate.suffix` | ` (copy)` | ` (copia)` |
+| `servers.duplicate.title` | `Duplicate server` | `Duplicar servidor` |
+| `servers.duplicate.subtitle` | `Review the copy, then save. Editing it later will not change the original.` | `Revisa la copia y guárdala. Editarla después no cambia el original.` |
+| `status.duplicate` | `Duplicate server · not saved` | `Duplicar servidor · sin guardar` |
+| `servers.duplicate.suffix.n` | ` (copy {0})` | ` (copia {0})` |
+| `servers.duplicate.save` | `Save copy` | `Guardar copia` |
 | `menu.delete` | `Delete server…` | `Eliminar servidor…` |
 | `menu.disabled.running` | `Unavailable while the game is running` | `No disponible con el juego en marcha` |
 | `menu.disabled.clientrunning` | `Close the game on {0} to switch or edit` | `Cierra el juego en {0} para cambiar o editar` |
