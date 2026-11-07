@@ -13,7 +13,7 @@ public static class ReleaseSigningKeys
     // throw, both at the first update check; ReleaseSigningKeysTests catches both.
     private static readonly string[] Encoded =
     [
-        "RWSW4jj1A5Idp08WKXT16AwD21ICuzdEz0CoIx39Wji6Zsffoqkq96Sl", // key ID A71D9203F538E296
+        "RWQV2QBmzLEDDRz6sZBwByp5xDjn0Cg2QgVTegnK4ZhbLv+pOGSXAQS8", // key ID 0D03B1CC6600D915
     ];
 
     public static IReadOnlyList<MinisignPublicKey> Trusted { get; } =

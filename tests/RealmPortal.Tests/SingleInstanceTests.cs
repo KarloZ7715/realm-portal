@@ -12,7 +12,8 @@ namespace RealmPortal.Tests;
 /// <summary>
 /// Single-instance guard (#197). Every test uses its own temp directory as the instance scope, so nothing depends on
 /// a global instance or the user's real config directory. Cross-process tests run the test assembly itself as a probe
-/// (<see cref="ProbeProgram"/>).
+/// (<see cref="ProbeProgram"/>). Blocking claim, raw-channel and probe tests await a dedicated caller thread so
+/// their in-process listener and I/O continuations can use the pool even on a busy test runner.
 /// </summary>
 public class SingleInstanceTests
 {
@@ -24,7 +25,7 @@ public class SingleInstanceTests
     };
 
     [Fact]
-    public void FirstClaim_IsPrimaryAndListens()
+    public Task FirstClaim_IsPrimaryAndListens() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -38,10 +39,10 @@ public class SingleInstanceTests
         Assert.True(File.Exists(endpoint.LockPath));
         if (!OperatingSystem.IsWindows())
             Assert.True(File.Exists(endpoint.ChannelAddress));
-    }
+    });
 
     [Fact]
-    public void SecondClaim_ForwardsTheMessageToThePrimaryHandler()
+    public Task SecondClaim_ForwardsTheMessageToThePrimaryHandler() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -54,10 +55,10 @@ public class SingleInstanceTests
         Assert.Equal(InstanceReply.Ok, second.Reply);
         Assert.True(second.ShouldExit);
         Assert.Equal(new InstanceMessage("play", ["realm one", "ñ"]), received.Take());
-    }
+    });
 
     [Fact]
-    public void SeveralForwards_AreAllDeliveredInOrder()
+    public Task SeveralForwards_AreAllDeliveredInOrder() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -72,10 +73,10 @@ public class SingleInstanceTests
 
         for (var i = 0; i < 5; i++)
             Assert.Equal(i.ToString(), Assert.Single(received.Take().Args));
-    }
+    });
 
     [Fact]
-    public void AVerbThePrimaryDoesNotHandle_IsReportedAsUnsupported()
+    public Task AVerbThePrimaryDoesNotHandle_IsReportedAsUnsupported() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -86,10 +87,10 @@ public class SingleInstanceTests
 
         Assert.Equal(ClaimOutcome.Forwarded, second.Outcome);
         Assert.Equal(InstanceReply.Unsupported, second.Reply);
-    }
+    });
 
     [Fact]
-    public void AThrowingHandler_AnswersInvalid_AndTheListenerKeepsServing()
+    public Task AThrowingHandler_AnswersInvalid_AndTheListenerKeepsServing() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -102,10 +103,10 @@ public class SingleInstanceTests
         using var second = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
 
         Assert.Equal(InstanceReply.Ok, second.Reply);
-    }
+    });
 
     [Fact]
-    public void Dispose_ReleasesTheLockAndRemovesTheSocket()
+    public Task Dispose_ReleasesTheLockAndRemovesTheSocket() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -117,10 +118,10 @@ public class SingleInstanceTests
         using var next = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
         Assert.Equal(ClaimOutcome.Primary, next.Outcome);
         Assert.True(next.IsListening);
-    }
+    });
 
     [Fact]
-    public void DifferentDirectories_AreIndependentInstances()
+    public Task DifferentDirectories_AreIndependentInstances() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         using var a = SingleInstance.Claim(InstanceEndpoint.For(dir.Combine("a")), InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
@@ -130,10 +131,10 @@ public class SingleInstanceTests
         Assert.Equal(ClaimOutcome.Primary, a.Outcome);
         Assert.Equal(ClaimOutcome.Primary, b.Outcome);
         Assert.Equal(ClaimOutcome.Primary, other.Outcome);
-    }
+    });
 
     [Fact]
-    public void ALockHeldWithoutAListener_TimesOutAsPrimaryUnresponsive()
+    public Task ALockHeldWithoutAListener_TimesOutAsPrimaryUnresponsive() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -147,10 +148,10 @@ public class SingleInstanceTests
         Assert.False(claim.ShouldExit);
         Assert.NotNull(claim.Detail);
         Assert.True(timer.Elapsed < TimeSpan.FromSeconds(10), $"took {timer.Elapsed}");
-    }
+    });
 
     [UnixFact]
-    public void APrimaryThatAcceptsButNeverAnswers_TimesOutAsPrimaryUnresponsive()
+    public Task APrimaryThatAcceptsButNeverAnswers_TimesOutAsPrimaryUnresponsive() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -166,10 +167,10 @@ public class SingleInstanceTests
         Assert.Equal(ClaimOutcome.PrimaryUnresponsive, claim.Outcome);
         Assert.Contains("did not answer", claim.Detail);
         Assert.True(timer.Elapsed < TimeSpan.FromSeconds(10), $"took {timer.Elapsed}");
-    }
+    });
 
     [Fact]
-    public void ALockDirectoryThatIsAFile_IsUnavailable_NotAnException()
+    public Task ALockDirectoryThatIsAFile_IsUnavailable_NotAnException() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var path = dir.Combine("config");
@@ -179,12 +180,12 @@ public class SingleInstanceTests
 
         Assert.Equal(ClaimOutcome.Unavailable, claim.Outcome);
         Assert.False(claim.ShouldExit);
-    }
+    });
 
     /// <remarks>A real stale socket (left by a killed process) is covered by <see cref="AKilledPrimaryProcess_DoesNotBlockTheNextStart"/>;
     /// a socket closed in-process cannot be staged because .NET unlinks the path on dispose.</remarks>
     [UnixFact]
-    public void AStaleFileAtTheSocketPathWithoutALock_IsReplacedByTheNextPrimary()
+    public Task AStaleFileAtTheSocketPathWithoutALock_IsReplacedByTheNextPrimary() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -199,10 +200,10 @@ public class SingleInstanceTests
         Assert.True(primary.IsListening);
         Assert.Equal(ClaimOutcome.Forwarded, second.Outcome);
         Assert.Equal(InstanceMessage.Focus, received.Take());
-    }
+    });
 
     [NonPrivilegedUnixFact]
-    public void TheSocketAndTheLockFile_AreOwnerOnly()
+    public Task TheSocketAndTheLockFile_AreOwnerOnly() => DedicatedThread.Run(() =>
     {
         if (OperatingSystem.IsWindows())
             return; // Skipped by the attribute; this guard is for the platform analyzer.
@@ -215,10 +216,10 @@ public class SingleInstanceTests
         Assert.Equal(ownerReadWrite, File.GetUnixFileMode(endpoint.ChannelAddress!));
         Assert.Equal(ownerReadWrite, File.GetUnixFileMode(endpoint.LockPath));
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(endpoint.Directory));
-    }
+    });
 
     [UnixFact]
-    public void ALongDirectory_UsesAShortSocketUnderXdgRuntimeDir_AndStillWorks()
+    public Task ALongDirectory_UsesAShortSocketUnderXdgRuntimeDir_AndStillWorks() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         using var runtime = ShortTempDirectory.Create();
@@ -238,7 +239,7 @@ public class SingleInstanceTests
         Assert.True(primary.IsListening);
         Assert.Equal(ClaimOutcome.Forwarded, second.Outcome);
         Assert.Equal(InstanceMessage.Focus, received.Take());
-    }
+    });
 
     [UnixFact]
     public void AnXdgRuntimeDirThatIsTooLong_FallsBackToThePrivateTempFolder()
@@ -256,7 +257,7 @@ public class SingleInstanceTests
     }
 
     [UnixFact]
-    public void WhenNoCandidateFits_ThereIsNoChannel_ButTheLockStillWorks()
+    public Task WhenNoCandidateFits_ThereIsNoChannel_ButTheLockStillWorks() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var deep = dir.Combine(new string('d', 60), new string('e', 60));
@@ -271,7 +272,7 @@ public class SingleInstanceTests
         Assert.Equal(ClaimOutcome.Primary, primary.Outcome);
         Assert.False(primary.IsListening);
         Assert.Equal(ClaimOutcome.PrimaryUnresponsive, second.Outcome);
-    }
+    });
 
     [Theory]
     [InlineData(100, true)]
@@ -301,7 +302,7 @@ public class SingleInstanceTests
     }
 
     [NonPrivilegedUnixFact]
-    public void ALongDirectoryWithoutXdgRuntimeDir_UsesAPrivateTempFolder()
+    public Task ALongDirectoryWithoutXdgRuntimeDir_UsesAPrivateTempFolder() => DedicatedThread.Run(() =>
     {
         if (OperatingSystem.IsWindows())
             return; // Skipped by the attribute; this guard is for the platform analyzer.
@@ -321,10 +322,10 @@ public class SingleInstanceTests
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(socketDir));
         Assert.Equal(ClaimOutcome.Forwarded, second.Outcome);
         Assert.Equal(InstanceMessage.Focus, received.Take());
-    }
+    });
 
     [UnixFact]
-    public void AFallbackFolderThatIsASymlink_IsRefused_AndThePrimaryStillStarts()
+    public Task AFallbackFolderThatIsASymlink_IsRefused_AndThePrimaryStillStarts() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         using var tmp = ShortTempDirectory.Create();
@@ -339,7 +340,7 @@ public class SingleInstanceTests
         Assert.Equal(ClaimOutcome.Primary, primary.Outcome);
         Assert.False(primary.IsListening);
         Assert.Contains("symbolic link", primary.Detail);
-    }
+    });
 
     /// <summary>
     /// QA finding: another local user can pre-create the predictable fallback folder (mode 0777) and listen there. A
@@ -347,7 +348,7 @@ public class SingleInstanceTests
     /// would answer.
     /// </summary>
     [NonPrivilegedUnixFact]
-    public void ASecondLaunch_RefusesAFallbackFolderThatIsNotPrivate()
+    public Task ASecondLaunch_RefusesAFallbackFolderThatIsNotPrivate() => DedicatedThread.Run(() =>
     {
         if (OperatingSystem.IsWindows())
             return; // Skipped by the attribute; this guard is for the platform analyzer.
@@ -371,10 +372,10 @@ public class SingleInstanceTests
         Assert.Contains("not private", claim.Detail);
         squatter.Blocking = false;
         Assert.Throws<SocketException>(() => squatter.Accept()); // nobody connected
-    }
+    });
 
     [LinuxFact]
-    public void ASecondLaunch_RefusesAPrimaryRunByAnotherUser()
+    public Task ASecondLaunch_RefusesAPrimaryRunByAnotherUser() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -387,10 +388,10 @@ public class SingleInstanceTests
         Assert.Equal(ClaimOutcome.PrimaryUnresponsive, claim.Outcome);
         Assert.Contains("Refused", claim.Detail);
         Assert.True(received.IsEmpty);
-    }
+    });
 
     [LinuxFact]
-    public void ThePrimary_DropsAClientRunByAnotherUser()
+    public Task ThePrimary_DropsAClientRunByAnotherUser() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -402,7 +403,7 @@ public class SingleInstanceTests
 
         Assert.Equal(ClaimOutcome.PrimaryUnresponsive, claim.Outcome);
         Assert.True(received.IsEmpty);
-    }
+    });
 
     [LinuxFact]
     public void PeerCredentials_ReportThisUserForALocalConnection()
@@ -421,7 +422,7 @@ public class SingleInstanceTests
     }
 
     [UnixFact]
-    public void ASymlinkAtTheSocketPath_IsRemovedWithoutTouchingItsTarget()
+    public Task ASymlinkAtTheSocketPath_IsRemovedWithoutTouchingItsTarget() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var config = dir.Combine("config");
@@ -437,10 +438,10 @@ public class SingleInstanceTests
         Assert.True(primary.IsListening);
         Assert.Equal(ClaimOutcome.Forwarded, second.Outcome);
         Assert.Equal("keep me", File.ReadAllText(target));
-    }
+    });
 
     [UnixFact]
-    public void ADanglingSymlinkAtTheSocketPath_IsRemoved()
+    public Task ADanglingSymlinkAtTheSocketPath_IsRemoved() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -449,10 +450,10 @@ public class SingleInstanceTests
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
 
         Assert.True(primary.IsListening);
-    }
+    });
 
     [UnixFact]
-    public void AnEmptyDirectoryAtTheSocketPath_IsRemoved()
+    public Task AnEmptyDirectoryAtTheSocketPath_IsRemoved() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -461,10 +462,10 @@ public class SingleInstanceTests
         using var primary = SingleInstance.Claim(endpoint, InstanceMessage.Focus, _ => InstanceReply.Ok, Fast);
 
         Assert.True(primary.IsListening);
-    }
+    });
 
     [UnixFact]
-    public void ANonEmptyDirectoryAtTheSocketPath_IsKept_AndThePrimaryRunsWithoutAChannel()
+    public Task ANonEmptyDirectoryAtTheSocketPath_IsKept_AndThePrimaryRunsWithoutAChannel() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -477,13 +478,13 @@ public class SingleInstanceTests
         Assert.False(primary.IsListening);
         Assert.NotNull(primary.Detail);
         Assert.Equal("keep me", File.ReadAllText(Path.Combine(endpoint.ChannelAddress!, "data.txt")));
-    }
+    });
 
     /// <summary>QA finding: with one connection served at a time, two or more silent clients used up the 3 s budget.</summary>
     [Theory]
     [InlineData(3)]
     [InlineData(12)] // more than the 8 concurrent slots
-    public void SilentClients_DoNotMakeARealLaunchOpenASecondWindow(int silentClients)
+    public Task SilentClients_DoNotMakeARealLaunchOpenASecondWindow(int silentClients) => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -504,9 +505,9 @@ public class SingleInstanceTests
         {
             silent.ForEach(s => s.Dispose());
         }
-    }
+    });
     [Fact]
-    public void PrimaryProcess_ReceivesTheFocusMessageFromThisProcess()
+    public Task PrimaryProcess_ReceivesTheFocusMessageFromThisProcess() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         using var probe = ProbeProcess.Start("instance-probe", "primary", dir.Path);
@@ -518,10 +519,10 @@ public class SingleInstanceTests
         Assert.Equal(InstanceReply.Ok, second.Reply);
         Assert.Equal("message focus", probe.WaitFor("message"));
         probe.Exit();
-    }
+    });
 
     [Fact]
-    public void SecondLaunchProcess_ForwardsAndExits()
+    public Task SecondLaunchProcess_ForwardsAndExits() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var received = new BlockingQueue();
@@ -539,10 +540,10 @@ public class SingleInstanceTests
 
         Assert.Equal(InstanceMessage.Focus, received.Take());
         Assert.Equal("unknown", received.Take().Verb);
-    }
+    });
 
     [Fact]
-    public void AKilledPrimaryProcess_DoesNotBlockTheNextStart()
+    public Task AKilledPrimaryProcess_DoesNotBlockTheNextStart() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -563,10 +564,10 @@ public class SingleInstanceTests
         Assert.True(next.IsListening);
         Assert.Equal(ClaimOutcome.Forwarded, forwarded.Outcome);
         Assert.Equal(InstanceMessage.Focus, received.Take());
-    }
+    });
 
     [LinuxFact]
-    public void AChildProcessOfTheKilledPrimary_DoesNotKeepTheLock()
+    public Task AChildProcessOfTheKilledPrimary_DoesNotKeepTheLock() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         int childId;
@@ -592,7 +593,7 @@ public class SingleInstanceTests
             child.Kill();
             child.WaitForExit(TimeSpan.FromSeconds(10));
         }
-    }
+    });
 
     public static TheoryData<string> GarbageRequests => new()
     {
@@ -612,7 +613,7 @@ public class SingleInstanceTests
 
     [Theory]
     [MemberData(nameof(GarbageRequests))]
-    public void GarbageRequests_AreAnsweredInvalid_NeverHandled_AndTheListenerKeepsServing(string request)
+    public Task GarbageRequests_AreAnsweredInvalid_NeverHandled_AndTheListenerKeepsServing(string request) => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -621,10 +622,10 @@ public class SingleInstanceTests
 
         Assert.Equal(InstanceReply.Invalid, RawExchange(endpoint, Encoding.UTF8.GetBytes(request)));
         AssertStillServes(endpoint, received);
-    }
+    });
 
     [Fact]
-    public void InvalidUtf8_IsAnsweredInvalid()
+    public Task InvalidUtf8_IsAnsweredInvalid() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -635,10 +636,10 @@ public class SingleInstanceTests
         bytes[37] = 0xFF;
         Assert.Equal(InstanceReply.Invalid, RawExchange(endpoint, bytes));
         AssertStillServes(endpoint, received);
-    }
+    });
 
     [Fact]
-    public void AnOversizedRequest_IsRejected_AndTheListenerKeepsServing()
+    public Task AnOversizedRequest_IsRejected_AndTheListenerKeepsServing() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -650,10 +651,10 @@ public class SingleInstanceTests
 
         Assert.True(reply is null or InstanceReply.Invalid, $"unexpected reply {reply}");
         AssertStillServes(endpoint, received);
-    }
+    });
 
     [Fact]
-    public void ASilentClient_IsDroppedAfterTheRequestTimeout_AndTheNextOneIsServed()
+    public Task ASilentClient_IsDroppedAfterTheRequestTimeout_AndTheNextOneIsServed() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -663,10 +664,10 @@ public class SingleInstanceTests
 
         using var silent = RawConnect(endpoint); // connects and sends nothing
         AssertStillServes(endpoint, received);
-    }
+    });
 
     [Fact]
-    public void AClientThatReadsTheReplyAfterTheRequestTimeout_StillGetsIt()
+    public Task AClientThatReadsTheReplyAfterTheRequestTimeout_StillGetsIt() => DedicatedThread.Run(() =>
     {
         // A busy machine can delay the client between sending its request and reading the reply. The reply must
         // stay available after the request deadline has passed (on Windows the pipe is closed by the primary).
@@ -686,10 +687,10 @@ public class SingleInstanceTests
         var line = InstanceProtocol.ReadLineAsync(stream, cts.Token).GetAwaiter().GetResult();
         Assert.NotNull(line);
         Assert.Equal(InstanceReply.Ok, InstanceProtocol.DecodeReply(line));
-    }
+    });
 
     [Fact]
-    public void AClientThatNeverReadsTheReply_IsDroppedAfterTheReplyTimeout_AndTheNextOneIsServed()
+    public Task AClientThatNeverReadsTheReply_IsDroppedAfterTheReplyTimeout_AndTheNextOneIsServed() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -708,10 +709,10 @@ public class SingleInstanceTests
         Assert.Equal(InstanceMessage.Focus, received.Take());
 
         AssertStillServes(endpoint, received);
-    }
+    });
 
     [Fact]
-    public void ConnectionsThatCloseImmediately_DoNotStopTheListener()
+    public Task ConnectionsThatCloseImmediately_DoNotStopTheListener() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();
         var endpoint = InstanceEndpoint.For(dir.Path);
@@ -722,7 +723,7 @@ public class SingleInstanceTests
             RawConnect(endpoint).Dispose();
 
         AssertStillServes(endpoint, received);
-    }
+    });
 
     [Property(MaxTest = 300)]
     public bool DecodingArbitraryBytes_NeverThrows(byte[] bytes)

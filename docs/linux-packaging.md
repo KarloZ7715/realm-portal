@@ -50,7 +50,7 @@ never goes to GitHub. The matching public key is committed as `minisign.pub` at 
 
 ### Release key
 
-The release key's public half is [`minisign.pub`](../minisign.pub) at the repository root, key ID `A71D9203F538E296`.
+The release key's public half is [`minisign.pub`](../minisign.pub) at the repository root, key ID `0D03B1CC6600D915`.
 The same key is built into the app (`ReleaseSigningKeys` in Core). `ReleaseSigningKeysTests` fails if the two ever
 differ. `.gitattributes` keeps `minisign.pub` byte-exact (LF) on every checkout. The secret key and its password stay
 offline with the maintainer. SECURITY.md covers rotation and what happens if the key is lost or leaked.
