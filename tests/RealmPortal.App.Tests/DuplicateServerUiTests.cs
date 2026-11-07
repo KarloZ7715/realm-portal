@@ -471,10 +471,17 @@ public sealed class DuplicateServerUiTests
         main.Servers.ReloadFromService();
         Assert.Single(main.Servers.Visible).DuplicateCommand.Execute(null);
         var form = Assert.IsType<AddServerViewModel>(main.Content);
+        // Advanced section (#192) is auto-expanded in duplicate mode with the source's lines and count.
+        Assert.True(form.IsAdvancedExpanded);
+        Assert.Equal("set patchlist example.com", form.ExtraRealmlistLinesText);
+        Assert.Equal(1, form.NonBlankExtraLineCount);
+        form.ExtraRealmlistLinesText += "\nset portal example.net";
         form.SaveCommand.Execute(null);
         Assert.Null(form.SaveError);
         var copy = Assert.Single(env.Session.Service.ListServers(compatibleOnly: false).Value!, s => s.Id != original.Id);
         Assert.Contains("set patchlist example.com", copy.ExtraRealmlistLines!);
+        Assert.Contains("set portal example.net", copy.ExtraRealmlistLines!);
+        Assert.DoesNotContain("set portal example.net", env.Session.Service.ListServers(compatibleOnly: false).Value!.Single(s => s.Id == original.Id).ExtraRealmlistLines);
     }
 
     [AvaloniaFact]

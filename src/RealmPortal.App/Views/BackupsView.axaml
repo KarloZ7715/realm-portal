@@ -51,8 +51,9 @@
     </Grid>
 
     <Grid Grid.Row="3">
-      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,10,10">
-        <ItemsControl Name="BackupList" ItemsSource="{Binding Backups}">
+      <ScrollViewer Name="BackupScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <!-- Bottom/right space is a margin on the list: ScrollViewer.Padding is not counted in the scroll extent (#210 follow-up). -->
+        <ItemsControl Name="BackupList" ItemsSource="{Binding Backups}" Margin="0,0,10,10">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><StackPanel Spacing="8"/></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>

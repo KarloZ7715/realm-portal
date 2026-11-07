@@ -40,7 +40,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
     private bool _formClosed;
     private readonly string? _editingServerId;
     private readonly ServerBuildOption? _initialBuild;
-    private readonly IReadOnlyList<string>? _extraRealmlistLines;
+    private readonly string _initialExtraLines = string.Empty;
     private readonly bool _isDuplicating;
     private readonly string? _sourceServerId;
     private readonly string? _sourceHost;
@@ -93,6 +93,9 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _initialBuild = BuildOptions.First(o => o.Build == entry.RequiredClientBuild);
         SelectedBuild = _initialBuild;
         ClearCacheOnSwitch = entry.ClearCacheOnSwitch;
+        ExtraRealmlistLinesText = string.Join('\n', entry.ExtraRealmlistLines);
+        _initialExtraLines = ExtraRealmlistLinesText;
+        IsAdvancedExpanded = entry.ExtraRealmlistLines.Count > 0;
         _initialInput = CurrentInput();
     }
 
@@ -109,9 +112,6 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _sourceServerId = entry.Id;
         _sourceHost = entry.Host;
         _sourceRealm = entry.Realm.Trim();
-        // Extras stay on the source; Core DuplicateServer copies them. Leaving this null means an
-        // AddServer fallback would drop them — the DuplicateServer path is required (#191 QA M4).
-        _extraRealmlistLines = null;
         Address = entry.Host;
         Realm = entry.Realm;
         Account = entry.Account ?? string.Empty;
@@ -137,13 +137,16 @@ public sealed partial class AddServerViewModel : ViewModelBase
             ? servers.Select(s => s.Name).ToList()
             : [];
         Name = CreateLocalizedDuplicateName(entry.Name, names);
+        ExtraRealmlistLinesText = string.Join('\n', entry.ExtraRealmlistLines);
+        _initialExtraLines = ExtraRealmlistLinesText;
+        IsAdvancedExpanded = entry.ExtraRealmlistLines.Count > 0;
         _initialInput = CurrentInput();
     }
 
-    private (string Name, string Address, string Realm, string Account, ClientItemViewModel? Client, ServerBuildOption? Build, bool? ClearCache) _initialInput;
+    private (string Name, string Address, string Realm, string Account, ClientItemViewModel? Client, ServerBuildOption? Build, bool? ClearCache, string Extra) _initialInput;
 
-    private (string, string, string, string, ClientItemViewModel?, ServerBuildOption?, bool?) CurrentInput() =>
-        (Name, Address, Realm, Account, SelectedClient, SelectedBuild, ClearCacheOnSwitch);
+    private (string, string, string, string, ClientItemViewModel?, ServerBuildOption?, bool?, string) CurrentInput() =>
+        (Name, Address, Realm, Account, SelectedClient, SelectedBuild, ClearCacheOnSwitch, ExtraRealmlistLinesText);
 
     /// <summary>True while every field still holds the value the form opened with (nothing typed or picked).</summary>
     public bool IsPristine => CurrentInput() == _initialInput;
@@ -161,7 +164,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     public bool IsDuplicating => _isDuplicating;
 
-    /// <summary>Build picker and Cache/WDB override: edit and duplicate (the copy keeps the source's values until changed).</summary>
+    /// <summary>Build and Cache/WDB fields show when editing or duplicating.</summary>
     public bool ShowBuildAndCacheFields => IsEditing || IsDuplicating;
 
     public string FormTitle => Loc.Get(IsEditing ? "edit.server.title" : IsDuplicating ? "servers.duplicate.title" : "add.title");
@@ -171,6 +174,40 @@ public sealed partial class AddServerViewModel : ViewModelBase
         : IsDuplicating ? Loc.Get("servers.duplicate.subtitle") : string.Empty;
 
     public string SaveLabel => Loc.Get(IsEditing ? "edit.server.save" : IsDuplicating ? "servers.duplicate.save" : "add.save");
+
+    /// <summary>Extra realmlist lines after <c>set realmlist</c>, one per row (#192). Blank lines are dropped on save.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExtraLinesError), nameof(HasExtraLinesError), nameof(AdvancedHeaderText), nameof(AdvancedHeaderAccessibleName), nameof(NonBlankExtraLineCount))]
+    private string _extraRealmlistLinesText = string.Empty;
+
+    /// <summary>Advanced section: collapsed by default; open when the server already has extra lines.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AdvancedHeaderAccessibleName))]
+    private bool _isAdvancedExpanded;
+
+    public string? ExtraLinesError { get; private set; }
+
+    public bool HasExtraLinesError => ExtraLinesError is not null;
+
+    /// <summary>Non-blank lines currently typed in the Advanced box (blank rows do not count).</summary>
+    public int NonBlankExtraLineCount => CountNonBlankExtraLines(ExtraRealmlistLinesText);
+
+    /// <summary>Expander header: "Advanced" or "Advanced · N line(s)" when the box has content.</summary>
+    public string AdvancedHeaderText
+    {
+        get
+        {
+            var n = NonBlankExtraLineCount;
+            if (n <= 0)
+                return Loc.Get("add.advanced");
+            return n == 1
+                ? Loc.Get("add.advanced.count.one")
+                : Loc.Format("add.advanced.count", n);
+        }
+    }
+
+    /// <summary>Accessible name for the Expander header, including the line count when present.</summary>
+    public string AdvancedHeaderAccessibleName => AdvancedHeaderText;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NameError), nameof(HasNameError))]
@@ -278,7 +315,7 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
     public override string StatusText => TestState == ConnectionTest.Testing
         ? Loc.Get("status.testing")
-        : Loc.Get(IsDuplicating ? "status.duplicate" : "status.add");
+        : Loc.Get(IsDuplicating ? "status.duplicate" : IsEditing ? "status.edit" : "status.add");
 
     private bool IsNameValid => Name.Trim().Length is > 0 and <= Server.MaxNameLength;
 
@@ -323,6 +360,11 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(ResultText));
         OnPropertyChanged(nameof(NameError));
+        OnPropertyChanged(nameof(ExtraLinesError));
+        OnPropertyChanged(nameof(HasExtraLinesError));
+        OnPropertyChanged(nameof(AdvancedHeaderText));
+        OnPropertyChanged(nameof(AdvancedHeaderAccessibleName));
+        OnPropertyChanged(nameof(NonBlankExtraLineCount));
         OnPropertyChanged(nameof(AddressError));
         OnPropertyChanged(nameof(AddressInterpretation));
         OnPropertyChanged(nameof(HasAddressInterpretation));
@@ -440,8 +482,6 @@ public sealed partial class AddServerViewModel : ViewModelBase
             }
 
             var hostForServer = port == DefaultPort ? host : $"{host}:{port}";
-            // Host+realm must stay unique, except an unchanged duplicate may keep the source address
-            // (and match earlier copies of that source). Changing to a third server's address is rejected (#191 QA).
             if (IsDuplicateAddress(hostForServer, realm) && !IsUnchangedSourceAddress(hostForServer, realm))
             {
                 SetSaveMessage("add.error.duplicate");
@@ -451,16 +491,35 @@ public sealed partial class AddServerViewModel : ViewModelBase
             var realmValue = realm.Length == 0 ? null : realm;
             var accountValue = account.Length == 0 ? null : account;
             var (build, clearBuild) = BuildChange();
+            if (!TryParseExtraLines(hostForServer, out var extraLines, out var extraError))
+            {
+                ExtraLinesError = extraError;
+                OnPropertyChanged(nameof(ExtraLinesError));
+                OnPropertyChanged(nameof(HasExtraLinesError));
+                IsAdvancedExpanded = true;
+                return;
+            }
+
+            ExtraLinesError = null;
+            OnPropertyChanged(nameof(ExtraLinesError));
+            OnPropertyChanged(nameof(HasExtraLinesError));
+
+            // Edit/duplicate: null keeps stored lines when the box still matches the original; empty list clears them.
+            // Add: null when there are no lines. ExtraRealmlistLines takes precedence over PatchlistHost (Core).
+            IReadOnlyList<string>? extraForRequest = IsEditing || IsDuplicating
+                ? (ExtraRealmlistLinesText == _initialExtraLines ? null : extraLines)
+                : (extraLines.Count == 0 ? null : extraLines);
+
             ServiceResult<ServerEntry> result;
             if (_editingServerId is { } serverId)
             {
                 result = _session.Service.UpdateServer(new UpdateServerRequest(serverId, Name.Trim(), hostForServer, realmValue,
                     RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
-                    ClearCacheOnSwitch: ClearCacheOnSwitch));
+                    ExtraRealmlistLines: extraForRequest, ClearCacheOnSwitch: ClearCacheOnSwitch));
             }
             else if (IsDuplicating && _sourceServerId is { } sourceId)
             {
-                // Core DuplicateServer (#219) allows the same host+realm as the source; then apply form fields it does not take.
+                // Core DuplicateServer copies extras from the source; then UpdateServer applies form fields + any edits.
                 var created = _session.Service.DuplicateServer(sourceId, Name.Trim(), realmValue, accountValue);
                 if (!created.Succeeded)
                 {
@@ -470,19 +529,24 @@ public sealed partial class AddServerViewModel : ViewModelBase
 
                 result = _session.Service.UpdateServer(new UpdateServerRequest(created.Value!.Id, Name.Trim(), hostForServer, realmValue,
                     RequiredClientBuild: build, Account: accountValue, ClientId: clientId, ClearRequiredClientBuild: clearBuild,
-                    ClearCacheOnSwitch: ClearCacheOnSwitch));
+                    ExtraRealmlistLines: extraForRequest, ClearCacheOnSwitch: ClearCacheOnSwitch));
             }
             else
             {
                 result = _session.Service.AddServer(new NewServer(Name.Trim(), hostForServer, realmValue, Account: accountValue, ClientId: clientId,
                     RequiredClientBuild: BuildOptions.Count > 0 ? SelectedBuild?.Build : null,
-                    ExtraRealmlistLines: _extraRealmlistLines,
-                    ClearCacheOnSwitch: ClearCacheOnSwitch));
+                    ExtraRealmlistLines: extraForRequest, ClearCacheOnSwitch: ClearCacheOnSwitch));
             }
-
             if (!result.Succeeded)
             {
                 SetSaveError(result.Error);
+                if (result.Error.Code is ServiceErrorCode.InvalidRealmlist)
+                {
+                    ExtraLinesError = FormatServiceRealmlistError(result.Error);
+                    OnPropertyChanged(nameof(ExtraLinesError));
+                    OnPropertyChanged(nameof(HasExtraLinesError));
+                    IsAdvancedExpanded = true;
+                }
                 return;
             }
 
@@ -520,88 +584,6 @@ public sealed partial class AddServerViewModel : ViewModelBase
         && string.Equals(hostForServer, _sourceHost, StringComparison.OrdinalIgnoreCase)
         && string.Equals(realm, _sourceRealm, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// Localized unique duplicate name: <c>"Name (copy)"</c> / <c>"Name (copia)"</c>, then <c>" (copy 2)"</c> / <c>" (copia 2)"</c>, …
-    /// Prefixes are cut by whole text elements so a trailing emoji is not split (same rule as Core #219).
-    /// </summary>
-    internal static string CreateLocalizedDuplicateName(string name, IReadOnlyList<string> existingNames)
-    {
-        // "Foo (copy)" / "Foo (copia)" → next free "Foo (copy 2)" / "Foo (copia 2)", not "Foo (copy) (copy)".
-        var basis = StripTrailingDuplicateSuffix(name.Trim());
-        for (var number = 1; ; number++)
-        {
-            var tail = number == 1
-                ? Loc.Get("servers.duplicate.suffix")
-                : Loc.Format("servers.duplicate.suffix.n", number);
-            var prefix = TruncateToTextElements(basis, Server.MaxNameLength - tail.Length).TrimEnd();
-            var candidate = (prefix + tail).Trim();
-            if (!existingNames.Any(n => string.Equals(n, candidate, StringComparison.OrdinalIgnoreCase)))
-            {
-                return candidate;
-            }
-        }
-    }
-
-    /// <summary>Removes a trailing localized <c>(copy)</c> / <c>(copy N)</c> (and ES <c>copia</c>) so renumbering is clean.</summary>
-    internal static string StripTrailingDuplicateSuffix(string name)
-    {
-        var suffixes = new[]
-        {
-            Loc.Get("servers.duplicate.suffix"),
-            // EN/ES templates for N≥2 share the same shape; try both languages so a mixed list still strips.
-            " (copy)",
-            " (copia)",
-        };
-        foreach (var suffix in suffixes.Distinct(StringComparer.Ordinal))
-        {
-            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-            {
-                return name[..^suffix.Length].TrimEnd();
-            }
-        }
-
-        // " (copy 12)" / " (copia 3)"
-        foreach (var marker in new[] { " (copy ", " (copia " })
-        {
-            var idx = name.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (idx <= 0 || !name.EndsWith(')'))
-            {
-                continue;
-            }
-
-            var num = name[(idx + marker.Length)..^1];
-            if (num.Length > 0 && num.All(char.IsAsciiDigit))
-            {
-                return name[..idx].TrimEnd();
-            }
-        }
-
-        return name;
-    }
-
-    /// <summary>Longest prefix of whole grapheme clusters within <paramref name="maxLength"/> UTF-16 chars.</summary>
-    internal static string TruncateToTextElements(string value, int maxLength)
-    {
-        if (value.Length <= maxLength)
-        {
-            return value;
-        }
-
-        var end = 0;
-        var elements = StringInfo.GetTextElementEnumerator(value);
-        while (elements.MoveNext())
-        {
-            var next = elements.ElementIndex + ((string)elements.Current).Length;
-            if (next > maxLength)
-            {
-                break;
-            }
-
-            end = next;
-        }
-
-        return value[..end];
-    }
 
     [RelayCommand]
     private void Cancel()
@@ -619,6 +601,119 @@ public sealed partial class AddServerViewModel : ViewModelBase
         _formClosed = true;
         CancelInFlightProbe();
     }
+
+
+    /// <summary>
+    /// Splits the Advanced box into trimmed non-blank lines. Rejects <c>set realmlist …</c> and validates each
+    /// line with <see cref="RealmlistText.Build"/>. Blank lines are dropped silently. Localized errors use
+    /// <c>Line N:</c> / <c>Línea N:</c>; when several fail, the first is shown plus <c>and N more</c>.
+    /// </summary>
+    private bool TryParseExtraLines(string hostForServer, out IReadOnlyList<string> lines, out string? error)
+    {
+        lines = SplitNonBlankExtraLines(ExtraRealmlistLinesText);
+        error = null;
+        if (lines.Count == 0)
+            return true;
+
+        var hostOnly = hostForServer.Contains(':')
+            ? hostForServer[..hostForServer.LastIndexOf(':')]
+            : hostForServer;
+        var failures = new List<(int Line, string Message)>();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            var displayLine = i + 1;
+            if (LooksLikeSetRealmlist(line))
+            {
+                failures.Add((displayLine, Loc.Get("add.advanced.error.realmlist")));
+                continue;
+            }
+
+            try
+            {
+                RealmlistText.Build(hostOnly, [line]);
+            }
+            catch (InvalidRealmlistException ex)
+            {
+                failures.Add((displayLine, FormatRealmlistKind(ex.Kind)));
+            }
+        }
+
+        // Catch cross-line issues (duplicate patchlist, overall Build) that per-line checks miss.
+        if (failures.Count == 0)
+        {
+            try
+            {
+                RealmlistText.Build(hostOnly, lines);
+            }
+            catch (InvalidRealmlistException ex)
+            {
+                var displayLine = ex.ExtraLineIndex is { } idx && idx >= 0 && idx < lines.Count ? idx + 1 : 1;
+                failures.Add((displayLine, FormatRealmlistKind(ex.Kind)));
+            }
+        }
+
+        if (failures.Count == 0)
+            return true;
+
+        error = FormatExtraLineErrors(failures);
+        return false;
+    }
+
+    /// <summary>Localized message for a Core <see cref="InvalidRealmlistKind"/> (never the English reason string).</summary>
+    internal static string FormatRealmlistKind(InvalidRealmlistKind kind) => kind switch
+    {
+        InvalidRealmlistKind.Empty => Loc.Get("add.advanced.error.empty"),
+        InvalidRealmlistKind.NotAscii => Loc.Get("add.advanced.error.notAscii"),
+        InvalidRealmlistKind.WrongFirstLine => Loc.Get("add.advanced.error.wrongFirstLine"),
+        InvalidRealmlistKind.MalformedLine => Loc.Get("add.advanced.error.malformedLine"),
+        InvalidRealmlistKind.ForbiddenKey => Loc.Get("add.advanced.error.forbiddenKey"),
+        InvalidRealmlistKind.DuplicateKey => Loc.Get("add.advanced.error.duplicateKey"),
+        InvalidRealmlistKind.InvalidValue => Loc.Get("add.advanced.error.invalidValue"),
+        InvalidRealmlistKind.BadLineEnding => Loc.Get("add.advanced.error.badLineEnding"),
+        _ => Loc.Get("add.advanced.error.invalidValue"),
+    };
+
+    /// <summary>First error as <c>Line N: …</c>, plus <c> and N more</c> when several lines failed.</summary>
+    internal static string FormatExtraLineErrors(IReadOnlyList<(int Line, string Message)> failures)
+    {
+        var first = Loc.Format("add.advanced.error.line", failures[0].Line, failures[0].Message);
+        if (failures.Count == 1)
+            return first;
+        return first + Loc.Format("add.advanced.error.more", failures.Count - 1);
+    }
+
+    private static string FormatServiceRealmlistError(ServiceError error)
+    {
+        var message = error.RealmlistKind is { } kind
+            ? FormatRealmlistKind(kind)
+            : Loc.Get("add.advanced.error.invalidValue");
+        var line = error.ExtraLineIndex is { } idx ? idx + 1 : error.LineNumber ?? 1;
+        return FormatExtraLineErrors([(line, message)]);
+    }
+
+    /// <summary>
+    /// True when the line is a <c>set realmlist</c> directive: tokens split on any whitespace,
+    /// case-insensitive. Catches <c>SET  REALMLIST</c>, tabs, and leading spaces; rejects
+    /// glued forms like <c>set realmlistfoo</c> and other keys like <c>set patchlist</c>.
+    /// </summary>
+    internal static bool LooksLikeSetRealmlist(string line)
+    {
+        var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            && parts[0].Equals("set", StringComparison.OrdinalIgnoreCase)
+            && parts[1].Equals("realmlist", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static IReadOnlyList<string> SplitNonBlankExtraLines(string text) =>
+        text.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n', StringSplitOptions.None)
+            .Select(static line => line.Trim())
+            .Where(static line => line.Length > 0)
+            .ToArray();
+
+    internal static int CountNonBlankExtraLines(string text) => SplitNonBlankExtraLines(text).Count;
 
     private void CancelInFlightProbe()
     {
@@ -638,6 +733,17 @@ public sealed partial class AddServerViewModel : ViewModelBase
         }
 
         cts.Dispose();
+    }
+
+    partial void OnExtraRealmlistLinesTextChanged(string value)
+    {
+        if (ExtraLinesError is not null)
+        {
+            ExtraLinesError = null;
+            OnPropertyChanged(nameof(ExtraLinesError));
+            OnPropertyChanged(nameof(HasExtraLinesError));
+        }
+        ClearSaveError();
     }
 
     partial void OnNameChanged(string value) => ClearSaveError();

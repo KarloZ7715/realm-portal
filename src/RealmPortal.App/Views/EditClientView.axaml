@@ -5,8 +5,9 @@
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.EditClientView"
              x:DataType="vm:EditClientViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,0,12">
-    <StackPanel Margin="20,10,20,0">
+  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <!-- Bottom space is a margin on the content: ScrollViewer.Padding is not counted in the scroll extent (#210 follow-up). -->
+    <StackPanel Name="ScrollContent" Margin="20,10,20,12">
       <Grid ColumnDefinitions="Auto,*" Height="44" ColumnSpacing="12">
         <Button Name="BackButton" Classes="link caps" VerticalAlignment="Center" AutomationProperties.Name="{loc:T clients.edit.back}" Command="{Binding CancelCommand}">
           <StackPanel Orientation="Horizontal" Spacing="10">
