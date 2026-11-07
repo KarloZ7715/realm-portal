@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:v="using:RealmPortal.App.Views"
              xmlns:vm="using:RealmPortal.App.ViewModels"
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.ServersView"
@@ -64,8 +65,13 @@
                  IsVisible="{Binding ShowResults}" Text="{Binding ResultsText}"/>
 
       <!-- Switching / opening / running -->
-      <c:Banner Grid.Row="3" Name="PhaseBanner" Margin="0,2,0,12" IsVisible="{Binding ShowBanner}"
-                Severity="{Binding BannerSeverity}" Header="{Binding BannerHeader}" Content="{Binding BannerBody}"/>
+      <StackPanel Grid.Row="3">
+      <c:Banner Name="PhaseBanner" Margin="0,2,0,12" IsVisible="{Binding ShowBanner}"
+                Severity="{Binding BannerSeverity}" Header="{Binding BannerHeader}">
+        <TextBlock Text="{Binding BannerBody}" TextWrapping="Wrap"/>
+      </c:Banner>
+      <v:ErrorRecoveryView DataContext="{Binding Recovery}"/>
+      </StackPanel>
       <StackPanel Grid.Row="4" Spacing="12" Margin="0,0,0,12" IsVisible="{Binding ShowSteps}">
         <ItemsControl ItemsSource="{Binding Steps}">
           <ItemsControl.ItemsPanel>
@@ -182,16 +188,20 @@
       <StackPanel Grid.Row="5" Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Margin="0,0,0,24" IsVisible="{Binding ShowEmpty}">
         <c:Seal Status="Inactive" Width="68" Height="68" HorizontalAlignment="Center" Margin="0,0,0,6"/>
         <TextBlock Classes="h1" FontSize="24" Foreground="{DynamicResource IvoryBrush}" HorizontalAlignment="Center" Text="{Binding EmptyTitle}"/>
-        <TextBlock Classes="body-sm" FontSize="15" Foreground="{DynamicResource BoneSoftBrush}" HorizontalAlignment="Center" TextAlignment="Center" Text="{loc:T servers.empty.hint}"/>
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="40" Margin="0,30,0,0">
-          <Button Classes="link caps" Command="{Binding ClearSearchCommand}" VerticalAlignment="Center"><TextBlock Text="{loc:T servers.empty.clear}"/></Button>
-          <Button Classes="secondary" Command="{Binding RequestAddServerCommand}">
+        <TextBlock Classes="body-sm" FontSize="15" Foreground="{DynamicResource BoneSoftBrush}" HorizontalAlignment="Center" TextAlignment="Center" Text="{Binding EmptyHint}" TextWrapping="Wrap" MaxWidth="480"/>
+        <WrapPanel HorizontalAlignment="Center" Margin="0,16,0,0">
+          <Button Classes="link caps" IsVisible="{Binding HasQuery}" Margin="0,0,16,8" Command="{Binding ClearSearchCommand}" VerticalAlignment="Center"><TextBlock Text="{loc:T servers.empty.clear}"/></Button>
+          <Button Classes="secondary" Margin="0,0,12,8" Command="{Binding RequestAddServerCommand}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <c:Icon Data="{DynamicResource IconPlus}" Width="14" Height="14" StrokeThickness="2.4"/>
               <TextBlock Text="{loc:T servers.empty.add}"/>
             </StackPanel>
           </Button>
-        </StackPanel>
+          <Button Name="EmptyScanButton" Classes="secondary" Margin="0,0,0,8" Command="{Binding ScanClientsCommand}"
+                  AutomationProperties.Name="{loc:T recovery.scanoraddclient.button}" AutomationProperties.HelpText="{Binding EmptyHint}">
+            <TextBlock Text="{loc:T recovery.scanoraddclient.button}"/>
+          </Button>
+        </WrapPanel>
       </StackPanel>
     </Grid>
 

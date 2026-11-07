@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="using:RealmPortal.App.Controls"
+             xmlns:v="using:RealmPortal.App.Views"
              xmlns:vm="using:RealmPortal.App.ViewModels"
              xmlns:loc="using:RealmPortal.App.Localization"
              x:Class="RealmPortal.App.Views.AddServerView"
@@ -140,6 +141,14 @@
           </Grid>
         </StackPanel>
       </ContentControl>
+      <v:ErrorRecoveryView DataContext="{Binding Recovery}"/>
+      <TextBlock Name="FormClientsEmpty" Text="{loc:T add.clients.empty}" IsVisible="{Binding Clients.IsEmpty}" TextWrapping="Wrap" Foreground="{DynamicResource BoneSoftBrush}"/>
+      <WrapPanel IsVisible="{Binding Clients.IsEmpty}">
+      <Button Name="FormFindClient" Margin="0,0,8,8" Classes="secondary compact" HorizontalAlignment="Left" IsVisible="{Binding Clients.IsEmpty}" Command="{Binding Clients.RescanCommand}"
+              AutomationProperties.Name="{loc:T recovery.scanoraddclient.button}" AutomationProperties.HelpText="{loc:T add.clients.empty}"><TextBlock Text="{loc:T recovery.scanoraddclient.button}"/></Button>
+      <Button Name="FormAddClient" Classes="secondary compact" Margin="0,0,8,8" Command="{Binding Clients.PickFolderCommand}"
+              AutomationProperties.Name="{loc:T recovery.addclient}" AutomationProperties.HelpText="{loc:T add.clients.empty}"><TextBlock Text="{loc:T recovery.addclient}"/></Button>
+      </WrapPanel>
       <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,16,0,0">
         <Button Name="TestButton" Classes="secondary" Width="210" Command="{Binding TestCommand}">
           <StackPanel Orientation="Horizontal" Spacing="8">
