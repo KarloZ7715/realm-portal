@@ -22,7 +22,7 @@ On a tag push, after both package jobs succeed, the **draft-release** job in `.g
 
 Linux outputs are also uploaded as a workflow artifact named `realm-portal-linux-<version>` containing:
 
-- `realm-portal_<deb-version>_amd64.deb` (SemVer prerelease dashes become `~` in the Debian version/filename, e.g. `1.1.0-rc.1` → `realm-portal_1.1.0~rc.1_amd64.deb`, so dpkg sorts the rc below the final release)
+- `realm-portal_<version>_amd64.deb` (the file name keeps the SemVer form, e.g. `realm-portal_1.1.0-rc.1_amd64.deb`, because GitHub renames `~` to `.` in release asset names; the package's Debian `Version` field still turns prerelease dashes into `~`, e.g. `1.1.0~rc.1`, so dpkg sorts the rc below the final release)
 - `RealmPortal-<version>-x86_64.AppImage` (keeps the SemVer form, e.g. `…-1.1.0-rc.1-…`)
 - `SHA256SUMS` (checksums for the `.deb` and AppImage)
 
@@ -50,7 +50,7 @@ never goes to GitHub. The matching public key is committed as `minisign.pub` at 
 
 ### Release key
 
-The release key's public half is [`minisign.pub`](../minisign.pub) at the repository root, key ID `A71D9203F538E296`.
+The release key's public half is [`minisign.pub`](../minisign.pub) at the repository root, key ID `0D03B1CC6600D915`.
 The same key is built into the app (`ReleaseSigningKeys` in Core). `ReleaseSigningKeysTests` fails if the two ever
 differ. `.gitattributes` keeps `minisign.pub` byte-exact (LF) on every checkout. The secret key and its password stay
 offline with the maintainer. SECURITY.md covers rotation and what happens if the key is lost or leaked.

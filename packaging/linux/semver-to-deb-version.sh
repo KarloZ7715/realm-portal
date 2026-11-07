@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Map a SemVer package version to a Debian Version field / .deb filename stem.
+# Map a SemVer package version to the Debian control Version field (not the .deb file name,
+# which keeps SemVer: GitHub renames "~" in release asset names).
 # "1.0.0-rc.1" must become "1.0.0~rc.1" so dpkg sorts it below the final "1.0.0".
 set -euo pipefail
 

@@ -144,7 +144,7 @@ downloading the app checks it:
 ### Release signature (#116, not enforced yet)
 
 Releases from 1.2.0 on ship `SHA256SUMS.minisig`, a minisign signature over `SHA256SUMS` made by the maintainer with the
-release key (key ID `A71D9203F538E296`, public key in [`minisign.pub`](../minisign.pub)). The signing process is in
+release key (key ID `0D03B1CC6600D915`, public key in [`minisign.pub`](../minisign.pub)). The signing process is in
 [linux-packaging.md](linux-packaging.md#signing-and-publishing-a-release).
 
 Core has a minisign verifier (`RealmPortal.Core.Updates.Signing`) and trusts exactly that key

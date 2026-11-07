@@ -73,7 +73,10 @@ public sealed class SheetLayoutTests : IDisposable
     }
 
     private static T Named<T>(Visual root, string name) where T : Control =>
-        root.GetVisualDescendants().OfType<T>().First(c => c.Name == name && c.IsEffectivelyVisible);
+        Find<T>(root, name) ?? throw new InvalidOperationException($"No visible {typeof(T).Name} named '{name}'.");
+
+    private static T? Find<T>(Visual root, string name) where T : Control =>
+        root.GetVisualDescendants().OfType<T>().FirstOrDefault(c => c.Name == name && c.IsEffectivelyVisible);
 
     private static Rect BoundsIn(Control control, Visual relativeTo) =>
         new(control.TranslatePoint(default, relativeTo)!.Value, control.Bounds.Size);
@@ -87,7 +90,9 @@ public sealed class SheetLayoutTests : IDisposable
     {
         var (window, main) = Open(width, height, language);
         main.SectionIndex = 2;
-        Screenshots.Settle();
+        // The Settings view is realized by later layout passes; wait for it rather than a fixed number of passes.
+        Screenshots.SettleUntil(() => Find<ScrollViewer>(window, "Scroller") is not null && Find<Button>(window, "AboutButton") is not null,
+            "the Settings view with its About button is shown");
         var scroller = Named<ScrollViewer>(window, "Scroller");
         // Twice: a late layout pass (fonts, wrapped text) can still grow the extent after the first jump.
         scroller.ScrollToEnd();
@@ -250,12 +255,21 @@ public sealed class SheetLayoutTests : IDisposable
     [AvaloniaFact]
     public async Task EditClient_ScrolledToTheEnd_ShowsTheFooterButtons()
     {
+        // Edit-client content is short; grow ScrollContent past the viewport so the sheet must scroll.
+        // Extent > Viewport (and the margin-vs-padding check inside AssertLastControlFullyVisible) then
+        // fail if the #210 content-margin fix is reverted to ScrollViewer.Padding.
         var (window, main) = Open(720, 360, Language.En);
         main.SectionIndex = 1;
         await Pump();
         main.Clients.Items[0].EditCommand.Execute(null);
         await Pump();
-        AssertLastControlFullyVisible(Named<ScrollViewer>(window, "Scroller"), Named<Button>(window, "SaveButton"));
+        var scroller = Named<ScrollViewer>(window, "Scroller");
+        var content = Named<StackPanel>(window, "ScrollContent");
+        Assert.True(content.Margin.Bottom >= 12, "bottom space must be content margin, not ScrollViewer.Padding (#210)");
+        content.MinHeight = scroller.Viewport.Height + 120;
+        Screenshots.Settle();
+        Assert.True(scroller.Extent.Height > scroller.Viewport.Height, "Edit client must scroll so the padding bug can show");
+        AssertLastControlFullyVisible(scroller, Named<Button>(window, "SaveButton"));
     }
 
     [AvaloniaFact]

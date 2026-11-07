@@ -131,7 +131,12 @@ maximized if it was maximized before), then `Window.Activate()`. What `Activate(
 child processes (the test assembly runs itself as a probe through `Support/ProbeProgram.cs`) for a primary in another
 process, a second launch that exits, a primary killed without cleanup, and a child process that outlives a killed
 primary. `tests/RealmPortal.App.Tests/InstanceActivationTests.cs` covers restore, show and activation with the headless
-platform. Nothing touches the user's real config directory.
+platform. Blocking claim, raw-channel and probe tests await a dedicated caller thread, rather than blocking a test-pool
+worker that their in-process primary needs for its listener and I/O continuations. This changes test scheduling only:
+all client, request and reply deadlines remain unchanged. The app tests also hold a synthetic lock without a listener
+to check that a genuinely unresponsive primary still returns `PrimaryUnresponsive`, never `Forwarded`.
+Headless window tests remain on Avalonia's UI thread; developer modes do not open a channel.
+Nothing touches the user's real config directory.
 
 For a manual check, use a throwaway config directory so the real one is not used:
 

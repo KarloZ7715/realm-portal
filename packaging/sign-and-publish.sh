@@ -101,14 +101,11 @@ for sub in verify verify-asset; do
 done
 
 version="${tag#v}"
-deb_version="$("${ROOT_DIR}/packaging/linux/semver-to-deb-version.sh" "$version")"
 if [[ "$version" == *-* ]]; then is_prerelease=true; else is_prerelease=false; fi
 trusted_comment="realm-portal ${tag}"
-binaries=(
-  "realm-portal_${deb_version}_amd64.deb"
-  "RealmPortal-${version}-x86_64.AppImage"
-  "RealmPortal-${version}-win-x64.zip"
-)
+# The same names the release workflow uploads; none contains "~" (GitHub would rename it).
+mapfile -t binaries < <("${ROOT_DIR}/packaging/release-asset-names.sh" "$version")
+[[ ${#binaries[@]} -eq 3 ]] || die "could not compute the release asset names for ${version}"
 sig_name="SHA256SUMS.minisig"
 ci_assets=("${binaries[@]}" SHA256SUMS)
 
