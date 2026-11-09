@@ -119,6 +119,12 @@ public enum ServiceErrorCode
     /// <summary>GitHub returned 403/429; wait for Retry-After before trying again.</summary>
     RateLimited,
 
+    /// <summary>
+    /// The release's <c>SHA256SUMS.minisig</c> is missing or does not verify against the built-in release key (#206).
+    /// Nothing was downloaded or installed; retrying gives the same answer, so the next step is the release page.
+    /// </summary>
+    SignatureInvalid,
+
     // ---- cross-cutting ----
     /// <summary>A multi-step operation failed and the compensating step failed too: the app state and the client files may disagree. See <see cref="ServiceError.Consistency"/>.</summary>
     InconsistentState,

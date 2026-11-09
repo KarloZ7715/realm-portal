@@ -17,6 +17,18 @@ internal static class Program
     /// </summary>
     internal static int Run(string[] args, StartupSteps steps)
     {
+        // Hidden packaging probe (#206): the release workflow runs it on every built package so a wrong
+        // -p:InstallKind fails the build. Answered before the single-instance claim and the UI, so it never
+        // talks to a running window or opens one.
+        if (args is [PrintInstallKindFlag])
+        {
+            Console.Out.WriteLine(FormatInstallKind(
+                RealmPortal.Core.Updates.InstallKindInfo.Current,
+                RealmPortal.Core.Updates.InstallKindInfo.AppImageSelfReplace));
+            Console.Out.Flush();
+            return 0;
+        }
+
         steps.InstallCrashLog(null);
         using var instance = steps.ClaimInstance(args);
         if (instance.ShouldExit)
@@ -25,6 +37,12 @@ internal static class Program
         AppDomain.CurrentDomain.ProcessExit += (_, _) => instance.Dispose();
         return steps.StartUi(args);
     }
+
+    internal const string PrintInstallKindFlag = "--print-install-kind";
+
+    /// <summary>The probe's one output line, e.g. <c>AppImage self-replace=true</c>; packaging/check-install-kind.sh parses it.</summary>
+    internal static string FormatInstallKind(RealmPortal.Core.Updates.InstallKind kind, bool appImageSelfReplace) =>
+        $"{kind} self-replace={(appImageSelfReplace ? "true" : "false")}";
 
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()

@@ -95,6 +95,7 @@ internal static class ServiceCli
             ServiceErrorCode.DownloadTooLarge => "The update download exceeded the allowed size, so it was not installed.",
             ServiceErrorCode.UntrustedRedirect => "The update URL was outside the allowed GitHub hosts, so nothing was downloaded.",
             ServiceErrorCode.RateLimited => "GitHub rate-limited the update check.",
+            ServiceErrorCode.SignatureInvalid => "The update's release signature could not be verified, so nothing was installed.",
             ServiceErrorCode.Unexpected => "An unexpected error occurred.",
             _ => throw new ArgumentOutOfRangeException(nameof(error), error.Code, "Unhandled ServiceErrorCode in CLI messages."),
         };

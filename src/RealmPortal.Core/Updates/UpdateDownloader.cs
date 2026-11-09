@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using RealmPortal.Core.Updates.Signing;
@@ -111,13 +109,19 @@ public sealed class UpdateDownloader : IDisposable
                 .ConfigureAwait(false);
         }
 
-        // Deb, WindowsZip, AppImage without self-replace → Downloads folder
-        var downloads = _downloadsDirectory();
-        PrivateStorageEnsure(downloads);
-        CleanupStaleParts(downloads);
+        // Deb, WindowsZip, AppImage without self-replace: Downloads if that folder (and its ancestors) are
+        // safe; otherwise $XDG_CACHE_HOME/RealmPortal/updates; otherwise the release page (#206).
+        if (!TryResolvePlacementDirectory(release, out var downloads, out var placementFallback))
+            return placementFallback!;
 
-        var finalPath = XdgDownloads.AllocateNoncollidingPath(downloads, assetName);
-        var partPath = PartPath(downloads, release.Version);
+        CleanupStaleParts(downloads);
+        CleanupStaleStaging(downloads);
+
+        // Written and verified inside a fresh private (0700) directory next to the final name, so no other
+        // user can swap the verified bytes before they get their final name (#206). Same filesystem: rename only.
+        var staging = CreateStagingDirectory(downloads);
+        var partPath = PartPath(staging, release.Version);
+        string finalPath;
         try
         {
             var digest = await DownloadToPartAsync(
@@ -125,38 +129,36 @@ public sealed class UpdateDownloader : IDisposable
                 .ConfigureAwait(false);
             Sha256Sums.EnsureMatches(expectedDigest, digest);
 
-            // Final name only after verification.
-            if (File.Exists(finalPath))
-                finalPath = XdgDownloads.AllocateNoncollidingPath(downloads, assetName);
-            File.Move(partPath, finalPath, overwrite: false);
-            if (!OperatingSystem.IsWindows())
-                File.SetUnixFileMode(finalPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-
-            string? command = null;
-            string? instructions = null;
-            if (kind == InstallKind.Deb)
-            {
-                command = ShellCommandQuote.AptInstallCommand(finalPath);
-                instructions = "Open the Downloads folder and install the .deb with the shown command. The app never runs sudo.";
-            }
-            else if (kind == InstallKind.AppImage)
-            {
-                command = ShellCommandQuote.ChmodUxCommand(finalPath);
-                instructions = "chmod the new AppImage, start it, then delete the old one. No apt command is shown.";
-            }
-            else if (kind == InstallKind.WindowsZip)
-            {
-                instructions = "Extract the zip over your current Realm Portal folder.";
-                TryWriteMotw(finalPath);
-            }
-
-            return new UpdateInstallResult(finalPath, kind, CopyableCommand: command, Instructions: instructions);
+            // Final name only after verification; never overwrite an existing file (renameat2 RENAME_NOREPLACE).
+            finalPath = XdgDownloads.AllocateNoncollidingPath(downloads, assetName);
+            if (!TryMoveNoReplace(partPath, ref finalPath, assetName, downloads, out var moveReason))
+                return UnsafeTargetFallback(release, moveReason);
+            FsyncDirectory(downloads);
         }
-        catch
+        finally
         {
-            TryDelete(partPath);
-            throw;
+            TryDeleteStaging(staging);
         }
+
+        string? command = null;
+        string? instructions = null;
+        if (kind == InstallKind.Deb)
+        {
+            command = ShellCommandQuote.AptInstallCommand(finalPath);
+            instructions = "Install the .deb with the command shown; the app never runs sudo.";
+        }
+        else if (kind == InstallKind.AppImage)
+        {
+            command = ShellCommandQuote.ChmodUxCommand(finalPath);
+            instructions = "chmod the new AppImage, start it, then delete the old one. No apt command is shown.";
+        }
+        else if (kind == InstallKind.WindowsZip)
+        {
+            instructions = "Extract the zip over your current Realm Portal folder.";
+            TryWriteMotw(finalPath);
+        }
+
+        return new UpdateInstallResult(finalPath, kind, CopyableCommand: command, Instructions: instructions);
     }
 
     /// <summary>
@@ -223,46 +225,51 @@ public sealed class UpdateDownloader : IDisposable
         CancellationToken cancellationToken)
     {
         var dir = Path.GetDirectoryName(target.ResolvedPath)!;
+
+        // Fail closed (#206): if another user can write the directory or the AppImage, they could swap the file between
+        // verification and the replace. Do not replace in place; hand back the release page instead.
+        if (!IsSafeToReplace(target, dir, out var unsafeReason))
+            return UnsafeTargetFallback(release, unsafeReason);
+
         CleanupStaleParts(dir);
-        var partPath = PartPath(dir, release.Version);
+        CleanupStaleStaging(dir);
+
+        // Download and verify inside a fresh 0700 directory next to the AppImage (same filesystem, so the final step is
+        // one rename(2)). Only the current user can enter it, so the verified bytes cannot be swapped by path.
+        var staging = CreateStagingDirectory(dir);
+        var partPath = PartPath(staging, release.Version);
         try
         {
             var digest = await DownloadToPartAsync(url, partPath, pin, TimeSpan.FromMinutes(10), cancellationToken)
                 .ConfigureAwait(false);
             Sha256Sums.EnsureMatches(expectedDigest, digest);
 
-            if (!AppImageTarget.SameIdentity(target.ResolvedPath, target))
-            {
-                TryDelete(partPath);
-                throw new UpdateException(UpdateErrorCode.UpdateCheckFailed, "APPIMAGE identity changed before replace.");
-            }
-
             var mode = AppImageTarget.ModeMasked0755(target.OriginalMode);
             if (!OperatingSystem.IsWindows())
                 File.SetUnixFileMode(partPath, (UnixFileMode)mode);
 
-            var bak = Path.Combine(dir, $".RealmPortal-{AppInfo.Version}.AppImage.bak");
+            // Re-check right before the replace: same file as resolved, and still nobody else can write there.
+            if (!AppImageTarget.SameIdentity(target.ResolvedPath, target))
+                throw new UpdateException(UpdateErrorCode.UpdateCheckFailed, "APPIMAGE identity changed before replace.");
+            if (!IsSafeToReplace(target, dir, out unsafeReason))
+                return UnsafeTargetFallback(release, unsafeReason);
+
+            // Random suffix so a 1777 directory cannot be DoS'd by planting a predictable .bak name (#206).
+            var bak = Path.Combine(dir, $".RealmPortal-{AppInfo.Version}.{Guid.NewGuid():N}.AppImage.bak");
             if (File.Exists(bak) || Directory.Exists(bak) || IsSymlink(bak))
+                return UnsafeTargetFallback(release, "Backup name collided.");
+
+            // Hard-link the old file as .bak, then rename(2) the verified file over the target. Any errno
+            // (including EXDEV, which would otherwise copy-and-truncate the shared inode) falls back.
+            if (!UnixPathSafety.TryHardLink(target.ResolvedPath, bak, out var linkErrno))
+                return UnsafeTargetFallback(release, "Could not create the .bak hard link (errno " + linkErrno + ").");
+            if (!UnixPathSafety.TryRenameOverwrite(partPath, target.ResolvedPath, out var renameErrno))
             {
-                if (!TryRemoveOwnedRegularFile(bak))
-                {
-                    TryDelete(partPath);
-                    throw new UpdateException(UpdateErrorCode.UpdateCheckFailed, "Existing .bak cannot be removed safely.");
-                }
+                TryDelete(bak);
+                return UnsafeTargetFallback(release, "Could not replace the AppImage (errno " + renameErrno + ").");
             }
 
-            // Hard-link the old file as .bak, then rename .part over the target.
-            try
-            {
-                CreateHardLink(bak, target.ResolvedPath);
-            }
-            catch (Exception ex)
-            {
-                TryDelete(partPath);
-                throw new UpdateException(UpdateErrorCode.UpdateCheckFailed, "Could not create .bak hard link: " + ex.Message, ex);
-            }
-
-            File.Move(partPath, target.ResolvedPath, overwrite: true);
+            FsyncDirectory(dir);
 
             return new UpdateInstallResult(
                 SavedPath: target.ResolvedPath,
@@ -271,11 +278,148 @@ public sealed class UpdateDownloader : IDisposable
                 BackupPath: bak,
                 Instructions: "Restart now to run the new AppImage.");
         }
-        catch
+        finally
         {
-            TryDelete(partPath);
-            throw;
+            TryDeleteStaging(staging);
         }
+    }
+
+    private static bool IsSafeToReplace(AppImageTargetInfo target, string dir, out string? reason) =>
+        AppImageTarget.IsDirectorySafeForReplace(dir, out reason)
+        && AppImageTarget.IsFileSafeForReplace(target.ResolvedPath, out reason);
+
+    /// <summary>
+    /// The AppImage could be changed by another user, so nothing is replaced: same result as an <see cref="InstallKind.Unknown"/>
+    /// build (the app opens the release page). The downloaded bytes, if any, are already gone with the staging directory.
+    /// </summary>
+    private static UpdateInstallResult UnsafeTargetFallback(ReleaseDocument release, string? reason) =>
+        new(
+            SavedPath: ReleaseDocumentParser.ResolveHtmlUrl(release),
+            Kind: InstallKind.Unknown,
+            Instructions: "The destination can be changed by other users, so the update was not installed ("
+                          + (reason ?? "unsafe target") + "). Open the release page in a browser.");
+
+    private const string StagingPrefix = ".RealmPortal-staging-";
+
+    /// <summary>Creates a new directory only the current user can use (0700), next to the final file.</summary>
+    private static string CreateStagingDirectory(string parent)
+    {
+        var path = Path.Combine(parent, StagingPrefix + Guid.NewGuid().ToString("N"));
+        if (Directory.Exists(path) || File.Exists(path))
+            throw new UpdateException(UpdateErrorCode.UpdateCheckFailed, "Staging directory already exists.");
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(path);
+            return path;
+        }
+
+        Directory.CreateDirectory(path, RealmPortal.Core.IO.PrivateStorage.PrivateDirectoryMode);
+        // CreateDirectory succeeds on an existing directory, and the mode is subject to umask: check what we got.
+        if (!UnixPathSafety.TryLstat(path, out var st) || !st.IsDirectory || !st.OwnedByUser)
+            throw new UpdateException(UpdateErrorCode.UpdateCheckFailed, "Staging directory is not private.");
+
+        if ((st.Permissions & 0x1FF) != 0b111_000_000)
+            File.SetUnixFileMode(path, RealmPortal.Core.IO.PrivateStorage.PrivateDirectoryMode);
+        return path;
+    }
+
+    private static void TryDeleteStaging(string path)
+    {
+        // Never rm -rf: delete only user-owned regular *.part files, then rmdir. Skip if the parent is unsafe.
+        UnixPathSafety.TryDeleteOwnedFilesThenRmdir(path, ".RealmPortal-*.part");
+    }
+
+    /// <summary>Removes staging directories left by a crash; only when the parent directory is safe.</summary>
+    private static void CleanupStaleStaging(string directory)
+    {
+        if (!Directory.Exists(directory) || !IsSafeDestination(directory))
+            return;
+        foreach (var path in Directory.EnumerateDirectories(directory, StagingPrefix + "*"))
+            TryDeleteStaging(path);
+    }
+
+    /// <summary>fsync(2) on a directory so a rename into it survives a crash. Best effort; no-op on Windows.</summary>
+    private static void FsyncDirectory(string directory) => UnixPathSafety.FsyncDirectory(directory);
+
+    private bool TryResolvePlacementDirectory(
+        ReleaseDocument release, out string directory, out UpdateInstallResult? fallback)
+    {
+        directory = null!;
+        fallback = null;
+        var downloads = _downloadsDirectory();
+        PrivateStorageEnsure(downloads);
+        if (IsSafeDestination(downloads))
+        {
+            directory = downloads;
+            return true;
+        }
+
+        var cache = GetPrivateUpdatesCache();
+        try
+        {
+            PrivateStorageEnsure(cache);
+        }
+        catch (Exception ex)
+        {
+            fallback = UnsafeTargetFallback(release, "Could not create the private updates cache: " + ex.Message);
+            return false;
+        }
+
+        if (IsSafeDestination(cache))
+        {
+            directory = cache;
+            return true;
+        }
+
+        fallback = UnsafeTargetFallback(
+            release, "The Downloads folder and the private updates cache can be changed by other users.");
+        return false;
+    }
+
+    private string GetPrivateUpdatesCache()
+    {
+        var cacheHome = _getVariable("XDG_CACHE_HOME");
+        if (string.IsNullOrWhiteSpace(cacheHome))
+        {
+            var home = _getVariable("HOME");
+            if (string.IsNullOrWhiteSpace(home))
+                home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            cacheHome = Path.Combine(home, ".cache");
+        }
+
+        return Path.Combine(Path.GetFullPath(cacheHome), "RealmPortal", "updates");
+    }
+
+    private static bool IsSafeDestination(string directory) =>
+        OperatingSystem.IsWindows() || UnixPathSafety.IsDirectoryTreeSafe(directory, out _);
+
+    /// <summary>Atomic no-overwrite move via renameat2(RENAME_NOREPLACE), or link+unlink. Retries on EEXIST.</summary>
+    private static bool TryMoveNoReplace(
+        string partPath, ref string finalPath, string assetName, string destDir, out string? reason)
+    {
+        reason = null;
+        if (OperatingSystem.IsWindows())
+        {
+            File.Move(partPath, finalPath, overwrite: false);
+            return true;
+        }
+
+        for (var i = 0; i < 10_000; i++)
+        {
+            if (UnixPathSafety.TryRenameNoReplace(partPath, finalPath, out var errno))
+                return true;
+            if (errno == UnixPathSafety.ErrnoExist)
+            {
+                finalPath = XdgDownloads.AllocateNoncollidingPath(destDir, assetName);
+                continue;
+            }
+
+            reason = "Could not move the verified file into place (errno " + errno + ").";
+            return false;
+        }
+
+        reason = "Could not allocate a unique download path.";
+        return false;
     }
 
     private async Task<byte[]> DownloadBytesAsync(
@@ -284,8 +428,8 @@ public sealed class UpdateDownloader : IDisposable
         TimeSpan absoluteDeadline,
         CancellationToken cancellationToken)
     {
-        var partDir = Path.Combine(Path.GetTempPath(), "realm-portal-update");
-        Directory.CreateDirectory(partDir);
+        // A fresh private temp directory (0700 on Unix), never a shared fixed name under /tmp (#206).
+        var partDir = Directory.CreateTempSubdirectory("realm-portal-update-").FullName;
         var part = Path.Combine(partDir, $".RealmPortal-sums.{Guid.NewGuid():N}.part");
         try
         {
@@ -297,6 +441,7 @@ public sealed class UpdateDownloader : IDisposable
         finally
         {
             TryDelete(part);
+            TryDeleteStaging(partDir);
         }
     }
 
@@ -472,7 +617,7 @@ public sealed class UpdateDownloader : IDisposable
 
     private static void CleanupStaleParts(string directory)
     {
-        if (!Directory.Exists(directory))
+        if (!Directory.Exists(directory) || !IsSafeDestination(directory))
             return;
         foreach (var path in Directory.EnumerateFiles(directory, ".RealmPortal-*.part"))
         {
@@ -507,7 +652,9 @@ public sealed class UpdateDownloader : IDisposable
     {
         try
         {
-            return File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+            // File.Exists is false for a symlink to a directory, so do not use it as a guard (#206).
+            return new FileInfo(path).LinkTarget is not null
+                   || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
         }
         catch
         {
@@ -554,45 +701,6 @@ public sealed class UpdateDownloader : IDisposable
             // optional
         }
     }
-
-    /// <summary>Starts a replaced AppImage then exits the current process — called by UI after confirmation.</summary>
-    public static void RestartReplacedAppImage(string targetPath, IReadOnlyList<string>? args = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-        var psi = new ProcessStartInfo
-        {
-            FileName = targetPath,
-            UseShellExecute = false,
-        };
-        if (args is not null)
-        {
-            foreach (var a in args)
-                psi.ArgumentList.Add(a);
-        }
-
-        Process.Start(psi);
-    }
-
-
-    private static void CreateHardLink(string linkPath, string existingFile)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            if (!CreateHardLinkWindows(linkPath, existingFile, IntPtr.Zero))
-                throw new IOException("CreateHardLink failed.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
-            return;
-        }
-
-        // link(oldpath, newpath): newpath becomes a hard link to oldpath.
-        if (LinkUnix(existingFile, linkPath) != 0)
-            throw new IOException("link(2) failed for .bak.", new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError()));
-    }
-
-    [DllImport("kernel32.dll", EntryPoint = "CreateHardLinkW", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool CreateHardLinkWindows(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
-
-    [DllImport("libc", EntryPoint = "link", SetLastError = true)]
-    private static extern int LinkUnix(string oldpath, string newpath);
 
     public void Dispose()
     {

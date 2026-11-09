@@ -73,6 +73,9 @@ jobs:
       - name: Test release asset names
         run: packaging/test-release-asset-names.sh
 
+      - name: Test install kind check
+        run: packaging/test-check-install-kind.sh
+
       - name: Test license collection
         run: packaging/test-collect-licenses.sh
 
@@ -113,27 +116,37 @@ jobs:
           set -euo pipefail
           dotnet restore "$APP_PROJECT" --locked-mode -p:PublishReadyToRun=true
 
-      - name: Publish (linux-x64, self-contained, trimmed, ReadyToRun)
+      - name: Publish (linux-x64, self-contained, trimmed, ReadyToRun; one per package)
+        # The install kind is compiled in (#206), so the .deb and the AppImage each get their own publish.
         run: |
           set -euo pipefail
-          publish_dir="$RUNNER_TEMP/publish"
-          dotnet publish "$APP_PROJECT" \
-            -c Release \
-            -r linux-x64 \
-            --no-restore \
-            --self-contained true \
-            -p:Version="$PACKAGE_VERSION" \
-            -p:InformationalVersion="$PACKAGE_VERSION" \
-            -p:PublishTrimmed=true \
-            -p:TrimMode=partial \
-            -p:PublishReadyToRun=true \
-            -o "$publish_dir" \
-            2>&1 | tee "$RUNNER_TEMP/publish.log"
-          if grep -E 'error (IL|NETSDK)' "$RUNNER_TEMP/publish.log"; then
-            echo "::error::Publish reported trim errors"
-            exit 1
-          fi
-          echo "PUBLISH_DIR=$publish_dir" >> "$GITHUB_ENV"
+          publish() {
+            local name="$1"; shift
+            local dir="$RUNNER_TEMP/publish-$name" log="$RUNNER_TEMP/publish-$name.log" start
+            start=$SECONDS
+            dotnet publish "$APP_PROJECT" \
+              -c Release \
+              -r linux-x64 \
+              --no-restore \
+              --self-contained true \
+              -p:Version="$PACKAGE_VERSION" \
+              -p:InformationalVersion="$PACKAGE_VERSION" \
+              -p:PublishTrimmed=true \
+              -p:TrimMode=partial \
+              -p:PublishReadyToRun=true \
+              "$@" \
+              -o "$dir" \
+              2>&1 | tee "$log"
+            if grep -E 'error (IL|NETSDK)' "$log"; then
+              echo "::error::Publish ($name) reported trim errors"
+              exit 1
+            fi
+            echo "Publish ($name) took $((SECONDS - start)) s"
+          }
+          publish deb -p:InstallKind=Deb
+          publish appimage -p:InstallKind=AppImage -p:AppImageSelfReplace=true
+          echo "DEB_PUBLISH_DIR=$RUNNER_TEMP/publish-deb" >> "$GITHUB_ENV"
+          echo "APPIMAGE_PUBLISH_DIR=$RUNNER_TEMP/publish-appimage" >> "$GITHUB_ENV"
 
       - name: Install packaging tools
         run: |
@@ -152,8 +165,23 @@ jobs:
           set -euo pipefail
           out_dir="$RUNNER_TEMP/packages"
           mkdir -p "$out_dir"
-          packaging/linux/build-packages.sh "$PUBLISH_DIR" "$PACKAGE_VERSION" "$out_dir"
+          packaging/linux/build-packages.sh "$DEB_PUBLISH_DIR" "$APPIMAGE_PUBLISH_DIR" "$PACKAGE_VERSION" "$out_dir"
           echo "PACKAGE_DIR=$out_dir" >> "$GITHUB_ENV"
+
+      - name: Check each package reports its install kind
+        # Runs the hidden --print-install-kind on the binaries inside the built packages, so a wrong -p:InstallKind
+        # fails here instead of shipping (#206). The AppImage is extracted, so FUSE is not needed.
+        run: |
+          set -euo pipefail
+          mapfile -t names < <(packaging/release-asset-names.sh "$PACKAGE_VERSION")
+          probe="$RUNNER_TEMP/kind-probe"
+          rm -rf "$probe"
+          mkdir -p "$probe/deb" "$probe/appimage"
+          dpkg-deb -x "$PACKAGE_DIR/${names[0]}" "$probe/deb"
+          packaging/check-install-kind.sh "$probe/deb/opt/realm-portal/RealmPortal.App" Deb false
+          (cd "$probe/appimage" && "$PACKAGE_DIR/${names[1]}" --appimage-extract >/dev/null)
+          packaging/check-install-kind.sh "$probe/appimage/squashfs-root/usr/lib/realm-portal/RealmPortal.App" AppImage true
+          rm -rf "$probe"
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -203,7 +231,7 @@ jobs:
         shell: pwsh
         run: dotnet restore $env:APP_PROJECT --locked-mode -p:PublishReadyToRun=true
 
-      - name: Publish (win-x64, self-contained)
+      - name: Publish (win-x64, self-contained, InstallKind=WindowsZip)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -216,6 +244,7 @@ jobs:
             -p:Version=$env:PACKAGE_VERSION `
             -p:InformationalVersion=$env:PACKAGE_VERSION `
             -p:PublishReadyToRun=true `
+            -p:InstallKind=WindowsZip `
             -o $publishDir
           if ($LASTEXITCODE -ne 0) { throw 'Windows publish failed' }
           "PUBLISH_DIR=$publishDir" >> $env:GITHUB_ENV
@@ -247,6 +276,17 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
           [IO.File]::WriteAllText((Join-Path $packageDir 'SHA256SUMS'), "$hash  $zipName`n", [Text.Encoding]::ASCII)
           "PACKAGE_DIR=$packageDir" >> $env:GITHUB_ENV
+
+      - name: Check the zip reports its install kind
+        # Unzips the built archive and runs the hidden --print-install-kind on it (#206).
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="$RUNNER_TEMP/kind-probe-win"
+          rm -rf "$probe"
+          pwsh -NoProfile -Command "Expand-Archive -LiteralPath \$env:PACKAGE_DIR/\$env:ZIP_NAME -DestinationPath '$probe'"
+          packaging/check-install-kind.sh "$probe/RealmPortal.App.exe" WindowsZip false
+          rm -rf "$probe"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

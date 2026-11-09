@@ -343,6 +343,7 @@ public class ClearErrorMessagesTests
         { ServiceErrorCode.DownloadTooLarge, ServiceErrorAction.TryAgain },
         { ServiceErrorCode.UntrustedRedirect, ServiceErrorAction.TryAgain },
         { ServiceErrorCode.RateLimited, ServiceErrorAction.TryAgain },
+        { ServiceErrorCode.SignatureInvalid, ServiceErrorAction.None },
         { ServiceErrorCode.InconsistentState, ServiceErrorAction.ReviewClientFiles },
         { ServiceErrorCode.Unexpected, ServiceErrorAction.TryAgain },
     };

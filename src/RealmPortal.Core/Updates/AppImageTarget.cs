@@ -1,6 +1,3 @@
-using System.Diagnostics;
-using System.Globalization;
-
 namespace RealmPortal.Core.Updates;
 
 /// <summary>
@@ -26,7 +23,7 @@ public static class AppImageTarget
     private static readonly byte[] AppImageType2 = [(byte)'A', (byte)'I', 0x02];
 
     /// <summary>Test seam for (device, inode, mode, ownership).</summary>
-    public static AppImageIdentityProbe? IdentityProbeForTests { get; set; }
+    internal static AppImageIdentityProbe? IdentityProbeForTests { get; set; }
 
     public static bool TryResolve(
         Func<string, string?>? getVariable,
@@ -121,6 +118,32 @@ public static class AppImageTarget
         return device == expected.Device && inode == expected.Inode;
     }
 
+    /// <summary>
+    /// True when no other user can rename, delete or create entries in <paramref name="directory"/>
+    /// or any ancestor (#206). See <see cref="UnixPathSafety.IsDirectoryTreeSafe"/>.
+    /// </summary>
+    public static bool IsDirectorySafeForReplace(string directory, out string? reason) =>
+        UnixPathSafety.IsDirectoryTreeSafe(directory, out reason);
+
+    /// <summary>
+    /// True when the AppImage at <paramref name="path"/> is a regular file owned by the current user that no other user
+    /// can write (#206). Group-write is allowed only for a strict private group.
+    /// </summary>
+    public static bool IsFileSafeForReplace(string path, out string? reason) =>
+        UnixPathSafety.IsRegularFileSafe(path, out reason);
+
+    /// <summary>File type and permission bits (<c>st_mode</c>) and ownership, without following a final symlink.</summary>
+    internal static bool TryStat(string path, out int rawMode, out bool ownedByUser)
+    {
+        rawMode = 0;
+        ownedByUser = false;
+        if (!UnixPathSafety.TryLstat(path, out var st))
+            return false;
+        rawMode = st.RawMode;
+        ownedByUser = st.OwnedByUser;
+        return true;
+    }
+
     /// <summary>Original mode masked with 0755 (drop setuid/setgid/sticky and group/other write).</summary>
     public static int ModeMasked0755(int originalMode)
     {
@@ -137,76 +160,13 @@ public static class AppImageTarget
         inode = 0;
         mode = 0;
         ownedByUser = false;
-        if (OperatingSystem.IsWindows())
+        if (!UnixPathSafety.TryLstat(path, out var st) || !st.IsRegularFile)
             return false;
-
-        try
-        {
-            // %d device, %i inode, %f raw mode hex, %u uid — GNU coreutils / BusyBox compatible enough for CI.
-            var psi = new ProcessStartInfo
-            {
-                FileName = "stat",
-                ArgumentList = { "-c", "%d %i %f %u", path },
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            using var proc = Process.Start(psi);
-            if (proc is null)
-                return false;
-            var output = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit(3000);
-            if (proc.ExitCode != 0)
-                return false;
-            var parts = output.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 4)
-                return false;
-            if (!ulong.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out device))
-                return false;
-            if (!ulong.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out inode))
-                return false;
-            if (!int.TryParse(parts[2], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var rawMode))
-                return false;
-            if (!uint.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var uid))
-                return false;
-
-            // S_IFREG = 0100000 octal = 0x8000
-            if ((rawMode & 0xF000) != 0x8000)
-                return false;
-            mode = rawMode & 0x1FF;
-            ownedByUser = uid == GetEuid();
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static uint GetEuid()
-    {
-        try
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "id",
-                ArgumentList = { "-u" },
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            using var proc = Process.Start(psi);
-            if (proc is null)
-                return uint.MaxValue;
-            var text = proc.StandardOutput.ReadToEnd().Trim();
-            proc.WaitForExit(2000);
-            return uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var uid) ? uid : uint.MaxValue;
-        }
-        catch
-        {
-            return uint.MaxValue;
-        }
+        device = st.Device;
+        inode = st.Inode;
+        mode = st.Permissions & 0x1FF;
+        ownedByUser = st.OwnedByUser;
+        return true;
     }
 
     private static bool IsDirectoryWritable(string directory)

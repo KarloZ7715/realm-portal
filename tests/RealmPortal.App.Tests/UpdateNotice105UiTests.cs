@@ -140,10 +140,11 @@ public class UpdateNotice105UiTests
             SavedPath: "/home/u/Downloads/realm-portal_1.1.0_amd64.deb",
             Kind: RealmPortal.Core.Updates.InstallKind.Deb,
             CopyableCommand: "sudo apt install '/home/u/Downloads/realm-portal_1.1.0_amd64.deb'",
-            Instructions: "Open the Downloads folder and install the .deb with the shown command. The app never runs sudo.");
+            Instructions: "Install the .deb with the command shown; the app never runs sudo.");
         var detail = UpdateInstallPresentation.FormatDetail(outcome)!;
         Assert.Contains("realm-portal_1.1.0_amd64.deb", detail, StringComparison.Ordinal);
         Assert.Contains("sudo apt install", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Downloads folder", detail, StringComparison.Ordinal);
     }
 
     private sealed class StubCoreChecker : RealmPortal.Core.Updates.IUpdateChecker

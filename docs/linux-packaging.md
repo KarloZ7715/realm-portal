@@ -32,15 +32,17 @@ AppStream metainfo: `build-packages.sh` writes a `<release>` entry for the packa
 
 ### Build steps (summary)
 
-1. Restore the app project once with `--locked-mode`; its committed lock files include both `linux-x64` and `win-x64`. Each job then runs `dotnet publish --no-restore` for its RID as self-contained. Linux uses `linux-x64`, `PublishTrimmed=true`, `TrimMode=partial`, and `PublishReadyToRun=true`; Windows uses `win-x64` and `PublishReadyToRun=true`.
-2. `packaging/linux/build-packages.sh` lays out the `.deb` and AppImage from that publish directory (see below).
+1. Restore the app project once with `--locked-mode`; its committed lock files include both `linux-x64` and `win-x64`. Each job then runs `dotnet publish --no-restore` for its RID as self-contained. Linux uses `linux-x64`, `PublishTrimmed=true`, `TrimMode=partial`, and `PublishReadyToRun=true`, and publishes twice because the install kind is compiled in: once with `-p:InstallKind=Deb` and once with `-p:InstallKind=AppImage -p:AppImageSelfReplace=true`. Windows uses `win-x64`, `PublishReadyToRun=true` and `-p:InstallKind=WindowsZip`.
+2. `packaging/linux/build-packages.sh` lays out the `.deb` from the first publish directory and the AppImage from the second (see below).
 3. `appimagetool` (AppImageKit release 13, pinned SHA in the workflow) produces the AppImage.
+4. `packaging/check-install-kind.sh` runs the hidden `RealmPortal.App --print-install-kind` on the binary inside each built package (extracted `.deb`, extracted AppImage, unzipped Windows archive) and fails the job on a wrong kind. See [updates-and-status.md](updates-and-status.md#install-kind).
 
-Local reproduction (after publish):
+Local reproduction (after both publishes):
 
 ```bash
 export APPIMAGETOOL=/path/to/obsolete-appimagetool-x86_64.AppImage
-packaging/linux/build-packages.sh /path/to/publish "$(EVENT_NAME=workflow_dispatch packaging/resolve-version.sh)" ./artifacts/linux
+packaging/linux/build-packages.sh /path/to/publish-deb /path/to/publish-appimage \
+  "$(EVENT_NAME=workflow_dispatch packaging/resolve-version.sh)" ./artifacts/linux
 ```
 
 ## Signing and publishing a release
