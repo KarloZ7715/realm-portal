@@ -99,23 +99,38 @@ public static class UnixPathSafety
     /// have group-write only with sticky. User-owned directories may have group-write without sticky
     /// only when the group is a strict private group.
     /// </summary>
-    public static bool IsDirectoryTreeSafe(string directory, out string? reason)
+    public static bool IsDirectoryTreeSafe(string directory, out string? reason) =>
+        TryResolveSafeDirectory(directory, out _, out reason);
+
+    /// <summary>
+    /// Same checks as <see cref="IsDirectoryTreeSafe"/>. On success <paramref name="resolved"/> is the
+    /// realpath that passed those checks (or <paramref name="directory"/> unchanged on Windows).
+    /// Callers that later open the directory with <c>O_NOFOLLOW</c> must use this path: a last-component
+    /// directory symlink is accepted after realpath, but lstat of the symlink itself is not a directory.
+    /// </summary>
+    public static bool TryResolveSafeDirectory(string directory, out string resolved, out string? reason)
     {
+        resolved = "";
         reason = null;
         if (OperatingSystem.IsWindows())
+        {
+            resolved = directory;
             return true;
+        }
         if (string.IsNullOrEmpty(directory))
         {
             reason = "Path is empty.";
             return false;
         }
 
-        var resolved = RealPath(directory);
-        if (resolved is null)
+        var resolvedPath = RealPath(directory);
+        if (resolvedPath is null)
         {
             reason = "Path cannot be resolved.";
             return false;
         }
+
+        resolved = resolvedPath;
 
         if (!TryLstat(resolved, out var leaf) || !leaf.IsDirectory)
         {

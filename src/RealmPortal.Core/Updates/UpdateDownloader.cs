@@ -132,7 +132,7 @@ public sealed class UpdateDownloader : IDisposable
             // Final name only after verification; never overwrite an existing file (renameat2 RENAME_NOREPLACE).
             finalPath = XdgDownloads.AllocateNoncollidingPath(downloads, assetName);
             if (!TryMoveNoReplace(partPath, ref finalPath, assetName, downloads, out var moveReason))
-                return UnsafeTargetFallback(release, moveReason);
+                return PlacementFailedFallback(release, moveReason ?? "Could not move the verified file into place.");
             FsyncDirectory(downloads);
         }
         finally
@@ -228,15 +228,20 @@ public sealed class UpdateDownloader : IDisposable
 
         // Fail closed (#206): if another user can write the directory or the AppImage, they could swap the file between
         // verification and the replace. Do not replace in place; hand back the release page instead.
-        if (!IsSafeToReplace(target, dir, out var unsafeReason))
+        // Use the realpath'd directory for staging and rename/link: a last-component directory symlink passes
+        // the safety check (realpath) but open(O_NOFOLLOW) cannot use the unresolved path.
+        if (!UnixPathSafety.TryResolveSafeDirectory(dir, out var resolvedDir, out var unsafeReason)
+            || !AppImageTarget.IsFileSafeForReplace(target.ResolvedPath, out unsafeReason))
             return UnsafeTargetFallback(release, unsafeReason);
 
-        CleanupStaleParts(dir);
-        CleanupStaleStaging(dir);
+        var replacePath = Path.Combine(resolvedDir, Path.GetFileName(target.ResolvedPath));
+
+        CleanupStaleParts(resolvedDir);
+        CleanupStaleStaging(resolvedDir);
 
         // Download and verify inside a fresh 0700 directory next to the AppImage (same filesystem, so the final step is
         // one rename(2)). Only the current user can enter it, so the verified bytes cannot be swapped by path.
-        var staging = CreateStagingDirectory(dir);
+        var staging = CreateStagingDirectory(resolvedDir);
         var partPath = PartPath(staging, release.Version);
         try
         {
@@ -251,28 +256,28 @@ public sealed class UpdateDownloader : IDisposable
             // Re-check right before the replace: same file as resolved, and still nobody else can write there.
             if (!AppImageTarget.SameIdentity(target.ResolvedPath, target))
                 throw new UpdateException(UpdateErrorCode.UpdateCheckFailed, "APPIMAGE identity changed before replace.");
-            if (!IsSafeToReplace(target, dir, out unsafeReason))
+            if (!IsSafeToReplace(target, resolvedDir, out unsafeReason))
                 return UnsafeTargetFallback(release, unsafeReason);
 
             // Random suffix so a 1777 directory cannot be DoS'd by planting a predictable .bak name (#206).
-            var bak = Path.Combine(dir, $".RealmPortal-{AppInfo.Version}.{Guid.NewGuid():N}.AppImage.bak");
+            var bak = Path.Combine(resolvedDir, $".RealmPortal-{AppInfo.Version}.{Guid.NewGuid():N}.AppImage.bak");
             if (File.Exists(bak) || Directory.Exists(bak) || IsSymlink(bak))
-                return UnsafeTargetFallback(release, "Backup name collided.");
+                return PlacementFailedFallback(release, "Backup name collided.");
 
             // Hard-link the old file as .bak, then rename(2) the verified file over the target. Any errno
             // (including EXDEV, which would otherwise copy-and-truncate the shared inode) falls back.
-            if (!UnixPathSafety.TryHardLink(target.ResolvedPath, bak, out var linkErrno))
-                return UnsafeTargetFallback(release, "Could not create the .bak hard link (errno " + linkErrno + ").");
-            if (!UnixPathSafety.TryRenameOverwrite(partPath, target.ResolvedPath, out var renameErrno))
+            if (!UnixPathSafety.TryHardLink(replacePath, bak, out var linkErrno))
+                return PlacementFailedFallback(release, "Could not create the .bak hard link (errno " + linkErrno + ").");
+            if (!UnixPathSafety.TryRenameOverwrite(partPath, replacePath, out var renameErrno))
             {
                 TryDelete(bak);
-                return UnsafeTargetFallback(release, "Could not replace the AppImage (errno " + renameErrno + ").");
+                return PlacementFailedFallback(release, "Could not replace the AppImage (errno " + renameErrno + ").");
             }
 
-            FsyncDirectory(dir);
+            FsyncDirectory(resolvedDir);
 
             return new UpdateInstallResult(
-                SavedPath: target.ResolvedPath,
+                SavedPath: replacePath,
                 Kind: InstallKind.AppImage,
                 ReplacedAppImage: true,
                 BackupPath: bak,
@@ -293,11 +298,26 @@ public sealed class UpdateDownloader : IDisposable
     /// build (the app opens the release page). The downloaded bytes, if any, are already gone with the staging directory.
     /// </summary>
     private static UpdateInstallResult UnsafeTargetFallback(ReleaseDocument release, string? reason) =>
+        ReleasePageFallback(
+            release,
+            "The destination can be changed by other users, so the update was not installed ("
+            + (reason ?? "unsafe target") + "). Open the release page in a browser.");
+
+    /// <summary>
+    /// Placement failed for a reason other than an unsafe (other-user-writable) destination:
+    /// a path errno, a backup-name collision, or a cache that could not be created. Do not blame
+    /// "other users" when the directory already passed the safety check.
+    /// </summary>
+    private static UpdateInstallResult PlacementFailedFallback(ReleaseDocument release, string reason) =>
+        ReleasePageFallback(
+            release,
+            "The update was not installed (" + reason + "). Open the release page in a browser.");
+
+    private static UpdateInstallResult ReleasePageFallback(ReleaseDocument release, string instructions) =>
         new(
             SavedPath: ReleaseDocumentParser.ResolveHtmlUrl(release),
             Kind: InstallKind.Unknown,
-            Instructions: "The destination can be changed by other users, so the update was not installed ("
-                          + (reason ?? "unsafe target") + "). Open the release page in a browser.");
+            Instructions: instructions);
 
     private const string StagingPrefix = ".RealmPortal-staging-";
 
@@ -348,11 +368,8 @@ public sealed class UpdateDownloader : IDisposable
         fallback = null;
         var downloads = _downloadsDirectory();
         PrivateStorageEnsure(downloads);
-        if (IsSafeDestination(downloads))
-        {
-            directory = downloads;
+        if (UnixPathSafety.TryResolveSafeDirectory(downloads, out directory, out _))
             return true;
-        }
 
         var cache = GetPrivateUpdatesCache();
         try
@@ -361,15 +378,12 @@ public sealed class UpdateDownloader : IDisposable
         }
         catch (Exception ex)
         {
-            fallback = UnsafeTargetFallback(release, "Could not create the private updates cache: " + ex.Message);
+            fallback = PlacementFailedFallback(release, "Could not create the private updates cache: " + ex.Message);
             return false;
         }
 
-        if (IsSafeDestination(cache))
-        {
-            directory = cache;
+        if (UnixPathSafety.TryResolveSafeDirectory(cache, out directory, out _))
             return true;
-        }
 
         fallback = UnsafeTargetFallback(
             release, "The Downloads folder and the private updates cache can be changed by other users.");

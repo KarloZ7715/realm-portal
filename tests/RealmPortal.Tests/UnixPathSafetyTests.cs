@@ -53,4 +53,18 @@ public class UnixPathSafetyTests
             UnixPathSafety.SimulateMissingRenameAt2 = false;
         }
     }
+
+    [UnixFact]
+    public void TryResolveSafeDirectory_WhenLastComponentIsASymlink_ReturnsTheRealPath()
+    {
+        using var dir = new TempDirectory();
+        var real = dir.Combine("real");
+        var link = dir.Combine("link");
+        Directory.CreateDirectory(real);
+        Directory.CreateSymbolicLink(link, real);
+
+        Assert.True(UnixPathSafety.TryResolveSafeDirectory(link, out var resolved, out var reason), reason);
+        Assert.Equal(UnixPathSafety.RealPath(real), resolved);
+        Assert.True(UnixPathSafety.IsDirectoryTreeSafe(link, out reason), reason);
+    }
 }

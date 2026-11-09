@@ -184,10 +184,11 @@ public class LocalFeedInstallEndToEndTests
         LoopbackFeed feed, TempDirectory dir, TestKey trusted, InstallKind kind, bool selfReplace = false,
         UnixFileMode appsMode = Mode0755, UnixFileMode appImageMode = Mode0755,
         UnixFileMode? downloadsMode = null, UnixFileMode? cacheHomeMode = null,
-        string? appsGroup = null, string? appImageGroup = null, Action<string, string>? configureApps = null)
+        string? appsGroup = null, string? appImageGroup = null, Action<string, string>? configureApps = null,
+        string? downloadsPath = null, string? appsPath = null)
     {
         var config = dir.Combine("config");
-        var downloads = dir.Combine("downloads");
+        var downloads = downloadsPath ?? dir.Combine("downloads");
         var cacheHome = dir.Combine("cache-home");
         Directory.CreateDirectory(config);
         Directory.CreateDirectory(downloads);
@@ -200,7 +201,7 @@ public class LocalFeedInstallEndToEndTests
         string? appImage = null;
         if (kind == InstallKind.AppImage && selfReplace)
         {
-            var apps = dir.Combine("apps");
+            var apps = appsPath ?? dir.Combine("apps");
             Directory.CreateDirectory(apps);
             appImage = Path.Combine(apps, "RealmPortal.AppImage");
             File.WriteAllBytes(appImage, [.. Elf, .. "old AppImage"u8]);
@@ -303,6 +304,54 @@ public class LocalFeedInstallEndToEndTests
         Assert.Equal(release.Payload, File.ReadAllBytes(outcome.AppImage!));
         Assert.Equal([.. Elf, .. "old AppImage"u8], File.ReadAllBytes(outcome.Result.BackupPath!));
         AssertNothingPlaced(outcome with { Result = null });
+    }
+
+    [UnixFact]
+    public async Task DownloadsDirectory_ThatIsASymlinkToASafeFolder_PlacesTheFile()
+    {
+        using var dir = new TempDirectory();
+        var real = dir.Combine("real-downloads");
+        var link = dir.Combine("link-downloads");
+        Directory.CreateDirectory(real);
+        Directory.CreateSymbolicLink(link, real);
+        using var feed = new LoopbackFeed();
+        var key = new TestKey();
+        var release = Signed(key, InstallKind.Deb);
+        Publish(feed, release);
+
+        var outcome = await Install(feed, dir, key, InstallKind.Deb, downloadsPath: link);
+
+        Assert.Null(outcome.Error);
+        Assert.NotNull(outcome.Result);
+        Assert.Equal(InstallKind.Deb, outcome.Result.Kind);
+        Assert.Equal(release.Payload, File.ReadAllBytes(Path.Combine(real, release.Asset)));
+        Assert.Equal(release.Payload, File.ReadAllBytes(outcome.Result.SavedPath));
+        Assert.False(UpdateInstallOutcome.FromCore(outcome.Result).IsReleasePageFallback);
+        Assert.DoesNotContain("errno", outcome.Result.Instructions ?? "", StringComparison.Ordinal);
+    }
+
+    [UnixFact]
+    public async Task AppImageParentDirectory_ThatIsASymlink_ReplacesTheResolvedFile()
+    {
+        using var dir = new TempDirectory();
+        var realApps = dir.Combine("real-apps");
+        var linkApps = dir.Combine("link-apps");
+        Directory.CreateDirectory(realApps);
+        Directory.CreateSymbolicLink(linkApps, realApps);
+        using var feed = new LoopbackFeed();
+        var key = new TestKey();
+        var release = Signed(key, InstallKind.AppImage);
+        Publish(feed, release);
+
+        var outcome = await Install(feed, dir, key, InstallKind.AppImage, selfReplace: true, appsPath: linkApps);
+
+        Assert.Null(outcome.Error);
+        Assert.NotNull(outcome.Result);
+        Assert.True(outcome.Result.ReplacedAppImage);
+        Assert.Equal(release.Payload, File.ReadAllBytes(Path.Combine(realApps, "RealmPortal.AppImage")));
+        Assert.Equal(release.Payload, File.ReadAllBytes(outcome.AppImage!));
+        Assert.False(UpdateInstallOutcome.FromCore(outcome.Result).IsReleasePageFallback);
+        Assert.DoesNotContain("errno", outcome.Result.Instructions ?? "", StringComparison.Ordinal);
     }
 
     [Fact]
