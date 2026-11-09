@@ -16,16 +16,16 @@ All notable changes to Realm Portal are listed here. The format follows
 - Extra realmlist lines: an Advanced section on the add and edit server form, plus CLI commands to edit, clear and list them ([#192](https://github.com/KarloZ7715/realm-portal/issues/192))
 - A `.bak` copy of `servers.json`, `clients.json` and the UI preferences is kept, and Settings can restore a damaged config from it ([#196](https://github.com/KarloZ7715/realm-portal/issues/196))
 - The welcome screen has a Back button, and servers can be added inside the first-run wizard ([#202](https://github.com/KarloZ7715/realm-portal/issues/202), [#203](https://github.com/KarloZ7715/realm-portal/issues/203); Back button test by [@jay23606](https://github.com/jay23606), merged as part of [#207](https://github.com/KarloZ7715/realm-portal/issues/207))
-- Only one copy of the app runs at a time; opening it again brings the existing window to the front
+- Only one copy of the app runs at a time; opening it again brings the existing window to the front ([#209](https://github.com/KarloZ7715/realm-portal/issues/209))
 - Empty states explain what is missing, and errors offer a next step, in the app and in the CLI ([#194](https://github.com/KarloZ7715/realm-portal/issues/194))
-- Packaged `.deb`, AppImage and Windows zip installs download and place updates in-app after verifying the signed checksums ([#206](https://github.com/KarloZ7715/realm-portal/issues/206))
-- FAQ and troubleshooting page in English and Spanish
+- Packaged `.deb`, AppImage and Windows zip builds download a verified update in-app: the `.deb` and the zip are saved to Downloads (the `.deb` shows a copyable `apt` command; the app never runs it), and an AppImage can replace itself ([#206](https://github.com/KarloZ7715/realm-portal/issues/206))
+- FAQ and troubleshooting page in English and Spanish ([#204](https://github.com/KarloZ7715/realm-portal/issues/204))
 
 ### Fixed
 
 - Settings scrolls correctly, sheet subtitles, the licenses Markdown and the server card menu row display properly, with keyboard access fixes for the card menu ([#198](https://github.com/KarloZ7715/realm-portal/issues/198), [#199](https://github.com/KarloZ7715/realm-portal/issues/199), [#200](https://github.com/KarloZ7715/realm-portal/issues/200), [#201](https://github.com/KarloZ7715/realm-portal/issues/201))
-- Re-applying an edited active server no longer leaves a stale undo behind
-- Opening a second copy of the app no longer loses the reply from the running one after a timeout
+- Re-applying an edited active server no longer leaves a stale undo behind ([#216](https://github.com/KarloZ7715/realm-portal/issues/216))
+- Opening a second copy of the app no longer loses the reply from the running one after a timeout ([#227](https://github.com/KarloZ7715/realm-portal/issues/227))
 
 ### Security
 
