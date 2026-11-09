@@ -166,3 +166,18 @@ public sealed class NonRootUnixTheoryAttribute : TheoryAttribute
             Skip = "Skipped when running as root (cannot observe EACCES on owned files).";
     }
 }
+
+/// <summary>
+/// Runs when a usable packaging bash is available: <c>bash</c> on Unix, or Git for Windows
+/// <c>bash.exe</c> after a successful <c>bash -c 'echo ok'</c> probe. Skipped otherwise
+/// (never invokes the Windows WSL bash stub).
+/// </summary>
+public sealed class PackagingBashFactAttribute : FactAttribute
+{
+    public PackagingBashFactAttribute()
+    {
+        if (PackagingBash.SkipReason is { } reason)
+            Skip = reason;
+    }
+}
+

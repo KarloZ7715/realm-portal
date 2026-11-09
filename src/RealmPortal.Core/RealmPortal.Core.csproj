@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="RealmPortal.Tests" />
+    <InternalsVisibleTo Include="RealmPortal.App.Tests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="BouncyCastle.Cryptography" />

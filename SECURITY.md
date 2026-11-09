@@ -33,9 +33,9 @@ was signed with it; nothing was ever signed with it. That key is no longer trust
 The trusted comment of each signature is `realm-portal <tag>`, for example `realm-portal v1.2.0`.
 
 The app's download path checks this signature before it trusts `SHA256SUMS`, and refuses an update that is unsigned or
-whose signature does not verify. The published packages do not download updates in the app yet (that comes with
-[#206](https://github.com/KarloZ7715/realm-portal/issues/206)); they open the release page, so check what you download
-with the steps below. See [docs/updates-and-status.md](docs/updates-and-status.md#release-signature-116).
+whose signature does not verify. The published packages download updates in the app with that check
+([#206](https://github.com/KarloZ7715/realm-portal/issues/206)); when the check fails they offer the release page. Check
+anything you download by hand with the steps below. See [docs/updates-and-status.md](docs/updates-and-status.md#release-signature-116).
 
 ### Verifying a release by hand
 

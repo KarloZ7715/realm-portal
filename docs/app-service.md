@@ -589,7 +589,7 @@ ServiceResult<ConfigBackupStatus> RestoreConfigBackup(ConfigFileKind file);
 
 | `ServiceErrorAction` | Codes | Suggested UI action |
 |---|---|---|
-| `None` | `BackupNotFound`; `StoreCorrupt` for files other than `servers.json` / `clients.json` | message only |
+| `None` | `BackupNotFound`; `StoreCorrupt` for files other than `servers.json` / `clients.json`; `SignatureInvalid` (the UI offers the release page) | message only |
 | `TryAgain` | `StoreLocked`, `FileSharingViolation`, `HashMismatch`, `Unexpected`, update codes (`UpdateCheckFailed`, `ChecksumMismatch`, `AssetMissing`, `DownloadTooLarge`, `UntrustedRedirect`, `RateLimited`) | Retry |
 | `CloseGame` | `GameRunning`, `ProcessCheckFailed` | close the game, then retry |
 | `ChooseServer` | `ServerNotFound`, `NothingToUndo`, `UndoTargetMissing` | go to the server list |

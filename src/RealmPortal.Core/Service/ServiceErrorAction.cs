@@ -62,6 +62,8 @@ public static class ServiceErrorActions
                 or ServiceErrorCode.UpdateCheckFailed or ServiceErrorCode.ChecksumMismatch or ServiceErrorCode.AssetMissing
                 or ServiceErrorCode.DownloadTooLarge or ServiceErrorCode.UntrustedRedirect or ServiceErrorCode.RateLimited
                 or ServiceErrorCode.Unexpected => ServiceErrorAction.TryAgain,
+            // A bad or missing release signature does not get better by retrying; the UI offers the release page.
+            ServiceErrorCode.SignatureInvalid => ServiceErrorAction.None,
             ServiceErrorCode.GameRunning or ServiceErrorCode.ProcessCheckFailed => ServiceErrorAction.CloseGame,
             ServiceErrorCode.ServerNotFound or ServiceErrorCode.NothingToUndo or ServiceErrorCode.UndoTargetMissing =>
                 ServiceErrorAction.ChooseServer,

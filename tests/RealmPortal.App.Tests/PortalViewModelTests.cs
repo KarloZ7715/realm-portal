@@ -770,7 +770,7 @@ public class PortalViewModelTests
     {
         using var env = new Env();
         Assert.Equal("en", env.Session.UiPreferences.Load().LanguageCode);
-        var store = new PortalSettingsStore(env.Session);
+        var store = new RealmPortal.App.Portal.PortalSettingsStore(env.Session);
         var environment = new Dictionary<string, string?>();
 
         var launcherFailed = store.Save(new SettingsModel(

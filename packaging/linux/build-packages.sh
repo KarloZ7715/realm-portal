@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
-# Assemble a .deb and AppImage from a linux-x64 self-contained dotnet publish directory.
+# Assemble a .deb and an AppImage from two linux-x64 self-contained dotnet publish directories (#206):
+# one published with -p:InstallKind=Deb, the other with -p:InstallKind=AppImage -p:AppImageSelfReplace=true.
+# The install kind is compiled in, so each package needs its own publish.
 set -euo pipefail
 
 usage() {
-  echo "usage: $(basename "$0") <publish-dir> <version> [output-dir]" >&2
+  echo "usage: $(basename "$0") <deb-publish-dir> <appimage-publish-dir> <version> [output-dir]" >&2
   exit 1
 }
 
-[[ $# -ge 2 ]] || usage
+[[ $# -ge 3 && $# -le 4 ]] || usage
 
-PUBLISH_DIR="$(readlink -f "$1")"
-VERSION="$2"
+DEB_PUBLISH_DIR="$(readlink -f "$1")"
+APPIMAGE_PUBLISH_DIR="$(readlink -f "$2")"
+VERSION="$3"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "${SCRIPT_DIR}/validate-version.sh" "$VERSION"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PACKAGING_DIR="${ROOT_DIR}/packaging/linux"
-OUT_DIR="${3:-"${ROOT_DIR}/artifacts/linux"}"
+OUT_DIR="${4:-"${ROOT_DIR}/artifacts/linux"}"
 APPIMAGETOOL="${APPIMAGETOOL:-}"
 # File names come from the single source of release asset names (deb, AppImage, zip).
 mapfile -t ASSET_NAMES < <("${SCRIPT_DIR}/../release-asset-names.sh" "$VERSION")
@@ -28,18 +31,24 @@ DEB_VERSION="$("${SCRIPT_DIR}/semver-to-deb-version.sh" "$VERSION")"
 IS_PRERELEASE=0
 [[ "$VERSION" == *-* ]] && IS_PRERELEASE=1
 
-if [[ ! -x "${PUBLISH_DIR}/RealmPortal.App" ]]; then
-  echo "error: missing executable ${PUBLISH_DIR}/RealmPortal.App" >&2
+for dir in "${DEB_PUBLISH_DIR}" "${APPIMAGE_PUBLISH_DIR}"; do
+  if [[ ! -x "${dir}/RealmPortal.App" ]]; then
+    echo "error: missing executable ${dir}/RealmPortal.App" >&2
+    exit 1
+  fi
+done
+if [[ "${DEB_PUBLISH_DIR}" == "${APPIMAGE_PUBLISH_DIR}" ]]; then
+  echo "error: the .deb and the AppImage need separate publish directories (different InstallKind)" >&2
   exit 1
 fi
 
 mkdir -p "${OUT_DIR}"
 
 install_tree() {
-  local dest_lib="$1"
+  local src_dir="$1" dest_lib="$2"
   rm -rf "${dest_lib}"
   mkdir -p "${dest_lib}"
-  cp -a "${PUBLISH_DIR}/." "${dest_lib}/"
+  cp -a "${src_dir}/." "${dest_lib}/"
 }
 
 write_deb_launcher() {
@@ -98,10 +107,10 @@ mkdir -p "${DEB_STAGING}/DEBIAN" \
   "${DEB_STAGING}/usr/share/icons" \
   "${DEB_STAGING}/usr/share/doc/realm-portal"
 
-install_tree "${DEB_STAGING}${DEB_INSTALL_LIB}"
+install_tree "${DEB_PUBLISH_DIR}" "${DEB_STAGING}${DEB_INSTALL_LIB}"
 write_deb_launcher "${DEB_STAGING}/usr/bin/realm-portal"
 # The self-contained build bundles the .NET runtime: ship its license and notices with ours.
-"${ROOT_DIR}/packaging/collect-licenses.sh" "${PUBLISH_DIR}" linux-x64 "${DEB_STAGING}/usr/share/doc/realm-portal"
+"${ROOT_DIR}/packaging/collect-licenses.sh" "${DEB_PUBLISH_DIR}" linux-x64 "${DEB_STAGING}/usr/share/doc/realm-portal"
 install -m 644 "${PACKAGING_DIR}/copyright" "${DEB_STAGING}/usr/share/doc/realm-portal/copyright"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \
@@ -146,9 +155,9 @@ mkdir -p "${APPIMAGE_INSTALL_LIB}" \
   "${APPDIR}/usr/share/applications" \
   "${APPDIR}/usr/share/icons"
 
-install_tree "${APPIMAGE_INSTALL_LIB}"
+install_tree "${APPIMAGE_PUBLISH_DIR}" "${APPIMAGE_INSTALL_LIB}"
 write_appimage_launcher "${APPDIR}/usr/bin/realm-portal"
-"${ROOT_DIR}/packaging/collect-licenses.sh" "${PUBLISH_DIR}" linux-x64 "${APPDIR}/usr/share/doc/realm-portal"
+"${ROOT_DIR}/packaging/collect-licenses.sh" "${APPIMAGE_PUBLISH_DIR}" linux-x64 "${APPDIR}/usr/share/doc/realm-portal"
 install -m 644 "${PACKAGING_DIR}/copyright" "${APPDIR}/usr/share/doc/realm-portal/copyright"
 
 cp "${PACKAGING_DIR}/com.karloz7715.RealmPortal.desktop" \

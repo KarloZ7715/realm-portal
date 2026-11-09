@@ -29,6 +29,48 @@ public class StartupTests
     }
 
     [Fact]
+    public void PrintInstallKind_AnswersWithoutCrashLogClaimOrUi()
+    {
+        var calls = new List<string>();
+        var steps = new StartupSteps(
+            _ => calls.Add("crash-log"),
+            _ => { calls.Add("claim"); return InstanceClaim.None; },
+            _ => { calls.Add("ui"); return 7; });
+
+        var exitCode = Program.Run([Program.PrintInstallKindFlag], steps);
+
+        Assert.Equal(0, exitCode);
+        Assert.Empty(calls);
+    }
+
+    [Fact]
+    public void PrintInstallKind_IsOnlyTheSoleArgument()
+    {
+        var calls = new List<string>();
+        var steps = new StartupSteps(
+            _ => calls.Add("crash-log"),
+            _ => { calls.Add("claim"); return InstanceClaim.None; },
+            _ => { calls.Add("ui"); return 7; });
+
+        Program.Run([Program.PrintInstallKindFlag, "--x"], steps);
+
+        Assert.Equal(["crash-log", "claim", "ui"], calls);
+    }
+
+    [Theory]
+    [InlineData(RealmPortal.Core.Updates.InstallKind.Unknown, false, "Unknown self-replace=false")]
+    [InlineData(RealmPortal.Core.Updates.InstallKind.Deb, false, "Deb self-replace=false")]
+    [InlineData(RealmPortal.Core.Updates.InstallKind.AppImage, true, "AppImage self-replace=true")]
+    [InlineData(RealmPortal.Core.Updates.InstallKind.WindowsZip, false, "WindowsZip self-replace=false")]
+    public void PrintInstallKind_Format(RealmPortal.Core.Updates.InstallKind kind, bool selfReplace, string expected) =>
+        Assert.Equal(expected, Program.FormatInstallKind(kind, selfReplace));
+
+    [Fact]
+    public void DevelopmentBuild_IsUnknown() =>
+        Assert.Equal("Unknown self-replace=false", Program.FormatInstallKind(
+            RealmPortal.Core.Updates.InstallKindInfo.Current, RealmPortal.Core.Updates.InstallKindInfo.AppImageSelfReplace));
+
+    [Fact]
     public Task Run_ExitsWithoutStartingTheUi_WhenAnotherInstanceTookOver() => DedicatedThread.Run(() =>
     {
         using var dir = ShortTempDirectory.Create();

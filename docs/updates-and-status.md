@@ -42,11 +42,11 @@ offline with the maintainer and the app carries the public key, so a compromised
 workflow cannot swap both an asset and `SHA256SUMS` without that download being refused (see
 [Release signature](#release-signature-116)).
 
-**Current limit:** the published packages are built with `InstallKind=Unknown`, so they never download an update in the
-app: **Update** opens the release page and the user downloads by hand. The signature check only runs for builds with a
-download-capable install kind, which arrive with [#206](https://github.com/KarloZ7715/realm-portal/issues/206). Until
-then, check a manual download with the `minisign` steps in
-[SECURITY.md](../SECURITY.md#verifying-a-release-by-hand). The other protections still apply:
+Since [#206](https://github.com/KarloZ7715/realm-portal/issues/206) every published package is built with its install
+kind (see [Install kind](#install-kind)), so **Update** downloads the package for that kind, checks the signature on
+`SHA256SUMS` and then the package's SHA-256, fail-closed. A missing or invalid signature stops the update before the
+package is fetched, and the app offers the release page instead. A manual download can still be checked with the `minisign` steps in
+[SECURITY.md](../SECURITY.md#verifying-a-release-by-hand). The other protections also apply:
 
 - The user always confirms **Update**; nothing updates silently.
 - Releases published since GitHub "immutable releases" was enabled for the repository (v1.0.1 on) are immutable, so their
@@ -119,6 +119,25 @@ otherwise it uses `https://github.com/KarloZ7715/realm-portal/releases/tag/v{v}`
 The install kind is a build-time constant set by packaging: `InstallKind` is one of `AppImage`, `Deb`, `WindowsZip` or
 `Unknown`. Development builds are `Unknown`. No runtime heuristics on install paths or `dpkg`.
 
+Packaging (#206). The kind is compiled into Core, so each package comes from its own `dotnet publish`:
+
+| Package | Publish properties | `--print-install-kind` |
+|---|---|---|
+| `.deb` | `-p:InstallKind=Deb` | `Deb self-replace=false` |
+| AppImage | `-p:InstallKind=AppImage -p:AppImageSelfReplace=true` (immutable releases are on) | `AppImage self-replace=true` |
+| Windows zip | `-p:InstallKind=WindowsZip` | `WindowsZip self-replace=false` |
+
+The Linux job publishes twice (`publish-deb`, `publish-appimage`) from the same locked restore, and
+`packaging/linux/build-packages.sh <deb-publish-dir> <appimage-publish-dir> <version> [output-dir]` builds each package
+from its own directory. `RealmPortal.App --print-install-kind` is a hidden flag that prints the compiled kind and exits
+before the single-instance check and the UI. After packaging, the release workflow runs it, through
+`packaging/check-install-kind.sh`, on the binary inside each built package (the extracted `.deb`, the extracted
+AppImage, the unzipped Windows archive), and a wrong kind fails the build. The asset set is unchanged: three packages
+plus `SHA256SUMS` (and `SHA256SUMS.minisig` once signed).
+
+The updater only compares plain `x.y.z` versions: a build whose own version is a prerelease (for example `1.2.0-rc.1`)
+gets no update offer, and prereleases are never offered.
+
 For `AppImage`, the `APPIMAGE` environment variable (set by the AppImage runtime) must also be present, and before
 downloading the app checks it:
 
@@ -166,8 +185,9 @@ Core has a minisign verifier (`RealmPortal.Core.Updates.Signing`) and trusts exa
 - Ed25519 and BLAKE2b come from BouncyCastle (MIT), kept in one adapter (`BouncyCastleEd25519`).
 
 How the download path uses it (`UpdateDownloader.DownloadVerifiedSumsAsync`, which calls `SignedSha256Sums.Check`).
-This only runs when the build has a download-capable `InstallKind`; published packages are `Unknown` until
-[#206](https://github.com/KarloZ7715/realm-portal/issues/206) and open the release page instead (see the threat model).
+It runs for every published package, because each one has a download-capable `InstallKind` since
+[#206](https://github.com/KarloZ7715/realm-portal/issues/206); only `Unknown` (development) builds skip the download and
+open the release page.
 
 1. If the release's asset list is known and has no `SHA256SUMS.minisig`, the update stops with `SignatureMissing` before
    anything is downloaded.
@@ -206,28 +226,34 @@ See SECURITY.md.
 3. Size limit: refuse when `Content-Length` is above the pinned `size` or 300 MB, **and** count bytes while streaming; abort
    with `DownloadTooLarge` as soon as the count exceeds either.
 4. The `.part` file is created with `FileMode.CreateNew`, a random suffix (`.RealmPortal-{v}.{random}.part`) and mode
-   `0600`, in the destination directory (same filesystem). SHA256 is computed while streaming. The file is flushed to disk
-   (`fsync`) before verification and rename. Stale `.RealmPortal-*.part` files from a crash are deleted on the next update
-   attempt, only in the destination directory, only if `lstat` shows a regular file owned by the user; symlinks and
-   anything else are left alone.
+   `0600`, inside a fresh **private staging directory** (`.RealmPortal-staging-{random}`, mode `0700`, owned by the user)
+   created in the destination directory, so it is on the same filesystem and the last step is a single `rename(2)` (#206).
+   No other user can enter the staging directory, so the verified bytes cannot be swapped by path between verification
+   and the rename. SHA256 is computed while streaming. The file is flushed to disk (`fsync`) before verification, and the
+   destination directory is `fsync`ed after the rename. The last step is `renameat2` relative to directory file
+   descriptors opened with `O_DIRECTORY|O_NOFOLLOW` (no-overwrite uses `RENAME_NOREPLACE`, or `linkat`+`unlinkat` if
+   `renameat2` is missing). Any `rename(2)` errno, including `EXDEV`, falls back to the release page instead of a
+   copy that would truncate a hard-linked `.bak`. The staging directory is removed afterwards by deleting only
+   user-owned regular `.part` files through that descriptor and then `rmdir` (never `rm -rf`); leftover staging is
+   skipped entirely when the parent directory is not safe. `SHA256SUMS` and the signature are downloaded through a
+   fresh private temp directory (`Directory.CreateTempSubdirectory`, `0700`), never a shared fixed name under `/tmp`.
 5. On mismatch, timeout, cancellation or any other failure, delete the `.part` file, show an error and offer to open the
    release page.
-6. Nothing downloaded is executed automatically or before verification. The only time a downloaded file runs is when the
-   user presses **Restart now** after a verified AppImage replacement. That starts the replaced target path directly with
-   `Process.Start` (`UseShellExecute = false`, no shell, the current arguments only), then the running app exits. `.deb` and zip files are never opened or run by the
-   app.
+6. Nothing downloaded is executed automatically or before verification. After a verified AppImage replacement the dialog
+   offers **Restart now** and shows the new path; Core does not start the new file itself. `.deb` and zip files are never
+   opened or run by the app.
 
 ### What "Update" does
 
 | Kind | Action |
 |---|---|
-| `AppImage` (release gate met) | Download into the target's directory. After verification, re-check that the target still has the recorded `(device, inode)` (otherwise abort without writing). This is a best-effort guard, not an atomic compare-and-replace: a concurrent writer could still replace the target between the check and the path-based `rename(2)`, which is accepted because the target is in a directory owned by the user. Then apply the target's **original file mode masked with `0755`** to the `.part` (setuid, setgid, sticky and group/other write are dropped), keep the old file as a hard link `.RealmPortal-{old}.AppImage.bak`, then `rename(2)` the `.part` over the target in the same directory. The dialog offers **Restart now**. **`.bak` rules:** if a `.bak` with that name already exists, it is removed first only if `lstat` shows a regular file owned by the user (never a symlink is followed); otherwise the update aborts. There is **no automatic rollback**. The new version deletes the `.bak` (same `lstat` checks) at its first successful start; if it never starts, the `.bak` stays and the error dialog shows its name so the user can restore it by hand. |
-| `Deb` | **No in-app install**: it needs root, and the app never calls `pkexec` or `sudo` or writes to a root-owned path. Download the verified file to the XDG Downloads folder (mode `0600`), open that folder, and show the command `sudo apt install '<absolute path>'`, built from the real XDG Downloads path and the real saved file name, quoted, so the copied command works from any directory. The UI may show the path `~`-relative only if the copied command uses the absolute one. |
-| `WindowsZip` | Download the verified zip to the user's Downloads folder, open it in Explorer, and show "extract over your current folder" instructions. No self-replacement in 1.1.0. Optional: write a `Zone.Identifier` (Mark of the Web) on the zip. |
+| `AppImage` (release gate met) | **Fail closed first** (#206): `realpath` the folder and walk every ancestor to `/`. The folder must be owned by the user; each ancestor must be owned by the user or root. Other-write is never allowed without the sticky bit. Group-write without sticky is allowed on the folder, the AppImage and user-owned ancestors only when the group is a strict private group (owner uid equals the group id, the group name equals the user name, the member list is empty or is only that user, no other passwd entry has that primary gid when the database can be enumerated, and the inode has no `system.posix_acl_access` xattr). Any lookup failure uses the strict rule. Root-owned ancestors may have group-write only with sticky. The AppImage itself must be owned by the user and follow the same write rules. Otherwise nothing is downloaded or replaced and the result is the same as an `Unknown` build: the app opens the release page (no new error code). This is checked before the download and again right before the replace. Then download into a private staging directory next to the target (see rule 4). After verification, apply the target's **original file mode masked with `0755`** to the staged file, re-check identity, hard-link the old file as `.RealmPortal-{old}.{random}.AppImage.bak` (a collision falls back; the random suffix avoids a DoS in a sticky world-writable folder), then `renameat2` the staged file over the target and `fsync` the directory. Any rename errno, including `EXDEV`, falls back instead of copying. A process running as the same user can still race the replace; that is outside this threat model. The dialog offers **Restart now**. There is **no automatic rollback**. |
+| `Deb` | **No in-app install**: it needs root, and the app never calls `pkexec` or `sudo` or writes to a root-owned path. Download the verified file to the XDG Downloads folder (mode `0600`) when that folder and its ancestors are safe under the same rules as AppImage replacement. If they are not, the file goes to `$XDG_CACHE_HOME/RealmPortal/updates` (created `0700`) when that path is itself safe; when `XDG_CACHE_HOME` is unset that is `~/.cache/RealmPortal/updates`. Otherwise the app opens the release page. Then show the command `sudo apt install '<absolute path>'`, built from the real saved path and file name, quoted, so the copied command works from any directory. The UI may show the path `~`-relative only if the copied command uses the absolute one. |
+| `WindowsZip` | Same destination rules as `Deb` (Downloads if safe, otherwise the private cache, otherwise the release page). Then open the folder in Explorer and show "extract over your current folder" instructions. No self-replacement in 1.1.0. Optional: write a `Zone.Identifier` (Mark of the Web) on the zip. |
 | `Unknown` or any failure | Open the release page (validated as above) in the browser. |
 
-In the Downloads folder an existing file is never overwritten: if the name is taken, a ` (1)`, ` (2)`… suffix is added.
-The final name is set only after verification.
+An existing file is never overwritten: the final `renameat2` uses `RENAME_NOREPLACE`, and if the name is taken a
+` (1)`, ` (2)`… suffix is added. The final name is set only after verification.
 
 **Copyable commands** (`chmod u+x …`, `sudo apt install …`) quote the absolute path with POSIX single quotes, escaping each
 `'` in the path as `'\''`, so any path works when pasted into a shell. If the path contains a control character (including
@@ -288,7 +314,8 @@ name may also query the DNS resolver configured on the system (on a cache miss).
   `ProbeScheduler` on top of the existing `IConnectionProbe`. The UI only owns the dialogs, the toggles and the dot.
 - New error codes: `UpdateCheckFailed`, `ChecksumMismatch`, `AssetMissing`, `DownloadTooLarge`, `UntrustedRedirect`,
   `RateLimited`, and from #116 `SignatureMissing` and `SignatureInvalid` (on `UpdateException`, which also carries the
-  `SignatureStatus`). These two are update-only and have no `ServiceErrorCode` twin yet.
+  `SignatureStatus`). #206 adds `ServiceErrorCode.SignatureInvalid` (next action `None`: retrying gives the same answer,
+  so the UI offers the release page) for both signature failures; `SignatureMissing` has no separate service code.
 
 ## 4. Tests
 
@@ -301,8 +328,11 @@ name may also query the DNS resolver configured on the system (on a cache miss).
   failed one). The **Check for updates** button makes one request even when it is `false`, and is debounced.
 - No `Authorization` header and no environment tokens are ever sent.
 - AppImage replacement in a temporary directory: symlinked `$APPIMAGE`, non-regular file, wrong magic, changed inode before
-  rename, mode masked to `0755` (setuid and group/other write dropped), `.bak` created, an existing `.bak` that is a
-  symlink or not owned by the user aborts the update, stale `.part` cleanup skips symlinks and non-regular files;
+  rename, a folder or AppImage writable by other users falls back to the release page (sticky folders still replace;
+  `775` with a strict private group still replaces; `775` with an ACL or a non-private group falls back), a mode change
+  after the download falls back, another uid cannot swap the staged file in a `1777` folder (this test returns entirely
+  when `sudo -n -u nobody` is not available), mode masked to `0755`, a `.bak` with a random suffix is created;
+  Downloads that are writable by others use `$XDG_CACHE_HOME/RealmPortal/updates` or the release page;
   `AppImageSelfReplace=false` builds never replace and show no `apt` command; `.deb` and zip paths never execute anything,
   never overwrite an existing file, and the `.deb` command uses the absolute path.
 - **Later** postpones the same version for 3 days; a newer version is still offered at the next daily check.

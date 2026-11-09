@@ -55,7 +55,7 @@ public class SignedUpdateEndToEndTests
     }
 
     /// <summary>A throwaway minisign key pair that only lives for one test.</summary>
-    private sealed class TestKey
+    internal sealed class TestKey
     {
         private readonly Ed25519PrivateKeyParameters _secret = new(new SecureRandom());
         private readonly byte[] _keyId = RandomNumberGenerator.GetBytes(8);
