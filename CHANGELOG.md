@@ -10,7 +10,7 @@ All notable changes to Realm Portal are listed here. The format follows
 
 ### Security
 
-- The in-app update download checks the minisign signature on `SHA256SUMS` before using it, and refuses unsigned releases or bad signatures with a clear message and a link to the release page. Published packages still open the release page instead of downloading until [#206](https://github.com/KarloZ7715/realm-portal/issues/206) ([#116](https://github.com/KarloZ7715/realm-portal/issues/116))
+- The in-app update download checks the minisign signature on `SHA256SUMS` before using it, and refuses unsigned releases or bad signatures with a clear message and a link to the release page. ([#116](https://github.com/KarloZ7715/realm-portal/issues/116))
 
 ## [1.1.0](https://github.com/KarloZ7715/realm-portal/compare/v1.0.1...v1.1.0) - 2026-10-28
 
