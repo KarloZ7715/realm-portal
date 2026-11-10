@@ -86,7 +86,7 @@ sha256sum --ignore-missing -c SHA256SUMS
 La línea de tu archivo debe terminar en `OK`. En Windows, en PowerShell:
 
 ```powershell
-Get-FileHash .\RealmPortal-1.1.0-win-x64.zip -Algorithm SHA256
+Get-FileHash .\RealmPortal-1.2.0-win-x64.zip -Algorithm SHA256
 ```
 
 Compara el resultado con la línea de ese archivo en `SHA256SUMS`. Esta comprobación detecta una descarga dañada o incompleta. No demuestra quién publicó el archivo.
