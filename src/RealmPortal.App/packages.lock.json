@@ -4,12 +4,12 @@
     "net9.0": {
       "Avalonia": {
         "type": "Direct",
-        "requested": "[11.3.22, )",
-        "resolved": "11.3.22",
-        "contentHash": "61kKbPq/2W/S8PkjRYnDCSvH2fAvhC3eTrYFtwMUZVShP5M2xXII76kIQo8bcezxwFkHc/yoRP3xzae2tFZRsQ==",
+        "requested": "[11.3.23, )",
+        "resolved": "11.3.23",
+        "contentHash": "w0V1UbDrb3IYLjE7hEztnsM3QQBf7kXrYSqDUHbW9PRz/kgu9sfrUcRjX/q09hneH8y5K/zUoXZqaO76VKEuvw==",
         "dependencies": {
           "Avalonia.BuildServices": "11.3.2",
-          "Avalonia.Remote.Protocol": "11.3.22",
+          "Avalonia.Remote.Protocol": "11.3.23",
           "MicroCom.Runtime": "0.11.0"
         }
       },
@@ -28,11 +28,11 @@
       },
       "Avalonia.Themes.Simple": {
         "type": "Direct",
-        "requested": "[11.3.22, )",
-        "resolved": "11.3.22",
-        "contentHash": "SsAQb6TilpCPKhY6GOPNfjDEuvR8dUxmozDi5Ws49X/CZmtfbsPSVFuEtCapxucwn1jFtNJYjvakDiHjxw6Sbw==",
+        "requested": "[11.3.23, )",
+        "resolved": "11.3.23",
+        "contentHash": "tD+7ApS95Z9CofTTmqhcwBjtpaz5AGD1XG3h+KO8/KIWo0t63/D5pUUiud5uKldhjSh/imrPUiHqc1hgD8PIJw==",
         "dependencies": {
-          "Avalonia": "11.3.22"
+          "Avalonia": "11.3.23"
         }
       },
       "CommunityToolkit.Mvvm": {
@@ -70,8 +70,8 @@
       },
       "Avalonia.Remote.Protocol": {
         "type": "Transitive",
-        "resolved": "11.3.22",
-        "contentHash": "Ll5YswLkNW0WZm7RkvGS+8B9vH4/x77IsnCqlBvmXOgiQd0J5bpJQFYo1NDVyRLadp4e8Yqg1WP2xEc6IK94HQ=="
+        "resolved": "11.3.23",
+        "contentHash": "XISBABqYGt6NVBFPCPlz/+FWiNADz1+f33e1yWk5Q/yMVMXVcnluSKy9XHIkEgSHMaY/fI2oo4l3MYYYzQHr5A=="
       },
       "Avalonia.Win32": {
         "type": "Transitive",
@@ -185,11 +185,11 @@
       },
       "Avalonia.Skia": {
         "type": "CentralTransitive",
-        "requested": "[11.3.22, )",
-        "resolved": "11.3.22",
-        "contentHash": "ZbnfFCr2f1l3RD1E/Tn5tJDRFIDm9ICY/PzG4lhuShd6mDg+0y5wRCytCYOSM79KhlboU/f0O7J1Mw7s83Sy3A==",
+        "requested": "[11.3.23, )",
+        "resolved": "11.3.23",
+        "contentHash": "ixxBSB4nijGgA6zPui7kgSj+4HBh0zn3HrlhTLpiG8AaPXJ4j2XfNSKcgLYSvAlDeKs6RhSz6LfTTSzZOYXUEQ==",
         "dependencies": {
-          "Avalonia": "11.3.22",
+          "Avalonia": "11.3.23",
           "HarfBuzzSharp": "8.3.1.1",
           "HarfBuzzSharp.NativeAssets.Linux": "8.3.1.1",
           "HarfBuzzSharp.NativeAssets.WebAssembly": "8.3.1.1",

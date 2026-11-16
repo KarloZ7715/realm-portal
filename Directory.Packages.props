@@ -7,16 +7,16 @@
   <ItemGroup>
     <!-- On Avalonia upgrades, re-verify TestApp.ResetUIThreadDispatcher's internal reflection and
          update HeadlessDispatcherGuardTests only after checking the reset contract. -->
-    <PackageVersion Include="Avalonia" Version="11.3.22" />
+    <PackageVersion Include="Avalonia" Version="11.3.23" />
     <PackageVersion Include="Avalonia.Desktop" Version="11.3.22" />
-    <PackageVersion Include="Avalonia.Themes.Simple" Version="11.3.22" />
+    <PackageVersion Include="Avalonia.Themes.Simple" Version="11.3.23" />
     <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="PeNet" Version="5.1.0" />
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
     <PackageVersion Include="Avalonia.Headless" Version="11.3.22" />
     <PackageVersion Include="Avalonia.Headless.XUnit" Version="11.3.22" />
-    <PackageVersion Include="Avalonia.Skia" Version="11.3.22" />
+    <PackageVersion Include="Avalonia.Skia" Version="11.3.23" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageVersion Include="FsCheck.Xunit" Version="3.6.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
